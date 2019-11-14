@@ -1,7 +1,7 @@
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    character::complete::digit1,
+    character::complete::{digit1, space0},
     combinator::{map, opt},
     error::{ErrorKind, ParseError},
     multi::separated_list,
@@ -10,9 +10,8 @@ use nom::{
 
 use crate::error::PineError;
 
-struct _IntExpr {
-    val: i32,
-}
+#[derive(Debug, PartialEq)]
+pub struct IntExpr(pub i32);
 
 pub fn underscore_digit_str(s: &str) -> IResult<&str, String, PineError<&str>> {
     map(separated_list(tag("_"), digit1), |s| s.join(""))(s)
@@ -32,12 +31,18 @@ pub fn unsigned_int(input: &str) -> IResult<&str, i32, PineError<&str>> {
 
 pub fn signed_int(s: &str) -> IResult<&str, i32, PineError<&str>> {
     let (s, sign) = opt(alt((tag("+"), tag("-"))))(s)?;
+    let (s, _) = space0(s)?;
     let (s, num_int) = unsigned_int(s)?;
     match sign {
         Some("+") | None => Ok((s, num_int)),
         Some("-") => Ok((s, -num_int)),
         _ => panic!("internal error: entered unreachable code"),
     }
+}
+
+pub fn int_expr(input: &str) -> IResult<&str, IntExpr, PineError<&str>> {
+    let (input, num) = signed_int(input)?;
+    Ok((input, IntExpr(num)))
 }
 
 #[cfg(test)]
@@ -74,6 +79,7 @@ mod tests {
     fn signed_int_test() {
         assert_eq!(signed_int("-1221_121"), Ok(("", -1221121)));
         assert_eq!(signed_int("+1221_121"), Ok(("", 1221121)));
+        assert_eq!(signed_int("+ 1221_121"), Ok(("", 1221121)));
         assert_eq!(signed_int("1221_121"), Ok(("", 1221121)));
     }
 }

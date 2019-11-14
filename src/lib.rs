@@ -4,7 +4,9 @@ extern crate nom;
 // mod comment_expr;
 mod error;
 mod int_expr;
-mod reference_ops;
+mod name;
+mod op;
+mod op_expr;
 // mod identifier_expr;
 
 // The integer literal is like \d+_\d+

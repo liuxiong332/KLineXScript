@@ -1,10 +1,12 @@
 use nom::error::{ErrorKind, ParseError};
+use nom::IResult;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum PineErrorKind {
     Nom(ErrorKind),
     Char(char),
     Context(&'static str),
+    ReservedVarName,
     InvalidIdentifier(&'static str), // The identifier is not invalid
 }
 
@@ -14,6 +16,8 @@ pub struct PineError<I> {
     /// part of input data, and some context
     pub errors: Vec<(I, PineErrorKind)>,
 }
+
+pub type PineResult<'a, O = &'a str> = IResult<&'a str, O, PineError<&'a str>>;
 
 impl<I> PineError<I> {
     pub fn from_pine_kind(input: I, kind: PineErrorKind) -> Self {

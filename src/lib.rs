@@ -1,7 +1,11 @@
 // #[macro_use]
 extern crate nom;
 
+// mod comment_expr;
+mod error;
 mod int_expr;
+mod reference_ops;
+// mod identifier_expr;
 
 // The integer literal is like \d+_\d+
 // named!(pub decimal<usize>,
@@ -34,7 +38,5 @@ struct _FloatExpr {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
+    fn it_works() {}
 }

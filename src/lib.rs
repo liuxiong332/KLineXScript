@@ -2,11 +2,13 @@
 extern crate nom;
 
 // mod comment_expr;
+mod comment;
 mod error;
-mod int_expr;
 mod name;
+mod num;
 mod op;
-mod op_expr;
+mod utils;
+// mod op_expr;
 // mod identifier_expr;
 
 // The integer literal is like \d+_\d+
@@ -32,10 +34,6 @@ mod op_expr;
 //         }
 //     )
 // );
-
-struct _FloatExpr {
-    val: f64,
-}
 
 #[cfg(test)]
 mod tests {

@@ -66,7 +66,6 @@ fn varname(input: &str) -> PineResult<VarName> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::int_expr::IntExpr;
 
     #[test]
     fn name_test() {

@@ -1,4 +1,5 @@
 use crate::name::VarName;
+use crate::num::Numeral;
 use crate::op::{BinaryOp, UnaryOp};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -18,18 +19,18 @@ pub struct ReferenceCall<'a> {
 pub enum Exp<'a> {
     Na,
     Bool(bool),
-    Int(i32),
-    Float(f64),
-    Str(String),
-    Color(String),
-    Tuple(Vec<Box<Exp<'a>>>),
+    Num(Numeral),
+    Str(&'a str),
+    Color(&'a str),
+    RetTuple(Box<Vec<VarName<'a>>>),
+    Tuple(Box<Vec<Exp<'a>>>),
     VarName(VarName<'a>),
     FuncCall(Box<FunctionCall<'a>>),
     ReferenceCall(Box<ReferenceCall<'a>>),
     Ite(Box<IfThenElse<'a>>),
     ForRange(Box<ForRange<'a>>),
-    UnaryOp(UnaryOp, Box<Exp<'a>>),
-    BinaryOp(BinaryOp, Box<Exp<'a>>, Box<Exp<'a>>),
+    UnaryExp(UnaryOp, Box<Exp<'a>>),
+    BinaryExp(BinaryOp, Box<Exp<'a>>, Box<Exp<'a>>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -51,8 +52,7 @@ pub struct FlatExp<'a>(pub Vec<OpOrExp2<'a>>);
 pub enum Exp2<'a> {
     Na,
     Bool(bool),
-    Int(i32),
-    Float(f64),
+    Num(Numeral),
     Str(&'a str),
     Color(&'a str),
     VarName(VarName<'a>),

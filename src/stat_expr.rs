@@ -12,6 +12,7 @@ use crate::name::{varname, VarName};
 use crate::op::*;
 use crate::stat_expr_types::*;
 use crate::string::string_lit;
+use crate::trans::flatexp_from_components;
 use crate::utils::eat_sep;
 
 pub fn exp2(input: &str) -> PineResult<Exp2> {
@@ -30,11 +31,11 @@ pub fn unopexp2(input: &str) -> PineResult<(Vec<UnaryOp>, Exp2)> {
     tuple((many0(unary_op), exp2))(input)
 }
 
-// pub fn flatexp(input: &str) -> PineResult<FlatExp> {
-//     let (input, head) = unopexp2(input)?;
-//     let (input, binop_chain) = many0(tuple((binary_op, unopexp2)))(input)?;
-
-// }
+pub fn flatexp(input: &str) -> PineResult<FlatExp> {
+    let (input, head) = unopexp2(input)?;
+    let (input, binop_chain) = many0(tuple((binary_op, unopexp2)))(input)?;
+    Ok((input, flatexp_from_components(head, binop_chain)))
+}
 
 // The left return tuple of expression `[a, b] = [1, 2]` that contain variable name between square brackets
 fn rettupledef(input: &str) -> PineResult<Vec<VarName>> {

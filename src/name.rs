@@ -48,7 +48,7 @@ fn is_alphanum_or_underscore(input: char) -> bool {
     input.is_alphanumeric() || input == '_'
 }
 
-fn varname(input: &str) -> PineResult<VarName> {
+pub fn varname(input: &str) -> PineResult<VarName> {
     let (input, _) = skip_ws(input)?;
     let (input, name) = recognize(pair(
         alpha_or_underscore,

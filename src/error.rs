@@ -9,6 +9,8 @@ pub enum PineErrorKind {
     ReservedVarName,
     InvalidIdentifier(&'static str), // The identifier is not invalid
     InvalidDecimal,
+    InvalidStrLiteral(&'static str),
+    InvalidColorLiteral,
 }
 
 #[derive(Debug, PartialEq)]

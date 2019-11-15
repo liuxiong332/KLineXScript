@@ -1,12 +1,20 @@
 // #[macro_use]
 extern crate nom;
 
+#[macro_use]
+extern crate lazy_static;
+
 // mod comment_expr;
+mod color;
 mod comment;
 mod error;
 mod name;
 mod num;
 mod op;
+mod stat_expr;
+mod stat_expr_types;
+mod string;
+mod trans;
 mod utils;
 // mod op_expr;
 // mod identifier_expr;

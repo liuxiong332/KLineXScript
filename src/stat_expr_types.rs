@@ -1,11 +1,17 @@
 use crate::name::VarName;
-use crate::op::{BinaryOp, ThirdOp, UnaryOp};
+use crate::op::{BinaryOp, UnaryOp};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct FunctionCall<'a> {
     pub method: Option<VarName<'a>>,
     pub pos_args: Vec<Exp<'a>>,
     pub dict_args: Vec<(&'a str, Exp<'a>)>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ReferenceCall<'a> {
+    pub method: VarName<'a>,
+    pub arg: Exp<'a>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -18,17 +24,49 @@ pub enum Exp<'a> {
     Color(String),
     Tuple(Vec<Box<Exp<'a>>>),
     VarName(VarName<'a>),
-    FuncCall(FunctionCall<'a>),
+    FuncCall(Box<FunctionCall<'a>>),
+    ReferenceCall(Box<ReferenceCall<'a>>),
+    Ite(Box<IfThenElse<'a>>),
+    ForRange(Box<ForRange<'a>>),
     UnaryOp(UnaryOp, Box<Exp<'a>>),
     BinaryOp(BinaryOp, Box<Exp<'a>>, Box<Exp<'a>>),
-    ThirdOp(ThirdOp, Box<Exp<'a>>, Box<Exp<'a>>, Box<Exp<'a>>),
-    Ite(IfThenElse<'a>),
-    ForRange(ForRange<'a>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum OpOrExp2<'a> {
+    Op(UnOrBinOp),
+    Exp2(Exp2<'a>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum UnOrBinOp {
+    UnaryOp(UnaryOp),
+    BinaryOp(BinaryOp),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FlatExp<'a>(pub Vec<OpOrExp2<'a>>);
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Exp2<'a> {
+    Na,
+    Bool(bool),
+    Int(i32),
+    Float(f64),
+    Str(&'a str),
+    Color(&'a str),
+    VarName(VarName<'a>),
+    RetTuple(Box<Vec<VarName<'a>>>),
+    Tuple(Box<Vec<Exp<'a>>>),
+    FuncCall(Box<FunctionCall<'a>>),
+    ReferenceCall(Box<ReferenceCall<'a>>),
+    Ite(Box<IfThenElse<'a>>),
+    ForRange(Box<ForRange<'a>>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Assignment<'a> {
-    pub vars: Vec<VarName()>,
+    pub vars: Vec<VarName<'a>>,
     pub vals: Vec<Exp<'a>>,
 }
 
@@ -60,8 +98,7 @@ pub enum Statement<'a> {
     Break,
     Continue,
     Assignment(VarName<'a>, Box<Exp<'a>>),
-    FuncCall(FunctionCall<'a>),
-    Ite(IfThenElse<'a>),
-    ForRange(ForRange<'a>),
-    FuncDef(FunctionDef<'a>),
+    Ite(Box<IfThenElse<'a>>),
+    ForRange(Box<ForRange<'a>>),
+    FuncCall(Box<FunctionCall<'a>>),
 }

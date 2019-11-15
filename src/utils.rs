@@ -9,7 +9,7 @@ pub fn is_ws(c: char) -> bool {
     }
 }
 
-fn separate(input: &str) -> PineResult {
+pub fn skip_ws(input: &str) -> PineResult {
     let ws_or_comment = alt((take_while1(is_ws), comment));
     recognize(many0(ws_or_comment))(input)
 }
@@ -19,9 +19,9 @@ mod tests {
     use super::*;
     #[test]
     fn separate_test() {
-        assert_eq!(separate("   hello"), Ok(("hello", "   ")));
+        assert_eq!(skip_ws("   hello"), Ok(("hello", "   ")));
         assert_eq!(
-            separate("   \n\t  \r //ssd\nhello"),
+            skip_ws("   \n\t  \r //ssd\nhello"),
             Ok(("hello", "   \n\t  \r //ssd\n"))
         );
     }

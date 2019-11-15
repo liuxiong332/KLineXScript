@@ -1,4 +1,5 @@
 use crate::error::{PineError, PineErrorKind, PineResult};
+use crate::utils::skip_ws;
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while},
@@ -48,6 +49,7 @@ fn is_alphanum_or_underscore(input: char) -> bool {
 }
 
 fn varname(input: &str) -> PineResult<VarName> {
+    let (input, _) = skip_ws(input)?;
     let (input, name) = recognize(pair(
         alpha_or_underscore,
         take_while(is_alphanum_or_underscore),

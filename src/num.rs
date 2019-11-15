@@ -11,6 +11,7 @@ use nom::{
 use std::str::FromStr;
 
 use crate::error::{PineError, PineErrorKind, PineResult};
+use crate::utils::skip_ws;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Numeral {
@@ -60,6 +61,7 @@ pub fn float_sgn_suffix(input: &str) -> PineResult<i32> {
 
 // match float or int. e.g. 2.12 2.12e121 .111e11  1221
 pub fn num_lit(input: &str) -> PineResult<Numeral> {
+    let (input, _) = skip_ws(input)?;
     let (input, out) = recognize(tuple((
         opt(decimal),
         opt(preceded(tag("."), decimal)),

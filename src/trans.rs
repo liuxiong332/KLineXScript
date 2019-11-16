@@ -213,10 +213,6 @@ impl<'a> From<FlatExp<'a>> for Exp<'a> {
             }
         }
 
-        // First apply the highest-precedent binop (^) where applicable. This will miss cases
-        // like 10 ^ #"hi" == 100. So then apply all unops, then apply all binops, starting again
-        // from the highest-precedent one.
-
         let mut explist: Vec<OpOrExp> =
             fe.0.into_iter()
                 .map(|oe| match oe {
@@ -225,9 +221,7 @@ impl<'a> From<FlatExp<'a>> for Exp<'a> {
                 })
                 .collect();
 
-        // First pass: find all triplets of the form a $ b where a and b are Exps and $ is a binop
-        // of the highest precedence
-        merge_all_binops(&mut explist, &*BINOP_PRECEDENCE[0]);
+        // The unary operation is the highest preceded.
         merge_all_unops(&mut explist, &*UNOPS);
 
         for binops in BINOP_PRECEDENCE.iter() {
@@ -264,6 +258,8 @@ impl<'a> From<Exp2<'a>> for Exp<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::num::Numeral;
+
     #[test]
     fn flatexp_from_components_test() {
         assert_eq!(
@@ -286,6 +282,57 @@ mod tests {
                 OpOrExp2::Op(UnOrBinOp::UnaryOp(UnaryOp::Minus)),
                 OpOrExp2::Exp2(Exp2::Bool(false)),
             ])
+        );
+
+        fn int_oe2(int_lit: i32) -> OpOrExp2<'static> {
+            OpOrExp2::Exp2(Exp2::Num(Numeral::Int(int_lit)))
+        }
+
+        fn int_exp(int_lit: i32) -> Exp<'static> {
+            Exp::Num(Numeral::Int(int_lit))
+        }
+
+        fn unary_oe2(unary_op: UnaryOp) -> OpOrExp2<'static> {
+            OpOrExp2::Op(UnOrBinOp::UnaryOp(unary_op))
+        }
+
+        fn binary_oe2(binary_op: BinaryOp) -> OpOrExp2<'static> {
+            OpOrExp2::Op(UnOrBinOp::BinaryOp(binary_op))
+        }
+
+        // 1 + 2 * -2 - -4 / -1;
+        assert_eq!(
+            Exp::from(FlatExp(vec![
+                int_oe2(1),
+                binary_oe2(BinaryOp::Plus),
+                int_oe2(2),
+                binary_oe2(BinaryOp::Mul),
+                unary_oe2(UnaryOp::Minus),
+                int_oe2(2),
+                binary_oe2(BinaryOp::Minus),
+                unary_oe2(UnaryOp::Minus),
+                int_oe2(4),
+                binary_oe2(BinaryOp::Div),
+                unary_oe2(UnaryOp::Minus),
+                int_oe2(1),
+            ])),
+            Exp::BinaryExp(
+                BinaryOp::Minus,
+                Box::new(Exp::BinaryExp(
+                    BinaryOp::Plus,
+                    Box::new(int_exp(1)),
+                    Box::new(Exp::BinaryExp(
+                        BinaryOp::Mul,
+                        Box::new(int_exp(2)),
+                        Box::new(Exp::UnaryExp(UnaryOp::Minus, Box::new(int_exp(2))))
+                    ))
+                )),
+                Box::new(Exp::BinaryExp(
+                    BinaryOp::Div,
+                    Box::new(Exp::UnaryExp(UnaryOp::Minus, Box::new(int_exp(4)))),
+                    Box::new(Exp::UnaryExp(UnaryOp::Minus, Box::new(int_exp(1)))),
+                ))
+            )
         );
     }
 }

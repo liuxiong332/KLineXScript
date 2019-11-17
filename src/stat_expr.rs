@@ -4,10 +4,11 @@ use nom::{
     combinator::{map, value},
     multi::{many0, separated_list},
     sequence::{delimited, tuple},
+    Err,
 };
 
 use crate::color::color_lit;
-use crate::error::PineResult;
+use crate::error::{PineError, PineErrorKind, PineResult};
 use crate::name::{varname, VarName};
 use crate::op::*;
 use crate::stat_expr_types::*;
@@ -68,6 +69,67 @@ fn ref_call(input: &str) -> PineResult<RefCall> {
     Ok((input, RefCall { name, arg }))
 }
 
+struct FuncCallArg<'a> {
+    name: Option<VarName<'a>>,
+    arg: Exp<'a>,
+}
+
+fn func_call_arg(input: &str) -> PineResult<FuncCallArg> {
+    alt((
+        map(exp, |s| FuncCallArg { name: None, arg: s }),
+        map(tuple((varname, eat_sep(tag("=")), exp)), |s| FuncCallArg {
+            name: Some(s.0),
+            arg: s.2,
+        }),
+    ))(input)
+}
+
+// fn func_call_args(input: &str) -> PineResult {
+//     while let Ok(call_arg) = func_call_arg(input) {
+
+//     }
+// }
+
+fn func_call(input: &str) -> PineResult<FunctionCall> {
+    let (input, (method, args)) = eat_sep(tuple((
+        varname,
+        delimited(
+            eat_sep(tag("(")),
+            separated_list(eat_sep(tag(",")), func_call_arg),
+            eat_sep(tag(")")),
+        ),
+    )))(input)?;
+    let is_dict_arg = false;
+    let dict_pos = args
+        .iter()
+        .position(|s| s.name.is_some())
+        .unwrap_or(args.len());
+
+    let pos_args = args[..dict_pos].into_iter().map(|s| s.arg).collect();
+    let mut dict_args = vec![];
+    for s in args[dict_pos..].into_iter() {
+        if let Some(name) = s.name {
+            dict_args.push((name, s.arg))
+        } else {
+            return Err(Err::Error(PineError::from_pine_kind(
+                input,
+                PineErrorKind::InvalidFuncCallArgs(
+                    "Dict arguments must appear after the position arguments",
+                ),
+            )));
+        }
+    }
+
+    Ok((
+        input,
+        FunctionCall {
+            method,
+            pos_args,
+            dict_args,
+        },
+    ))
+}
+
 fn function_exp_def(input: &str) -> PineResult<FunctionDef> {
     let (input, name) = varname(input)?;
     let (input, args) = delimited(
@@ -121,6 +183,21 @@ mod tests {
         assert_eq!(
             tupledef(" [ hello , true ]"),
             Ok(("", vec![Exp::VarName(VarName("hello")), Exp::Bool(true),]))
+        );
+    }
+
+    #[test]
+    fn func_call_test() {
+        assert_eq!(
+            func_call("funa(arg1, arg2, a = 3)"),
+            Ok((
+                "",
+                FunctionCall {
+                    method: VarName("funa"),
+                    pos_args: vec![Exp::VarName(VarName("arg1")), Exp::VarName(VarName("arg2"))],
+                    dict_args: vec![(VarName("a"), Exp::Num(Numeral::Int(3)))]
+                }
+            ))
         );
     }
 }

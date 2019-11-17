@@ -6,7 +6,7 @@ use crate::op::{BinaryOp, UnaryOp};
 pub struct FunctionCall<'a> {
     pub method: VarName<'a>,
     pub pos_args: Vec<Exp<'a>>,
-    pub dict_args: Vec<(&'a str, Exp<'a>)>,
+    pub dict_args: Vec<(VarName<'a>, Exp<'a>)>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -68,6 +68,7 @@ pub enum Exp2<'a> {
     Tuple(Box<Vec<Exp<'a>>>),
     FuncCall(Box<FunctionCall<'a>>),
     RefCall(Box<RefCall<'a>>),
+    Condition(Box<Condition<'a>>),
     Ite(Box<IfThenElse<'a>>),
     ForRange(Box<ForRange<'a>>),
 }

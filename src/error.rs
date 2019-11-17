@@ -11,6 +11,7 @@ pub enum PineErrorKind {
     InvalidDecimal,
     InvalidStrLiteral(&'static str),
     InvalidColorLiteral,
+    InvalidFuncCallArgs(&'static str),
 }
 
 #[derive(Debug, PartialEq)]

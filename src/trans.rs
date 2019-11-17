@@ -248,7 +248,7 @@ impl<'a> From<Exp2<'a>> for Exp<'a> {
             Exp2::RetTuple(p) => Exp::RetTuple(p),
             Exp2::Tuple(t) => Exp::Tuple(t),
             Exp2::FuncCall(t) => Exp::FuncCall(t),
-            Exp2::ReferenceCall(f) => Exp::ReferenceCall(f),
+            Exp2::RefCall(f) => Exp::RefCall(f),
             Exp2::Ite(t) => Exp::Ite(t),
             Exp2::ForRange(t) => Exp::ForRange(t),
         }

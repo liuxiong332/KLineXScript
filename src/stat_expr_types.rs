@@ -4,15 +4,22 @@ use crate::op::{BinaryOp, UnaryOp};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct FunctionCall<'a> {
-    pub method: Option<VarName<'a>>,
+    pub method: VarName<'a>,
     pub pos_args: Vec<Exp<'a>>,
     pub dict_args: Vec<(&'a str, Exp<'a>)>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct ReferenceCall<'a> {
-    pub method: VarName<'a>,
+pub struct RefCall<'a> {
+    pub name: VarName<'a>,
     pub arg: Exp<'a>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Condition<'a> {
+    pub cond: Exp<'a>,
+    pub exp1: Exp<'a>,
+    pub exp2: Exp<'a>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -22,11 +29,12 @@ pub enum Exp<'a> {
     Num(Numeral),
     Str(&'a str),
     Color(&'a str),
+    VarName(VarName<'a>),
     RetTuple(Box<Vec<VarName<'a>>>),
     Tuple(Box<Vec<Exp<'a>>>),
-    VarName(VarName<'a>),
     FuncCall(Box<FunctionCall<'a>>),
-    ReferenceCall(Box<ReferenceCall<'a>>),
+    RefCall(Box<RefCall<'a>>),
+    Condition(Box<Condition<'a>>),
     Ite(Box<IfThenElse<'a>>),
     ForRange(Box<ForRange<'a>>),
     UnaryExp(UnaryOp, Box<Exp<'a>>),
@@ -59,7 +67,7 @@ pub enum Exp2<'a> {
     RetTuple(Box<Vec<VarName<'a>>>),
     Tuple(Box<Vec<Exp<'a>>>),
     FuncCall(Box<FunctionCall<'a>>),
-    ReferenceCall(Box<ReferenceCall<'a>>),
+    RefCall(Box<RefCall<'a>>),
     Ite(Box<IfThenElse<'a>>),
     ForRange(Box<ForRange<'a>>),
 }
@@ -94,11 +102,18 @@ pub struct ForRange<'a> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct FunctionDef<'a> {
+    pub name: VarName<'a>,
+    pub params: Vec<VarName<'a>>,
+    pub body: Block<'a>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum Statement<'a> {
     Break,
     Continue,
     Assignment(VarName<'a>, Box<Exp<'a>>),
     Ite(Box<IfThenElse<'a>>),
     ForRange(Box<ForRange<'a>>),
-    FuncCall(Box<FunctionCall<'a>>),
+    FuncCall(Box<FunctionDef<'a>>),
 }

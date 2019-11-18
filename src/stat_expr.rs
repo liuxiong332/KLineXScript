@@ -10,7 +10,7 @@ use nom::{
 use crate::color::color_lit;
 use crate::error::{PineError, PineErrorKind, PineResult};
 use crate::func_call::func_call;
-use crate::name::{varname, VarName};
+use crate::name::{varname_ws, VarName};
 use crate::op::*;
 use crate::stat_expr_types::*;
 use crate::string::string_lit;
@@ -24,7 +24,7 @@ pub fn exp2(input: &str) -> PineResult<Exp2> {
         value(Exp2::Bool(false), eat_sep(tag("false"))),
         map(string_lit, Exp2::Str),
         map(color_lit, Exp2::Color),
-        map(varname, Exp2::VarName),
+        map(varname_ws, Exp2::VarName),
         map(rettupledef, |varnames| Exp2::RetTuple(Box::new(varnames))),
         map(tupledef, |exps| Exp2::Tuple(Box::new(exps))),
         map(func_call, |exp| Exp2::FuncCall(Box::new(exp))),
@@ -49,7 +49,7 @@ pub fn exp(input: &str) -> PineResult<Exp> {
 fn rettupledef(input: &str) -> PineResult<Vec<VarName>> {
     eat_sep(delimited(
         eat_sep(tag("[")),
-        separated_list(eat_sep(tag(",")), varname),
+        separated_list(eat_sep(tag(",")), varname_ws),
         eat_sep(tag("]")),
     ))(input)
 }
@@ -65,7 +65,7 @@ fn tupledef(input: &str) -> PineResult<Vec<Exp>> {
 
 fn ref_call(input: &str) -> PineResult<RefCall> {
     let (input, (name, arg)) = tuple((
-        varname,
+        varname_ws,
         delimited(eat_sep(tag("[")), exp, eat_sep(tag("]"))),
     ))(input)?;
     Ok((input, RefCall { name, arg }))
@@ -85,10 +85,10 @@ fn condition(input: &str) -> PineResult<Condition> {
 // }
 
 fn function_exp_def(input: &str) -> PineResult<FunctionDef> {
-    let (input, name) = varname(input)?;
+    let (input, name) = varname_ws(input)?;
     let (input, args) = delimited(
         eat_sep(tag("(")),
-        separated_list(eat_sep(tag(",")), varname),
+        separated_list(eat_sep(tag(",")), varname_ws),
         eat_sep(tag(")")),
     )(input)?;
     let (input, body) = exp(input)?;

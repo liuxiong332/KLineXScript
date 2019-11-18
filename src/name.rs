@@ -49,7 +49,6 @@ fn is_alphanum_or_underscore(input: char) -> bool {
 }
 
 pub fn varname(input: &str) -> PineResult<VarName> {
-    let (input, _) = skip_ws(input)?;
     let (input, name) = recognize(pair(
         alpha_or_underscore,
         take_while(is_alphanum_or_underscore),
@@ -65,6 +64,11 @@ pub fn varname(input: &str) -> PineResult<VarName> {
     Ok((input, VarName(name)))
 }
 
+pub fn varname_ws(input: &str) -> PineResult<VarName> {
+    let (input, _) = skip_ws(input)?;
+    varname(input)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -76,7 +80,7 @@ mod tests {
         assert_eq!(alpha_or_underscore("hello"), Ok(("ello", "h")));
         assert!(alpha_or_underscore("2hello").is_err());
 
-        assert_eq!(varname("hello_world"), Ok(("", VarName("hello_world"))));
-        assert_eq!(varname("hed_12s"), Ok(("", VarName("hed_12s"))));
+        assert_eq!(varname_ws(" hello_world"), Ok(("", VarName("hello_world"))));
+        assert_eq!(varname_ws(" hed_12s"), Ok(("", VarName("hed_12s"))));
     }
 }

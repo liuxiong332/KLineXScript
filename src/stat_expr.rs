@@ -2,19 +2,20 @@ use nom::{
     branch::alt,
     bytes::complete::tag,
     combinator::{map, opt, peek, value},
-    multi::{many0, separated_list},
+    multi::{count, many0, separated_list},
     sequence::{delimited, preceded, separated_pair, tuple},
     Err,
 };
 
 use crate::color::color_lit;
 use crate::error::{PineError, PineErrorKind, PineResult};
+use crate::func_call::func_call;
 use crate::name::{varname, VarName};
 use crate::op::*;
 use crate::stat_expr_types::*;
 use crate::string::string_lit;
 use crate::trans::flatexp_from_components;
-use crate::utils::{eat_sep, multi_opt_separated_pair};
+use crate::utils::{eat_sep, eat_statement, statement_indent};
 
 pub fn exp2(input: &str) -> PineResult<Exp2> {
     alt((
@@ -26,6 +27,7 @@ pub fn exp2(input: &str) -> PineResult<Exp2> {
         map(varname, Exp2::VarName),
         map(rettupledef, |varnames| Exp2::RetTuple(Box::new(varnames))),
         map(tupledef, |exps| Exp2::Tuple(Box::new(exps))),
+        map(func_call, |exp| Exp2::FuncCall(Box::new(exp))),
     ))(input)
 }
 
@@ -62,86 +64,25 @@ fn tupledef(input: &str) -> PineResult<Vec<Exp>> {
 }
 
 fn ref_call(input: &str) -> PineResult<RefCall> {
-    let (input, (name, arg)) = eat_sep(tuple((
+    let (input, (name, arg)) = tuple((
         varname,
         delimited(eat_sep(tag("[")), exp, eat_sep(tag("]"))),
-    )))(input)?;
+    ))(input)?;
     Ok((input, RefCall { name, arg }))
 }
 
-#[derive(Debug, PartialEq)]
-struct FuncCallArg<'a> {
-    name: Option<VarName<'a>>,
-    arg: Exp<'a>,
+fn condition(input: &str) -> PineResult<Condition> {
+    let (input, (cond, _, exp1, _, exp2)) =
+        tuple((exp, eat_sep(tag("?")), exp, eat_sep(tag(":")), exp))(input)?;
+    Ok((input, Condition { cond, exp1, exp2 }))
 }
 
-fn func_call_arg(input: &str) -> PineResult<FuncCallArg> {
-    if let Ok((input, result)) = map(tuple((varname, eat_sep(tag("=")), exp)), |s| FuncCallArg {
-        name: Some(s.0),
-        arg: s.2,
-    })(input)
-    {
-        Ok((input, result))
-    } else {
-        let result = map(exp, |s| FuncCallArg { name: None, arg: s })(input)?;
-        Ok(result)
-    }
-}
-
-fn func_call_args(input: &str) -> PineResult<(Vec<Exp>, Vec<(VarName, Exp)>)> {
-    let (input, arg1) = opt(func_call_arg)(input)?;
-    if arg1.is_none() {
-        return Ok((input, (vec![], vec![])));
-    }
-    let arg1 = arg1.unwrap();
-    let mut is_dict_args = arg1.name.is_some();
-    let mut pos_args: Vec<Exp> = vec![];
-    let mut dict_args: Vec<(VarName, Exp)> = vec![];
-    if is_dict_args {
-        dict_args = vec![(arg1.name.unwrap(), arg1.arg)]
-    } else {
-        pos_args = vec![arg1.arg];
-    };
-
-    let mut cur_input = input;
-
-    while let Ok((next_input, arg)) = preceded(eat_sep(tag(",")), func_call_arg)(cur_input) {
-        match arg.name {
-            Some(name) => {
-                is_dict_args = true;
-                dict_args.push((name, arg.arg));
-            }
-            _ => {
-                if is_dict_args {
-                    return Err(Err::Error(PineError::from_pine_kind(
-                        input,
-                        PineErrorKind::InvalidFuncCallArgs(
-                            "Position argument must appear before the dict argument",
-                        ),
-                    )));
-                }
-                pos_args.push(arg.arg);
-            }
-        }
-        cur_input = next_input;
-    }
-    Ok((cur_input, (pos_args, dict_args)))
-}
-
-fn func_call(input: &str) -> PineResult<FunctionCall> {
-    let (input, (method, (pos_args, dict_args))) = eat_sep(tuple((
-        varname,
-        delimited(eat_sep(tag("(")), func_call_args, eat_sep(tag(")"))),
-    )))(input)?;
-    Ok((
-        input,
-        FunctionCall {
-            method,
-            pos_args,
-            dict_args,
-        },
-    ))
-}
+// fn if_then_else(input: &str) -> PineResult<IfThenElse> {
+//     tuple((
+//         tag("if")),
+//         exp,
+//     ))
+// }
 
 fn function_exp_def(input: &str) -> PineResult<FunctionDef> {
     let (input, name) = varname(input)?;
@@ -163,9 +104,28 @@ fn function_exp_def(input: &str) -> PineResult<FunctionDef> {
         },
     ))
 }
-// fn functiondef(input: &str) -> PineResult<FunctionCall> {
 
+// fn statement_indent(input: &str, indent_count: usize) -> PineResult<Statement> {
+//     let line_start = count(alt((tag("    "), tag("\t"))), indent_count);
+//     for line in input.lines().iter() {
+
+//     }
 // }
+
+fn statement_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<Statement> {
+    move |input: &'a str| {
+        alt((
+            value(
+                Statement::Break,
+                eat_statement(statement_indent(indent), tag("break")),
+            ),
+            value(
+                Statement::Continue,
+                eat_statement(statement_indent(indent), tag("continue")),
+            ),
+        ))(input)
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -200,27 +160,39 @@ mod tests {
     }
 
     #[test]
-    fn func_call_test() {
+    fn ref_call_test() {
         assert_eq!(
-            func_call_arg("a = true"),
+            ref_call("hello[true]"),
             Ok((
                 "",
-                FuncCallArg {
-                    name: Some(VarName("a")),
+                RefCall {
+                    name: VarName("hello"),
                     arg: Exp::Bool(true)
                 }
             ))
         );
+    }
+
+    #[test]
+    fn condition_test() {
         assert_eq!(
-            func_call("funa(arg1, arg2, a = true)"),
+            condition("a ? b : c"),
             Ok((
                 "",
-                FunctionCall {
-                    method: VarName("funa"),
-                    pos_args: vec![Exp::VarName(VarName("arg1")), Exp::VarName(VarName("arg2"))],
-                    dict_args: vec![(VarName("a"), Exp::Bool(true))]
+                Condition {
+                    cond: Exp::VarName(VarName("a")),
+                    exp1: Exp::VarName(VarName("b")),
+                    exp2: Exp::VarName(VarName("c")),
                 }
             ))
+        );
+    }
+
+    #[test]
+    fn statement_test() {
+        assert_eq!(
+            statement_with_indent(1)("    break \n"),
+            Ok(("", Statement::Break))
         );
     }
 }

@@ -8,6 +8,7 @@ extern crate lazy_static;
 mod color;
 mod comment;
 mod error;
+mod func_call;
 mod name;
 mod num;
 mod op;

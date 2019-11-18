@@ -4,8 +4,8 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, take_while1},
     combinator::{peek, recognize},
-    multi::many0,
-    sequence::preceded,
+    multi::{count, many0},
+    sequence::{delimited, preceded, tuple},
     IResult,
 };
 
@@ -26,6 +26,25 @@ where
     F: Fn(&'a str) -> PineResult<O>,
 {
     move |input: &str| preceded(skip_ws, &fun)(input)
+}
+
+pub fn statement_indent<'a>(indent_count: usize) -> impl Fn(&'a str) -> PineResult {
+    move |input: &'a str| recognize(count(alt((tag("    "), tag("\t"))), indent_count))(input)
+}
+
+pub fn statement_end<'a>(input: &'a str) -> PineResult {
+    recognize(tuple((
+        many0(alt((tag(" "), tag("\t"), comment))),
+        alt((tag("\n"), tag("\r\n"))),
+    )))(input)
+}
+
+pub fn eat_statement<'a, O1, F1, O, F>(start: F1, fun: F) -> impl Fn(&'a str) -> PineResult<O>
+where
+    F1: Fn(&'a str) -> PineResult<O1>,
+    F: Fn(&'a str) -> PineResult<O>,
+{
+    move |input: &str| delimited(&start, &fun, statement_end)(input)
 }
 
 pub trait Len {
@@ -82,7 +101,7 @@ mod tests {
 
         assert_eq!(eat_sep(tag("hello"))("  hello"), Ok(("", "hello")));
     }
-
+    #[test]
     fn multi_opt_separated_pair_test() {
         let parser = multi_opt_separated_pair(
             separated_list(tag(","), alpha1),
@@ -92,6 +111,21 @@ mod tests {
         assert_eq!(
             parser("wo,dd|a.b.c"),
             Ok(("", (vec!["wo", "dd"], vec!["a", "b", "c"])))
+        );
+    }
+
+    #[test]
+    fn eat_statement_test() {
+        assert_eq!(statement_indent(1)("    hello"), Ok(("hello", "    ")));
+
+        assert_eq!(
+            eat_statement(tag("hello "), tag("world"))("hello world  \nhd"),
+            Ok(("hd", "world"))
+        );
+
+        assert_eq!(
+            eat_statement(statement_indent(1), tag("world"))("    world  \nhd"),
+            Ok(("hd", "world"))
         );
     }
 }

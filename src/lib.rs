@@ -1,4 +1,4 @@
-// #[macro_use]
+#[macro_use]
 extern crate nom;
 
 #[macro_use]
@@ -16,32 +16,29 @@ mod stat_expr_types;
 mod string;
 mod trans;
 mod utils;
-// mod op_expr;
-// mod identifier_expr;
 
-// The integer literal is like \d+_\d+
-// named!(pub decimal<usize>,
-//     map_res!(
-//         map_res!(
-//             digit1,
-//             str::from_utf8),
-//         |s| usize::from_str_radix(s, 10)
-//     )
-//  );
+use error::{PineError, PineErrorKind};
+use stat_expr::exp;
+use stat_expr_types::Exp;
 
-// named!(
-//     int_literal<i32>,
-//     map!(
-//         do_parse!(sign: opt!(alt!(tag!("+") | tag!("-"))) >> expt: decimal >> (sign, expt)),
-//         |(sign, expt): (Option<&[u8]>, usize)| {
-//             match sign {
-//                 Some(b"+") | None => expt as i32,
-//                 Some(b"-") => -(expt as i32),
-//                 _ => unreachable!(),
-//             }
-//         }
-//     )
-// );
+pub fn parse_all(input: &str) -> Result<Exp, PineError<&str>> {
+    match exp(input) {
+        Ok((input, parsed)) => {
+            if input.len() != 0 {
+                Err(PineError::from_pine_kind(
+                    input,
+                    PineErrorKind::Context("Parse error"),
+                ))
+            } else {
+                Ok(parsed)
+            }
+        }
+        _ => Err(PineError::from_pine_kind(
+            input,
+            PineErrorKind::Context("Parse error"),
+        )),
+    }
+}
 
 #[cfg(test)]
 mod tests {

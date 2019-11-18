@@ -74,9 +74,38 @@ pub enum Exp2<'a> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub enum DataType {
+    Float,
+    Int,
+    Bool,
+    Color,
+    String,
+    Line,
+    Label,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct Assignment<'a> {
-    pub vars: Vec<VarName<'a>>,
-    pub vals: Vec<Exp<'a>>,
+    pub name: VarName<'a>,
+    pub val: Exp<'a>,
+    pub var_type: Option<DataType>,
+    pub var: bool,
+}
+
+impl<'a> Assignment<'a> {
+    pub fn new(
+        name: VarName<'a>,
+        val: Exp<'a>,
+        var: bool,
+        var_type: Option<DataType>,
+    ) -> Assignment<'a> {
+        Assignment {
+            name,
+            val,
+            var,
+            var_type,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -85,12 +114,28 @@ pub struct Block<'a> {
     pub ret_stmt: Option<Exp<'a>>,
 }
 
+impl<'a> Block<'a> {
+    pub fn new(stmts: Vec<Statement<'a>>, ret_stmt: Option<Exp<'a>>) -> Block<'a> {
+        Block { stmts, ret_stmt }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct IfThenElse<'a> {
     pub cond: Exp<'a>,
     pub then_blk: Block<'a>,
-    pub elseifs: Vec<(Exp<'a>, Block<'a>)>,
+    // pub elseifs: Vec<(Exp<'a>, Block<'a>)>,
     pub else_blk: Option<Block<'a>>,
+}
+
+impl<'a> IfThenElse<'a> {
+    pub fn new(cond: Exp<'a>, then_blk: Block<'a>, else_blk: Option<Block<'a>>) -> Self {
+        IfThenElse {
+            cond,
+            then_blk,
+            else_blk,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -113,7 +158,7 @@ pub struct FunctionDef<'a> {
 pub enum Statement<'a> {
     Break,
     Continue,
-    Assignment(VarName<'a>, Box<Exp<'a>>),
+    Assignment(Assignment<'a>),
     Ite(Box<IfThenElse<'a>>),
     ForRange(Box<ForRange<'a>>),
     FuncCall(Box<FunctionDef<'a>>),

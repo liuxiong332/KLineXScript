@@ -158,7 +158,7 @@ pub struct FunctionDef<'a> {
 pub enum Statement<'a> {
     Break,
     Continue,
-    Assignment(Assignment<'a>),
+    Assignment(Box<Assignment<'a>>),
     Ite(Box<IfThenElse<'a>>),
     ForRange(Box<ForRange<'a>>),
     FuncCall(Box<FunctionDef<'a>>),

@@ -98,6 +98,10 @@ fn if_then_else<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<IfThenElse>
     }
 }
 
+fn if_then_else_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<IfThenElse> {
+    move |input: &'a str| preceded(statement_indent(indent), if_then_else(indent))(input)
+}
+
 fn function_exp_def(input: &str) -> PineResult<FunctionDef> {
     let (input, name) = varname_ws(input)?;
     let (input, args) = delimited(
@@ -202,10 +206,12 @@ fn statement_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<St
                 Statement::Continue,
                 eat_statement(&gen_indent, tag("continue")),
             ),
-            map(
-                eat_statement(&gen_indent, var_assign),
-                Statement::Assignment,
-            ),
+            map(eat_statement(&gen_indent, var_assign), |s| {
+                Statement::Assignment(Box::new(s))
+            }),
+            map(if_then_else_with_indent(indent), |s| {
+                Statement::Ite(Box::new(s))
+            }),
         ))(input)
     }
 }
@@ -282,12 +288,12 @@ mod tests {
             statement_with_indent(0)("a = b \n"),
             Ok((
                 "",
-                Statement::Assignment(Assignment::new(
+                Statement::Assignment(Box::new(Assignment::new(
                     VarName("a"),
                     Exp::VarName(VarName("b")),
                     false,
                     None
-                ))
+                )))
             ))
         );
     }
@@ -301,6 +307,21 @@ mod tests {
                 Block::new(
                     vec![Statement::Break, Statement::Continue],
                     Some(Exp::Bool(true))
+                )
+            ))
+        );
+    }
+
+    #[test]
+    fn if_then_else_test() {
+        assert_eq!(
+            if_then_else(0)("if true \n    break\n    true  \n"),
+            Ok((
+                "",
+                IfThenElse::new(
+                    Exp::Bool(true),
+                    Block::new(vec![Statement::Break], Some(Exp::Bool(true))),
+                    None
                 )
             ))
         );

@@ -11,6 +11,7 @@ use crate::color::color_lit;
 use crate::error::{PineError, PineErrorKind, PineResult};
 use crate::func_call::func_call;
 use crate::name::{varname, varname_ws, VarName};
+use crate::num::num_lit_ws;
 use crate::op::*;
 use crate::stat_expr_types::*;
 use crate::string::string_lit;
@@ -101,6 +102,27 @@ fn if_then_else<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<IfThenElse>
 fn if_then_else_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<IfThenElse> {
     move |input: &'a str| preceded(statement_indent(indent), if_then_else(indent))(input)
 }
+
+// fn if_then_else<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<IfThenElse> {
+//     move |input: &'a str| {
+//         let (input, (_, cond, _, then_block, else_block)) = tuple((
+//             tag("for"),
+//             varname,
+//             eat_sep(tag("=")),
+//             num_lit_ws(),
+//             eat_sep(tag("to")),
+//             num_lit_ws(),
+//             opt(tuple((eat_sep(tag("by")), num_lit_ws()))),
+//             statement_end,
+//             block_with_indent(indent + 1),
+//         ))(input)?;
+//         if let Some((_, _, else_block)) = else_block {
+//             Ok((input, IfThenElse::new(cond, then_block, Some(else_block))))
+//         } else {
+//             Ok((input, IfThenElse::new(cond, then_block, None)))
+//         }
+//     }
+// }
 
 fn function_exp_def(input: &str) -> PineResult<FunctionDef> {
     let (input, name) = varname_ws(input)?;

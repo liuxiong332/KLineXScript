@@ -59,9 +59,7 @@ pub fn float_sgn_suffix(input: &str) -> PineResult<i32> {
     }
 }
 
-// match float or int. e.g. 2.12 2.12e121 .111e11  1221
 pub fn num_lit(input: &str) -> PineResult<Numeral> {
-    let (input, _) = skip_ws(input)?;
     let (input, out) = recognize(tuple((
         opt(decimal),
         opt(preceded(tag("."), decimal)),
@@ -76,6 +74,12 @@ pub fn num_lit(input: &str) -> PineResult<Numeral> {
     }
 }
 
+// match float or int. e.g. 2.12 2.12e121 .111e11  1221
+pub fn num_lit_ws(input: &str) -> PineResult<Numeral> {
+    let (input, _) = skip_ws(input)?;
+    num_lit(input)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -87,9 +91,9 @@ mod tests {
         assert_eq!(signed_int("+ 1221_121"), Ok(("", 1221121)));
         assert_eq!(signed_int("1221_121"), Ok(("", 1221121)));
 
-        assert_eq!(num_lit("121.1"), Ok(("", Numeral::Float(121.1))));
-        assert_eq!(num_lit("121"), Ok(("", Numeral::Int(121))));
-        assert_eq!(num_lit("121e1"), Ok(("", Numeral::Float(121e1))));
-        assert_eq!(num_lit("121.1e1"), Ok(("", Numeral::Float(121.1e1))));
+        assert_eq!(num_lit_ws("121.1"), Ok(("", Numeral::Float(121.1))));
+        assert_eq!(num_lit_ws("121"), Ok(("", Numeral::Int(121))));
+        assert_eq!(num_lit_ws("121e1"), Ok(("", Numeral::Float(121e1))));
+        assert_eq!(num_lit_ws("121.1e1"), Ok(("", Numeral::Float(121.1e1))));
     }
 }

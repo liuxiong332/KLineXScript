@@ -33,8 +33,8 @@ pub fn statement_indent<'a>(indent_count: usize) -> impl Fn(&'a str) -> PineResu
 
 pub fn statement_end<'a>(input: &'a str) -> PineResult {
     recognize(tuple((
-        many0(alt((tag(" "), tag("\t"), comment))),
-        alt((tag("\n"), tag("\r\n"))),
+        many0(alt((tag(" "), tag("\t")))),
+        alt((tag("\n"), tag("\r\n"), comment)),
     )))(input)
 }
 
@@ -75,6 +75,8 @@ mod tests {
     fn eat_statement_test() {
         assert_eq!(statement_indent(1)("    hello"), Ok(("hello", "    ")));
 
+        assert_eq!(statement_end("  // hello \n"), Ok(("", "  // hello \n")));
+        assert_eq!(statement_end("     \n"), Ok(("", "     \n")));
         assert_eq!(
             eat_statement(tag("hello "), tag("world"))("hello world  \nhd"),
             Ok(("hd", "world"))

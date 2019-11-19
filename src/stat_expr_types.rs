@@ -35,6 +35,7 @@ pub enum Exp<'a> {
     FuncCall(Box<FunctionCall<'a>>),
     RefCall(Box<RefCall<'a>>),
     Condition(Box<Condition<'a>>),
+    PrefixExp(Box<PrefixExp<'a>>),
     Ite(Box<IfThenElse<'a>>),
     ForRange(Box<ForRange<'a>>),
     UnaryExp(UnaryOp, Box<Exp<'a>>),
@@ -69,6 +70,7 @@ pub enum Exp2<'a> {
     FuncCall(Box<FunctionCall<'a>>),
     RefCall(Box<RefCall<'a>>),
     Condition(Box<Condition<'a>>),
+    PrefixExp(Box<PrefixExp<'a>>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -104,6 +106,11 @@ impl<'a> Assignment<'a> {
             var_type,
         }
     }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PrefixExp<'a> {
+    pub var_chain: Vec<VarName<'a>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -174,6 +181,7 @@ pub struct FunctionDef<'a> {
 pub enum Statement<'a> {
     Break,
     Continue,
+    Comment,
     Assignment(Box<Assignment<'a>>),
     Ite(Box<IfThenElse<'a>>),
     ForRange(Box<ForRange<'a>>),

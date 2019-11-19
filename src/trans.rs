@@ -249,6 +249,7 @@ impl<'a> From<Exp2<'a>> for Exp<'a> {
             Exp2::FuncCall(t) => Exp::FuncCall(t),
             Exp2::Condition(t) => Exp::Condition(t),
             Exp2::RefCall(f) => Exp::RefCall(f),
+            Exp2::PrefixExp(f) => Exp::PrefixExp(f),
         }
     }
 }

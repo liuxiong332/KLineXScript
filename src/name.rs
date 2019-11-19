@@ -81,5 +81,11 @@ mod tests {
 
         assert_eq!(varname_ws(" hello_world"), Ok(("", VarName("hello_world"))));
         assert_eq!(varname_ws(" hed_12s"), Ok(("", VarName("hed_12s"))));
+
+        assert_eq!(varname("myVar"), Ok(("", VarName("myVar"))));
+        assert_eq!(varname("_myVar"), Ok(("", VarName("_myVar"))));
+        assert_eq!(varname("my123Var"), Ok(("", VarName("my123Var"))));
+        assert_eq!(varname("MAX_LEN"), Ok(("", VarName("MAX_LEN"))));
+        assert_eq!(varname("max_len"), Ok(("", VarName("max_len"))));
     }
 }

@@ -7,6 +7,7 @@ use nom::{
 };
 
 use crate::color::color_lit;
+use crate::comment::comment;
 use crate::error::PineResult;
 use crate::func_call::{func_call, func_call_ws};
 use crate::name::{varname, varname_ws, VarName};
@@ -25,12 +26,13 @@ pub fn exp2(input: &str) -> PineResult<Exp2> {
         map(num_lit_ws, Exp2::Num),
         map(string_lit, Exp2::Str),
         map(color_lit, Exp2::Color),
-        map(varname_ws, Exp2::VarName),
-        map(rettupledef, |varnames| Exp2::RetTuple(Box::new(varnames))),
-        map(tupledef, |exps| Exp2::Tuple(Box::new(exps))),
-        map(func_call_ws, |exp| Exp2::FuncCall(Box::new(exp))),
-        map(ref_call, |exp| Exp2::RefCall(Box::new(exp))),
-        map(condition, |exp| Exp2::Condition(Box::new(exp))),
+        map(prefix_exp, |exp| Exp2::PrefixExp(Box::new(exp))), // match a.b.c
+        map(rettupledef, |varnames| Exp2::RetTuple(Box::new(varnames))), // match [a, b + c]
+        map(tupledef, |exps| Exp2::Tuple(Box::new(exps))),     // match [a, b]
+        map(func_call_ws, |exp| Exp2::FuncCall(Box::new(exp))), // match a(b)
+        map(ref_call, |exp| Exp2::RefCall(Box::new(exp))),     // match a[b]
+        map(condition, |exp| Exp2::Condition(Box::new(exp))),  // match a ? b : c
+        map(varname_ws, Exp2::VarName),                        // match a
     ))(input)
 }
 
@@ -46,16 +48,6 @@ pub fn flatexp(input: &str) -> PineResult<FlatExp> {
 
 pub fn exp(input: &str) -> PineResult<Exp> {
     map(flatexp, Exp::from)(input)
-}
-
-pub fn exp_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<Exp> {
-    move |input: &'a str| {
-        alt((
-            map(flatexp, Exp::from),
-            map(eat_sep(if_then_else(indent)), |s| Exp::Ite(Box::new(s))),
-            map(eat_sep(for_range(indent)), |s| Exp::ForRange(Box::new(s))),
-        ))(input)
-    }
 }
 
 // The left return tuple of expression `[a, b] = [1, 2]` that contain variable name between square brackets
@@ -84,10 +76,27 @@ fn ref_call(input: &str) -> PineResult<RefCall> {
     Ok((input, RefCall { name, arg }))
 }
 
+fn cond_exp(input: &str) -> PineResult<Exp> {}
+
 fn condition(input: &str) -> PineResult<Condition> {
     let (input, (cond, _, exp1, _, exp2)) =
         tuple((exp, eat_sep(tag("?")), exp, eat_sep(tag(":")), exp))(input)?;
     Ok((input, Condition { cond, exp1, exp2 }))
+}
+
+fn prefix_exp(input: &str) -> PineResult<PrefixExp> {
+    let (input, (prefix, _, names)) = eat_sep(tuple((
+        varname,
+        tag("."),
+        separated_list(tag("."), varname),
+    )))(input)?;
+
+    Ok((
+        input,
+        PrefixExp {
+            var_chain: [vec![prefix], names].concat(),
+        },
+    ))
 }
 
 fn if_then_else<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<IfThenElse> {
@@ -184,6 +193,16 @@ fn datatype(input: &str) -> PineResult<DataType> {
     Ok((input, data_type))
 }
 
+pub fn exp_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<Exp> {
+    move |input: &'a str| {
+        alt((
+            map(terminated(flatexp, statement_end), Exp::from),
+            map(eat_sep(if_then_else(indent)), |s| Exp::Ite(Box::new(s))),
+            map(eat_sep(for_range(indent)), |s| Exp::ForRange(Box::new(s))),
+        ))(input)
+    }
+}
+
 fn var_assign_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<Assignment> {
     move |input: &'a str| {
         let exp_parser = || exp_with_indent(indent);
@@ -219,15 +238,21 @@ fn block_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<Block>
 
         let mut stmts: Vec<Statement<'a>> = vec![];
         let mut cur_input = input;
-        while let Ok((next_input, stas)) = statement_with_indent(indent)(cur_input) {
-            stmts.push(stas);
-            cur_input = next_input;
+        while cur_input.len() > 0 {
+            if let Ok((next_input, stas)) = statement_with_indent(indent)(cur_input) {
+                stmts.push(stas);
+                cur_input = next_input;
+            } else {
+                break;
+            }
         }
-        if let Ok((next_input, ret_stmt)) = eat_statement(gen_indent, exp)(cur_input) {
-            Ok((next_input, Block::new(stmts, Some(ret_stmt))))
-        } else {
-            Ok((cur_input, Block::new(stmts, None)))
+        if cur_input.len() > 0 {
+            if let Ok((next_input, ret_stmt)) = eat_statement(gen_indent, exp)(cur_input) {
+                return Ok((next_input, Block::new(stmts, Some(ret_stmt))));
+            }
         }
+        Ok((cur_input, Block::new(stmts, None)))
+
         // let (input, ()) = tuple((, opt(eat_statement(gen_indent, exp))))(input)?;
     }
 }
@@ -247,22 +272,29 @@ fn statement_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<St
             map(eat_statement(&gen_indent, func_call), |s| {
                 Statement::FuncCall(Box::new(s))
             }),
-            map(
-                eat_statement(&gen_indent, var_assign_with_indent(indent)),
-                |s| Statement::Assignment(Box::new(s)),
-            ),
+            map(preceded(&gen_indent, var_assign_with_indent(indent)), |s| {
+                Statement::Assignment(Box::new(s))
+            }),
             map(if_then_else_with_indent(indent), |s| {
                 Statement::Ite(Box::new(s))
             }),
             map(for_range_with_indent(indent), |s| {
                 Statement::ForRange(Box::new(s))
             }),
+            value(
+                Statement::Comment,
+                preceded(statement_indent(indent), comment),
+            ),
         ))(input)
     }
 }
 
 pub fn statement(input: &str) -> PineResult<Statement> {
     statement_with_indent(0)(input)
+}
+
+pub fn block(input: &str) -> PineResult<Block> {
+    block_with_indent(0)(input)
 }
 
 #[cfg(test)]
@@ -385,6 +417,45 @@ mod tests {
                 }))
             ))
         );
+
+        assert_eq!(
+            statement_with_indent(1)("    //helo world \na = close"),
+            Ok(("a = close", Statement::Comment))
+        );
+    }
+
+    #[test]
+    fn assignment_test() {
+        assert_eq!(
+            statement_with_indent(0)("a = close // This is also a comment\n"),
+            Ok((
+                "",
+                Statement::Assignment(Box::new(Assignment::new(
+                    VarName("a"),
+                    Exp::VarName(VarName("close")),
+                    false,
+                    None
+                )))
+            ))
+        )
+    }
+
+    #[test]
+    fn prefix_exp_test() {
+        assert_eq!(
+            statement_with_indent(0)("m = a.b.c \n"),
+            Ok((
+                "",
+                Statement::Assignment(Box::new(Assignment::new(
+                    VarName("m"),
+                    Exp::PrefixExp(Box::new(PrefixExp {
+                        var_chain: vec![VarName("a"), VarName("b"), VarName("c")]
+                    })),
+                    false,
+                    None
+                )))
+            ))
+        )
     }
 
     #[test]

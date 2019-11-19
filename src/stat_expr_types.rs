@@ -141,10 +141,28 @@ impl<'a> IfThenElse<'a> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ForRange<'a> {
     pub var: VarName<'a>,
-    pub start: Exp<'a>,
-    pub end: Exp<'a>,
-    pub step: Option<Exp<'a>>,
+    pub start: Numeral,
+    pub end: Numeral,
+    pub step: Option<Numeral>,
     pub do_blk: Block<'a>,
+}
+
+impl<'a> ForRange<'a> {
+    pub fn new(
+        var: VarName<'a>,
+        start: Numeral,
+        end: Numeral,
+        step: Option<Numeral>,
+        do_blk: Block<'a>,
+    ) -> Self {
+        ForRange {
+            var,
+            start,
+            end,
+            step,
+            do_blk,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

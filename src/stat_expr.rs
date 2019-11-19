@@ -103,26 +103,26 @@ fn if_then_else_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult
     move |input: &'a str| preceded(statement_indent(indent), if_then_else(indent))(input)
 }
 
-// fn if_then_else<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<IfThenElse> {
-//     move |input: &'a str| {
-//         let (input, (_, cond, _, then_block, else_block)) = tuple((
-//             tag("for"),
-//             varname,
-//             eat_sep(tag("=")),
-//             num_lit_ws(),
-//             eat_sep(tag("to")),
-//             num_lit_ws(),
-//             opt(tuple((eat_sep(tag("by")), num_lit_ws()))),
-//             statement_end,
-//             block_with_indent(indent + 1),
-//         ))(input)?;
-//         if let Some((_, _, else_block)) = else_block {
-//             Ok((input, IfThenElse::new(cond, then_block, Some(else_block))))
-//         } else {
-//             Ok((input, IfThenElse::new(cond, then_block, None)))
-//         }
-//     }
-// }
+fn for_range<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<ForRange> {
+    move |input: &'a str| {
+        let (input, (_, var, _, start, _, end, by, _, do_blk)) = tuple((
+            tag("for"),
+            varname_ws,
+            eat_sep(tag("=")),
+            num_lit_ws,
+            eat_sep(tag("to")),
+            num_lit_ws,
+            opt(tuple((eat_sep(tag("by")), num_lit_ws))),
+            statement_end,
+            block_with_indent(indent + 1),
+        ))(input)?;
+        if let Some((_, step)) = by {
+            Ok((input, ForRange::new(var, start, end, Some(step), do_blk)))
+        } else {
+            Ok((input, ForRange::new(var, start, end, None, do_blk)))
+        }
+    }
+}
 
 fn function_exp_def(input: &str) -> PineResult<FunctionDef> {
     let (input, name) = varname_ws(input)?;
@@ -344,6 +344,23 @@ mod tests {
                     Exp::Bool(true),
                     Block::new(vec![Statement::Break], Some(Exp::Bool(true))),
                     None
+                )
+            ))
+        );
+    }
+
+    #[test]
+    fn for_range_test() {
+        assert_eq!(
+            for_range(0)("for a = 1 to 2 \n    break\n    true  \n"),
+            Ok((
+                "",
+                ForRange::new(
+                    VarName("a"),
+                    Numeral::Int(1),
+                    Numeral::Int(2),
+                    None,
+                    Block::new(vec![Statement::Break], Some(Exp::Bool(true))),
                 )
             ))
         );

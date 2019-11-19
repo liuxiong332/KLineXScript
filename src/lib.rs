@@ -1,4 +1,4 @@
-#[macro_use]
+// #[macro_use]
 extern crate nom;
 
 #[macro_use]
@@ -19,11 +19,11 @@ mod trans;
 mod utils;
 
 use error::{PineError, PineErrorKind};
-use stat_expr::exp;
-use stat_expr_types::Exp;
+use stat_expr::statement;
+use stat_expr_types::Statement;
 
-pub fn parse_all(input: &str) -> Result<Exp, PineError<&str>> {
-    match exp(input) {
+pub fn parse_all(input: &str) -> Result<Statement, PineError<&str>> {
+    match statement(input) {
         Ok((input, parsed)) => {
             if input.len() != 0 {
                 Err(PineError::from_pine_kind(
@@ -39,10 +39,4 @@ pub fn parse_all(input: &str) -> Result<Exp, PineError<&str>> {
             PineErrorKind::Context("Parse error"),
         )),
     }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {}
 }

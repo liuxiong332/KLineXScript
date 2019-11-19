@@ -1,9 +1,7 @@
 use nom::{
-    branch::alt,
     bytes::complete::tag,
-    combinator::{map, opt, peek, value},
-    multi::{many0, separated_list},
-    sequence::{delimited, preceded, separated_pair, tuple},
+    combinator::{map, opt},
+    sequence::{delimited, preceded, tuple},
     Err,
 };
 
@@ -96,7 +94,6 @@ pub fn func_call_ws(input: &str) -> PineResult<FunctionCall> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::num::Numeral;
     #[test]
     fn func_call_test() {
         assert_eq!(

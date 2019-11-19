@@ -1,9 +1,5 @@
-use crate::error::{PineError, PineResult};
-use nom::{
-    bytes::complete::{tag, take_until},
-    error::{ErrorKind, ParseError, VerboseError},
-    Err, IResult,
-};
+use crate::error::PineResult;
+use nom::bytes::complete::{tag, take_until};
 
 // The comment is like this //... until the end of this line.
 pub fn comment(input: &str) -> PineResult {
@@ -15,6 +11,12 @@ pub fn comment(input: &str) -> PineResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::PineError;
+    use nom::{
+        error::{ErrorKind, ParseError},
+        Err,
+    };
+
     #[test]
     fn comment_test() {
         assert_eq!(

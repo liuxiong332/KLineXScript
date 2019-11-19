@@ -1,14 +1,13 @@
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    combinator::{map, opt, peek, value},
-    multi::{count, many0, separated_list},
-    sequence::{delimited, preceded, separated_pair, terminated, tuple},
-    Err,
+    combinator::{map, opt, value},
+    multi::{many0, separated_list},
+    sequence::{delimited, preceded, terminated, tuple},
 };
 
 use crate::color::color_lit;
-use crate::error::{PineError, PineErrorKind, PineResult};
+use crate::error::PineResult;
 use crate::func_call::{func_call, func_call_ws};
 use crate::name::{varname, varname_ws, VarName};
 use crate::num::num_lit_ws;
@@ -23,12 +22,15 @@ pub fn exp2(input: &str) -> PineResult<Exp2> {
         value(Exp2::Na, eat_sep(tag("na"))),
         value(Exp2::Bool(true), eat_sep(tag("true"))),
         value(Exp2::Bool(false), eat_sep(tag("false"))),
+        map(num_lit_ws, Exp2::Num),
         map(string_lit, Exp2::Str),
         map(color_lit, Exp2::Color),
         map(varname_ws, Exp2::VarName),
         map(rettupledef, |varnames| Exp2::RetTuple(Box::new(varnames))),
         map(tupledef, |exps| Exp2::Tuple(Box::new(exps))),
         map(func_call_ws, |exp| Exp2::FuncCall(Box::new(exp))),
+        map(ref_call, |exp| Exp2::RefCall(Box::new(exp))),
+        map(condition, |exp| Exp2::Condition(Box::new(exp))),
     ))(input)
 }
 
@@ -159,13 +161,6 @@ fn function_def_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult
     }
 }
 
-// fn statement_indent(input: &str, indent_count: usize) -> PineResult<Statement> {
-//     let line_start = count(alt((tag("    "), tag("\t"))), indent_count);
-//     for line in input.lines().iter() {
-
-//     }
-// }
-
 fn datatype(input: &str) -> PineResult<DataType> {
     let (input, label) = alt((
         tag("float"),
@@ -264,6 +259,10 @@ fn statement_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<St
             }),
         ))(input)
     }
+}
+
+pub fn statement(input: &str) -> PineResult<Statement> {
+    statement_with_indent(0)(input)
 }
 
 #[cfg(test)]

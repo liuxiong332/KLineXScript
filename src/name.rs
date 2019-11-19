@@ -3,7 +3,6 @@ use crate::utils::skip_ws;
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while},
-    character::complete::{alpha0, alphanumeric0},
     combinator::recognize,
     sequence::pair,
     Err,
@@ -35,7 +34,7 @@ fn alpha_or_underscore(input: &str) -> PineResult {
         let b = t.is_alphabetic() || t == '_';
         (t, b)
     }) {
-        Some((t, true)) => Ok((&input[1..], &input[0..1])),
+        Some((_, true)) => Ok((&input[1..], &input[0..1])),
         _ => Err(Err::Error(PineError::from_pine_kind(
             &input[1..],
             PineErrorKind::InvalidIdentifier("The identifier must start with alphabetic or _"),

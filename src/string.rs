@@ -54,15 +54,17 @@ pub fn unescape(buf: &str) -> Result<String, &'static str> {
     }
 }
 
-fn gen_quote_str(quote_char: &'static str) -> impl Fn(&str) -> PineResult {
-    move |input: &str| -> PineResult {
+fn gen_quote_str(quote_char: &'static str) -> impl Fn(&str) -> PineResult<String> {
+    move |input: &str| {
+        let ignore_chars = ["\n\\", quote_char].join("");
         let (next_input, out) = delimited(
             tag(quote_char),
-            escaped(is_not("\n\"\\"), '\\', one_of(ESCAPE_CODE)),
+            escaped(is_not(&ignore_chars[..]), '\\', one_of(ESCAPE_CODE)),
             tag(quote_char),
         )(input)?;
+        println!("out {}", out);
         match unescape(out) {
-            Ok(res_str) => Ok((next_input, out)),
+            Ok(res_str) => Ok((next_input, res_str)),
             Err(err_str) => Err(Err::Error(PineError::from_pine_kind(
                 input,
                 PineErrorKind::InvalidStrLiteral(err_str),
@@ -71,7 +73,7 @@ fn gen_quote_str(quote_char: &'static str) -> impl Fn(&str) -> PineResult {
     }
 }
 
-pub fn string_lit(input: &str) -> PineResult {
+pub fn string_lit(input: &str) -> PineResult<String> {
     alt((gen_quote_str("\""), gen_quote_str("'")))(input)
 }
 
@@ -88,14 +90,15 @@ mod tests {
         );
     }
 
+    #[test]
     fn string_lit_test() {
         assert_eq!(
             string_lit(r"'hello \' world'ding"),
-            Ok(("ding", "hello ' world"))
+            Ok(("ding", String::from("hello ' world")))
         );
         assert_eq!(
             string_lit("\"hello \' world\"ding"),
-            Ok(("ding", "hello ' world"))
+            Ok(("ding", String::from("hello ' world")))
         )
     }
 }

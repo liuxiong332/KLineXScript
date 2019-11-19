@@ -1,12 +1,11 @@
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    character::complete::{digit0, digit1, space0},
+    character::complete::digit1,
     combinator::{map, opt, recognize},
-    error::{ErrorKind, ParseError},
     multi::separated_list,
     sequence::{preceded, tuple},
-    Err, IResult,
+    Err,
 };
 use std::str::FromStr;
 
@@ -23,19 +22,20 @@ pub fn underscore_digit_str(s: &str) -> PineResult<String> {
     map(separated_list(tag("_"), digit1), |s| s.join(""))(s)
 }
 
-pub fn signed_int(s: &str) -> PineResult<i32> {
-    let (s, sign) = opt(alt((tag("+"), tag("-"))))(s)?;
-    let (s, _) = space0(s)?;
-    let (s, num_int) = decimal(s)?;
-    match sign {
-        Some("+") | None => Ok((s, num_int)),
-        Some("-") => Ok((s, -num_int)),
-        _ => panic!("internal error: entered unreachable code"),
-    }
-}
+// pub fn signed_int(s: &str) -> PineResult<i32> {
+//     let (s, sign) = opt(alt((tag("+"), tag("-"))))(s)?;
+//     let (s, _) = space0(s)?;
+//     let (s, num_int) = decimal(s)?;
+//     match sign {
+//         Some("+") | None => Ok((s, num_int)),
+//         Some("-") => Ok((s, -num_int)),
+//         _ => panic!("internal error: entered unreachable code"),
+//     }
+// }
 
 pub fn decimal(input: &str) -> PineResult<i32> {
     let (next_s, num_str) = underscore_digit_str(input).unwrap();
+    // let (next_s, num_str) = digit1(input)?;
     match i32::from_str_radix(&num_str, 10) {
         Ok(num) => Ok((next_s, num)),
         _ => Err(Err::Error(PineError::from_pine_kind(
@@ -65,12 +65,15 @@ pub fn num_lit(input: &str) -> PineResult<Numeral> {
         opt(preceded(tag("."), decimal)),
         opt(float_mag),
     )))(input)?;
-
     if let Ok(n) = i32::from_str_radix(out, 10) {
         Ok((input, Numeral::Int(n)))
-    } else {
-        let f = f64::from_str(out).unwrap();
+    } else if let Ok(f) = f64::from_str(out) {
         Ok((input, Numeral::Float(f)))
+    } else {
+        Err(Err::Error(PineError::from_pine_kind(
+            input,
+            PineErrorKind::InvalidDecimal,
+        )))
     }
 }
 
@@ -86,11 +89,6 @@ mod tests {
 
     #[test]
     fn signed_int_test() {
-        assert_eq!(signed_int("-1221_121"), Ok(("", -1221121)));
-        assert_eq!(signed_int("+1221_121"), Ok(("", 1221121)));
-        assert_eq!(signed_int("+ 1221_121"), Ok(("", 1221121)));
-        assert_eq!(signed_int("1221_121"), Ok(("", 1221121)));
-
         assert_eq!(num_lit_ws("121.1"), Ok(("", Numeral::Float(121.1))));
         assert_eq!(num_lit_ws("121"), Ok(("", Numeral::Int(121))));
         assert_eq!(num_lit_ws("121e1"), Ok(("", Numeral::Float(121e1))));

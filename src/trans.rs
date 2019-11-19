@@ -1,6 +1,5 @@
 use crate::op::{BinaryOp, UnaryOp};
 use crate::stat_expr_types::{Exp, Exp2, FlatExp, OpOrExp2, UnOrBinOp};
-use nom::{multi::many0, sequence::tuple};
 // pine language precedence table(The belower, the higher):
 //   conditional ?:
 //   or
@@ -250,8 +249,6 @@ impl<'a> From<Exp2<'a>> for Exp<'a> {
             Exp2::FuncCall(t) => Exp::FuncCall(t),
             Exp2::Condition(t) => Exp::Condition(t),
             Exp2::RefCall(f) => Exp::RefCall(f),
-            Exp2::Ite(t) => Exp::Ite(t),
-            Exp2::ForRange(t) => Exp::ForRange(t),
         }
     }
 }

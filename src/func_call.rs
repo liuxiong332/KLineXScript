@@ -8,7 +8,7 @@ use nom::{
 };
 
 use crate::error::{PineError, PineErrorKind, PineResult};
-use crate::name::{varname_ws, VarName};
+use crate::name::{varname, varname_ws, VarName};
 use crate::stat_expr::exp;
 use crate::stat_expr_types::{Exp, FunctionCall};
 use crate::utils::eat_sep;
@@ -75,10 +75,10 @@ fn func_call_args(input: &str) -> PineResult<(Vec<Exp>, Vec<(VarName, Exp)>)> {
 }
 
 pub fn func_call(input: &str) -> PineResult<FunctionCall> {
-    let (input, (method, (pos_args, dict_args))) = eat_sep(tuple((
-        varname_ws,
+    let (input, (method, (pos_args, dict_args))) = tuple((
+        varname,
         delimited(eat_sep(tag("(")), func_call_args, eat_sep(tag(")"))),
-    )))(input)?;
+    ))(input)?;
     Ok((
         input,
         FunctionCall {
@@ -87,6 +87,10 @@ pub fn func_call(input: &str) -> PineResult<FunctionCall> {
             dict_args,
         },
     ))
+}
+
+pub fn func_call_ws(input: &str) -> PineResult<FunctionCall> {
+    eat_sep(func_call)(input)
 }
 
 #[cfg(test)]
@@ -106,7 +110,7 @@ mod tests {
             ))
         );
         assert_eq!(
-            func_call("funa(arg1, arg2, a = true)"),
+            func_call_ws("funa(arg1, arg2, a = true)"),
             Ok((
                 "",
                 FunctionCall {

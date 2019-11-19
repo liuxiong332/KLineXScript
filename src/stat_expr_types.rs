@@ -69,8 +69,6 @@ pub enum Exp2<'a> {
     FuncCall(Box<FunctionCall<'a>>),
     RefCall(Box<RefCall<'a>>),
     Condition(Box<Condition<'a>>),
-    Ite(Box<IfThenElse<'a>>),
-    ForRange(Box<ForRange<'a>>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -179,5 +177,6 @@ pub enum Statement<'a> {
     Assignment(Box<Assignment<'a>>),
     Ite(Box<IfThenElse<'a>>),
     ForRange(Box<ForRange<'a>>),
-    FuncCall(Box<FunctionDef<'a>>),
+    FuncCall(Box<FunctionCall<'a>>),
+    FuncDef(Box<FunctionDef<'a>>),
 }

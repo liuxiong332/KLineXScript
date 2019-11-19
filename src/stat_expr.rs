@@ -3,7 +3,7 @@ use nom::{
     bytes::complete::tag,
     combinator::{map, opt, peek, value},
     multi::{count, many0, separated_list},
-    sequence::{delimited, preceded, separated_pair, tuple},
+    sequence::{delimited, preceded, separated_pair, terminated, tuple},
     Err,
 };
 
@@ -138,25 +138,25 @@ fn for_range_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<Fo
     move |input: &'a str| preceded(statement_indent(indent), for_range(indent))(input)
 }
 
-fn function_exp_def(input: &str) -> PineResult<FunctionDef> {
-    let (input, name) = varname_ws(input)?;
-    let (input, args) = delimited(
-        eat_sep(tag("(")),
-        separated_list(eat_sep(tag(",")), varname_ws),
-        eat_sep(tag(")")),
-    )(input)?;
-    let (input, body) = exp(input)?;
-    Ok((
-        input,
-        FunctionDef {
-            name,
-            params: args,
-            body: Block {
-                stmts: vec![],
-                ret_stmt: Some(body),
-            },
-        },
-    ))
+fn function_def_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<FunctionDef> {
+    move |input: &'a str| {
+        let (input, (_, name, _, params, _, _, body)) = tuple((
+            statement_indent(indent),
+            varname,
+            eat_sep(tag("(")),
+            separated_list(eat_sep(tag(",")), varname_ws),
+            eat_sep(tag(")")),
+            eat_sep(tag("=>")),
+            alt((
+                preceded(statement_end, block_with_indent(indent + 1)),
+                map(terminated(exp, statement_end), |s| Block {
+                    stmts: vec![],
+                    ret_stmt: Some(s),
+                }),
+            )),
+        ))(input)?;
+        Ok((input, FunctionDef { name, params, body }))
+    }
 }
 
 // fn statement_indent(input: &str, indent_count: usize) -> PineResult<Statement> {
@@ -246,6 +246,9 @@ fn statement_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<St
                 Statement::Continue,
                 eat_statement(&gen_indent, tag("continue")),
             ),
+            map(function_def_with_indent(indent), |s| {
+                Statement::FuncDef(Box::new(s))
+            }),
             map(eat_statement(&gen_indent, func_call), |s| {
                 Statement::FuncCall(Box::new(s))
             }),
@@ -351,6 +354,35 @@ mod tests {
                     method: VarName("a"),
                     pos_args: vec![Exp::VarName(VarName("arg1"))],
                     dict_args: vec![]
+                }))
+            ))
+        );
+        assert_eq!(
+            statement_with_indent(1)("    a(arg1) => b \n"),
+            Ok((
+                "",
+                Statement::FuncDef(Box::new(FunctionDef {
+                    name: VarName("a"),
+                    params: vec![VarName("arg1")],
+                    body: Block {
+                        stmts: vec![],
+                        ret_stmt: Some(Exp::VarName(VarName("b")))
+                    }
+                }))
+            ))
+        );
+
+        assert_eq!(
+            statement_with_indent(1)("    a(arg1) => \n        b \n"),
+            Ok((
+                "",
+                Statement::FuncDef(Box::new(FunctionDef {
+                    name: VarName("a"),
+                    params: vec![VarName("arg1")],
+                    body: Block {
+                        stmts: vec![],
+                        ret_stmt: Some(Exp::VarName(VarName("b")))
+                    }
                 }))
             ))
         );

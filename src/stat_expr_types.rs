@@ -32,6 +32,7 @@ pub enum Exp<'a> {
     VarName(VarName<'a>),
     RetTuple(Box<Vec<VarName<'a>>>),
     Tuple(Box<Vec<Exp<'a>>>),
+    TypeCast(Box<TypeCast<'a>>),
     FuncCall(Box<FunctionCall<'a>>),
     RefCall(Box<RefCall<'a>>),
     PrefixExp(Box<PrefixExp<'a>>),
@@ -67,10 +68,22 @@ pub enum Exp2<'a> {
     VarName(VarName<'a>),
     RetTuple(Box<Vec<VarName<'a>>>),
     Tuple(Box<Vec<Exp<'a>>>),
+    TypeCast(Box<TypeCast<'a>>),
     FuncCall(Box<FunctionCall<'a>>),
     RefCall(Box<RefCall<'a>>),
     PrefixExp(Box<PrefixExp<'a>>),
     Exp(Exp<'a>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TypeCast<'a> {
+    pub data_type: DataType,
+    pub exp: Exp<'a>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PrefixExp<'a> {
+    pub var_chain: Vec<VarName<'a>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -109,8 +122,15 @@ impl<'a> Assignment<'a> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct PrefixExp<'a> {
-    pub var_chain: Vec<VarName<'a>>,
+pub struct VarAssignment<'a> {
+    pub name: VarName<'a>,
+    pub val: Exp<'a>,
+}
+
+impl<'a> VarAssignment<'a> {
+    pub fn new(name: VarName<'a>, val: Exp<'a>) -> VarAssignment<'a> {
+        VarAssignment { name, val }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -183,6 +203,7 @@ pub enum Statement<'a> {
     Continue,
     None,
     Assignment(Box<Assignment<'a>>),
+    VarAssignment(Box<VarAssignment<'a>>),
     Ite(Box<IfThenElse<'a>>),
     ForRange(Box<ForRange<'a>>),
     FuncCall(Box<FunctionCall<'a>>),

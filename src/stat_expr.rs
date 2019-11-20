@@ -7,7 +7,6 @@ use nom::{
 };
 
 use crate::color::color_lit;
-use crate::comment::comment;
 use crate::error::PineResult;
 use crate::func_call::{func_call, func_call_ws};
 use crate::name::{varname, varname_ws, VarName};
@@ -31,6 +30,7 @@ pub fn exp2(input: &str) -> PineResult<Exp2> {
         map(prefix_exp, |exp| Exp2::PrefixExp(Box::new(exp))), // match a.b.c
         map(rettupledef, |varnames| Exp2::RetTuple(Box::new(varnames))), // match [a, b]
         map(tupledef, |exps| Exp2::Tuple(Box::new(exps))),     // match [a, b + c]
+        map(type_cast, |exp| Exp2::TypeCast(Box::new(exp))),   // match float(b)
         map(func_call_ws, |exp| Exp2::FuncCall(Box::new(exp))), // match a(b)
         map(ref_call, |exp| Exp2::RefCall(Box::new(exp))),     // match a[b]
         map(varname_ws, Exp2::VarName),                        // match a
@@ -70,6 +70,12 @@ fn tupledef(input: &str) -> PineResult<Vec<Exp>> {
         separated_list(eat_sep(tag(",")), exp),
         eat_sep(tag("]")),
     ))(input)
+}
+
+fn type_cast(input: &str) -> PineResult<TypeCast> {
+    let (input, (data_type, _, e, _)) =
+        tuple((eat_sep(datatype), eat_sep(tag("(")), exp, eat_sep(tag(")"))))(input)?;
+    Ok((input, TypeCast { data_type, exp: e }))
 }
 
 fn ref_call(input: &str) -> PineResult<RefCall> {
@@ -214,7 +220,7 @@ pub fn exp_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<Exp>
     }
 }
 
-fn var_assign_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<Assignment> {
+fn assign_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<Assignment> {
     move |input: &'a str| {
         let exp_parser = || exp_with_indent(indent);
         alt((
@@ -240,6 +246,15 @@ fn var_assign_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<A
                 Assignment::new(s.0, s.2, false, None)
             }),
         ))(input)
+    }
+}
+
+fn var_assign_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<VarAssignment> {
+    move |input: &'a str| {
+        map(
+            tuple((varname, eat_sep(tag(":=")), exp_with_indent(indent))),
+            |s| VarAssignment::new(s.0, s.2),
+        )(input)
     }
 }
 
@@ -283,8 +298,11 @@ fn statement_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<St
             map(eat_statement(&gen_indent, func_call), |s| {
                 Statement::FuncCall(Box::new(s))
             }),
-            map(preceded(&gen_indent, var_assign_with_indent(indent)), |s| {
+            map(preceded(&gen_indent, assign_with_indent(indent)), |s| {
                 Statement::Assignment(Box::new(s))
+            }),
+            map(preceded(&gen_indent, var_assign_with_indent(indent)), |s| {
+                Statement::VarAssignment(Box::new(s))
             }),
             map(if_then_else_with_indent(indent), |s| {
                 Statement::Ite(Box::new(s))
@@ -465,7 +483,17 @@ mod tests {
                     None
                 )))
             ))
-        )
+        );
+        assert_eq!(
+            statement_with_indent(0)("a := close\n"),
+            Ok((
+                "",
+                Statement::VarAssignment(Box::new(VarAssignment::new(
+                    VarName("a"),
+                    Exp::VarName(VarName("close")),
+                )))
+            ))
+        );
     }
 
     #[test]

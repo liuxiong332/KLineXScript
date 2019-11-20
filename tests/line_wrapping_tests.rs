@@ -5,6 +5,9 @@ use pine::num::*;
 use pine::op::*;
 use pine::stat_expr_types::*;
 
+mod utils;
+use utils::*;
+
 #[test]
 fn expr_test() {
     let add_expr = Block::new(
@@ -49,33 +52,19 @@ fn func_call_test() {
     assert_eq!(
         pine::parse_all(FUNC_CALL_STAT),
         Ok(Block::new(
-            vec![Statement::FuncCall(Box::new(FunctionCall {
-                method: VarName("plot"),
-                pos_args: vec![Exp::FuncCall(Box::new(FunctionCall {
-                    method: VarName("correlation"),
-                    pos_args: vec![
-                        Exp::VarName(VarName("src")),
-                        Exp::VarName(VarName("ovr")),
-                        Exp::VarName(VarName("length"))
-                    ],
-                    dict_args: vec![],
-                }))],
-                dict_args: vec![
-                    (
-                        VarName("color"),
-                        Exp::PrefixExp(Box::new(PrefixExp {
-                            var_chain: vec![VarName("color"), VarName("purple")]
-                        }))
-                    ),
-                    (
-                        VarName("style"),
-                        Exp::PrefixExp(Box::new(PrefixExp {
-                            var_chain: vec![VarName("plot"), VarName("style_area")]
-                        }))
-                    ),
-                    (VarName("transp"), Exp::Num(Numeral::Int(40)))
-                ],
-            }))],
+            vec![gen_func_call_stmt(
+                "plot",
+                vec![gen_func_call(
+                    "correlation",
+                    vec![gen_name("src"), gen_name("ovr"), gen_name("length")],
+                    vec![]
+                )],
+                vec![
+                    (VarName("color"), gen_prefix(vec!["color", "purple"]),),
+                    (VarName("style"), gen_prefix(vec!["plot", "style_area"]),),
+                    (VarName("transp"), gen_int(40))
+                ]
+            ),],
             None
         ))
     );
@@ -117,57 +106,6 @@ fn func_def_test() {
             None
         ))
     );
-}
-
-fn gen_unop<'a>(op: UnaryOp, exp: Exp<'a>) -> Exp<'a> {
-    Exp::UnaryExp(op, Box::new(exp))
-}
-
-fn gen_binop<'a>(op: BinaryOp, exp1: Exp<'a>, exp2: Exp<'a>) -> Exp<'a> {
-    Exp::BinaryExp(op, Box::new(exp1), Box::new(exp2))
-}
-
-fn gen_func_call<'a>(
-    method: &'a str,
-    pos_args: Vec<Exp<'a>>,
-    dict_args: Vec<(VarName<'a>, Exp<'a>)>,
-) -> Exp<'a> {
-    Exp::FuncCall(Box::new(FunctionCall {
-        method: VarName(method),
-        pos_args: pos_args,
-        dict_args: dict_args,
-    }))
-}
-
-fn gen_ref_call<'a>(name: &'a str, exp: Exp<'a>) -> Exp<'a> {
-    Exp::RefCall(Box::new(RefCall {
-        name: VarName(name),
-        arg: exp,
-    }))
-}
-
-fn gen_int(num: i32) -> Exp<'static> {
-    Exp::Num(Numeral::Int(num))
-}
-
-fn gen_name(name: &str) -> Exp {
-    Exp::VarName(VarName(name))
-}
-
-fn gen_condition<'a>(cond: Exp<'a>, exp1: Exp<'a>, exp2: Exp<'a>) -> Exp<'a> {
-    Exp::Condition(Box::new(Condition { cond, exp1, exp2 }))
-}
-
-fn gen_assign<'a>(name: &'a str, val: Exp<'a>) -> Statement<'a> {
-    Statement::Assignment(Box::new(Assignment::new(VarName(name), val, false, None)))
-}
-
-fn gen_func_def<'a>(name: &'a str, params: Vec<&'a str>, body: Block<'a>) -> Statement<'a> {
-    Statement::FuncDef(Box::new(FunctionDef {
-        name: VarName(name),
-        params: params.into_iter().map(|s| VarName(s)).collect(),
-        body: body,
-    }))
 }
 
 const FUNC_DEF2: &str = "\
@@ -259,6 +197,49 @@ fn cond_expr_test() {
                     None
                 )
             )],
+            None
+        ))
+    );
+}
+
+const EXPR_COMMENT: &str = "c = open > close ? color.red :
+high > high[1] ? color.lime : // a comment
+low < low[1] ? color.blue : color.black
+bgcolor(c)
+";
+
+#[test]
+fn expr_comment_test() {
+    assert_eq!(
+        pine::parse_all(EXPR_COMMENT),
+        Ok(Block::new(
+            vec![
+                gen_assign(
+                    "c",
+                    gen_condition(
+                        gen_binop(BinaryOp::Gt, gen_name("open"), gen_name("close")),
+                        gen_prefix(vec!["color", "red"]),
+                        gen_condition(
+                            gen_binop(
+                                BinaryOp::Gt,
+                                gen_name("high"),
+                                gen_ref_call("high", gen_int(1))
+                            ),
+                            gen_prefix(vec!["color", "lime"]),
+                            gen_condition(
+                                gen_binop(
+                                    BinaryOp::Lt,
+                                    gen_name("low"),
+                                    gen_ref_call("low", gen_int(1))
+                                ),
+                                gen_prefix(vec!["color", "blue"]),
+                                gen_prefix(vec!["color", "black"])
+                            )
+                        )
+                    )
+                ),
+                gen_func_call_stmt("bgcolor", vec![gen_name("c")], vec![])
+            ],
             None
         ))
     );

@@ -6,8 +6,8 @@ use nom::{
 };
 
 use crate::error::{PineError, PineErrorKind, PineResult};
-use crate::name::{varname, varname_ws, VarName};
-use crate::stat_expr::exp;
+use crate::name::{varname_ws, VarName};
+use crate::stat_expr::{callable_expr, exp};
 use crate::stat_expr_types::{Exp, FunctionCall};
 use crate::utils::eat_sep;
 
@@ -74,7 +74,7 @@ fn func_call_args(input: &str) -> PineResult<(Vec<Exp>, Vec<(VarName, Exp)>)> {
 
 pub fn func_call(input: &str) -> PineResult<FunctionCall> {
     let (input, (method, (pos_args, dict_args))) = tuple((
-        varname,
+        callable_expr,
         delimited(eat_sep(tag("(")), func_call_args, eat_sep(tag(")"))),
     ))(input)?;
     Ok((
@@ -94,6 +94,7 @@ pub fn func_call_ws(input: &str) -> PineResult<FunctionCall> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::stat_expr_types::PrefixExp;
     #[test]
     fn func_call_test() {
         assert_eq!(
@@ -111,7 +112,7 @@ mod tests {
             Ok((
                 "",
                 FunctionCall {
-                    method: VarName("funa"),
+                    method: Exp::VarName(VarName("funa")),
                     pos_args: vec![Exp::VarName(VarName("arg1")), Exp::VarName(VarName("arg2"))],
                     dict_args: vec![(VarName("a"), Exp::Bool(true))]
                 }
@@ -123,7 +124,21 @@ mod tests {
             Ok((
                 "",
                 FunctionCall {
-                    method: VarName("funa"),
+                    method: Exp::VarName(VarName("funa")),
+                    pos_args: vec![],
+                    dict_args: vec![]
+                }
+            ))
+        );
+
+        assert_eq!(
+            func_call_ws("funa.funb()"),
+            Ok((
+                "",
+                FunctionCall {
+                    method: Exp::PrefixExp(Box::new(PrefixExp {
+                        var_chain: vec![VarName("funa"), VarName("funb")]
+                    })),
                     pos_args: vec![],
                     dict_args: vec![]
                 }
@@ -137,9 +152,9 @@ mod tests {
             Ok((
                 "",
                 FunctionCall {
-                    method: VarName("funa"),
+                    method: Exp::VarName(VarName("funa")),
                     pos_args: vec![Exp::FuncCall(Box::new(FunctionCall {
-                        method: VarName("funb"),
+                        method: Exp::VarName(VarName("funb")),
                         pos_args: vec![],
                         dict_args: vec![]
                     }))],

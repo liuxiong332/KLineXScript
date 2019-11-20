@@ -112,3 +112,97 @@ fn variable_declare_test() {
         ))
     );
 }
+
+const IF_STATES: &str = "// This code compiles
+x = if close > open
+    close
+else
+    open
+";
+
+const IF_NEST_STATS: &str = "
+x = if close > open
+    b = if close > close[1]
+        close
+    else
+        close[1]
+    b
+else
+    open
+";
+
+#[test]
+fn if_stats_test() {
+    assert_eq!(
+        pine::parse_all(IF_STATES),
+        Ok(Block::new(
+            vec![
+                Statement::None,
+                gen_assign(
+                    "x",
+                    Exp::Ite(Box::new(IfThenElse::new(
+                        gen_binop(BinaryOp::Gt, gen_name("close"), gen_name("open")),
+                        Block::new(vec![], Some(gen_name("close"))),
+                        Some(Block::new(vec![], Some(gen_name("open"))))
+                    )))
+                ),
+            ],
+            None
+        ))
+    );
+
+    assert_eq!(
+        pine::parse_all(IF_NEST_STATS),
+        Ok(Block::new(
+            vec![
+                Statement::None,
+                gen_assign(
+                    "x",
+                    Exp::Ite(Box::new(IfThenElse::new(
+                        gen_binop(BinaryOp::Gt, gen_name("close"), gen_name("open")),
+                        Block::new(
+                            vec![gen_assign(
+                                "b",
+                                Exp::Ite(Box::new(IfThenElse::new(
+                                    gen_binop(
+                                        BinaryOp::Gt,
+                                        gen_name("close"),
+                                        gen_ref_call("close", gen_int(1))
+                                    ),
+                                    Block::new(vec![], Some(gen_name("close"))),
+                                    Some(Block::new(
+                                        vec![],
+                                        Some(gen_ref_call("close", gen_int(1)))
+                                    ))
+                                )))
+                            )],
+                            Some(gen_name("b"))
+                        ),
+                        Some(Block::new(vec![], Some(gen_name("open"))))
+                    )))
+                )
+            ],
+            None
+        ))
+    );
+}
+
+const IF_EXPR: &str = "
+if (crossover(source, lower))
+    strategy.entry(\"BBandLE\", strategy.long, stop=lower,
+                   oca_name=\"BollingerBands\",
+                   oca_type=strategy.oca.cancel, comment=\"BBandLE\")
+else
+    strategy.cancel(id=\"BBandLE\")
+";
+
+// #[test]
+// fn if_expr_test() {
+//     assert_eq!(pine::parse_all(IF_EXPR), Block::new(vec![
+//         Statement::None,
+//         Statement::Ite(Box::new(IfThenElse::new(
+//             gen_func_call("crossover", vec![gen_name("source", gen_name("lower"))], vec![]),
+
+//         )))
+//     ], None));
+// }

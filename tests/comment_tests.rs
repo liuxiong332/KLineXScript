@@ -18,7 +18,7 @@ fn comment_test() {
             vec![
                 Statement::None,
                 Statement::FuncCall(Box::new(FunctionCall {
-                    method: VarName("study"),
+                    method: Exp::VarName(VarName("study")),
                     pos_args: vec![Exp::Str(String::from("Test"))],
                     dict_args: vec![]
                 })),
@@ -30,7 +30,7 @@ fn comment_test() {
                     None
                 ))),
                 Statement::FuncCall(Box::new(FunctionCall {
-                    method: VarName("plot"),
+                    method: Exp::VarName(VarName("plot")),
                     pos_args: vec![Exp::VarName(VarName("a"))],
                     dict_args: vec![]
                 }))

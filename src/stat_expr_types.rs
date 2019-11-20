@@ -4,14 +4,14 @@ use crate::op::{BinaryOp, UnaryOp};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct FunctionCall<'a> {
-    pub method: VarName<'a>,
+    pub method: Exp<'a>,
     pub pos_args: Vec<Exp<'a>>,
     pub dict_args: Vec<(VarName<'a>, Exp<'a>)>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct RefCall<'a> {
-    pub name: VarName<'a>,
+    pub name: Exp<'a>,
     pub arg: Exp<'a>,
 }
 

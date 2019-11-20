@@ -17,7 +17,7 @@ pub fn gen_func_call<'a>(
     dict_args: Vec<(VarName<'a>, Exp<'a>)>,
 ) -> Exp<'a> {
     Exp::FuncCall(Box::new(FunctionCall {
-        method: VarName(method),
+        method: Exp::VarName(VarName(method)),
         pos_args: pos_args,
         dict_args: dict_args,
     }))
@@ -25,7 +25,7 @@ pub fn gen_func_call<'a>(
 
 pub fn gen_ref_call<'a>(name: &'a str, exp: Exp<'a>) -> Exp<'a> {
     Exp::RefCall(Box::new(RefCall {
-        name: VarName(name),
+        name: Exp::VarName(VarName(name)),
         arg: exp,
     }))
 }
@@ -66,7 +66,7 @@ pub fn gen_func_call_stmt<'a>(
     dict_args: Vec<(VarName<'a>, Exp<'a>)>,
 ) -> Statement<'a> {
     Statement::FuncCall(Box::new(FunctionCall {
-        method: VarName(method),
+        method: Exp::VarName(VarName(method)),
         pos_args: pos_args,
         dict_args: dict_args,
     }))

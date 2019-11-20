@@ -92,7 +92,7 @@ fn func_def_test() {
                                 BinaryOp::Eq,
                                 Box::new(Exp::VarName(VarName("s")),),
                                 Box::new(Exp::RefCall(Box::new(RefCall {
-                                    name: VarName("s"),
+                                    name: Exp::VarName(VarName("s")),
                                     arg: Exp::Num(Numeral::Int(1))
                                 })))
                             ),

@@ -5,10 +5,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(Windows) 启动",
+            "name": "(Windows) Launch",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "输入程序名称，例如 ${workspaceFolder}/a.exe",
+            "program": "${workspaceFolder}/target/debug/expr_tests-e1292d83ff11e1ae.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

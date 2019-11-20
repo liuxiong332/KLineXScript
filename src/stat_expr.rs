@@ -27,13 +27,13 @@ pub fn exp2(input: &str) -> PineResult<Exp2> {
         map(string_lit, Exp2::Str),
         map(color_lit, Exp2::Color),
         map(bracket_expr, Exp2::Exp),
-        map(prefix_exp, |exp| Exp2::PrefixExp(Box::new(exp))), // match a.b.c
+        map(prefix_exp_ws, |exp| Exp2::PrefixExp(Box::new(exp))), // match a.b.c
         map(rettupledef, |varnames| Exp2::RetTuple(Box::new(varnames))), // match [a, b]
-        map(tupledef, |exps| Exp2::Tuple(Box::new(exps))),     // match [a, b + c]
-        map(type_cast, |exp| Exp2::TypeCast(Box::new(exp))),   // match float(b)
-        map(func_call_ws, |exp| Exp2::FuncCall(Box::new(exp))), // match a(b)
-        map(ref_call, |exp| Exp2::RefCall(Box::new(exp))),     // match a[b]
-        map(varname_ws, Exp2::VarName),                        // match a
+        map(tupledef, |exps| Exp2::Tuple(Box::new(exps))),        // match [a, b + c]
+        map(type_cast, |exp| Exp2::TypeCast(Box::new(exp))),      // match float(b)
+        map(func_call_ws, |exp| Exp2::FuncCall(Box::new(exp))),   // match a(b)
+        map(ref_call, |exp| Exp2::RefCall(Box::new(exp))),        // match a[b]
+        map(varname_ws, Exp2::VarName),                           // match a
     ))(input)
 }
 
@@ -78,9 +78,17 @@ fn type_cast(input: &str) -> PineResult<TypeCast> {
     Ok((input, TypeCast { data_type, exp: e }))
 }
 
+pub fn callable_expr(input: &str) -> PineResult<Exp> {
+    alt((
+        delimited(tag("("), exp, eat_sep(tag(")"))),
+        map(prefix_exp, |exp| Exp::PrefixExp(Box::new(exp))), // match a.b.c
+        map(varname, Exp::VarName),                           // match a
+    ))(input)
+}
+
 fn ref_call(input: &str) -> PineResult<RefCall> {
     let (input, (name, arg)) = tuple((
-        varname_ws,
+        eat_sep(callable_expr),
         delimited(eat_sep(tag("[")), exp, eat_sep(tag("]"))),
     ))(input)?;
     Ok((input, RefCall { name, arg }))
@@ -102,11 +110,8 @@ fn condition(input: &str) -> PineResult<Condition> {
 }
 
 fn prefix_exp(input: &str) -> PineResult<PrefixExp> {
-    let (input, (prefix, _, names)) = eat_sep(tuple((
-        varname,
-        tag("."),
-        separated_list(tag("."), varname),
-    )))(input)?;
+    let (input, (prefix, _, names)) =
+        tuple((varname, tag("."), separated_list(tag("."), varname)))(input)?;
 
     Ok((
         input,
@@ -114,6 +119,10 @@ fn prefix_exp(input: &str) -> PineResult<PrefixExp> {
             var_chain: [vec![prefix], names].concat(),
         },
     ))
+}
+
+fn prefix_exp_ws(input: &str) -> PineResult<PrefixExp> {
+    eat_sep(prefix_exp)(input)
 }
 
 fn if_then_else<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<IfThenElse> {
@@ -124,7 +133,7 @@ fn if_then_else<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<IfThenElse>
             statement_end,
             block_with_indent(indent + 1),
             opt(tuple((
-                tag("else"),
+                preceded(statement_indent(indent), tag("else")),
                 statement_end,
                 block_with_indent(indent + 1),
             ))),
@@ -292,6 +301,13 @@ fn statement_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<St
                 Statement::Continue,
                 eat_statement(&gen_indent, tag("continue")),
             ),
+            value(Statement::None, statement_end),
+            map(if_then_else_with_indent(indent), |s| {
+                Statement::Ite(Box::new(s))
+            }),
+            map(for_range_with_indent(indent), |s| {
+                Statement::ForRange(Box::new(s))
+            }),
             map(function_def_with_indent(indent), |s| {
                 Statement::FuncDef(Box::new(s))
             }),
@@ -304,13 +320,6 @@ fn statement_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<St
             map(preceded(&gen_indent, var_assign_with_indent(indent)), |s| {
                 Statement::VarAssignment(Box::new(s))
             }),
-            map(if_then_else_with_indent(indent), |s| {
-                Statement::Ite(Box::new(s))
-            }),
-            map(for_range_with_indent(indent), |s| {
-                Statement::ForRange(Box::new(s))
-            }),
-            value(Statement::None, statement_end),
         ))(input)
     }
 }
@@ -362,7 +371,7 @@ mod tests {
             Ok((
                 "",
                 RefCall {
-                    name: VarName("hello"),
+                    name: Exp::VarName(VarName("hello")),
                     arg: Exp::Bool(true)
                 }
             ))
@@ -428,7 +437,7 @@ mod tests {
             Ok((
                 "",
                 Statement::FuncCall(Box::new(FunctionCall {
-                    method: VarName("a"),
+                    method: Exp::VarName(VarName("a")),
                     pos_args: vec![Exp::VarName(VarName("arg1"))],
                     dict_args: vec![]
                 }))

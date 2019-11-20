@@ -86,7 +86,7 @@ fn bracket_expr(input: &str) -> PineResult<Exp> {
 
 fn condition(input: &str) -> PineResult<Condition> {
     let (input, (cond, _, exp1, _, exp2)) = tuple((
-        map(exp2, |s| Exp::from(s)),
+        map(flatexp, |s| Exp::from(s)),
         eat_sep(tag("?")),
         exp,
         eat_sep(tag(":")),

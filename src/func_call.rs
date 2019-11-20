@@ -88,7 +88,6 @@ pub fn func_call(input: &str) -> PineResult<FunctionCall> {
 }
 
 pub fn func_call_ws(input: &str) -> PineResult<FunctionCall> {
-    println!("current input {}", input);
     eat_sep(func_call)(input)
 }
 
@@ -97,56 +96,56 @@ mod tests {
     use super::*;
     #[test]
     fn func_call_test() {
-        // assert_eq!(
-        //     func_call_arg("a = true"),
-        //     Ok((
-        //         "",
-        //         FuncCallArg {
-        //             name: Some(VarName("a")),
-        //             arg: Exp::Bool(true)
-        //         }
-        //     ))
-        // );
-        // assert_eq!(
-        //     func_call_ws("funa(arg1, arg2, a = true)"),
-        //     Ok((
-        //         "",
-        //         FunctionCall {
-        //             method: VarName("funa"),
-        //             pos_args: vec![Exp::VarName(VarName("arg1")), Exp::VarName(VarName("arg2"))],
-        //             dict_args: vec![(VarName("a"), Exp::Bool(true))]
-        //         }
-        //     ))
-        // );
+        assert_eq!(
+            func_call_arg("a = true"),
+            Ok((
+                "",
+                FuncCallArg {
+                    name: Some(VarName("a")),
+                    arg: Exp::Bool(true)
+                }
+            ))
+        );
+        assert_eq!(
+            func_call_ws("funa(arg1, arg2, a = true)"),
+            Ok((
+                "",
+                FunctionCall {
+                    method: VarName("funa"),
+                    pos_args: vec![Exp::VarName(VarName("arg1")), Exp::VarName(VarName("arg2"))],
+                    dict_args: vec![(VarName("a"), Exp::Bool(true))]
+                }
+            ))
+        );
 
-        // assert_eq!(
-        //     func_call_ws("funa()"),
-        //     Ok((
-        //         "",
-        //         FunctionCall {
-        //             method: VarName("funa"),
-        //             pos_args: vec![],
-        //             dict_args: vec![]
-        //         }
-        //     ))
-        // );
+        assert_eq!(
+            func_call_ws("funa()"),
+            Ok((
+                "",
+                FunctionCall {
+                    method: VarName("funa"),
+                    pos_args: vec![],
+                    dict_args: vec![]
+                }
+            ))
+        );
     }
     #[test]
     fn func_call_recursive_test() {
-        // assert_eq!(
-        //     func_call_ws("funa(funb())"),
-        //     Ok((
-        //         "",
-        //         FunctionCall {
-        //             method: VarName("funa"),
-        //             pos_args: vec![Exp::FuncCall(Box::new(FunctionCall {
-        //                 method: VarName("funb"),
-        //                 pos_args: vec![],
-        //                 dict_args: vec![]
-        //             }))],
-        //             dict_args: vec![]
-        //         }
-        //     ))
-        // );
+        assert_eq!(
+            func_call_ws("funa(funb())"),
+            Ok((
+                "",
+                FunctionCall {
+                    method: VarName("funa"),
+                    pos_args: vec![Exp::FuncCall(Box::new(FunctionCall {
+                        method: VarName("funb"),
+                        pos_args: vec![],
+                        dict_args: vec![]
+                    }))],
+                    dict_args: vec![]
+                }
+            ))
+        );
     }
 }

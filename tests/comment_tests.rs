@@ -16,13 +16,13 @@ fn comment_test() {
         pine::parse_all(TEXT_WITH_COMMENT),
         Ok(Block::new(
             vec![
-                Statement::Comment,
+                Statement::None,
                 Statement::FuncCall(Box::new(FunctionCall {
                     method: VarName("study"),
                     pos_args: vec![Exp::Str(String::from("Test"))],
                     dict_args: vec![]
                 })),
-                Statement::Comment,
+                Statement::None,
                 Statement::Assignment(Box::new(Assignment::new(
                     VarName("a"),
                     Exp::VarName(VarName("close")),

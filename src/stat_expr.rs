@@ -18,6 +18,7 @@ use crate::string::string_lit;
 use crate::trans::flatexp_from_components;
 use crate::utils::{eat_sep, eat_statement, statement_end, statement_indent};
 
+// exp2 contain the expressions that can apply the binary operators(+,-,*,/) and unary operators(+,-)
 pub fn exp2(input: &str) -> PineResult<Exp2> {
     alt((
         value(Exp2::Na, eat_sep(tag("na"))),
@@ -26,12 +27,12 @@ pub fn exp2(input: &str) -> PineResult<Exp2> {
         map(num_lit_ws, Exp2::Num),
         map(string_lit, Exp2::Str),
         map(color_lit, Exp2::Color),
+        map(bracket_expr, Exp2::Exp),
         map(prefix_exp, |exp| Exp2::PrefixExp(Box::new(exp))), // match a.b.c
-        map(rettupledef, |varnames| Exp2::RetTuple(Box::new(varnames))), // match [a, b + c]
-        map(tupledef, |exps| Exp2::Tuple(Box::new(exps))),     // match [a, b]
+        map(rettupledef, |varnames| Exp2::RetTuple(Box::new(varnames))), // match [a, b]
+        map(tupledef, |exps| Exp2::Tuple(Box::new(exps))),     // match [a, b + c]
         map(func_call_ws, |exp| Exp2::FuncCall(Box::new(exp))), // match a(b)
         map(ref_call, |exp| Exp2::RefCall(Box::new(exp))),     // match a[b]
-        map(condition, |exp| Exp2::Condition(Box::new(exp))),  // match a ? b : c
         map(varname_ws, Exp2::VarName),                        // match a
     ))(input)
 }
@@ -47,7 +48,10 @@ pub fn flatexp(input: &str) -> PineResult<FlatExp> {
 }
 
 pub fn exp(input: &str) -> PineResult<Exp> {
-    map(flatexp, Exp::from)(input)
+    alt((
+        map(condition, |exp| Exp::Condition(Box::new(exp))), // match a ? b : c
+        map(flatexp, Exp::from),
+    ))(input)
 }
 
 // The left return tuple of expression `[a, b] = [1, 2]` that contain variable name between square brackets
@@ -76,11 +80,18 @@ fn ref_call(input: &str) -> PineResult<RefCall> {
     Ok((input, RefCall { name, arg }))
 }
 
-fn cond_exp(input: &str) -> PineResult<Exp> {}
+fn bracket_expr(input: &str) -> PineResult<Exp> {
+    delimited(eat_sep(tag("(")), exp, eat_sep(tag(")")))(input)
+}
 
 fn condition(input: &str) -> PineResult<Condition> {
-    let (input, (cond, _, exp1, _, exp2)) =
-        tuple((exp, eat_sep(tag("?")), exp, eat_sep(tag(":")), exp))(input)?;
+    let (input, (cond, _, exp1, _, exp2)) = tuple((
+        map(exp2, |s| Exp::from(s)),
+        eat_sep(tag("?")),
+        exp,
+        eat_sep(tag(":")),
+        exp,
+    ))(input)?;
     Ok((input, Condition { cond, exp1, exp2 }))
 }
 
@@ -196,7 +207,7 @@ fn datatype(input: &str) -> PineResult<DataType> {
 pub fn exp_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<Exp> {
     move |input: &'a str| {
         alt((
-            map(terminated(flatexp, statement_end), Exp::from),
+            terminated(exp, statement_end),
             map(eat_sep(if_then_else(indent)), |s| Exp::Ite(Box::new(s))),
             map(eat_sep(for_range(indent)), |s| Exp::ForRange(Box::new(s))),
         ))(input)
@@ -281,10 +292,7 @@ fn statement_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<St
             map(for_range_with_indent(indent), |s| {
                 Statement::ForRange(Box::new(s))
             }),
-            value(
-                Statement::Comment,
-                preceded(statement_indent(indent), comment),
-            ),
+            value(Statement::None, statement_end),
         ))(input)
     }
 }
@@ -359,6 +367,26 @@ mod tests {
     }
 
     #[test]
+    fn condition_statement_test() {
+        assert_eq!(
+            statement_with_indent(0)("m = a ? b : c \n"),
+            Ok((
+                "",
+                Statement::Assignment(Box::new(Assignment::new(
+                    VarName("m"),
+                    Exp::Condition(Box::new(Condition {
+                        cond: Exp::VarName(VarName("a")),
+                        exp1: Exp::VarName(VarName("b")),
+                        exp2: Exp::VarName(VarName("c")),
+                    })),
+                    false,
+                    None
+                )))
+            ))
+        );
+    }
+
+    #[test]
     fn statement_test() {
         assert_eq!(
             statement_with_indent(1)("    break \n"),
@@ -420,7 +448,7 @@ mod tests {
 
         assert_eq!(
             statement_with_indent(1)("    //helo world \na = close"),
-            Ok(("a = close", Statement::Comment))
+            Ok(("a = close", Statement::None))
         );
     }
 

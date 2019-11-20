@@ -34,8 +34,8 @@ pub enum Exp<'a> {
     Tuple(Box<Vec<Exp<'a>>>),
     FuncCall(Box<FunctionCall<'a>>),
     RefCall(Box<RefCall<'a>>),
-    Condition(Box<Condition<'a>>),
     PrefixExp(Box<PrefixExp<'a>>),
+    Condition(Box<Condition<'a>>),
     Ite(Box<IfThenElse<'a>>),
     ForRange(Box<ForRange<'a>>),
     UnaryExp(UnaryOp, Box<Exp<'a>>),
@@ -69,8 +69,8 @@ pub enum Exp2<'a> {
     Tuple(Box<Vec<Exp<'a>>>),
     FuncCall(Box<FunctionCall<'a>>),
     RefCall(Box<RefCall<'a>>),
-    Condition(Box<Condition<'a>>),
     PrefixExp(Box<PrefixExp<'a>>),
+    Exp(Exp<'a>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -181,7 +181,7 @@ pub struct FunctionDef<'a> {
 pub enum Statement<'a> {
     Break,
     Continue,
-    Comment,
+    None,
     Assignment(Box<Assignment<'a>>),
     Ite(Box<IfThenElse<'a>>),
     ForRange(Box<ForRange<'a>>),

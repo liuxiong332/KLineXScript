@@ -198,11 +198,51 @@ else
 
 // #[test]
 // fn if_expr_test() {
-//     assert_eq!(pine::parse_all(IF_EXPR), Block::new(vec![
-//         Statement::None,
-//         Statement::Ite(Box::new(IfThenElse::new(
-//             gen_func_call("crossover", vec![gen_name("source", gen_name("lower"))], vec![]),
+//     let gen_prefix = |names: Vec<&str>| {
+//         Exp::PrefixExp(Box::new(PrefixExp {
+//             var_chain: names.into_iter().map(|s| VarName(s)).collect(),
+//         }))
+//     };
 
-//         )))
-//     ], None));
+//     let gen_dot_func_call =
+//         |methods: Vec<&str>, pos_args: Vec<Exp>, dict_args: Vec<(VarName, Exp)>| {
+//             Exp::FuncCall(Box::new(FunctionCall {
+//                 method: gen_prefix(methods),
+//                 pos_args: pos_args,
+//                 dict_args: dict_args,
+//             }))
+//         };
+//         vec![gen_dot_func_call(
+//             vec!["strategy", "entry"],
+//             vec![
+//                 Exp::Str(String::from("BBandLE")),
+//                 gen_prefix(vec!["strategy", "long"]),
+//             ],
+//             vec![
+//                 (VarName("stop"), gen_name("lower")),
+//                 (
+//                     VarName("oca_name"),
+//                     Exp::Str(String::from("BollingerBands"))
+//                 ),
+//                 (
+//                     VarName("oca_type"),
+//                     gen_prefix(vec!["strategy", "oca", "cancel"])
+//                 ),
+//                 (VarName("comment"), Exp::Str(String::from("BBandLE"))),
+//             ]
+//         )]
+//     assert_eq!(
+//         pine::parse_all(IF_EXPR),
+//         Block::new(
+//             vec![
+//                 Statement::None,
+//                 Statement::Ite(Box::new(IfThenElse::new(gen_func_call(
+//                     "crossover",
+//                     vec![gen_name("source", gen_name("lower"))],
+//                     vec![]
+//                 ),)))
+//             ],
+//             None
+//         )
+//     );
 // }

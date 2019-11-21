@@ -5,11 +5,11 @@ use nom::{
     Err,
 };
 
-use crate::error::{PineError, PineErrorKind, PineResult};
-use crate::name::{varname_ws, VarName};
-use crate::stat_expr::{callable_expr, exp};
-use crate::stat_expr_types::{Exp, FunctionCall};
-use crate::utils::eat_sep;
+use super::error::{PineError, PineErrorKind, PineResult};
+use super::name::{varname_ws, VarName};
+use super::stat_expr::{callable_expr, exp};
+use super::stat_expr_types::{Exp, FunctionCall};
+use super::utils::eat_sep;
 
 #[derive(Debug, PartialEq)]
 struct FuncCallArg<'a> {
@@ -94,7 +94,7 @@ pub fn func_call_ws(input: &str) -> PineResult<FunctionCall> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::stat_expr_types::PrefixExp;
+    use crate::ast::stat_expr_types::PrefixExp;
     #[test]
     fn func_call_test() {
         assert_eq!(

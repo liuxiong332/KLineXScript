@@ -1,9 +1,9 @@
 extern crate pine;
 // use pine::error::PineError;
-use pine::name::*;
-use pine::num::*;
-use pine::op::*;
-use pine::stat_expr_types::*;
+use pine::ast::name::*;
+use pine::ast::num::*;
+use pine::ast::op::*;
+use pine::ast::stat_expr_types::*;
 
 mod utils;
 pub use utils::*;

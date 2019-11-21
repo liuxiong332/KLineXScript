@@ -1,5 +1,5 @@
-use crate::op::{BinaryOp, UnaryOp};
-use crate::stat_expr_types::{Exp, Exp2, FlatExp, OpOrExp2, UnOrBinOp};
+use super::op::{BinaryOp, UnaryOp};
+use super::stat_expr_types::{Exp, Exp2, FlatExp, OpOrExp2, UnOrBinOp};
 // pine language precedence table(The belower, the higher):
 //   conditional ?:
 //   or
@@ -258,7 +258,7 @@ impl<'a> From<Exp2<'a>> for Exp<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::num::Numeral;
+    use crate::ast::num::Numeral;
 
     #[test]
     fn flatexp_from_components_test() {

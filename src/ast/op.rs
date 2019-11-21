@@ -1,5 +1,5 @@
-use crate::error::PineResult;
-use crate::utils::skip_ws;
+use super::error::PineResult;
+use super::utils::skip_ws;
 use nom::{branch::alt, bytes::complete::tag, combinator::value};
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]

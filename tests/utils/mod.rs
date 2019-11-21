@@ -1,7 +1,7 @@
-use pine::name::*;
-use pine::num::*;
-use pine::op::*;
-use pine::stat_expr_types::*;
+use pine::ast::name::*;
+use pine::ast::num::*;
+use pine::ast::op::*;
+use pine::ast::stat_expr_types::*;
 
 pub fn gen_unop<'a>(op: UnaryOp, exp: Exp<'a>) -> Exp<'a> {
     Exp::UnaryExp(op, Box::new(exp))

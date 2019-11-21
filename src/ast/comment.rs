@@ -1,4 +1,4 @@
-use crate::error::PineResult;
+use super::error::PineResult;
 use nom::bytes::complete::{tag, take_until};
 
 // The comment is like this //... until the end of this line.
@@ -11,7 +11,7 @@ pub fn comment(input: &str) -> PineResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::error::PineError;
+    use crate::ast::error::PineError;
     use nom::{
         error::{ErrorKind, ParseError},
         Err,

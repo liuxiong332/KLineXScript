@@ -1,7 +1,7 @@
 extern crate pine;
 // use pine::error::PineError;
-use pine::name::*;
-use pine::stat_expr_types::*;
+use pine::ast::name::*;
+use pine::ast::stat_expr_types::*;
 
 const TEXT_WITH_COMMENT: &str = "//@version=4
 study(\"Test\")

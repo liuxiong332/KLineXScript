@@ -1,4 +1,4 @@
-use crate::error::{PineError, PineErrorKind, PineResult};
+use super::error::{PineError, PineErrorKind, PineResult};
 use nom::{
     branch::alt,
     bytes::complete::{escaped, is_not, tag, take_until},

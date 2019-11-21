@@ -1,5 +1,5 @@
-use crate::error::{PineError, PineErrorKind, PineResult};
-use crate::utils::skip_ws;
+use super::error::{PineError, PineErrorKind, PineResult};
+use super::utils::skip_ws;
 use nom::{
     bytes::complete::{tag, take_while},
     combinator::recognize,

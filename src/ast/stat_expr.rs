@@ -6,16 +6,16 @@ use nom::{
     sequence::{delimited, preceded, terminated, tuple},
 };
 
-use crate::color::color_lit;
-use crate::error::PineResult;
-use crate::func_call::{func_call, func_call_ws};
-use crate::name::{varname, varname_ws, VarName};
-use crate::num::num_lit_ws;
-use crate::op::*;
-use crate::stat_expr_types::*;
-use crate::string::string_lit;
-use crate::trans::flatexp_from_components;
-use crate::utils::{eat_sep, eat_statement, statement_end, statement_indent};
+use super::color::color_lit;
+use super::error::PineResult;
+use super::func_call::{func_call, func_call_ws};
+use super::name::{varname, varname_ws, VarName};
+use super::num::num_lit_ws;
+use super::op::*;
+use super::stat_expr_types::*;
+use super::string::string_lit;
+use super::trans::flatexp_from_components;
+use super::utils::{eat_sep, eat_statement, statement_end, statement_indent};
 
 // exp2 contain the expressions that can apply the binary operators(+,-,*,/) and unary operators(+,-)
 pub fn exp2(input: &str) -> PineResult<Exp2> {
@@ -343,7 +343,7 @@ pub fn block(input: &str) -> PineResult<Block> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::num::Numeral;
+    use crate::ast::num::Numeral;
     #[test]
     fn rettupledef_test() {
         assert_eq!(

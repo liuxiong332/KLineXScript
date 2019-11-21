@@ -9,8 +9,8 @@ use nom::{
 };
 use std::str::FromStr;
 
-use crate::error::{PineError, PineErrorKind, PineResult};
-use crate::utils::skip_ws;
+use super::error::{PineError, PineErrorKind, PineResult};
+use super::utils::skip_ws;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Numeral {

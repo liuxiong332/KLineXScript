@@ -1,5 +1,5 @@
-use crate::comment::comment;
-use crate::error::PineResult;
+use super::comment::comment;
+use super::error::PineResult;
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while1},

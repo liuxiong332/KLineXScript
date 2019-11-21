@@ -286,9 +286,17 @@ fn block_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<Block>
                 return Ok((next_input, Block::new(stmts, Some(ret_stmt))));
             }
         }
+        // let block = match stmts.last() {
+        //     Some(&Statement::Ite(_)) | Some(&Statement::ForRange(_)) => {
+        //         match stmts.pop().unwrap() {
+        //             Statement::Ite(s) => Block::new(stmts, Some(Exp::Ite(s))),
+        //             Statement::ForRange(s) => Block::new(stmts, Some(Exp::ForRange(s))),
+        //             _ => unreachable!(),
+        //         }
+        //     }
+        //     _ => Block::new(stmts, None),
+        // };
         Ok((cur_input, Block::new(stmts, None)))
-
-        // let (input, ()) = tuple((, opt(eat_statement(gen_indent, exp))))(input)?;
     }
 }
 

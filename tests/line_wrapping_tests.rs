@@ -6,7 +6,7 @@ use pine::op::*;
 use pine::stat_expr_types::*;
 
 mod utils;
-use utils::*;
+pub use utils::*;
 
 #[test]
 fn expr_test() {

@@ -1,4 +1,5 @@
 use nom::error::{ErrorKind, ParseError};
+use nom::Err;
 use nom::IResult;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -13,6 +14,7 @@ pub enum PineErrorKind {
     InvalidColorLiteral,
     InvalidFuncCallArgs(&'static str),
     IncorrectIndent,
+    CannotInferType,
 }
 
 #[derive(Debug, PartialEq)]
@@ -54,4 +56,8 @@ impl<I> ParseError<I> for PineError<I> {
         other.errors.push((input, PineErrorKind::Context(ctx)));
         other
     }
+}
+
+pub fn pine_err(input: &str, kind: PineErrorKind) -> Err<PineError<&str>> {
+    Err::Error(PineError::from_pine_kind(input, kind))
 }

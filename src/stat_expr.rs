@@ -419,6 +419,18 @@ mod tests {
                 )))
             ))
         );
+        assert_eq!(
+            statement_with_indent(0)("m = na \n"),
+            Ok((
+                "",
+                Statement::Assignment(Box::new(Assignment::new(
+                    VarName("m"),
+                    Exp::Na,
+                    false,
+                    None
+                )))
+            ))
+        );
     }
 
     #[test]

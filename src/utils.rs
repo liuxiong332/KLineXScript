@@ -46,16 +46,6 @@ where
     move |input: &str| delimited(&start, &fun, statement_end)(input)
 }
 
-pub trait Len {
-    fn len(&self) -> usize;
-}
-
-impl<T> Len for Vec<T> {
-    fn len(&self) -> usize {
-        Vec::len(self)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

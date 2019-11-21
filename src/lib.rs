@@ -6,6 +6,8 @@ use nom::Err;
 extern crate lazy_static;
 
 pub mod ast;
+pub mod runtime;
+pub mod types;
 
 use ast::error::{PineError, PineErrorKind};
 use ast::stat_expr::block;

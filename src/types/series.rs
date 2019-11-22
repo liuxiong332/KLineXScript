@@ -1,11 +1,13 @@
 use super::traits::PineType;
 use std::convert::From;
+use std::marker::PhantomData;
 use std::mem;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Series<'a, D: PineType<'a>> {
     current: Option<D>,
     history: Vec<Option<D>>,
+    phantom: PhantomData<&'a D>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -19,6 +21,7 @@ impl<'a, D: PineType<'a>> Series<'a, D> {
         Series {
             current: None,
             history: vec![],
+            phantom: PhantomData,
         }
     }
 
@@ -52,6 +55,7 @@ impl<'a, D: PineType<'a>> From<D> for Series<'a, D> {
         Series {
             current: Some(input),
             history: vec![],
+            phantom: PhantomData,
         }
     }
 }
@@ -61,6 +65,7 @@ impl<'a, D: PineType<'a>> From<Option<D>> for Series<'a, D> {
         Series {
             current: input,
             history: vec![],
+            phantom: PhantomData,
         }
     }
 }

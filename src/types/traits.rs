@@ -1,3 +1,5 @@
+use super::error::SeriesErr;
+
 #[derive(Debug, PartialEq)]
 pub enum SecondType {
     Simple,
@@ -24,7 +26,7 @@ pub enum ConvertErr {
 }
 
 pub trait PineStaticType {
-    fn get_type() -> (DataType, SecondType);
+    fn static_type() -> (DataType, SecondType);
 }
 
 pub trait PineType<'a> {
@@ -38,7 +40,7 @@ pub trait PineType<'a> {
 pub fn downcast<'a, T: PineStaticType + 'a>(
     item: Box<dyn PineType<'a> + 'a>,
 ) -> Result<Box<T>, ConvertErr> {
-    if T::get_type() == item.get_type() {
+    if T::static_type() == item.get_type() {
         unsafe {
             let raw: *mut dyn PineType<'a> = Box::into_raw(item);
             Ok(Box::from_raw(raw as *mut T))
@@ -54,10 +56,14 @@ pub trait PineClass {
 
 pub trait PineFrom<'a> {
     // The user force type cast
-    fn from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
-        Self::auto_from(t)
+    fn explicity_from(
+        t: Box<dyn PineType<'a> + 'a>,
+    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+        Self::implicity_from(t)
     }
 
     // Create this type from the source type for auto cast
-    fn auto_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr>;
+    fn implicity_from(
+        t: Box<dyn PineType<'a> + 'a>,
+    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr>;
 }

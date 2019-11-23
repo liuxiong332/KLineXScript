@@ -1,3 +1,4 @@
+pub mod error;
 pub mod primitive;
 pub mod series;
 pub mod traits;

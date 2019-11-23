@@ -1,4 +1,4 @@
-use super::primitive::Int;
+use super::error::SeriesErr;
 use super::traits::{
     downcast, ConvertErr, DataType, PineFrom, PineStaticType, PineType, SecondType,
 };
@@ -7,38 +7,32 @@ use std::marker::PhantomData;
 use std::mem;
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Series<'a, D: PineStaticType + PineType<'a> + 'a> {
-    current: Option<D>,
-    history: Vec<Option<D>>,
+pub struct Series<'a, D: Default + PineStaticType + PineType<'a> + 'a> {
+    current: D,
+    history: Vec<D>,
     phantom: PhantomData<&'a D>,
 }
 
-#[derive(Debug, PartialEq)]
-pub enum SeriesErr {
-    Negative,
-    OutBound,
-}
-
-impl<'a, D: PineStaticType + PineType<'a> + 'a> From<D> for Series<'a, D> {
+impl<'a, D: Default + PineStaticType + PineType<'a> + 'a> From<D> for Series<'a, D> {
     fn from(input: D) -> Self {
         Series {
-            current: Some(input),
+            current: input,
             history: vec![],
             phantom: PhantomData,
         }
     }
 }
 
-impl<'a, D: PineStaticType + PineType<'a> + 'a> Series<'a, D> {
+impl<'a, D: Default + PineStaticType + PineType<'a> + 'a> Series<'a, D> {
     pub fn new() -> Series<'a, D> {
         Series {
-            current: None,
+            current: D::default(),
             history: vec![],
             phantom: PhantomData,
         }
     }
 
-    pub fn index(&self, i: usize) -> Result<&Option<D>, SeriesErr> {
+    pub fn index(&self, i: usize) -> Result<&D, SeriesErr> {
         let len = self.history.len();
         match i {
             // m if m < 0 => Err(SeriesErr::Negative),
@@ -48,12 +42,13 @@ impl<'a, D: PineStaticType + PineType<'a> + 'a> Series<'a, D> {
         }
     }
 
-    pub fn update(&mut self, current: Option<D>) {
+    pub fn update(&mut self, current: D) {
         self.current = current;
     }
 
     pub fn commit(&mut self) {
-        self.history.push(mem::replace(&mut self.current, None));
+        self.history
+            .push(mem::replace(&mut self.current, D::default()));
     }
 
     pub fn roll_back(&mut self) {
@@ -61,23 +56,27 @@ impl<'a, D: PineStaticType + PineType<'a> + 'a> Series<'a, D> {
     }
 }
 
-impl<'a, D: PineStaticType + PineType<'a>> PineType<'a> for Series<'a, D> {
+impl<'a, D: Default + PineStaticType + PineType<'a>> PineType<'a> for Series<'a, D> {
     fn get_type(&self) -> (DataType, SecondType) {
-        (<D as PineStaticType>::get_type().0, SecondType::Series)
+        (<D as PineStaticType>::static_type().0, SecondType::Series)
     }
 }
 
-impl<'a, D: PineStaticType + PineType<'a> + 'a> PineFrom<'a> for Series<'a, D> {
-    fn from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
-        Self::auto_from(t)
+impl<'a, D: Default + PineStaticType + PineType<'a> + 'a> PineFrom<'a> for Series<'a, D> {
+    fn explicity_from(
+        t: Box<dyn PineType<'a> + 'a>,
+    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+        Self::implicity_from(t)
     }
 
-    fn auto_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
-        let data_type = <D as PineStaticType>::get_type().0;
+    fn implicity_from(
+        t: Box<dyn PineType<'a> + 'a>,
+    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+        let data_type = <D as PineStaticType>::static_type().0;
         match t.get_type() {
             (d, SecondType::Series) if data_type == d => Ok(t),
             (d, SecondType::Simple) if data_type == d => Ok(Box::new(Series {
-                current: Some(*downcast::<D>(t).unwrap()),
+                current: *downcast::<D>(t).unwrap(),
                 history: vec![],
                 phantom: PhantomData,
             })),
@@ -88,18 +87,19 @@ impl<'a, D: PineStaticType + PineType<'a> + 'a> PineFrom<'a> for Series<'a, D> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::primitive::Int;
     use super::*;
 
     #[test]
     fn series_test() {
         let int: Int = Some(1);
         let mut series = <Series<Int> as From<Int>>::from(int);
-        assert_eq!(series.index(0), Ok(&Some(Some(1))));
-        series.update(Some(Some(2)));
-        assert_eq!(series.index(0), Ok(&Some(Some(2))));
+        assert_eq!(series.index(0), Ok(&Some(1)));
+        series.update(Some(2));
+        assert_eq!(series.index(0), Ok(&Some(2)));
 
         series.commit();
-        assert_eq!(series.history, vec![Some(Some(2))]);
+        assert_eq!(series.history, vec![Some(2)]);
         assert_eq!(series.current, None);
 
         series.roll_back();

@@ -7,20 +7,22 @@ use std::marker::PhantomData;
 pub type Int = Option<i32>;
 
 impl PineStaticType for Int {
-    fn get_type() -> (DataType, SecondType) {
+    fn static_type() -> (DataType, SecondType) {
         (DataType::Int, SecondType::Simple)
     }
 }
 
 impl<'a> PineType<'a> for Option<i32> {
     fn get_type(&self) -> (DataType, SecondType) {
-        <Self as PineStaticType>::get_type()
+        <Self as PineStaticType>::static_type()
     }
 }
 
 impl<'a> PineFrom<'a> for Int {
     // NA -> Int Float -> Int
-    fn from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+    fn explicity_from(
+        t: Box<dyn PineType<'a> + 'a>,
+    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
         match t.get_type() {
             (DataType::Int, SecondType::Simple) => Ok(t),
             (DataType::NA, SecondType::Simple) => {
@@ -40,7 +42,9 @@ impl<'a> PineFrom<'a> for Int {
     }
 
     // NA -> Int
-    fn auto_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+    fn implicity_from(
+        t: Box<dyn PineType<'a> + 'a>,
+    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
         match t.get_type() {
             (DataType::Int, SecondType::Simple) => Ok(t),
             (DataType::NA, SecondType::Simple) => {
@@ -55,13 +59,13 @@ impl<'a> PineFrom<'a> for Int {
 // pine float type
 pub type Float = Option<f64>;
 impl PineStaticType for Float {
-    fn get_type() -> (DataType, SecondType) {
+    fn static_type() -> (DataType, SecondType) {
         (DataType::Float, SecondType::Simple)
     }
 }
 impl<'a> PineType<'a> for Float {
     fn get_type(&self) -> (DataType, SecondType) {
-        <Self as PineStaticType>::get_type()
+        <Self as PineStaticType>::static_type()
     }
 }
 
@@ -75,8 +79,11 @@ fn int2float<'a>(t: Box<dyn PineType<'a> + 'a>) -> Box<dyn PineType<'a> + 'a> {
 }
 
 impl<'a> PineFrom<'a> for Float {
-    fn from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+    fn explicity_from(
+        t: Box<dyn PineType<'a> + 'a>,
+    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
         match t.get_type() {
+            (DataType::Float, SecondType::Simple) => Ok(t),
             (DataType::NA, SecondType::Simple) => {
                 let i: Float = None;
                 Ok(Box::new(i))
@@ -86,7 +93,9 @@ impl<'a> PineFrom<'a> for Float {
         }
     }
 
-    fn auto_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+    fn implicity_from(
+        t: Box<dyn PineType<'a> + 'a>,
+    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
         match t.get_type() {
             (DataType::Float, SecondType::Simple) => Ok(t),
             (DataType::NA, SecondType::Simple) => {
@@ -102,77 +111,77 @@ impl<'a> PineFrom<'a> for Float {
 // pine bool type
 pub type Bool = bool;
 impl PineStaticType for Bool {
-    fn get_type() -> (DataType, SecondType) {
+    fn static_type() -> (DataType, SecondType) {
         (DataType::Bool, SecondType::Simple)
     }
 }
 impl<'a> PineType<'a> for Bool {
     fn get_type(&self) -> (DataType, SecondType) {
-        <Self as PineStaticType>::get_type()
+        <Self as PineStaticType>::static_type()
     }
 }
 
 // pine color type
 pub struct Color<'a>(pub &'a str);
 impl<'a> PineStaticType for Color<'a> {
-    fn get_type() -> (DataType, SecondType) {
+    fn static_type() -> (DataType, SecondType) {
         (DataType::Color, SecondType::Simple)
     }
 }
 impl<'a> PineType<'a> for Color<'a> {
     fn get_type(&self) -> (DataType, SecondType) {
-        <Self as PineStaticType>::get_type()
+        <Self as PineStaticType>::static_type()
     }
 }
 
 impl PineStaticType for String {
-    fn get_type() -> (DataType, SecondType) {
+    fn static_type() -> (DataType, SecondType) {
         (DataType::String, SecondType::Simple)
     }
 }
 // pine string type
 impl<'a> PineType<'a> for String {
     fn get_type(&self) -> (DataType, SecondType) {
-        <Self as PineStaticType>::get_type()
+        <Self as PineStaticType>::static_type()
     }
 }
 
 // pine na type
 pub struct NA;
 impl PineStaticType for NA {
-    fn get_type() -> (DataType, SecondType) {
+    fn static_type() -> (DataType, SecondType) {
         (DataType::NA, SecondType::Simple)
     }
 }
 impl<'a> PineType<'a> for NA {
     fn get_type(&self) -> (DataType, SecondType) {
-        <Self as PineStaticType>::get_type()
+        <Self as PineStaticType>::static_type()
     }
 }
 
 // pine type that represent variable name
 pub struct PineVar<'a>(pub &'a str);
 impl<'a> PineStaticType for PineVar<'a> {
-    fn get_type() -> (DataType, SecondType) {
+    fn static_type() -> (DataType, SecondType) {
         (DataType::String, SecondType::Simple)
     }
 }
 impl<'a> PineType<'a> for PineVar<'a> {
     fn get_type(&self) -> (DataType, SecondType) {
-        <Self as PineStaticType>::get_type()
+        <Self as PineStaticType>::static_type()
     }
 }
 
 // pine tuple type
 pub struct Tuple<'a>(pub Vec<Box<dyn PineType<'a> + 'a>>);
 impl<'a> PineStaticType for Tuple<'a> {
-    fn get_type() -> (DataType, SecondType) {
+    fn static_type() -> (DataType, SecondType) {
         (DataType::String, SecondType::Simple)
     }
 }
 impl<'a> PineType<'a> for Tuple<'a> {
     fn get_type(&self) -> (DataType, SecondType) {
-        <Self as PineStaticType>::get_type()
+        <Self as PineStaticType>::static_type()
     }
 }
 
@@ -183,13 +192,13 @@ pub struct Callable<'a, D> {
     phantom: PhantomData<&'a D>,
 }
 impl<'a, D> PineStaticType for Callable<'a, D> {
-    fn get_type() -> (DataType, SecondType) {
+    fn static_type() -> (DataType, SecondType) {
         (DataType::String, SecondType::Simple)
     }
 }
 impl<'a, D> PineType<'a> for Callable<'a, D> {
     fn get_type(&self) -> (DataType, SecondType) {
-        <Self as PineStaticType>::get_type()
+        <Self as PineStaticType>::static_type()
     }
 }
 
@@ -222,5 +231,51 @@ where
             }
         }
         Ok((self.func)(pos_args))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::primitive::Int;
+    use super::*;
+
+    #[test]
+    fn int_test() {
+        assert_eq!(
+            <Int as PineStaticType>::static_type(),
+            (DataType::Int, SecondType::Simple)
+        );
+        assert_eq!(
+            <Int as PineType>::get_type(&Int::default()),
+            (DataType::Int, SecondType::Simple)
+        );
+
+        assert!(Int::implicity_from(Box::new(NA)).is_ok());
+        assert!(Int::explicity_from(Box::new(Some(3i32))).is_ok());
+        assert!(Int::explicity_from(Box::new(Some(3f64))).is_ok());
+        assert_eq!(
+            downcast::<Int>(Int::explicity_from(Box::new(Some(3f64))).unwrap()),
+            Ok(Box::new(Some(3i32)))
+        );
+    }
+
+    #[test]
+    fn float_test() {
+        assert_eq!(
+            <Float as PineStaticType>::static_type(),
+            (DataType::Float, SecondType::Simple)
+        );
+        assert_eq!(
+            <Float as PineType>::get_type(&Default::default()),
+            (DataType::Float, SecondType::Simple)
+        );
+
+        assert!(Float::implicity_from(Box::new(NA)).is_ok());
+        assert!(Float::implicity_from(Box::new(Some(3f64))).is_ok());
+        assert!(Float::implicity_from(Box::new(Some(3i32))).is_ok());
+        assert_eq!(
+            downcast::<Float>(Float::implicity_from(Box::new(Some(3i32))).unwrap()),
+            Ok(Box::new(Some(3f64)))
+        );
     }
 }

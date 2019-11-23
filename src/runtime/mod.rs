@@ -18,8 +18,8 @@ impl<'a> Runner<'a> for Exp<'a> {
         match *self {
             Exp::Na => Ok(Box::new(NA)),
             Exp::Bool(b) => Ok(Box::new(b)),
-            Exp::Num(Numeral::Float(f)) => Ok(Box::new(f)),
-            Exp::Num(Numeral::Int(n)) => Ok(Box::new(n)),
+            // Exp::Num(Numeral::Float(f)) => Ok(Box::new(f)),
+            // Exp::Num(Numeral::Int(n)) => Ok(Box::new(n)),
             Exp::Str(ref s) => Ok(Box::new(String::from(s))),
             Exp::Color(s) => Ok(Box::new(Color(s))),
             Exp::VarName(VarName(s)) => Ok(Box::new(PineVar(s))),
@@ -37,11 +37,11 @@ impl<'a> Runner<'a> for Exp<'a> {
                 }
                 Ok(Box::new(Tuple(col)))
             }
-            Exp::TypeCast(ref type_cast) => {
-                let result: Box<dyn PineType<'a> + 'a> = type_cast.exp.run(_context)?;
-                result.into(&type_cast.data_type)
-            }
-            Exp::FuncCall(ref func_call) => {}
+            // Exp::TypeCast(ref type_cast) => {
+            //     let result: Box<dyn PineType<'a> + 'a> = type_cast.exp.run(_context)?;
+            //     result.into(&type_cast.data_type)
+            // }
+            // Exp::FuncCall(ref func_call) => {}
             _ => unreachable!(),
         }
     }

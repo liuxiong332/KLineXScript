@@ -1,10 +1,13 @@
-use super::traits::PineType;
+use super::primitive::Int;
+use super::traits::{
+    downcast, ConvertErr, DataType, PineFrom, PineStaticType, PineType, SecondType,
+};
 use std::convert::From;
 use std::marker::PhantomData;
 use std::mem;
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Series<'a, D: PineType<'a>> {
+pub struct Series<'a, D: PineStaticType + PineType<'a> + 'a> {
     current: Option<D>,
     history: Vec<Option<D>>,
     phantom: PhantomData<&'a D>,
@@ -16,7 +19,17 @@ pub enum SeriesErr {
     OutBound,
 }
 
-impl<'a, D: PineType<'a>> Series<'a, D> {
+impl<'a, D: PineStaticType + PineType<'a> + 'a> From<D> for Series<'a, D> {
+    fn from(input: D) -> Self {
+        Series {
+            current: Some(input),
+            history: vec![],
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<'a, D: PineStaticType + PineType<'a> + 'a> Series<'a, D> {
     pub fn new() -> Series<'a, D> {
         Series {
             current: None,
@@ -48,24 +61,27 @@ impl<'a, D: PineType<'a>> Series<'a, D> {
     }
 }
 
-impl<'a, D: PineType<'a>> PineType<'a> for Series<'a, D> {}
-
-impl<'a, D: PineType<'a>> From<D> for Series<'a, D> {
-    fn from(input: D) -> Self {
-        Series {
-            current: Some(input),
-            history: vec![],
-            phantom: PhantomData,
-        }
+impl<'a, D: PineStaticType + PineType<'a>> PineType<'a> for Series<'a, D> {
+    fn get_type(&self) -> (DataType, SecondType) {
+        (<D as PineStaticType>::get_type().0, SecondType::Series)
     }
 }
 
-impl<'a, D: PineType<'a>> From<Option<D>> for Series<'a, D> {
-    fn from(input: Option<D>) -> Self {
-        Series {
-            current: input,
-            history: vec![],
-            phantom: PhantomData,
+impl<'a, D: PineStaticType + PineType<'a> + 'a> PineFrom<'a> for Series<'a, D> {
+    fn from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+        Self::auto_from(t)
+    }
+
+    fn auto_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+        let data_type = <D as PineStaticType>::get_type().0;
+        match t.get_type() {
+            (d, SecondType::Series) if data_type == d => Ok(t),
+            (d, SecondType::Simple) if data_type == d => Ok(Box::new(Series {
+                current: Some(*downcast::<D>(t).unwrap()),
+                history: vec![],
+                phantom: PhantomData,
+            })),
+            _ => Err(ConvertErr::NotCompatible),
         }
     }
 }
@@ -76,17 +92,14 @@ mod tests {
 
     #[test]
     fn series_test() {
-        let series = Series::from(1);
-        assert_eq!(series.index(0), Ok(&Some(1)));
-
-        let mut series = Series::from(Some(1));
-        assert_eq!(series.index(0), Ok(&Some(1)));
-
-        series.update(Some(2));
-        assert_eq!(series.index(0), Ok(&Some(2)));
+        let int: Int = Some(1);
+        let mut series = <Series<Int> as From<Int>>::from(int);
+        assert_eq!(series.index(0), Ok(&Some(Some(1))));
+        series.update(Some(Some(2)));
+        assert_eq!(series.index(0), Ok(&Some(Some(2))));
 
         series.commit();
-        assert_eq!(series.history, vec![Some(2)]);
+        assert_eq!(series.history, vec![Some(Some(2))]);
         assert_eq!(series.current, None);
 
         series.roll_back();

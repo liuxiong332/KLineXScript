@@ -16,6 +16,9 @@ pub enum DataType {
     Line,
     Label,
     NA,
+    PineVar,
+    Tuple,
+    Callable
 }
 
 #[derive(Debug, PartialEq)]
@@ -65,5 +68,7 @@ pub trait PineFrom<'a> {
     // Create this type from the source type for auto cast
     fn implicity_from(
         t: Box<dyn PineType<'a> + 'a>,
-    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr>;
+    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+        Err(ConvertErr::NotCompatible)
+    }
 }

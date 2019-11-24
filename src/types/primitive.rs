@@ -164,17 +164,22 @@ impl<'a> PineType<'a> for Color<'a> {
     }
 }
 
+impl<'a> PineFrom<'a> for Color<'a> {}
+
 impl PineStaticType for String {
     fn static_type() -> (DataType, SecondType) {
         (DataType::String, SecondType::Simple)
     }
 }
+
 // pine string type
 impl<'a> PineType<'a> for String {
     fn get_type(&self) -> (DataType, SecondType) {
         <Self as PineStaticType>::static_type()
     }
 }
+
+impl<'a> PineFrom<'a> for String {}
 
 // pine na type
 pub struct NA;
@@ -189,11 +194,13 @@ impl<'a> PineType<'a> for NA {
     }
 }
 
+impl<'a> PineFrom<'a> for NA {}
+
 // pine type that represent variable name
 pub struct PineVar<'a>(pub &'a str);
 impl<'a> PineStaticType for PineVar<'a> {
     fn static_type() -> (DataType, SecondType) {
-        (DataType::String, SecondType::Simple)
+        (DataType::PineVar, SecondType::Simple)
     }
 }
 impl<'a> PineType<'a> for PineVar<'a> {
@@ -201,12 +208,13 @@ impl<'a> PineType<'a> for PineVar<'a> {
         <Self as PineStaticType>::static_type()
     }
 }
+impl<'a> PineFrom<'a> for PineVar<'a> {}
 
 // pine tuple type
 pub struct Tuple<'a>(pub Vec<Box<dyn PineType<'a> + 'a>>);
 impl<'a> PineStaticType for Tuple<'a> {
     fn static_type() -> (DataType, SecondType) {
-        (DataType::String, SecondType::Simple)
+        (DataType::Tuple, SecondType::Simple)
     }
 }
 impl<'a> PineType<'a> for Tuple<'a> {
@@ -214,6 +222,7 @@ impl<'a> PineType<'a> for Tuple<'a> {
         <Self as PineStaticType>::static_type()
     }
 }
+impl<'a> PineFrom<'a> for Tuple<'a> {}
 
 // pine callable type
 pub struct Callable<'a, D> {
@@ -223,7 +232,7 @@ pub struct Callable<'a, D> {
 }
 impl<'a, D> PineStaticType for Callable<'a, D> {
     fn static_type() -> (DataType, SecondType) {
-        (DataType::String, SecondType::Simple)
+        (DataType::Callable, SecondType::Simple)
     }
 }
 impl<'a, D> PineType<'a> for Callable<'a, D> {
@@ -231,6 +240,7 @@ impl<'a, D> PineType<'a> for Callable<'a, D> {
         <Self as PineStaticType>::static_type()
     }
 }
+impl<'a, D> PineFrom<'a> for Callable<'a, D> {}
 
 impl<'a, D> Callable<'a, D>
 where
@@ -319,7 +329,7 @@ mod tests {
             (DataType::Bool, SecondType::Simple)
         );
         assert_eq!(
-            <Bool as PineType>::get_type(&Default::default()),
+            <Bool as PineType>::get_type(&Bool::default()),
             (DataType::Bool, SecondType::Simple)
         );
         assert_eq!(from_bool(true), Ok(Box::new(true)));
@@ -332,5 +342,14 @@ mod tests {
 
         assert_eq!(from_bool(Some(3f64)), Ok(Box::new(true)));
         assert_eq!(from_bool(None as Float), Ok(Box::new(false)));
+    }
+
+    #[test]
+    fn color_test() {
+        assert_eq!(Color::static_type(), (DataType::Color, SecondType::Simple));
+        assert_eq!(
+            Color::get_type(&Color("")),
+            (DataType::Color, SecondType::Simple)
+        );
     }
 }

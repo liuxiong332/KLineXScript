@@ -1,15 +1,18 @@
 use super::ast::name::VarName;
 use super::ast::num::Numeral;
-use super::ast::stat_expr_types::{DataType, Exp, FunctionCall, Statement, TypeCast};
+use super::ast::stat_expr_types::{
+    DataType, Exp, FunctionCall, PrefixExp, RefCall, Statement, TypeCast,
+};
 use super::types::{
-    downcast, Bool, Callable, Color, ConvertErr, DataType as FirstType, Float, Int, PineFrom,
-    PineType, PineVar, SecondType, Tuple, NA,
+    downcast, Bool, Callable, Color, ConvertErr, DataType as FirstType, Float, Int, Object,
+    PineFrom, PineType, PineVar, SecondType, Tuple, NA,
 };
 use std::collections::HashMap;
 
 struct Context<'a> {
     input: &'a str,
-    vars: HashMap<&'a str, Box<dyn PineType<'a>>>,
+    vars: HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
+    objects: HashMap<&'a str, Box<Object<'a>>>,
 }
 
 trait Runner<'a> {
@@ -42,6 +45,7 @@ impl<'a> Runner<'a> for Exp<'a> {
             }
             Exp::TypeCast(ref type_cast) => type_cast.run(_context),
             Exp::FuncCall(ref func_call) => func_call.run(_context),
+            // Exp::RefCall(ref ref_call) => {}
             _ => unreachable!(),
         }
     }
@@ -79,6 +83,29 @@ impl<'a> Runner<'a> for FunctionCall<'a> {
             }
             _ => Err(ConvertErr::NotSupportOperator),
         }
+    }
+}
+
+impl<'a> Runner<'a> for PrefixExp<'a> {
+    fn run(&self, context: &mut Context<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+        let varname = self.var_chain[0].0;
+        let var = context.objects.get(varname);
+        if var.is_none() {
+            return Err(ConvertErr::NotSupportOperator);
+        }
+        let var_unwrap = var.unwrap();
+        let name = self.var_chain[1];
+        let mut subobj = var_unwrap.get(name.0)?;
+        for name in self.var_chain[2..].iter() {
+            match subobj.get_type() {
+                (FirstType::Object, SecondType::Simple) => {
+                    let obj = downcast::<Object>(subobj).unwrap();
+                    subobj = obj.get(name.0)?;
+                }
+                _ => return Err(ConvertErr::NotSupportOperator),
+            }
+        }
+        Ok(subobj)
     }
 }
 

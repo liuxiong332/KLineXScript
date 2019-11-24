@@ -18,7 +18,8 @@ pub enum DataType {
     NA,
     PineVar,
     Tuple,
-    Callable
+    Callable,
+    Object,
 }
 
 #[derive(Debug, PartialEq)]
@@ -54,6 +55,8 @@ pub fn downcast<'a, T: PineStaticType + 'a>(
 }
 
 pub trait PineClass<'a> {
+    fn custom_type(&self) -> &str;
+
     fn get(&self, name: &str) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr>;
 
     fn set(&self, name: &str, property: Box<dyn PineType<'a> + 'a>) -> Result<(), ConvertErr>;

@@ -1,5 +1,5 @@
 use super::traits::{
-    downcast, ConvertErr, DataType, PineFrom, PineStaticType, PineType, SecondType,
+    downcast, ConvertErr, DataType, PineClass, PineFrom, PineStaticType, PineType, SecondType,
 };
 use std::collections::HashMap;
 use std::marker::PhantomData;
@@ -277,6 +277,35 @@ impl<'a> Callable<'a> {
             }
         }
         (self.func)(all_args)
+    }
+}
+
+pub struct Object<'a> {
+    obj: Box<dyn PineClass<'a> + 'a>,
+}
+impl<'a> PineStaticType for Object<'a> {
+    fn static_type() -> (DataType, SecondType) {
+        (DataType::Object, SecondType::Simple)
+    }
+}
+impl<'a> PineType<'a> for Object<'a> {
+    fn get_type(&self) -> (DataType, SecondType) {
+        <Self as PineStaticType>::static_type()
+    }
+}
+impl<'a> PineFrom<'a> for Object<'a> {}
+
+impl<'a> Object<'a> {
+    pub fn new(obj: Box<dyn PineClass<'a> + 'a>) -> Object<'a> {
+        Object { obj }
+    }
+
+    pub fn get(&self, name: &str) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+        self.obj.get(name)
+    }
+
+    pub fn set(&self, name: &str, property: Box<dyn PineType<'a> + 'a>) -> Result<(), ConvertErr> {
+        self.obj.set(name, property)
     }
 }
 

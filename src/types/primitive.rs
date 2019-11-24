@@ -1,6 +1,7 @@
 use super::traits::{
     downcast, ConvertErr, DataType, PineFrom, PineStaticType, PineType, SecondType,
 };
+use std::collections::HashMap;
 use std::marker::PhantomData;
 
 // pine int type
@@ -244,7 +245,9 @@ impl<'a, D> PineFrom<'a> for Callable<'a, D> {}
 
 impl<'a, D> Callable<'a, D>
 where
-    D: Fn(Vec<Box<dyn PineType<'a> + 'a>>) -> Box<dyn PineType<'a> + 'a>,
+    D: Fn(
+        HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
+    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr>,
 {
     fn new(func: D, param_names: Vec<&'static str>) -> Callable<'a, D> {
         Callable {
@@ -256,21 +259,28 @@ where
 
     fn call(
         &self,
-        mut pos_args: Vec<Box<dyn PineType<'a> + 'a>>,
+        pos_args: Vec<Box<dyn PineType<'a> + 'a>>,
         dict_args: Vec<(Box<PineVar<'a>>, Box<dyn PineType<'a> + 'a>)>,
     ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
         if pos_args.len() > self.param_names.len() {
             return Err(ConvertErr::NotValidParam);
         }
-        pos_args.resize_with(self.param_names.len(), || Box::new(NA));
 
+        let mut all_args: HashMap<&'a str, Box<dyn PineType<'a> + 'a>> = HashMap::new();
+        for (i, val) in pos_args.into_iter().enumerate() {
+            let name = self.param_names[i];
+            all_args.insert(name, val);
+        }
         for (varname, val) in dict_args.into_iter() {
-            match self.param_names.iter().position(|&v| (*varname).0 == v) {
-                None => return Err(ConvertErr::NotValidParam),
-                Some(index) => pos_args[index] = val,
+            let name = (*varname).0;
+            match self.param_names.iter().any(|&v| name == v) {
+                false => return Err(ConvertErr::NotValidParam),
+                true => {
+                    all_args.insert(name, val);
+                }
             }
         }
-        Ok((self.func)(pos_args))
+        (self.func)(all_args)
     }
 }
 
@@ -350,6 +360,36 @@ mod tests {
         assert_eq!(
             Color::get_type(&Color("")),
             (DataType::Color, SecondType::Simple)
+        );
+    }
+
+    fn vec2tuple2<I>(v: Vec<I>) -> (I, I) {
+        let mut iter = v.into_iter();
+        (iter.next().unwrap(), iter.next().unwrap())
+    }
+
+    fn test_func<'a>(
+        mut args: HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
+    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+        let (arg1, arg2) = (args.remove("arg1").unwrap(), args.remove("arg2").unwrap());
+        let s: Int =
+            Some(downcast::<Int>(arg1).unwrap().unwrap() + downcast::<Int>(arg2).unwrap().unwrap());
+        Ok(Box::new(s) as Box<dyn PineType>)
+    }
+
+    #[test]
+    fn callable_test() {
+        let callable = Callable::new(test_func, vec!["arg1", "arg2"]);
+        let call_res = callable.call(
+            vec![
+                Box::new(Some(1)) as Box<dyn PineType>,
+                Box::new(Some(2)) as Box<dyn PineType>,
+            ],
+            vec![],
+        );
+        assert_eq!(
+            downcast::<Int>(call_res.unwrap()).unwrap(),
+            Box::new(Some(3))
         );
     }
 }

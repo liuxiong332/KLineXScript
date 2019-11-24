@@ -53,8 +53,10 @@ pub fn downcast<'a, T: PineStaticType + 'a>(
     }
 }
 
-pub trait PineClass {
-    fn get<'a, D: PineType<'a>, E>(&self, name: &str) -> Result<D, E>;
+pub trait PineClass<'a> {
+    fn get(&self, name: &str) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr>;
+
+    fn set(&self, name: &str, property: Box<dyn PineType<'a> + 'a>) -> Result<(), ConvertErr>;
 }
 
 pub trait PineFrom<'a> {

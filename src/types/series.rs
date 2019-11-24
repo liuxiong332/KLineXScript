@@ -56,6 +56,12 @@ impl<'a, D: Default + PineStaticType + PineType<'a> + 'a> Series<'a, D> {
     }
 }
 
+impl<'a, D: Default + PineStaticType + PineType<'a> + 'a> PineStaticType for Series<'a, D> {
+    fn static_type() -> (DataType, SecondType) {
+        (<D as PineStaticType>::static_type().0, SecondType::Series)
+    }
+}
+
 impl<'a, D: Default + PineStaticType + PineType<'a>> PineType<'a> for Series<'a, D> {
     fn get_type(&self) -> (DataType, SecondType) {
         (<D as PineStaticType>::static_type().0, SecondType::Series)

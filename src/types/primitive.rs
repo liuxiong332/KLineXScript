@@ -82,15 +82,7 @@ impl<'a> PineFrom<'a> for Float {
     fn explicity_from(
         t: Box<dyn PineType<'a> + 'a>,
     ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
-        match t.get_type() {
-            (DataType::Float, SecondType::Simple) => Ok(t),
-            (DataType::NA, SecondType::Simple) => {
-                let i: Float = None;
-                Ok(Box::new(i))
-            }
-            (DataType::Int, SecondType::Simple) => Ok(int2float(t)),
-            _ => Err(ConvertErr::NotCompatible),
-        }
+        Self::implicity_from(t)
     }
 
     fn implicity_from(
@@ -118,6 +110,44 @@ impl PineStaticType for Bool {
 impl<'a> PineType<'a> for Bool {
     fn get_type(&self) -> (DataType, SecondType) {
         <Self as PineStaticType>::static_type()
+    }
+}
+
+impl<'a> PineFrom<'a> for Bool {
+    fn explicity_from(
+        t: Box<dyn PineType<'a> + 'a>,
+    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+        Self::implicity_from(t)
+    }
+
+    fn implicity_from(
+        t: Box<dyn PineType<'a> + 'a>,
+    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+        match t.get_type() {
+            (DataType::Bool, SecondType::Simple) => Ok(t),
+            (DataType::NA, SecondType::Simple) => {
+                let i: Bool = false;
+                Ok(Box::new(i))
+            }
+            (DataType::Float, SecondType::Simple) => {
+                let f: Box<Float> = downcast::<Float>(t).unwrap();
+                let b: Bool = match *f {
+                    Some(_) => true,
+                    None => false,
+                };
+                Ok(Box::new(b))
+            }
+
+            (DataType::Int, SecondType::Simple) => {
+                let f: Box<Int> = downcast::<Int>(t).unwrap();
+                let b: Bool = match *f {
+                    Some(_) => true,
+                    None => false,
+                };
+                Ok(Box::new(b))
+            }
+            _ => Err(ConvertErr::NotCompatible),
+        }
     }
 }
 
@@ -277,5 +307,30 @@ mod tests {
             downcast::<Float>(Float::implicity_from(Box::new(Some(3i32))).unwrap()),
             Ok(Box::new(Some(3f64)))
         );
+    }
+
+    fn from_bool<'a, D: PineType<'a> + 'a>(val: D) -> Result<Box<Bool>, ConvertErr> {
+        downcast::<Bool>(Bool::implicity_from(Box::new(val)).unwrap())
+    }
+    #[test]
+    fn bool_test() {
+        assert_eq!(
+            <Bool as PineStaticType>::static_type(),
+            (DataType::Bool, SecondType::Simple)
+        );
+        assert_eq!(
+            <Bool as PineType>::get_type(&Default::default()),
+            (DataType::Bool, SecondType::Simple)
+        );
+        assert_eq!(from_bool(true), Ok(Box::new(true)));
+        assert_eq!(from_bool(false), Ok(Box::new(false)));
+
+        assert_eq!(from_bool(NA), Ok(Box::new(false)));
+
+        assert_eq!(from_bool(Some(3i32)), Ok(Box::new(true)));
+        assert_eq!(from_bool(None as Int), Ok(Box::new(false)));
+
+        assert_eq!(from_bool(Some(3f64)), Ok(Box::new(true)));
+        assert_eq!(from_bool(None as Float), Ok(Box::new(false)));
     }
 }

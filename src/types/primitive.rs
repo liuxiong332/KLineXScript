@@ -226,41 +226,38 @@ impl<'a> PineType<'a> for Tuple<'a> {
 impl<'a> PineFrom<'a> for Tuple<'a> {}
 
 // pine callable type
-pub struct Callable<'a, D> {
-    func: D,
+pub struct Callable<'a> {
+    func: fn(
+        HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
+    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr>,
     param_names: Vec<&'static str>,
-    phantom: PhantomData<&'a D>,
 }
-impl<'a, D> PineStaticType for Callable<'a, D> {
+impl<'a> PineStaticType for Callable<'a> {
     fn static_type() -> (DataType, SecondType) {
         (DataType::Callable, SecondType::Simple)
     }
 }
-impl<'a, D> PineType<'a> for Callable<'a, D> {
+impl<'a> PineType<'a> for Callable<'a> {
     fn get_type(&self) -> (DataType, SecondType) {
         <Self as PineStaticType>::static_type()
     }
 }
-impl<'a, D> PineFrom<'a> for Callable<'a, D> {}
+impl<'a> PineFrom<'a> for Callable<'a> {}
 
-impl<'a, D> Callable<'a, D>
-where
-    D: Fn(
-        HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
-    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr>,
-{
-    fn new(func: D, param_names: Vec<&'static str>) -> Callable<'a, D> {
-        Callable {
-            func,
-            param_names,
-            phantom: PhantomData,
-        }
+impl<'a> Callable<'a> {
+    pub fn new(
+        func: fn(
+            HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
+        ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr>,
+        param_names: Vec<&'static str>,
+    ) -> Callable<'a> {
+        Callable { func, param_names }
     }
 
-    fn call(
+    pub fn call(
         &self,
         pos_args: Vec<Box<dyn PineType<'a> + 'a>>,
-        dict_args: Vec<(Box<PineVar<'a>>, Box<dyn PineType<'a> + 'a>)>,
+        dict_args: Vec<(&'a str, Box<dyn PineType<'a> + 'a>)>,
     ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
         if pos_args.len() > self.param_names.len() {
             return Err(ConvertErr::NotValidParam);
@@ -271,8 +268,7 @@ where
             let name = self.param_names[i];
             all_args.insert(name, val);
         }
-        for (varname, val) in dict_args.into_iter() {
-            let name = (*varname).0;
+        for (name, val) in dict_args.into_iter() {
             match self.param_names.iter().any(|&v| name == v) {
                 false => return Err(ConvertErr::NotValidParam),
                 true => {

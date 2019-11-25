@@ -388,11 +388,6 @@ mod tests {
         );
     }
 
-    fn vec2tuple2<I>(v: Vec<I>) -> (I, I) {
-        let mut iter = v.into_iter();
-        (iter.next().unwrap(), iter.next().unwrap())
-    }
-
     fn test_func<'a>(
         mut args: HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
     ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
@@ -415,6 +410,37 @@ mod tests {
         assert_eq!(
             downcast::<Int>(call_res.unwrap()).unwrap(),
             Box::new(Some(3))
+        );
+    }
+
+    struct A;
+    impl<'a> PineClass<'a> for A {
+        fn custom_type(&self) -> &str {
+            "Custom A"
+        }
+
+        fn get(&self, name: &str) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+            match name {
+                "int1" => Ok(Box::new(Some(1i32))),
+                "int2" => Ok(Box::new(Some(2i32))),
+                "float1" => Ok(Box::new(Some(1f64))),
+                "float2" => Ok(Box::new(Some(2f64))),
+                _ => Err(ConvertErr::NotSupportOperator),
+            }
+        }
+
+        fn set(&self, _n: &str, _p: Box<dyn PineType<'a> + 'a>) -> Result<(), ConvertErr> {
+            Err(ConvertErr::NotSupportOperator)
+        }
+    }
+
+    #[test]
+    fn object_test() {
+        let obj = Object::new(Box::new(A));
+        assert_eq!(obj.get_type(), (DataType::Object, SecondType::Simple));
+        assert_eq!(
+            downcast::<Int>(obj.get("int1").unwrap()).unwrap(),
+            Box::new(Some(1))
         );
     }
 }

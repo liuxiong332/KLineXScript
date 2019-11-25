@@ -10,9 +10,15 @@ use super::types::{
 use std::collections::HashMap;
 
 struct Context<'a> {
-    input: &'a str,
-    vars: HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
+    // input: &'a str,
+    // vars: HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
     objects: HashMap<&'a str, Box<Object<'a>>>,
+}
+
+impl<'a> Context<'a> {
+    fn new(objects: HashMap<&'a str, Box<Object<'a>>>) -> Context<'a> {
+        Context { objects }
+    }
 }
 
 trait Runner<'a> {
@@ -112,7 +118,35 @@ impl<'a> Runner<'a> for PrefixExp<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    use crate::types::PineClass;
     #[test]
-    fn test() {}
+    fn prefix_exp_test() {
+        struct A;
+        impl<'a> PineClass<'a> for A {
+            fn custom_type(&self) -> &str {
+                "Custom A"
+            }
+
+            fn get(&self, name: &str) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+                match name {
+                    "int" => Ok(Box::new(Some(1i32))),
+                    "object" => Ok(Box::new(Object::new(Box::new(A)))),
+                    _ => Err(ConvertErr::NotSupportOperator),
+                }
+            }
+        }
+
+        let mut objects: HashMap<&str, Box<Object>> = HashMap::new();
+        objects.insert("obja", Box::new(Object::new(Box::new(A))));
+        let mut context = Context::new(objects);
+
+        let exp = PrefixExp {
+            var_chain: vec![VarName("obja"), VarName("object"), VarName("int")],
+        };
+        assert_eq!(
+            downcast::<Int>(exp.run(&mut context).unwrap()),
+            Ok(Box::new(Some(1)))
+        );
+        // Context::new()
+    }
 }

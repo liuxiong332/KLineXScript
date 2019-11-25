@@ -260,7 +260,14 @@ impl<'a> PineType<'a> for String {
     }
 }
 
-impl<'a> PineFrom<'a, String> for String {}
+impl<'a> PineFrom<'a, String> for String {
+    fn implicity_from(_t: Box<dyn PineType<'a> + 'a>) -> Result<Box<String>, ConvertErr> {
+        match _t.get_type() {
+            (DataType::String, SecondType::Simple) => Ok(downcast::<String>(_t)?),
+            _ => Err(ConvertErr::NotSupportOperator),
+        }
+    }
+}
 
 // pine na type
 pub struct NA;

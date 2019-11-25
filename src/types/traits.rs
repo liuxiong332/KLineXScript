@@ -79,3 +79,15 @@ pub trait PineFrom<'a, D: 'a> {
 pub trait Negative<D> {
     fn negative(self) -> D;
 }
+
+pub trait Arithmetic {
+    fn add(self, other: Self) -> Self;
+
+    fn minus(self, other: Self) -> Self;
+
+    fn mul(self, other: Self) -> Self;
+
+    fn div(self, other: Self) -> Self;
+
+    fn rem(self, other: Self) -> Self;
+}

@@ -1,6 +1,6 @@
 use super::traits::{
-    downcast, ConvertErr, DataType, Negative, PineClass, PineFrom, PineStaticType, PineType,
-    SecondType,
+    downcast, Arithmetic, ConvertErr, DataType, Negative, PineClass, PineFrom, PineStaticType,
+    PineType, SecondType,
 };
 use std::collections::HashMap;
 
@@ -12,6 +12,43 @@ impl Negative<Int> for Int {
         match self {
             Some(i) => Some(-i),
             None => None,
+        }
+    }
+}
+
+impl Arithmetic for Int {
+    fn add(self, other: Self) -> Self {
+        match (self, other) {
+            (Some(i1), Some(i2)) => Some(i1 + i2),
+            _ => None,
+        }
+    }
+
+    fn minus(self, other: Self) -> Self {
+        match (self, other) {
+            (Some(i1), Some(i2)) => Some(i1 - i2),
+            _ => None,
+        }
+    }
+
+    fn mul(self, other: Self) -> Self {
+        match (self, other) {
+            (Some(i1), Some(i2)) => Some(i1 * i2),
+            _ => None,
+        }
+    }
+
+    fn div(self, other: Self) -> Self {
+        match (self, other) {
+            (Some(i1), Some(i2)) => Some(i1 / i2),
+            _ => None,
+        }
+    }
+
+    fn rem(self, other: Self) -> Self {
+        match (self, other) {
+            (Some(i1), Some(i2)) => Some(i1 % i2),
+            _ => None,
         }
     }
 }
@@ -74,6 +111,42 @@ impl Negative<Float> for Float {
     }
 }
 
+impl Arithmetic for Float {
+    fn add(self, other: Self) -> Self {
+        match (self, other) {
+            (Some(i1), Some(i2)) => Some(i1 + i2),
+            _ => None,
+        }
+    }
+
+    fn minus(self, other: Self) -> Self {
+        match (self, other) {
+            (Some(i1), Some(i2)) => Some(i1 - i2),
+            _ => None,
+        }
+    }
+
+    fn mul(self, other: Self) -> Self {
+        match (self, other) {
+            (Some(i1), Some(i2)) => Some(i1 * i2),
+            _ => None,
+        }
+    }
+
+    fn div(self, other: Self) -> Self {
+        match (self, other) {
+            (Some(i1), Some(i2)) => Some(i1 / i2),
+            _ => None,
+        }
+    }
+
+    fn rem(self, other: Self) -> Self {
+        match (self, other) {
+            (Some(i1), Some(i2)) => Some(i1 % i2),
+            _ => None,
+        }
+    }
+}
 impl PineStaticType for Float {
     fn static_type() -> (DataType, SecondType) {
         (DataType::Float, SecondType::Simple)

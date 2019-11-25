@@ -248,5 +248,17 @@ mod tests {
             biop_runner(BinaryOp::BoolAnd, Exp::Bool(false), Exp::Bool(true)),
             Ok(Box::new(false))
         );
+        assert_eq!(
+            biop_runner(BinaryOp::BoolAnd, Exp::Bool(false), Exp::Bool(false)),
+            Ok(Box::new(false))
+        );
+        assert_eq!(
+            biop_runner(BinaryOp::BoolOr, Exp::Bool(false), Exp::Bool(true)),
+            Ok(Box::new(true))
+        );
+        assert_eq!(
+            biop_runner(BinaryOp::BoolOr, Exp::Bool(false), Exp::Bool(false)),
+            Ok(Box::new(false))
+        );
     }
 }

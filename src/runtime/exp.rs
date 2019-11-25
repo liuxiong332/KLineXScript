@@ -1,4 +1,5 @@
 use super::context::{Context, Runner};
+use super::op::{binary_op_run, unary_op_run};
 use crate::ast::name::VarName;
 use crate::ast::num::Numeral;
 pub use crate::ast::stat_expr_types::{
@@ -36,6 +37,8 @@ impl<'a> Runner<'a> for Exp<'a> {
             Exp::TypeCast(ref type_cast) => type_cast.run(_context),
             Exp::FuncCall(ref func_call) => func_call.run(_context),
             // Exp::RefCall(ref ref_call) => {}
+            Exp::UnaryExp(op, exp) => unary_op_run(op, exp, _context),
+            Exp::BinaryExp(op, exp1, exp2) => binary_op_run(op, exp1, exp2, _context),
             _ => unreachable!(),
         }
     }

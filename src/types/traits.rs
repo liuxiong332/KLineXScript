@@ -28,6 +28,9 @@ pub enum ConvertErr {
     NotValidParam,
     NotSupportOperator,
     OutBound,
+    NameDeclared,
+    InvalidTypeCast,
+    InvalidNADeclarer,
 }
 
 pub trait PineStaticType {

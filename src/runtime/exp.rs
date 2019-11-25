@@ -215,9 +215,18 @@ mod tests {
     #[test]
     fn ref_call_test() {
         let mut context = Context::new(HashMap::new());
-        // let exp = RefCall {
-        //     name: Exp::VarName("hello"),
-        //     arg: Exp::Num(Numeral::Int(1))
-        // }
+        let mut series: Series<Int> = Series::from(Some(1));
+        series.commit();
+        series.update(Some(2));
+        context.vars.insert("hello", Box::new(series));
+
+        let exp = RefCall {
+            name: Exp::VarName(VarName("hello")),
+            arg: Exp::Num(Numeral::Int(1)),
+        };
+        assert_eq!(
+            downcast::<Int>(exp.run(&mut context).unwrap()),
+            Ok(Box::new(Some(1)))
+        );
     }
 }

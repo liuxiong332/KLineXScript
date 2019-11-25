@@ -7,8 +7,8 @@ use crate::types::{
 };
 
 pub fn unary_op_run<'a>(
-    op: UnaryOp,
-    exp: Box<Exp<'a>>,
+    op: &UnaryOp,
+    exp: &Box<Exp<'a>>,
     context: &mut Context<'a>,
 ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
     match op {
@@ -36,7 +36,7 @@ pub fn unary_op_run<'a>(
     }
 }
 fn bi_operate<'a, D: Arithmetic + PartialOrd + PartialEq + PineType<'a> + 'a>(
-    op: BinaryOp,
+    op: &BinaryOp,
     d1: Box<D>,
     d2: Box<D>,
 ) -> Box<dyn PineType<'a> + 'a> {
@@ -57,9 +57,9 @@ fn bi_operate<'a, D: Arithmetic + PartialOrd + PartialEq + PineType<'a> + 'a>(
 }
 
 pub fn binary_op_run<'a>(
-    op: BinaryOp,
-    exp1: Box<Exp<'a>>,
-    exp2: Box<Exp<'a>>,
+    op: &BinaryOp,
+    exp1: &Box<Exp<'a>>,
+    exp2: &Box<Exp<'a>>,
     context: &mut Context<'a>,
 ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
     match op {
@@ -122,8 +122,8 @@ mod tests {
         assert_eq!(
             downcast::<Int>(
                 unary_op_run(
-                    UnaryOp::Minus,
-                    Box::new(Exp::Num(Numeral::Int(1))),
+                    &UnaryOp::Minus,
+                    &Box::new(Exp::Num(Numeral::Int(1))),
                     &mut context,
                 )
                 .unwrap()
@@ -133,7 +133,7 @@ mod tests {
 
         assert_eq!(
             downcast::<Bool>(
-                unary_op_run(UnaryOp::BoolNot, Box::new(Exp::Bool(true)), &mut context,).unwrap()
+                unary_op_run(&UnaryOp::BoolNot, &Box::new(Exp::Bool(true)), &mut context,).unwrap()
             ),
             Ok(Box::new(false))
         );
@@ -153,7 +153,7 @@ mod tests {
         v2: Exp<'a>,
     ) -> Result<Box<D>, ConvertErr> {
         let mut context = Context::new(HashMap::new());
-        downcast::<D>(binary_op_run(op, Box::new(v1), Box::new(v2), &mut context).unwrap())
+        downcast::<D>(binary_op_run(&op, &Box::new(v1), &Box::new(v2), &mut context).unwrap())
     }
 
     #[test]

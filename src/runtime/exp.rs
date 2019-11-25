@@ -37,8 +37,8 @@ impl<'a> Runner<'a> for Exp<'a> {
             Exp::TypeCast(ref type_cast) => type_cast.run(_context),
             Exp::FuncCall(ref func_call) => func_call.run(_context),
             // Exp::RefCall(ref ref_call) => {}
-            Exp::UnaryExp(op, exp) => unary_op_run(op, exp, _context),
-            Exp::BinaryExp(op, exp1, exp2) => binary_op_run(op, exp1, exp2, _context),
+            Exp::UnaryExp(ref op, ref exp) => unary_op_run(op, exp, _context),
+            Exp::BinaryExp(ref op, ref exp1, ref exp2) => binary_op_run(op, exp1, exp2, _context),
             _ => unreachable!(),
         }
     }

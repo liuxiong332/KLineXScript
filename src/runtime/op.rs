@@ -241,4 +241,12 @@ mod tests {
             Ok(Box::new(false))
         );
     }
+
+    #[test]
+    fn logic_test() {
+        assert_eq!(
+            biop_runner(BinaryOp::BoolAnd, Exp::Bool(false), Exp::Bool(true)),
+            Ok(Box::new(false))
+        );
+    }
 }

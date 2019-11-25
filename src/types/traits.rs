@@ -64,18 +64,18 @@ pub trait PineClass<'a> {
     }
 }
 
-pub trait PineFrom<'a> {
+pub trait PineFrom<'a, D: 'a> {
     // The user force type cast
-    fn explicity_from(
-        t: Box<dyn PineType<'a> + 'a>,
-    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+    fn explicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<D>, ConvertErr> {
         Self::implicity_from(t)
     }
 
     // Create this type from the source type for auto cast
-    fn implicity_from(
-        t: Box<dyn PineType<'a> + 'a>,
-    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+    fn implicity_from(_t: Box<dyn PineType<'a> + 'a>) -> Result<Box<D>, ConvertErr> {
         Err(ConvertErr::NotCompatible)
     }
+}
+
+pub trait Negative<D> {
+    fn negative(self) -> D;
 }

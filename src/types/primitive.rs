@@ -1,11 +1,20 @@
 use super::traits::{
-    downcast, ConvertErr, DataType, PineClass, PineFrom, PineStaticType, PineType, SecondType,
+    downcast, ConvertErr, DataType, Negative, PineClass, PineFrom, PineStaticType, PineType,
+    SecondType,
 };
 use std::collections::HashMap;
-use std::marker::PhantomData;
 
 // pine int type
 pub type Int = Option<i32>;
+
+impl Negative<Int> for Int {
+    fn negative(self) -> Int {
+        match self {
+            Some(i) => Some(-i),
+            None => None,
+        }
+    }
+}
 
 impl PineStaticType for Int {
     fn static_type() -> (DataType, SecondType) {
@@ -13,19 +22,17 @@ impl PineStaticType for Int {
     }
 }
 
-impl<'a> PineType<'a> for Option<i32> {
+impl<'a> PineType<'a> for Int {
     fn get_type(&self) -> (DataType, SecondType) {
         <Self as PineStaticType>::static_type()
     }
 }
 
-impl<'a> PineFrom<'a> for Int {
+impl<'a> PineFrom<'a, Int> for Int {
     // NA -> Int Float -> Int
-    fn explicity_from(
-        t: Box<dyn PineType<'a> + 'a>,
-    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+    fn explicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Int>, ConvertErr> {
         match t.get_type() {
-            (DataType::Int, SecondType::Simple) => Ok(t),
+            (DataType::Int, SecondType::Simple) => Ok(downcast::<Int>(t).unwrap()),
             (DataType::NA, SecondType::Simple) => {
                 let i: Int = None;
                 Ok(Box::new(i))
@@ -43,11 +50,9 @@ impl<'a> PineFrom<'a> for Int {
     }
 
     // NA -> Int
-    fn implicity_from(
-        t: Box<dyn PineType<'a> + 'a>,
-    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+    fn implicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Int>, ConvertErr> {
         match t.get_type() {
-            (DataType::Int, SecondType::Simple) => Ok(t),
+            (DataType::Int, SecondType::Simple) => Ok(downcast::<Int>(t).unwrap()),
             (DataType::NA, SecondType::Simple) => {
                 let i: Int = None;
                 Ok(Box::new(i))
@@ -59,6 +64,16 @@ impl<'a> PineFrom<'a> for Int {
 
 // pine float type
 pub type Float = Option<f64>;
+
+impl Negative<Float> for Float {
+    fn negative(self) -> Float {
+        match self {
+            Some(i) => Some(-i),
+            None => None,
+        }
+    }
+}
+
 impl PineStaticType for Float {
     fn static_type() -> (DataType, SecondType) {
         (DataType::Float, SecondType::Simple)
@@ -70,7 +85,7 @@ impl<'a> PineType<'a> for Float {
     }
 }
 
-fn int2float<'a>(t: Box<dyn PineType<'a> + 'a>) -> Box<dyn PineType<'a> + 'a> {
+fn int2float<'a>(t: Box<dyn PineType<'a> + 'a>) -> Box<Float> {
     let i: Box<Int> = downcast::<Int>(t).unwrap();
     let f: Float = match *i {
         Some(i) => Some(i as f64),
@@ -79,18 +94,14 @@ fn int2float<'a>(t: Box<dyn PineType<'a> + 'a>) -> Box<dyn PineType<'a> + 'a> {
     Box::new(f)
 }
 
-impl<'a> PineFrom<'a> for Float {
-    fn explicity_from(
-        t: Box<dyn PineType<'a> + 'a>,
-    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+impl<'a> PineFrom<'a, Float> for Float {
+    fn explicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Float>, ConvertErr> {
         Self::implicity_from(t)
     }
 
-    fn implicity_from(
-        t: Box<dyn PineType<'a> + 'a>,
-    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+    fn implicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Float>, ConvertErr> {
         match t.get_type() {
-            (DataType::Float, SecondType::Simple) => Ok(t),
+            (DataType::Float, SecondType::Simple) => Ok(downcast::<Float>(t).unwrap()),
             (DataType::NA, SecondType::Simple) => {
                 let i: Float = None;
                 Ok(Box::new(i))
@@ -114,18 +125,14 @@ impl<'a> PineType<'a> for Bool {
     }
 }
 
-impl<'a> PineFrom<'a> for Bool {
-    fn explicity_from(
-        t: Box<dyn PineType<'a> + 'a>,
-    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+impl<'a> PineFrom<'a, Bool> for Bool {
+    fn explicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Bool>, ConvertErr> {
         Self::implicity_from(t)
     }
 
-    fn implicity_from(
-        t: Box<dyn PineType<'a> + 'a>,
-    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+    fn implicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Bool>, ConvertErr> {
         match t.get_type() {
-            (DataType::Bool, SecondType::Simple) => Ok(t),
+            (DataType::Bool, SecondType::Simple) => Ok(downcast::<Bool>(t).unwrap()),
             (DataType::NA, SecondType::Simple) => {
                 let i: Bool = false;
                 Ok(Box::new(i))
@@ -165,7 +172,7 @@ impl<'a> PineType<'a> for Color<'a> {
     }
 }
 
-impl<'a> PineFrom<'a> for Color<'a> {}
+impl<'a> PineFrom<'a, Color<'a>> for Color<'a> {}
 
 impl PineStaticType for String {
     fn static_type() -> (DataType, SecondType) {
@@ -180,7 +187,7 @@ impl<'a> PineType<'a> for String {
     }
 }
 
-impl<'a> PineFrom<'a> for String {}
+impl<'a> PineFrom<'a, String> for String {}
 
 // pine na type
 pub struct NA;
@@ -195,7 +202,7 @@ impl<'a> PineType<'a> for NA {
     }
 }
 
-impl<'a> PineFrom<'a> for NA {}
+impl<'a> PineFrom<'a, NA> for NA {}
 
 // pine type that represent variable name
 pub struct PineVar<'a>(pub &'a str);
@@ -209,7 +216,7 @@ impl<'a> PineType<'a> for PineVar<'a> {
         <Self as PineStaticType>::static_type()
     }
 }
-impl<'a> PineFrom<'a> for PineVar<'a> {}
+impl<'a> PineFrom<'a, PineVar<'a>> for PineVar<'a> {}
 
 // pine tuple type
 pub struct Tuple<'a>(pub Vec<Box<dyn PineType<'a> + 'a>>);
@@ -223,7 +230,7 @@ impl<'a> PineType<'a> for Tuple<'a> {
         <Self as PineStaticType>::static_type()
     }
 }
-impl<'a> PineFrom<'a> for Tuple<'a> {}
+impl<'a> PineFrom<'a, Tuple<'a>> for Tuple<'a> {}
 
 // pine callable type
 pub struct Callable<'a> {
@@ -242,7 +249,7 @@ impl<'a> PineType<'a> for Callable<'a> {
         <Self as PineStaticType>::static_type()
     }
 }
-impl<'a> PineFrom<'a> for Callable<'a> {}
+impl<'a> PineFrom<'a, Callable<'a>> for Callable<'a> {}
 
 impl<'a> Callable<'a> {
     pub fn new(
@@ -293,7 +300,7 @@ impl<'a> PineType<'a> for Object<'a> {
         <Self as PineStaticType>::static_type()
     }
 }
-impl<'a> PineFrom<'a> for Object<'a> {}
+impl<'a> PineFrom<'a, Object<'a>> for Object<'a> {}
 
 impl<'a> Object<'a> {
     pub fn new(obj: Box<dyn PineClass<'a> + 'a>) -> Object<'a> {

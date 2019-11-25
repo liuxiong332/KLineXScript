@@ -68,19 +68,17 @@ impl<'a, D: Default + PineStaticType + PineType<'a>> PineType<'a> for Series<'a,
     }
 }
 
-impl<'a, D: Default + PineStaticType + PineType<'a> + 'a> PineFrom<'a> for Series<'a, D> {
-    fn explicity_from(
-        t: Box<dyn PineType<'a> + 'a>,
-    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+impl<'a, D: Default + PineStaticType + PineType<'a> + 'a> PineFrom<'a, Series<'a, D>>
+    for Series<'a, D>
+{
+    fn explicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Series<'a, D>>, ConvertErr> {
         Self::implicity_from(t)
     }
 
-    fn implicity_from(
-        t: Box<dyn PineType<'a> + 'a>,
-    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+    fn implicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Series<'a, D>>, ConvertErr> {
         let data_type = <D as PineStaticType>::static_type().0;
         match t.get_type() {
-            (d, SecondType::Series) if data_type == d => Ok(t),
+            (d, SecondType::Series) if data_type == d => Ok(downcast::<Series<D>>(t).unwrap()),
             (d, SecondType::Simple) if data_type == d => Ok(Box::new(Series {
                 current: *downcast::<D>(t).unwrap(),
                 history: vec![],

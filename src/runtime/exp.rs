@@ -7,7 +7,7 @@ pub use crate::ast::stat_expr_types::{
 };
 use crate::types::{
     downcast, Bool, Callable, Color, ConvertErr, DataType as FirstType, Float, Int, Object,
-    PineFrom, PineType, PineVar, SecondType, Tuple, NA,
+    PineFrom, PineStaticType, PineType, PineVar, SecondType, Series, Tuple, NA,
 };
 
 impl<'a> Runner<'a> for Exp<'a> {
@@ -36,7 +36,11 @@ impl<'a> Runner<'a> for Exp<'a> {
             }
             Exp::TypeCast(ref type_cast) => type_cast.run(_context),
             Exp::FuncCall(ref func_call) => func_call.run(_context),
-            // Exp::RefCall(ref ref_call) => {}
+            Exp::RefCall(ref ref_call) => ref_call.run(_context),
+            Exp::PrefixExp(ref prefix_exp) => prefix_exp.run(_context),
+            Exp::Condition(ref cond) => cond.run(_context),
+            // Ite(Box<IfThenElse<'a>>),
+            // ForRange(Box<ForRange<'a>>),
             Exp::UnaryExp(ref op, ref exp) => unary_op_run(op, exp, _context),
             Exp::BinaryExp(ref op, ref exp1, ref exp2) => binary_op_run(op, exp1, exp2, _context),
             _ => unreachable!(),
@@ -109,6 +113,36 @@ impl<'a> Runner<'a> for Condition<'a> {
         match *downcast::<Bool>(bool_val).unwrap() {
             true => self.exp1.run(context),
             false => self.exp2.run(context),
+        }
+    }
+}
+
+fn get_slice<'a, D: Default + PineType<'a> + PineStaticType + 'a + Clone>(
+    name: Box<dyn PineType<'a> + 'a>,
+    arg: Box<dyn PineType<'a> + 'a>,
+) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+    let s: Box<Series<D>> = Series::implicity_from(name)?;
+    let i = Int::implicity_from(arg)?;
+    match *i {
+        None => Err(ConvertErr::NotSupportOperator),
+        Some(i) => {
+            let res = Box::new(s.index(i as usize)?.clone());
+            Ok(res)
+        }
+    }
+}
+
+impl<'a> Runner<'a> for RefCall<'a> {
+    fn run(&self, context: &mut Context<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+        let name = self.name.run(context)?;
+        let arg = self.arg.run(context)?;
+        match name.get_type() {
+            (FirstType::Int, _) => get_slice::<Int>(name, arg),
+            (FirstType::Float, _) => get_slice::<Float>(name, arg),
+            (FirstType::Bool, _) => get_slice::<Bool>(name, arg),
+            (FirstType::Color, _) => get_slice::<Color>(name, arg),
+            (FirstType::String, _) => get_slice::<String>(name, arg),
+            _ => Err(ConvertErr::NotSupportOperator),
         }
     }
 }

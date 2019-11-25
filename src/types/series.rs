@@ -1,4 +1,3 @@
-use super::error::SeriesErr;
 use super::traits::{
     downcast, ConvertErr, DataType, PineFrom, PineStaticType, PineType, SecondType,
 };
@@ -32,13 +31,13 @@ impl<'a, D: Default + PineStaticType + PineType<'a> + 'a> Series<'a, D> {
         }
     }
 
-    pub fn index(&self, i: usize) -> Result<&D, SeriesErr> {
+    pub fn index(&self, i: usize) -> Result<&D, ConvertErr> {
         let len = self.history.len();
         match i {
             // m if m < 0 => Err(SeriesErr::Negative),
             0 => Ok(&self.current),
             m if m >= 1 && m <= len => Ok(&self.history[(len - i) as usize]),
-            _ => Err(SeriesErr::OutBound),
+            _ => Err(ConvertErr::OutBound),
         }
     }
 

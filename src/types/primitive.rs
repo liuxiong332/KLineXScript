@@ -233,6 +233,7 @@ impl<'a> PineFrom<'a, Bool> for Bool {
 }
 
 // pine color type
+#[derive(Debug, PartialEq, Clone, Default)]
 pub struct Color<'a>(pub &'a str);
 impl<'a> PineStaticType for Color<'a> {
     fn static_type() -> (DataType, SecondType) {

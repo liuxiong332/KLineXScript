@@ -9,6 +9,7 @@ use crate::types::{
     downcast, Bool, Callable, Color, ConvertErr, DataType as FirstType, Float, Int, Object,
     PineFrom, PineStaticType, PineType, PineVar, SecondType, Series, Tuple, NA,
 };
+use std::collections::HashMap;
 
 impl<'a> Runner<'a> for Exp<'a> {
     fn run(&self, _context: &mut Context<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
@@ -118,15 +119,18 @@ impl<'a> Runner<'a> for Condition<'a> {
 }
 
 fn get_slice<'a, D: Default + PineType<'a> + PineStaticType + 'a + Clone>(
-    name: Box<dyn PineType<'a> + 'a>,
+    vars: &mut HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
+    name: &'a str,
+    obj: Box<dyn PineType<'a> + 'a>,
     arg: Box<dyn PineType<'a> + 'a>,
 ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
-    let s: Box<Series<D>> = Series::implicity_from(name)?;
+    let s: Box<Series<D>> = Series::implicity_from(obj)?;
     let i = Int::implicity_from(arg)?;
     match *i {
         None => Err(ConvertErr::NotSupportOperator),
         Some(i) => {
             let res = Box::new(s.index(i as usize)?.clone());
+            vars.insert(name, s);
             Ok(res)
         }
     }
@@ -136,12 +140,22 @@ impl<'a> Runner<'a> for RefCall<'a> {
     fn run(&self, context: &mut Context<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
         let name = self.name.run(context)?;
         let arg = self.arg.run(context)?;
-        match name.get_type() {
-            (FirstType::Int, _) => get_slice::<Int>(name, arg),
-            (FirstType::Float, _) => get_slice::<Float>(name, arg),
-            (FirstType::Bool, _) => get_slice::<Bool>(name, arg),
-            (FirstType::Color, _) => get_slice::<Color>(name, arg),
-            (FirstType::String, _) => get_slice::<String>(name, arg),
+        if name.get_type() != (FirstType::PineVar, SecondType::Simple) {
+            return Err(ConvertErr::NotSupportOperator);
+        }
+        let varname = downcast::<PineVar>(name).unwrap().0;
+        let var_opt = context.vars.remove(varname);
+        if var_opt.is_none() {
+            return Err(ConvertErr::NotSupportOperator);
+        }
+
+        let var = var_opt.unwrap();
+        match var.get_type() {
+            (FirstType::Int, _) => get_slice::<Int>(&mut context.vars, varname, var, arg),
+            (FirstType::Float, _) => get_slice::<Float>(&mut context.vars, varname, var, arg),
+            (FirstType::Bool, _) => get_slice::<Bool>(&mut context.vars, varname, var, arg),
+            (FirstType::Color, _) => get_slice::<Color>(&mut context.vars, varname, var, arg),
+            (FirstType::String, _) => get_slice::<String>(&mut context.vars, varname, var, arg),
             _ => Err(ConvertErr::NotSupportOperator),
         }
     }
@@ -196,5 +210,14 @@ mod tests {
             downcast::<Int>(cond_exp.run(&mut context).unwrap()),
             Ok(Box::new(Some(1)))
         );
+    }
+
+    #[test]
+    fn ref_call_test() {
+        let mut context = Context::new(HashMap::new());
+        // let exp = RefCall {
+        //     name: Exp::VarName("hello"),
+        //     arg: Exp::Num(Numeral::Int(1))
+        // }
     }
 }

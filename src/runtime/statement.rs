@@ -5,8 +5,8 @@ use crate::types::{
     Series,
 };
 
-impl<'a> StmtRunner<'a> for Statement<'a> {
-    fn run(&self, context: &mut Context<'a>) -> Result<(), ConvertErr> {
+impl<'a, 'b> StmtRunner<'a, 'b> for Statement<'a> {
+    fn run(&self, context: &mut Context<'a, 'b>) -> Result<(), ConvertErr> {
         match *self {
             Statement::Assignment(ref assign) => assign.run(context),
             Statement::VarAssignment(ref var_assign) => var_assign.run(context),
@@ -15,13 +15,13 @@ impl<'a> StmtRunner<'a> for Statement<'a> {
     }
 }
 
-impl<'a> StmtRunner<'a> for Assignment<'a> {
-    fn run(&self, context: &mut Context<'a>) -> Result<(), ConvertErr> {
+impl<'a, 'b> StmtRunner<'a, 'b> for Assignment<'a> {
+    fn run(&self, context: &mut Context<'a, 'b>) -> Result<(), ConvertErr> {
         let name = self.name.0;
         if context.contains_declare(name) {
             return Err(ConvertErr::NameDeclared);
         }
-        context.insert_declare(name);
+        context.create_declare(name);
 
         // For variable declare with var type, it only need initialize once.
         if self.var && context.contains_var(name) {
@@ -45,20 +45,23 @@ impl<'a> StmtRunner<'a> for Assignment<'a> {
     }
 }
 
-fn update_series<'a, D: Default + PineType<'a> + PineStaticType + 'a + PineFrom<'a, D> + Clone>(
-    context: &mut Context<'a>,
+fn update_series<'a, 'b, D>(
+    context: &mut Context<'a, 'b>,
     name: &'a str,
     exist_val: Box<dyn PineType<'a> + 'a>,
     val: Box<dyn PineType<'a> + 'a>,
-) -> Result<(), ConvertErr> {
+) -> Result<(), ConvertErr>
+where
+    D: Default + PineType<'a> + PineStaticType + 'a + PineFrom<'a, D> + Clone,
+{
     let mut s = Series::implicity_from(exist_val)?;
     s.update(*D::implicity_from(val)?);
     context.update_var(name, s);
     Ok(())
 }
 
-impl<'a> StmtRunner<'a> for VarAssignment<'a> {
-    fn run(&self, context: &mut Context<'a>) -> Result<(), ConvertErr> {
+impl<'a, 'b> StmtRunner<'a, 'b> for VarAssignment<'a> {
+    fn run(&self, context: &mut Context<'a, 'b>) -> Result<(), ConvertErr> {
         let name = self.name.0;
         if !context.contains_declare(name) {
             return Err(ConvertErr::NameNotDeclard);
@@ -125,7 +128,7 @@ mod tests {
     fn var_assignment_test() {
         let mut context = Context::new(None);
         context.create_var("hello", Box::new(Some(12)));
-        context.insert_declare("hello");
+        context.create_declare("hello");
 
         let test_val = |context: &mut Context, int_val| {
             let s: Box<Series<Int>> =

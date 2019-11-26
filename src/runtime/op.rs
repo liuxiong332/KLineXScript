@@ -6,10 +6,10 @@ use crate::types::{
     PineType, SecondType,
 };
 
-pub fn unary_op_run<'a>(
+pub fn unary_op_run<'a, 'b>(
     op: &UnaryOp,
     exp: &Box<Exp<'a>>,
-    context: &mut Context<'a>,
+    context: &mut Context<'a, 'b>,
 ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
     match op {
         UnaryOp::Plus => exp.run(context),
@@ -56,11 +56,11 @@ fn bi_operate<'a, D: Arithmetic + PartialOrd + PartialEq + PineType<'a> + 'a>(
     }
 }
 
-pub fn binary_op_run<'a>(
+pub fn binary_op_run<'a, 'b>(
     op: &BinaryOp,
     exp1: &Box<Exp<'a>>,
     exp2: &Box<Exp<'a>>,
-    context: &mut Context<'a>,
+    context: &mut Context<'a, 'b>,
 ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
     match op {
         BinaryOp::BoolAnd => {
@@ -114,7 +114,6 @@ mod tests {
     use super::*;
     use crate::ast::num::Numeral;
     use crate::types::PineStaticType;
-    use std::collections::HashMap;
 
     #[test]
     fn unary_op_test() {

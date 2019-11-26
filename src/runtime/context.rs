@@ -1,16 +1,16 @@
 use crate::types::{ConvertErr, Object, PineType, NA};
 use std::collections::{HashMap, HashSet};
 
-pub struct Context<'a> {
+pub struct Context<'a, 'b> {
     // input: &'a str,
-    parent: Option<&'a mut Context<'a>>,
+    parent: Option<&'b mut Context<'a, 'b>>,
 
     vars: HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
     declare_vars: HashSet<&'a str>,
 }
 
-impl<'a> Context<'a> {
-    pub fn new(parent: Option<&'a mut Context<'a>>) -> Context<'a> {
+impl<'a, 'b> Context<'a, 'b> {
+    pub fn new(parent: Option<&'b mut Context<'a, 'b>>) -> Context<'a, 'b> {
         Context {
             parent,
             vars: HashMap::new(),
@@ -73,7 +73,7 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub fn insert_declare(&mut self, name: &'a str) {
+    pub fn create_declare(&mut self, name: &'a str) {
         self.declare_vars.insert(name);
     }
 
@@ -86,15 +86,69 @@ impl<'a> Context<'a> {
     }
 }
 
-pub trait Runner<'a> {
-    fn run(&self, context: &mut Context<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr>;
+pub trait Runner<'a, 'b> {
+    fn run(&self, context: &mut Context<'a, 'b>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr>;
 }
 
-pub trait StmtRunner<'a> {
-    fn run(&self, context: &mut Context<'a>) -> Result<(), ConvertErr>;
+pub trait StmtRunner<'a, 'b> {
+    fn run(&self, context: &mut Context<'a, 'b>) -> Result<(), ConvertErr>;
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::{Int, PineFrom};
+
+    #[test]
+    fn context_test() {
+        let mut context1 = Context::new(None);
+        context1.create_declare("hello");
+        assert!(context1.contains_declare("hello"));
+
+        context1.clear_declare();
+        assert!(!context1.contains_declare("hello"));
+
+        context1.create_var("hello", Box::new(Some(1)));
+        assert_eq!(
+            Int::implicity_from(context1.move_var("hello").unwrap()),
+            Ok(Box::new(Some(1)))
+        );
+
+        context1.update_var("hello", Box::new(Some(10)));
+        assert_eq!(
+            Int::implicity_from(context1.move_var("hello").unwrap()),
+            Ok(Box::new(Some(10)))
+        );
+        assert!(context1.contains_var("hello"));
+
+        context1.map_var("hello", |_| Some(Box::new(Some(100)) as Box<dyn PineType>));
+        assert_eq!(
+            Int::implicity_from(context1.move_var("hello").unwrap()),
+            Ok(Box::new(Some(100)))
+        );
+    }
+
+    #[test]
+    fn derive_context_test() {
+        let mut context1 = Context::new(None);
+        context1.create_var("hello", Box::new(Some(1)));
+
+        let mut context2 = Context::new(Some(&mut context1));
+        context2.create_var("hello2", Box::new(Some(2)));
+
+        let mov_res = context2.move_var("hello").unwrap();
+        context2.update_var("hello", mov_res);
+
+        assert!(context2.vars.get("hello").is_none());
+        assert!(context2
+            .parent
+            .as_mut()
+            .unwrap()
+            .vars
+            .get("hello")
+            .is_some());
+
+        assert!(context2.contains_var("hello"));
+        assert!(context2.contains_var("hello2"));
+    }
 }

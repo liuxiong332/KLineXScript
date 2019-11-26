@@ -10,8 +10,11 @@ use crate::types::{
     PineFrom, PineStaticType, PineType, PineVar, SecondType, Series, Tuple, NA,
 };
 
-impl<'a> Runner<'a> for Exp<'a> {
-    fn run(&self, _context: &mut Context<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+impl<'a, 'b> Runner<'a, 'b> for Exp<'a> {
+    fn run(
+        &self,
+        _context: &mut Context<'a, 'b>,
+    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
         match *self {
             Exp::Na => Ok(Box::new(NA)),
             Exp::Bool(b) => Ok(Box::new(b)),
@@ -48,9 +51,9 @@ impl<'a> Runner<'a> for Exp<'a> {
     }
 }
 
-impl<'a> Runner<'a> for TypeCast<'a> {
-    fn run(&self, _context: &mut Context<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
-        let result = self.exp.run(_context)?;
+impl<'a, 'b> Runner<'a, 'b> for TypeCast<'a> {
+    fn run(&self, context: &mut Context<'a, 'b>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+        let result = self.exp.run(context)?;
         match self.data_type {
             DataType::Bool => Ok(Bool::explicity_from(result)?),
             DataType::Int => Ok(Int::explicity_from(result)?),
@@ -62,19 +65,19 @@ impl<'a> Runner<'a> for TypeCast<'a> {
     }
 }
 
-impl<'a> Runner<'a> for FunctionCall<'a> {
-    fn run(&self, _context: &mut Context<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
-        let result = self.method.run(_context)?;
+impl<'a, 'b> Runner<'a, 'b> for FunctionCall<'a> {
+    fn run(&self, context: &mut Context<'a, 'b>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+        let result = self.method.run(context)?;
         match result.get_type() {
             (FirstType::Callable, SecondType::Simple) => {
                 let callable = downcast::<Callable>(result).unwrap();
                 let mut pos_args = vec![];
                 for exp in self.pos_args.iter() {
-                    pos_args.push(exp.run(_context)?);
+                    pos_args.push(exp.run(context)?);
                 }
                 let mut dict_args = vec![];
                 for (n, exp) in self.dict_args.iter() {
-                    dict_args.push((n.0, exp.run(_context)?));
+                    dict_args.push((n.0, exp.run(context)?));
                 }
                 callable.call(pos_args, dict_args)
             }
@@ -83,8 +86,8 @@ impl<'a> Runner<'a> for FunctionCall<'a> {
     }
 }
 
-impl<'a> Runner<'a> for PrefixExp<'a> {
-    fn run(&self, context: &mut Context<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+impl<'a, 'b> Runner<'a, 'b> for PrefixExp<'a> {
+    fn run(&self, context: &mut Context<'a, 'b>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
         let varname = self.var_chain[0].0;
         let var = context.move_var(varname);
         if var.is_none() {
@@ -113,8 +116,8 @@ impl<'a> Runner<'a> for PrefixExp<'a> {
     }
 }
 
-impl<'a> Runner<'a> for Condition<'a> {
-    fn run(&self, context: &mut Context<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+impl<'a, 'b> Runner<'a, 'b> for Condition<'a> {
+    fn run(&self, context: &mut Context<'a, 'b>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
         let cond = self.cond.run(context)?;
         let bool_val = Bool::implicity_from(cond)?;
         match *downcast::<Bool>(bool_val).unwrap() {
@@ -124,8 +127,8 @@ impl<'a> Runner<'a> for Condition<'a> {
     }
 }
 
-fn get_slice<'a, D: Default + PineType<'a> + PineStaticType + 'a + Clone>(
-    context: &mut Context<'a>,
+fn get_slice<'a, 'b, D: Default + PineType<'a> + PineStaticType + 'a + Clone>(
+    context: &mut Context<'a, 'b>,
     name: &'a str,
     obj: Box<dyn PineType<'a> + 'a>,
     arg: Box<dyn PineType<'a> + 'a>,
@@ -146,8 +149,8 @@ fn get_slice<'a, D: Default + PineType<'a> + PineStaticType + 'a + Clone>(
     }
 }
 
-impl<'a> Runner<'a> for RefCall<'a> {
-    fn run(&self, context: &mut Context<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+impl<'a, 'b> Runner<'a, 'b> for RefCall<'a> {
+    fn run(&self, context: &mut Context<'a, 'b>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
         let name = self.name.run(context)?;
         let arg = self.arg.run(context)?;
         if name.get_type() != (FirstType::PineVar, SecondType::Simple) {

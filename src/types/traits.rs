@@ -1,6 +1,3 @@
-use super::error::SeriesErr;
-use std::fmt;
-
 #[derive(Debug, PartialEq)]
 pub enum SecondType {
     Simple,
@@ -67,7 +64,7 @@ pub trait PineClass<'a> {
 
     fn get(&self, name: &str) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr>;
 
-    fn set(&self, name: &str, property: Box<dyn PineType<'a> + 'a>) -> Result<(), ConvertErr> {
+    fn set(&self, _name: &str, _property: Box<dyn PineType<'a> + 'a>) -> Result<(), ConvertErr> {
         Err(ConvertErr::NotSupportOperator)
     }
 }

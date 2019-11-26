@@ -118,7 +118,7 @@ mod tests {
 
     #[test]
     fn unary_op_test() {
-        let mut context = Context::new(HashMap::new());
+        let mut context = Context::new(None);
         assert_eq!(
             downcast::<Int>(
                 unary_op_run(
@@ -152,7 +152,7 @@ mod tests {
         v1: Exp<'a>,
         v2: Exp<'a>,
     ) -> Result<Box<D>, ConvertErr> {
-        let mut context = Context::new(HashMap::new());
+        let mut context = Context::new(None);
         downcast::<D>(binary_op_run(&op, &Box::new(v1), &Box::new(v2), &mut context).unwrap())
     }
 

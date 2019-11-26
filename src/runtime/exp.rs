@@ -9,7 +9,6 @@ use crate::types::{
     downcast, Bool, Callable, Color, ConvertErr, DataType as FirstType, Float, Int, Object,
     PineFrom, PineStaticType, PineType, PineVar, SecondType, Series, Tuple, NA,
 };
-use std::collections::HashMap;
 
 impl<'a> Runner<'a> for Exp<'a> {
     fn run(&self, _context: &mut Context<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
@@ -87,13 +86,19 @@ impl<'a> Runner<'a> for FunctionCall<'a> {
 impl<'a> Runner<'a> for PrefixExp<'a> {
     fn run(&self, context: &mut Context<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
         let varname = self.var_chain[0].0;
-        let var = context.objects.get(varname);
+        let var = context.move_var(varname);
         if var.is_none() {
             return Err(ConvertErr::NotSupportOperator);
         }
         let var_unwrap = var.unwrap();
-        let name = self.var_chain[1];
-        let mut subobj = var_unwrap.get(name.0)?;
+        if var_unwrap.get_type() != (FirstType::Object, SecondType::Simple) {
+            return Err(ConvertErr::InvalidVarType(format!(
+                "Expect Object type, but get {:?}",
+                var_unwrap.get_type().0
+            )));
+        }
+        let object = downcast::<Object>(var_unwrap)?;
+        let mut subobj = object.get(self.var_chain[1].0)?;
         for name in self.var_chain[2..].iter() {
             match subobj.get_type() {
                 (FirstType::Object, SecondType::Simple) => {
@@ -103,6 +108,7 @@ impl<'a> Runner<'a> for PrefixExp<'a> {
                 _ => return Err(ConvertErr::NotSupportOperator),
             }
         }
+        context.update_var(varname, object);
         Ok(subobj)
     }
 }
@@ -119,18 +125,22 @@ impl<'a> Runner<'a> for Condition<'a> {
 }
 
 fn get_slice<'a, D: Default + PineType<'a> + PineStaticType + 'a + Clone>(
-    vars: &mut HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
+    context: &mut Context<'a>,
     name: &'a str,
     obj: Box<dyn PineType<'a> + 'a>,
     arg: Box<dyn PineType<'a> + 'a>,
 ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
     let s: Box<Series<D>> = Series::implicity_from(obj)?;
+    let arg_type = arg.get_type();
     let i = Int::implicity_from(arg)?;
     match *i {
-        None => Err(ConvertErr::NotSupportOperator),
+        None => Err(ConvertErr::InvalidVarType(format!(
+            "Expect simple int, but get {:?} {:?}",
+            arg_type.1, arg_type.0
+        ))),
         Some(i) => {
             let res = Box::new(s.index(i as usize)?.clone());
-            vars.insert(name, s);
+            context.update_var(name, s);
             Ok(res)
         }
     }
@@ -144,18 +154,18 @@ impl<'a> Runner<'a> for RefCall<'a> {
             return Err(ConvertErr::NotSupportOperator);
         }
         let varname = downcast::<PineVar>(name).unwrap().0;
-        let var_opt = context.vars.remove(varname);
+        let var_opt = context.move_var(varname);
         if var_opt.is_none() {
             return Err(ConvertErr::NotSupportOperator);
         }
 
         let var = var_opt.unwrap();
         match var.get_type() {
-            (FirstType::Int, _) => get_slice::<Int>(&mut context.vars, varname, var, arg),
-            (FirstType::Float, _) => get_slice::<Float>(&mut context.vars, varname, var, arg),
-            (FirstType::Bool, _) => get_slice::<Bool>(&mut context.vars, varname, var, arg),
-            (FirstType::Color, _) => get_slice::<Color>(&mut context.vars, varname, var, arg),
-            (FirstType::String, _) => get_slice::<String>(&mut context.vars, varname, var, arg),
+            (FirstType::Int, _) => get_slice::<Int>(context, varname, var, arg),
+            (FirstType::Float, _) => get_slice::<Float>(context, varname, var, arg),
+            (FirstType::Bool, _) => get_slice::<Bool>(context, varname, var, arg),
+            (FirstType::Color, _) => get_slice::<Color>(context, varname, var, arg),
+            (FirstType::String, _) => get_slice::<String>(context, varname, var, arg),
             _ => Err(ConvertErr::NotSupportOperator),
         }
     }
@@ -184,9 +194,8 @@ mod tests {
             }
         }
 
-        let mut objects: HashMap<&str, Box<Object>> = HashMap::new();
-        objects.insert("obja", Box::new(Object::new(Box::new(A))));
-        let mut context = Context::new(objects);
+        let mut context = Context::new(None);
+        context.create_var("obja", Box::new(Object::new(Box::new(A))));
 
         let exp = PrefixExp {
             var_chain: vec![VarName("obja"), VarName("object"), VarName("int")],
@@ -200,7 +209,7 @@ mod tests {
 
     #[test]
     fn condition_test() {
-        let mut context = Context::new(HashMap::new());
+        let mut context = Context::new(None);
         let cond_exp = Condition {
             cond: Exp::Bool(true),
             exp1: Exp::Num(Numeral::Int(1)),
@@ -214,11 +223,11 @@ mod tests {
 
     #[test]
     fn ref_call_test() {
-        let mut context = Context::new(HashMap::new());
+        let mut context = Context::new(None);
         let mut series: Series<Int> = Series::from(Some(1));
         series.commit();
         series.update(Some(2));
-        context.vars.insert("hello", Box::new(series));
+        context.create_var("hello", Box::new(series));
 
         let exp = RefCall {
             name: Exp::VarName(VarName("hello")),

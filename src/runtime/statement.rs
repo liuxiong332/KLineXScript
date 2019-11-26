@@ -4,7 +4,6 @@ use crate::types::{
     Bool, Color, ConvertErr, DataType as FirstType, Float, Int, PineFrom, PineStaticType, PineType,
     Series,
 };
-use std::collections::HashMap;
 
 impl<'a> StmtRunner<'a> for Statement<'a> {
     fn run(&self, context: &mut Context<'a>) -> Result<(), ConvertErr> {
@@ -19,13 +18,13 @@ impl<'a> StmtRunner<'a> for Statement<'a> {
 impl<'a> StmtRunner<'a> for Assignment<'a> {
     fn run(&self, context: &mut Context<'a>) -> Result<(), ConvertErr> {
         let name = self.name.0;
-        if context.declare_vars.contains(name) {
+        if context.contains_declare(name) {
             return Err(ConvertErr::NameDeclared);
         }
-        context.declare_vars.insert(name);
+        context.insert_declare(name);
 
         // For variable declare with var type, it only need initialize once.
-        if self.var && context.vars.contains_key(name) {
+        if self.var && context.contains_var(name) {
             return Ok(());
         }
         let val = self.val.run(context)?;
@@ -41,38 +40,37 @@ impl<'a> StmtRunner<'a> for Assignment<'a> {
         if let (FirstType::NA, _) = true_val.get_type() {
             return Err(ConvertErr::InvalidNADeclarer);
         }
-        context.vars.insert(name, true_val);
+        context.create_var(name, true_val);
         Ok(())
     }
 }
 
 fn update_series<'a, D: Default + PineType<'a> + PineStaticType + 'a + PineFrom<'a, D> + Clone>(
-    vars: &mut HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
+    context: &mut Context<'a>,
     name: &'a str,
     exist_val: Box<dyn PineType<'a> + 'a>,
     val: Box<dyn PineType<'a> + 'a>,
 ) -> Result<(), ConvertErr> {
     let mut s = Series::implicity_from(exist_val)?;
     s.update(*D::implicity_from(val)?);
-    vars.insert(name, s);
+    context.update_var(name, s);
     Ok(())
 }
 
 impl<'a> StmtRunner<'a> for VarAssignment<'a> {
     fn run(&self, context: &mut Context<'a>) -> Result<(), ConvertErr> {
         let name = self.name.0;
-        if !context.declare_vars.contains(name) {
+        if !context.contains_declare(name) {
             return Err(ConvertErr::NameNotDeclard);
         }
         let val = self.val.run(context)?;
-        let exist_val = context.vars.remove(name).unwrap();
-        let vars = &mut context.vars;
+        let exist_val = context.move_var(name).unwrap();
         match exist_val.get_type() {
-            (FirstType::Bool, _) => update_series::<Bool>(vars, name, exist_val, val),
-            (FirstType::Int, _) => update_series::<Int>(vars, name, exist_val, val),
-            (FirstType::Float, _) => update_series::<Float>(vars, name, exist_val, val),
-            (FirstType::Color, _) => update_series::<Color>(vars, name, exist_val, val),
-            (FirstType::String, _) => update_series::<String>(vars, name, exist_val, val),
+            (FirstType::Bool, _) => update_series::<Bool>(context, name, exist_val, val),
+            (FirstType::Int, _) => update_series::<Int>(context, name, exist_val, val),
+            (FirstType::Float, _) => update_series::<Float>(context, name, exist_val, val),
+            (FirstType::Color, _) => update_series::<Color>(context, name, exist_val, val),
+            (FirstType::String, _) => update_series::<String>(context, name, exist_val, val),
             _ => Err(ConvertErr::NotSupportOperator),
         }
     }
@@ -84,15 +82,14 @@ mod tests {
     use crate::ast::name::VarName;
     use crate::ast::num::Numeral;
     use crate::runtime::exp::Exp;
-    use std::collections::HashMap;
 
     #[test]
     fn assignment_test() {
-        let mut context = Context::new(HashMap::new());
+        let mut context = Context::new(None);
         let test_val = |context: &mut Context, int_val| {
-            let val = Int::explicity_from(context.vars.remove("hello").unwrap());
+            let val = Int::explicity_from(context.move_var("hello").unwrap());
             assert_eq!(val, Ok(Box::new(Some(int_val))));
-            context.vars.insert("hello", val.unwrap());
+            context.update_var("hello", val.unwrap());
         };
         let assign = Statement::Assignment(Box::new(Assignment::new(
             VarName("hello"),
@@ -103,7 +100,7 @@ mod tests {
         assert_eq!(assign.run(&mut context), Ok(()));
         test_val(&mut context, 12);
 
-        context.declare_vars.clear();
+        context.clear_declare();
         let assign = Statement::Assignment(Box::new(Assignment::new(
             VarName("hello"),
             Exp::Num(Numeral::Int(23)),
@@ -113,7 +110,7 @@ mod tests {
         assert_eq!(assign.run(&mut context), Ok(()));
         test_val(&mut context, 12);
 
-        context.declare_vars.clear();
+        context.clear_declare();
         let assign = Statement::Assignment(Box::new(Assignment::new(
             VarName("hello"),
             Exp::Num(Numeral::Int(23)),
@@ -126,22 +123,22 @@ mod tests {
 
     #[test]
     fn var_assignment_test() {
-        let mut context = Context::new(HashMap::new());
-        context.vars.insert("hello", Box::new(Some(12)));
-        context.declare_vars.insert("hello");
+        let mut context = Context::new(None);
+        context.create_var("hello", Box::new(Some(12)));
+        context.insert_declare("hello");
 
-        let test_val = |vars: &mut HashMap<_, _>, int_val| {
+        let test_val = |context: &mut Context, int_val| {
             let s: Box<Series<Int>> =
-                Series::implicity_from(vars.remove("hello").unwrap()).unwrap();
+                Series::implicity_from(context.move_var("hello").unwrap()).unwrap();
             assert_eq!(s, Box::new(Series::from(Some(int_val))));
-            vars.insert("hello", s);
+            context.update_var("hello", s);
         };
         let assign = VarAssignment::new(VarName("hello"), Exp::Num(Numeral::Int(24)));
         assert_eq!(assign.run(&mut context), Ok(()));
-        test_val(&mut context.vars, 24);
+        test_val(&mut context, 24);
 
         let assign = VarAssignment::new(VarName("hello"), Exp::Num(Numeral::Int(36)));
         assert_eq!(assign.run(&mut context), Ok(()));
-        test_val(&mut context.vars, 36);
+        test_val(&mut context, 36);
     }
 }

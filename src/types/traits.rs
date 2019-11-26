@@ -1,4 +1,5 @@
 use super::error::SeriesErr;
+use std::fmt;
 
 #[derive(Debug, PartialEq)]
 pub enum SecondType {
@@ -32,6 +33,7 @@ pub enum ConvertErr {
     InvalidTypeCast,
     InvalidNADeclarer,
 
+    InvalidVarType(String), // The variable type is invalid.
     NameNotDeclard,
 }
 

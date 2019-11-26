@@ -123,4 +123,25 @@ mod tests {
         assert_eq!(assign.run(&mut context), Ok(()));
         test_val(&mut context, 23);
     }
+
+    #[test]
+    fn var_assignment_test() {
+        let mut context = Context::new(HashMap::new());
+        context.vars.insert("hello", Box::new(Some(12)));
+        context.declare_vars.insert("hello");
+
+        let test_val = |vars: &mut HashMap<_, _>, int_val| {
+            let s: Box<Series<Int>> =
+                Series::implicity_from(vars.remove("hello").unwrap()).unwrap();
+            assert_eq!(s, Box::new(Series::from(Some(int_val))));
+            vars.insert("hello", s);
+        };
+        let assign = VarAssignment::new(VarName("hello"), Exp::Num(Numeral::Int(24)));
+        assert_eq!(assign.run(&mut context), Ok(()));
+        test_val(&mut context.vars, 24);
+
+        let assign = VarAssignment::new(VarName("hello"), Exp::Num(Numeral::Int(36)));
+        assert_eq!(assign.run(&mut context), Ok(()));
+        test_val(&mut context.vars, 36);
+    }
 }

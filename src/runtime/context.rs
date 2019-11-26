@@ -19,6 +19,16 @@ pub trait Ctx<'a> {
     fn contains_declare(&self, name: &'a str) -> bool;
 
     fn clear_declare(&mut self);
+
+    fn get_type(&self) -> ContextType;
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum ContextType {
+    Normal,
+    IfElseBlock,
+    ForRangeBlock,
+    FuncDefBlock,
 }
 
 // T is Context<_, _>, but in this situation, we cannot give Context<'c, 'd>
@@ -26,15 +36,17 @@ pub trait Ctx<'a> {
 pub struct Context<'a, 'b> {
     // input: &'a str,
     parent: Option<&'b mut (dyn 'b + Ctx<'a>)>,
+    context_type: ContextType,
 
     vars: HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
     declare_vars: HashSet<&'a str>,
 }
 
 impl<'a, 'b> Context<'a, 'b> {
-    pub fn new<'c>(parent: Option<&'b mut (dyn 'b + Ctx<'a>)>) -> Context<'a, 'b> {
+    pub fn new(parent: Option<&'b mut (dyn 'b + Ctx<'a>)>, t: ContextType) -> Context<'a, 'b> {
         Context {
             parent,
+            context_type: t,
             vars: HashMap::new(),
             declare_vars: HashSet::new(),
         }
@@ -112,14 +124,18 @@ impl<'a, 'b> Ctx<'a> for Context<'a, 'b> {
     fn clear_declare(&mut self) {
         self.declare_vars.clear();
     }
+
+    fn get_type(&self) -> ContextType {
+        self.context_type
+    }
 }
 
 pub trait Runner<'a> {
-    fn run(&self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr>;
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr>;
 }
 
 pub trait StmtRunner<'a> {
-    fn run(&self, context: &mut dyn Ctx<'a>) -> Result<(), ConvertErr>;
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), ConvertErr>;
 }
 
 #[cfg(test)]
@@ -129,7 +145,7 @@ mod tests {
 
     #[test]
     fn context_test() {
-        let mut context1 = Context::new(None);
+        let mut context1 = Context::new(None, ContextType::Normal);
         context1.create_declare("hello");
         assert!(context1.contains_declare("hello"));
 
@@ -158,10 +174,10 @@ mod tests {
 
     #[test]
     fn derive_context_test() {
-        let mut context1 = Context::new(None);
+        let mut context1 = Context::new(None, ContextType::Normal);
         context1.create_var("hello", Box::new(Some(1)));
 
-        let mut context2 = Context::new(Some(&mut context1));
+        let mut context2 = Context::new(Some(&mut context1), ContextType::Normal);
         context2.create_var("hello2", Box::new(Some(2)));
 
         let mov_res = context2.move_var("hello").unwrap();

@@ -17,6 +17,7 @@ pub enum DataType {
     PineVar,
     Tuple,
     Callable,
+    Function,
     Object,
 }
 
@@ -32,6 +33,9 @@ pub enum ConvertErr {
 
     InvalidVarType(String), // The variable type is invalid.
     NameNotDeclard,
+
+    Continue,
+    Break,
 }
 
 pub trait PineStaticType {

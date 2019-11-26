@@ -1,4 +1,4 @@
-use super::context::{Context, Ctx, Runner};
+use super::context::{Ctx, Runner};
 use super::op::{binary_op_run, unary_op_run};
 use crate::ast::name::VarName;
 use crate::ast::num::Numeral;
@@ -6,12 +6,12 @@ pub use crate::ast::stat_expr_types::{
     Condition, DataType, Exp, FunctionCall, PrefixExp, RefCall, Statement, TypeCast,
 };
 use crate::types::{
-    downcast, Bool, Callable, Color, ConvertErr, DataType as FirstType, Float, Int, Object,
-    PineFrom, PineStaticType, PineType, PineVar, SecondType, Series, Tuple, NA,
+    downcast, Bool, Color, ConvertErr, DataType as FirstType, Float, Int, Object, PineFrom,
+    PineStaticType, PineType, PineVar, SecondType, Series, Tuple, NA,
 };
 
 impl<'a> Runner<'a> for Exp<'a> {
-    fn run(&self, _context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+    fn run(&'a self, _context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
         match *self {
             Exp::Na => Ok(Box::new(NA)),
             Exp::Bool(b) => Ok(Box::new(b)),
@@ -49,7 +49,7 @@ impl<'a> Runner<'a> for Exp<'a> {
 }
 
 impl<'a> Runner<'a> for TypeCast<'a> {
-    fn run(&self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
         let result = self.exp.run(context)?;
         match self.data_type {
             DataType::Bool => Ok(Bool::explicity_from(result)?),
@@ -62,29 +62,8 @@ impl<'a> Runner<'a> for TypeCast<'a> {
     }
 }
 
-impl<'a> Runner<'a> for FunctionCall<'a> {
-    fn run(&self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
-        let result = self.method.run(context)?;
-        match result.get_type() {
-            (FirstType::Callable, SecondType::Simple) => {
-                let callable = downcast::<Callable>(result).unwrap();
-                let mut pos_args = vec![];
-                for exp in self.pos_args.iter() {
-                    pos_args.push(exp.run(context)?);
-                }
-                let mut dict_args = vec![];
-                for (n, exp) in self.dict_args.iter() {
-                    dict_args.push((n.0, exp.run(context)?));
-                }
-                callable.call(pos_args, dict_args)
-            }
-            _ => Err(ConvertErr::NotSupportOperator),
-        }
-    }
-}
-
 impl<'a> Runner<'a> for PrefixExp<'a> {
-    fn run(&self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
         let varname = self.var_chain[0].0;
         let var = context.move_var(varname);
         if var.is_none() {
@@ -114,7 +93,7 @@ impl<'a> Runner<'a> for PrefixExp<'a> {
 }
 
 impl<'a> Runner<'a> for Condition<'a> {
-    fn run(&self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
         let cond = self.cond.run(context)?;
         let bool_val = Bool::implicity_from(cond)?;
         match *downcast::<Bool>(bool_val).unwrap() {
@@ -147,7 +126,7 @@ fn get_slice<'a, D: Default + PineType<'a> + PineStaticType + 'a + Clone>(
 }
 
 impl<'a> Runner<'a> for RefCall<'a> {
-    fn run(&self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
         let name = self.name.run(context)?;
         let arg = self.arg.run(context)?;
         if name.get_type() != (FirstType::PineVar, SecondType::Simple) {
@@ -174,8 +153,8 @@ impl<'a> Runner<'a> for RefCall<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::runtime::context::{Context, ContextType};
     use crate::types::PineClass;
-    use std::collections::HashMap;
 
     #[test]
     fn prefix_exp_test() {
@@ -194,12 +173,13 @@ mod tests {
             }
         }
 
-        let mut context = Context::new(None);
-        context.create_var("obja", Box::new(Object::new(Box::new(A))));
-
         let exp = PrefixExp {
             var_chain: vec![VarName("obja"), VarName("object"), VarName("int")],
         };
+
+        let mut context = Context::new(None, ContextType::Normal);
+        context.create_var("obja", Box::new(Object::new(Box::new(A))));
+
         assert_eq!(
             downcast::<Int>(exp.run(&mut context).unwrap()),
             Ok(Box::new(Some(1)))
@@ -209,12 +189,12 @@ mod tests {
 
     #[test]
     fn condition_test() {
-        let mut context = Context::new(None);
         let cond_exp = Condition {
             cond: Exp::Bool(true),
             exp1: Exp::Num(Numeral::Int(1)),
             exp2: Exp::Num(Numeral::Int(2)),
         };
+        let mut context = Context::new(None, ContextType::Normal);
         assert_eq!(
             downcast::<Int>(cond_exp.run(&mut context).unwrap()),
             Ok(Box::new(Some(1)))
@@ -223,16 +203,17 @@ mod tests {
 
     #[test]
     fn ref_call_test() {
-        let mut context = Context::new(None);
+        let exp = RefCall {
+            name: Exp::VarName(VarName("hello")),
+            arg: Exp::Num(Numeral::Int(1)),
+        };
+
+        let mut context = Context::new(None, ContextType::Normal);
         let mut series: Series<Int> = Series::from(Some(1));
         series.commit();
         series.update(Some(2));
         context.create_var("hello", Box::new(series));
 
-        let exp = RefCall {
-            name: Exp::VarName(VarName("hello")),
-            arg: Exp::Num(Numeral::Int(1)),
-        };
         assert_eq!(
             downcast::<Int>(exp.run(&mut context).unwrap()),
             Ok(Box::new(Some(1)))

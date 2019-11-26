@@ -8,7 +8,7 @@ use crate::types::{
 
 pub fn unary_op_run<'a>(
     op: &UnaryOp,
-    exp: &Box<Exp<'a>>,
+    exp: &'a Box<Exp<'a>>,
     context: &mut (dyn Ctx<'a>),
 ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
     match op {
@@ -58,8 +58,8 @@ fn bi_operate<'a, D: Arithmetic + PartialOrd + PartialEq + PineType<'a> + 'a>(
 
 pub fn binary_op_run<'a, 'b>(
     op: &BinaryOp,
-    exp1: &Box<Exp<'a>>,
-    exp2: &Box<Exp<'a>>,
+    exp1: &'a Box<Exp<'a>>,
+    exp2: &'a Box<Exp<'a>>,
     context: &mut (dyn 'b + Ctx<'a>),
 ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
     match op {
@@ -113,27 +113,22 @@ pub fn binary_op_run<'a, 'b>(
 mod tests {
     use super::*;
     use crate::ast::num::Numeral;
+    use crate::runtime::context::ContextType;
     use crate::types::PineStaticType;
 
     #[test]
     fn unary_op_test() {
-        let mut context = Context::new(None);
+        let exp = Box::new(Exp::Num(Numeral::Int(1)));
+        let exp2 = Box::new(Exp::Bool(true));
+
+        let mut context = Context::new(None, ContextType::Normal);
         assert_eq!(
-            downcast::<Int>(
-                unary_op_run(
-                    &UnaryOp::Minus,
-                    &Box::new(Exp::Num(Numeral::Int(1))),
-                    &mut context,
-                )
-                .unwrap()
-            ),
+            downcast::<Int>(unary_op_run(&UnaryOp::Minus, &exp, &mut context,).unwrap()),
             Ok(Box::new(Some(-1)))
         );
 
         assert_eq!(
-            downcast::<Bool>(
-                unary_op_run(&UnaryOp::BoolNot, &Box::new(Exp::Bool(true)), &mut context,).unwrap()
-            ),
+            downcast::<Bool>(unary_op_run(&UnaryOp::BoolNot, &exp2, &mut context,).unwrap()),
             Ok(Box::new(false))
         );
     }
@@ -151,7 +146,7 @@ mod tests {
         v1: Exp<'a>,
         v2: Exp<'a>,
     ) -> Result<Box<D>, ConvertErr> {
-        let mut context = Context::new(None);
+        let mut context = Context::new(None, ContextType::Normal);
         downcast::<D>(binary_op_run(&op, &Box::new(v1), &Box::new(v2), &mut context).unwrap())
     }
 

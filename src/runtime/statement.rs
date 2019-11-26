@@ -20,6 +20,7 @@ impl<'a> StmtRunner<'a> for Statement<'a> {
             Statement::Ite(ref ite) => StmtRunner::run(ite.as_ref(), context),
             Statement::ForRange(ref fr) => StmtRunner::run(fr.as_ref(), context),
             Statement::FuncCall(ref fun_call) => StmtRunner::run(fun_call.as_ref(), context),
+            Statement::FuncDef(ref fun_def) => fun_def.run(context),
             _ => Err(ConvertErr::NotSupportOperator),
         }
     }

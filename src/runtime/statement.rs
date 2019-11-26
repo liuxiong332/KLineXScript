@@ -1,4 +1,4 @@
-use super::context::{Context, Runner, StmtRunner};
+use super::context::{Context, Ctx, Runner, StmtRunner};
 use crate::ast::stat_expr_types::{
     Assignment, Block, DataType, ForRange, IfThenElse, Statement, VarAssignment,
 };
@@ -7,8 +7,8 @@ use crate::types::{
     Series, NA,
 };
 
-impl<'a, 'b> StmtRunner<'a, 'b> for Statement<'a> {
-    fn run(&self, context: &mut Context<'a, 'b>) -> Result<(), ConvertErr> {
+impl<'a> StmtRunner<'a> for Statement<'a> {
+    fn run(&self, context: &mut dyn Ctx<'a>) -> Result<(), ConvertErr> {
         match *self {
             Statement::Assignment(ref assign) => assign.run(context),
             Statement::VarAssignment(ref var_assign) => var_assign.run(context),
@@ -17,8 +17,8 @@ impl<'a, 'b> StmtRunner<'a, 'b> for Statement<'a> {
     }
 }
 
-impl<'a, 'b> StmtRunner<'a, 'b> for Assignment<'a> {
-    fn run(&self, context: &mut Context<'a, 'b>) -> Result<(), ConvertErr> {
+impl<'a> StmtRunner<'a> for Assignment<'a> {
+    fn run(&self, context: &mut dyn Ctx<'a>) -> Result<(), ConvertErr> {
         let name = self.name.0;
         if context.contains_declare(name) {
             return Err(ConvertErr::NameDeclared);
@@ -48,7 +48,7 @@ impl<'a, 'b> StmtRunner<'a, 'b> for Assignment<'a> {
 }
 
 fn update_series<'a, 'b, D>(
-    context: &mut Context<'a, 'b>,
+    context: &mut (dyn 'b + Ctx<'a>),
     name: &'a str,
     exist_val: Box<dyn PineType<'a> + 'a>,
     val: Box<dyn PineType<'a> + 'a>,
@@ -62,8 +62,8 @@ where
     Ok(())
 }
 
-impl<'a, 'b> StmtRunner<'a, 'b> for VarAssignment<'a> {
-    fn run(&self, context: &mut Context<'a, 'b>) -> Result<(), ConvertErr> {
+impl<'a> StmtRunner<'a> for VarAssignment<'a> {
+    fn run(&self, context: &mut dyn Ctx<'a>) -> Result<(), ConvertErr> {
         let name = self.name.0;
         if !context.contains_declare(name) {
             return Err(ConvertErr::NameNotDeclard);
@@ -81,8 +81,8 @@ impl<'a, 'b> StmtRunner<'a, 'b> for VarAssignment<'a> {
     }
 }
 
-impl<'a, 'b> Runner<'a, 'b> for IfThenElse<'a> {
-    fn run(&self, context: &mut Context<'a, 'b>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+impl<'a> Runner<'a> for IfThenElse<'a> {
+    fn run(&self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
         let cond = self.cond.run(context)?;
         let cond_bool = Bool::implicity_from(cond)?;
         if *cond_bool {
@@ -95,8 +95,8 @@ impl<'a, 'b> Runner<'a, 'b> for IfThenElse<'a> {
     }
 }
 
-impl<'a, 'b> StmtRunner<'a, 'b> for IfThenElse<'a> {
-    fn run(&self, context: &mut Context<'a, 'b>) -> Result<(), ConvertErr> {
+impl<'a> StmtRunner<'a> for IfThenElse<'a> {
+    fn run(&self, context: &mut dyn Ctx<'a>) -> Result<(), ConvertErr> {
         match Runner::run(self, context) {
             Ok(_) => Ok(()),
             Err(e) => Err(e),
@@ -104,17 +104,29 @@ impl<'a, 'b> StmtRunner<'a, 'b> for IfThenElse<'a> {
     }
 }
 
-impl<'a, 'b> Runner<'a, 'b> for ForRange<'a> {
-    fn run(&self, context: &mut Context<'a, 'b>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
-        // let iter_name = self.var.0;
-        // let start = self.start.
-        // let step = if self.step.is_some() { self.step.unwrap()} else if
+impl<'a> Runner<'a> for ForRange<'a> {
+    fn run(&self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+        let iter_name = self.var.0;
+        let start = self.start;
+        let end = self.end;
+        let step = if let Some(s) = self.step {
+            s
+        } else if start < end {
+            1
+        } else {
+            -1
+        };
+        let mut iter = start;
+        while (step > 0 && iter < end) || (step < 0 && iter > end) {
+            let new_context = Context::new(Some(context));
+            iter += step;
+        }
         Err(ConvertErr::NotSupportOperator)
     }
 }
 
-impl<'a, 'b> StmtRunner<'a, 'b> for ForRange<'a> {
-    fn run(&self, context: &mut Context<'a, 'b>) -> Result<(), ConvertErr> {
+impl<'a> StmtRunner<'a> for ForRange<'a> {
+    fn run(&self, context: &mut dyn Ctx<'a>) -> Result<(), ConvertErr> {
         match Runner::run(self, context) {
             Ok(_) => Ok(()),
             Err(e) => Err(e),
@@ -122,8 +134,8 @@ impl<'a, 'b> StmtRunner<'a, 'b> for ForRange<'a> {
     }
 }
 
-impl<'a, 'b> Runner<'a, 'b> for Block<'a> {
-    fn run(&self, context: &mut Context<'a, 'b>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+impl<'a> Runner<'a> for Block<'a> {
+    fn run(&self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
         for st in self.stmts.iter() {
             st.run(context)?;
         }

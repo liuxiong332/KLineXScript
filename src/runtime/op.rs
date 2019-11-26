@@ -1,4 +1,4 @@
-use super::context::{Context, Runner};
+use super::context::{Context, Ctx, Runner};
 use super::exp::Exp;
 use crate::ast::op::{BinaryOp, UnaryOp};
 use crate::types::{
@@ -6,10 +6,10 @@ use crate::types::{
     PineType, SecondType,
 };
 
-pub fn unary_op_run<'a, 'b>(
+pub fn unary_op_run<'a>(
     op: &UnaryOp,
     exp: &Box<Exp<'a>>,
-    context: &mut Context<'a, 'b>,
+    context: &mut (dyn Ctx<'a>),
 ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
     match op {
         UnaryOp::Plus => exp.run(context),
@@ -60,7 +60,7 @@ pub fn binary_op_run<'a, 'b>(
     op: &BinaryOp,
     exp1: &Box<Exp<'a>>,
     exp2: &Box<Exp<'a>>,
-    context: &mut Context<'a, 'b>,
+    context: &mut (dyn 'b + Ctx<'a>),
 ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
     match op {
         BinaryOp::BoolAnd => {

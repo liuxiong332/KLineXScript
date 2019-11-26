@@ -31,6 +31,8 @@ pub enum ConvertErr {
     NameDeclared,
     InvalidTypeCast,
     InvalidNADeclarer,
+
+    NameNotDeclard,
 }
 
 pub trait PineStaticType {

@@ -1,13 +1,16 @@
 use super::context::{Context, Runner, StmtRunner};
-use crate::ast::stat_expr_types::{Assignment, DataType, Statement};
+use crate::ast::stat_expr_types::{Assignment, DataType, Statement, VarAssignment};
 use crate::types::{
-    Bool, Color, ConvertErr, DataType as FirstType, Float, Int, PineFrom, PineType,
+    Bool, Color, ConvertErr, DataType as FirstType, Float, Int, PineFrom, PineStaticType, PineType,
+    Series,
 };
+use std::collections::HashMap;
 
 impl<'a> StmtRunner<'a> for Statement<'a> {
     fn run(&self, context: &mut Context<'a>) -> Result<(), ConvertErr> {
         match *self {
             Statement::Assignment(ref assign) => assign.run(context),
+            Statement::VarAssignment(ref var_assign) => var_assign.run(context),
             _ => Err(ConvertErr::NotSupportOperator),
         }
     }
@@ -40,6 +43,38 @@ impl<'a> StmtRunner<'a> for Assignment<'a> {
         }
         context.vars.insert(name, true_val);
         Ok(())
+    }
+}
+
+fn update_series<'a, D: Default + PineType<'a> + PineStaticType + 'a + PineFrom<'a, D> + Clone>(
+    vars: &mut HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
+    name: &'a str,
+    exist_val: Box<dyn PineType<'a> + 'a>,
+    val: Box<dyn PineType<'a> + 'a>,
+) -> Result<(), ConvertErr> {
+    let mut s = Series::implicity_from(exist_val)?;
+    s.update(*D::implicity_from(val)?);
+    vars.insert(name, s);
+    Ok(())
+}
+
+impl<'a> StmtRunner<'a> for VarAssignment<'a> {
+    fn run(&self, context: &mut Context<'a>) -> Result<(), ConvertErr> {
+        let name = self.name.0;
+        if !context.declare_vars.contains(name) {
+            return Err(ConvertErr::NameNotDeclard);
+        }
+        let val = self.val.run(context)?;
+        let exist_val = context.vars.remove(name).unwrap();
+        let vars = &mut context.vars;
+        match exist_val.get_type() {
+            (FirstType::Bool, _) => update_series::<Bool>(vars, name, exist_val, val),
+            (FirstType::Int, _) => update_series::<Int>(vars, name, exist_val, val),
+            (FirstType::Float, _) => update_series::<Float>(vars, name, exist_val, val),
+            (FirstType::Color, _) => update_series::<Color>(vars, name, exist_val, val),
+            (FirstType::String, _) => update_series::<String>(vars, name, exist_val, val),
+            _ => Err(ConvertErr::NotSupportOperator),
+        }
     }
 }
 

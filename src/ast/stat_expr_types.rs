@@ -166,18 +166,18 @@ impl<'a> IfThenElse<'a> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ForRange<'a> {
     pub var: VarName<'a>,
-    pub start: Numeral,
-    pub end: Numeral,
-    pub step: Option<Numeral>,
+    pub start: i32,
+    pub end: i32,
+    pub step: Option<i32>,
     pub do_blk: Block<'a>,
 }
 
 impl<'a> ForRange<'a> {
     pub fn new(
         var: VarName<'a>,
-        start: Numeral,
-        end: Numeral,
-        step: Option<Numeral>,
+        start: i32,
+        end: i32,
+        step: Option<i32>,
         do_blk: Block<'a>,
     ) -> Self {
         ForRange {

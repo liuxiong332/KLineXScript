@@ -1,8 +1,10 @@
 use super::context::{Context, Runner, StmtRunner};
-use crate::ast::stat_expr_types::{Assignment, DataType, Statement, VarAssignment};
+use crate::ast::stat_expr_types::{
+    Assignment, Block, DataType, ForRange, IfThenElse, Statement, VarAssignment,
+};
 use crate::types::{
     Bool, Color, ConvertErr, DataType as FirstType, Float, Int, PineFrom, PineStaticType, PineType,
-    Series,
+    Series, NA,
 };
 
 impl<'a, 'b> StmtRunner<'a, 'b> for Statement<'a> {
@@ -75,6 +77,60 @@ impl<'a, 'b> StmtRunner<'a, 'b> for VarAssignment<'a> {
             (FirstType::Color, _) => update_series::<Color>(context, name, exist_val, val),
             (FirstType::String, _) => update_series::<String>(context, name, exist_val, val),
             _ => Err(ConvertErr::NotSupportOperator),
+        }
+    }
+}
+
+impl<'a, 'b> Runner<'a, 'b> for IfThenElse<'a> {
+    fn run(&self, context: &mut Context<'a, 'b>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+        let cond = self.cond.run(context)?;
+        let cond_bool = Bool::implicity_from(cond)?;
+        if *cond_bool {
+            self.then_blk.run(context)
+        } else if let Some(ref else_blk) = self.else_blk {
+            else_blk.run(context)
+        } else {
+            Ok(Box::new(NA))
+        }
+    }
+}
+
+impl<'a, 'b> StmtRunner<'a, 'b> for IfThenElse<'a> {
+    fn run(&self, context: &mut Context<'a, 'b>) -> Result<(), ConvertErr> {
+        match Runner::run(self, context) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
+        }
+    }
+}
+
+impl<'a, 'b> Runner<'a, 'b> for ForRange<'a> {
+    fn run(&self, context: &mut Context<'a, 'b>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+        // let iter_name = self.var.0;
+        // let start = self.start.
+        // let step = if self.step.is_some() { self.step.unwrap()} else if
+        Err(ConvertErr::NotSupportOperator)
+    }
+}
+
+impl<'a, 'b> StmtRunner<'a, 'b> for ForRange<'a> {
+    fn run(&self, context: &mut Context<'a, 'b>) -> Result<(), ConvertErr> {
+        match Runner::run(self, context) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
+        }
+    }
+}
+
+impl<'a, 'b> Runner<'a, 'b> for Block<'a> {
+    fn run(&self, context: &mut Context<'a, 'b>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+        for st in self.stmts.iter() {
+            st.run(context)?;
+        }
+        if let Some(ref exp) = self.ret_stmt {
+            exp.run(context)
+        } else {
+            Ok(Box::new(NA))
         }
     }
 }

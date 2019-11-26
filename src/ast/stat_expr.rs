@@ -10,7 +10,7 @@ use super::color::color_lit;
 use super::error::PineResult;
 use super::func_call::{func_call, func_call_ws};
 use super::name::{varname, varname_ws, VarName};
-use super::num::num_lit_ws;
+use super::num::{int_lit_ws, num_lit_ws};
 use super::op::*;
 use super::stat_expr_types::*;
 use super::string::string_lit;
@@ -156,10 +156,10 @@ fn for_range<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<ForRange> {
             tag("for"),
             varname_ws,
             eat_sep(tag("=")),
-            num_lit_ws,
+            int_lit_ws,
             eat_sep(tag("to")),
-            num_lit_ws,
-            opt(tuple((eat_sep(tag("by")), num_lit_ws))),
+            int_lit_ws,
+            opt(tuple((eat_sep(tag("by")), int_lit_ws))),
             statement_end,
             block_with_indent(indent + 1),
         ))(input)?;
@@ -580,8 +580,8 @@ mod tests {
                 "",
                 ForRange::new(
                     VarName("a"),
-                    Numeral::Int(1),
-                    Numeral::Int(2),
+                    1,
+                    2,
                     None,
                     Block::new(vec![Statement::Break], Some(Exp::Bool(true))),
                 )

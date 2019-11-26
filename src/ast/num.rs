@@ -4,7 +4,7 @@ use nom::{
     character::complete::digit1,
     combinator::{map, opt, recognize},
     multi::separated_list,
-    sequence::{preceded, tuple},
+    sequence::{preceded, terminated, tuple},
     Err,
 };
 use std::str::FromStr;
@@ -43,6 +43,21 @@ pub fn decimal(input: &str) -> PineResult<i32> {
             PineErrorKind::InvalidDecimal,
         ))),
     }
+}
+
+pub fn int_lit(input: &str) -> PineResult<i32> {
+    let (input, (sign, lit)) =
+        tuple((opt(terminated(alt((tag("+"), tag("-"))), skip_ws)), decimal))(input)?;
+    match sign {
+        Some("+") | None => Ok((input, lit)),
+        Some("-") => Ok((input, -lit)),
+        _ => unreachable!(),
+    }
+}
+
+pub fn int_lit_ws(input: &str) -> PineResult<i32> {
+    let (input, _) = skip_ws(input)?;
+    int_lit(input)
 }
 
 pub fn float_mag(input: &str) -> PineResult<i32> {
@@ -93,5 +108,12 @@ mod tests {
         assert_eq!(num_lit_ws("121"), Ok(("", Numeral::Int(121))));
         assert_eq!(num_lit_ws("121e1"), Ok(("", Numeral::Float(121e1))));
         assert_eq!(num_lit_ws("121.1e1"), Ok(("", Numeral::Float(121.1e1))));
+    }
+
+    #[test]
+    fn int_test() {
+        assert_eq!(int_lit_ws(" + 121"), Ok(("", 121i32)));
+        assert_eq!(int_lit_ws(" - 121"), Ok(("", -121i32)));
+        assert_eq!(int_lit_ws(" 121"), Ok(("", 121)));
     }
 }

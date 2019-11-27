@@ -6,13 +6,13 @@ use std::marker::PhantomData;
 use std::mem;
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Series<'a, D: Default + PineStaticType + PineType<'a> + 'a> {
+pub struct Series<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> {
     current: D,
     history: Vec<D>,
     phantom: PhantomData<&'a D>,
 }
 
-impl<'a, D: Default + PineStaticType + PineType<'a> + 'a> From<D> for Series<'a, D> {
+impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> From<D> for Series<'a, D> {
     fn from(input: D) -> Self {
         Series {
             current: input,
@@ -22,7 +22,7 @@ impl<'a, D: Default + PineStaticType + PineType<'a> + 'a> From<D> for Series<'a,
     }
 }
 
-impl<'a, D: Default + PineStaticType + PineType<'a> + 'a> Series<'a, D> {
+impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> Series<'a, D> {
     pub fn new() -> Series<'a, D> {
         Series {
             current: D::default(),
@@ -55,19 +55,24 @@ impl<'a, D: Default + PineStaticType + PineType<'a> + 'a> Series<'a, D> {
     }
 }
 
-impl<'a, D: Default + PineStaticType + PineType<'a> + 'a> PineStaticType for Series<'a, D> {
+impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> PineStaticType for Series<'a, D> {
     fn static_type() -> (DataType, SecondType) {
         (<D as PineStaticType>::static_type().0, SecondType::Series)
     }
 }
 
-impl<'a, D: Default + PineStaticType + PineType<'a>> PineType<'a> for Series<'a, D> {
+impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> PineType<'a> for Series<'a, D> {
     fn get_type(&self) -> (DataType, SecondType) {
         (<D as PineStaticType>::static_type().0, SecondType::Series)
     }
+
+    fn copy(&'a self) -> Box<dyn PineType<'a> + 'a> {
+        let series = self.clone();
+        Box::new(series)
+    }
 }
 
-impl<'a, D: Default + PineStaticType + PineType<'a> + 'a> PineFrom<'a, Series<'a, D>>
+impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> PineFrom<'a, Series<'a, D>>
     for Series<'a, D>
 {
     fn explicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Series<'a, D>>, ConvertErr> {

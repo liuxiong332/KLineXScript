@@ -132,7 +132,24 @@ impl<'a> Runner<'a> for ForRange<'a> {
         while (step > 0 && iter < end) || (step < 0 && iter > end) {
             let mut new_context = Context::new(Some(context), ContextType::ForRangeBlock);
             new_context.create_var(iter_name, Box::new(Some(iter)));
-            ret_val = self.do_blk.run(&mut new_context)?;
+            match self.do_blk.run(&mut new_context) {
+                Ok(val) => {
+                    ret_val = val;
+                }
+                Err(ConvertErr::Break) => {
+                    if let Some(ref exp) = self.do_blk.ret_stmt {
+                        ret_val = Runner::run(exp, &mut new_context)?
+                    }
+                    break;
+                }
+                Err(ConvertErr::Continue) => {
+                    if let Some(ref exp) = self.do_blk.ret_stmt {
+                        ret_val = Runner::run(exp, &mut new_context)?
+                    }
+                    continue;
+                }
+                e => return e,
+            }
             iter += step;
         }
         Ok(ret_val)
@@ -276,6 +293,21 @@ mod tests {
             None,
         )));
         let block = Block::new(vec![assign], Some(Exp::Num(Numeral::Int(10))));
+        let for_range = ForRange::new(VarName("i"), 1, 10, None, block);
+
+        let mut context = Context::new(None, ContextType::Normal);
+
+        let result = Runner::run(&for_range, &mut context);
+        assert!(result.is_ok());
+
+        assert_eq!(Int::implicity_from(result.unwrap()), Ok(Box::new(Some(10))));
+
+        assert!(context.move_var("a").is_none());
+    }
+
+    #[test]
+    fn for_range_break_test() {
+        let block = Block::new(vec![Statement::Break], Some(Exp::VarName(VarName("i"))));
         let for_range = ForRange::new(VarName("i"), 1, 10, None, block);
 
         let mut context = Context::new(None, ContextType::Normal);

@@ -134,6 +134,13 @@ pub trait Runner<'a> {
     fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr>;
 }
 
+pub trait RVRunner<'a> {
+    fn rv_run(
+        &'a self,
+        context: &mut dyn Ctx<'a>,
+    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr>;
+}
+
 pub trait StmtRunner<'a> {
     fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), ConvertErr>;
 }

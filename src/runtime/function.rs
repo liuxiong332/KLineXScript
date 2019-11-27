@@ -3,6 +3,7 @@ use crate::ast::stat_expr_types::FunctionDef;
 use crate::types::{ConvertErr, DataType, PineFrom, PineStaticType, PineType, SecondType};
 use std::collections::HashMap;
 
+#[derive(Debug, PartialEq, Clone)]
 pub struct Function<'a> {
     def: &'a FunctionDef<'a>,
 }
@@ -16,7 +17,12 @@ impl<'a> PineType<'a> for Function<'a> {
     fn get_type(&self) -> (DataType, SecondType) {
         <Self as PineStaticType>::static_type()
     }
+
+    fn copy(&'a self) -> Box<dyn PineType<'a> + 'a> {
+        Box::new(self.clone())
+    }
 }
+
 impl<'a> PineFrom<'a, Function<'a>> for Function<'a> {}
 
 impl<'a> Function<'a> {

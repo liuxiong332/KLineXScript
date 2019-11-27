@@ -63,6 +63,10 @@ impl<'a> PineType<'a> for Int {
     fn get_type(&self) -> (DataType, SecondType) {
         <Self as PineStaticType>::static_type()
     }
+
+    fn copy(&'a self) -> Box<dyn PineType<'a> + 'a> {
+        Box::new(self.clone())
+    }
 }
 
 impl<'a> PineFrom<'a, Int> for Int {
@@ -156,6 +160,10 @@ impl<'a> PineType<'a> for Float {
     fn get_type(&self) -> (DataType, SecondType) {
         <Self as PineStaticType>::static_type()
     }
+
+    fn copy(&'a self) -> Box<dyn PineType<'a> + 'a> {
+        Box::new(self.clone())
+    }
 }
 
 fn int2float<'a>(t: Box<dyn PineType<'a> + 'a>) -> Box<Float> {
@@ -195,6 +203,10 @@ impl PineStaticType for Bool {
 impl<'a> PineType<'a> for Bool {
     fn get_type(&self) -> (DataType, SecondType) {
         <Self as PineStaticType>::static_type()
+    }
+
+    fn copy(&'a self) -> Box<dyn PineType<'a> + 'a> {
+        Box::new(self.clone())
     }
 }
 
@@ -244,6 +256,10 @@ impl<'a> PineType<'a> for Color<'a> {
     fn get_type(&self) -> (DataType, SecondType) {
         <Self as PineStaticType>::static_type()
     }
+
+    fn copy(&'a self) -> Box<dyn PineType<'a> + 'a> {
+        Box::new(self.clone())
+    }
 }
 
 impl<'a> PineFrom<'a, Color<'a>> for Color<'a> {}
@@ -259,6 +275,10 @@ impl<'a> PineType<'a> for String {
     fn get_type(&self) -> (DataType, SecondType) {
         <Self as PineStaticType>::static_type()
     }
+
+    fn copy(&'a self) -> Box<dyn PineType<'a> + 'a> {
+        Box::new(self.clone())
+    }
 }
 
 impl<'a> PineFrom<'a, String> for String {
@@ -271,7 +291,9 @@ impl<'a> PineFrom<'a, String> for String {
 }
 
 // pine na type
+#[derive(Debug, PartialEq, Clone)]
 pub struct NA;
+
 impl PineStaticType for NA {
     fn static_type() -> (DataType, SecondType) {
         (DataType::NA, SecondType::Simple)
@@ -281,11 +303,16 @@ impl<'a> PineType<'a> for NA {
     fn get_type(&self) -> (DataType, SecondType) {
         <Self as PineStaticType>::static_type()
     }
+
+    fn copy(&'a self) -> Box<dyn PineType<'a> + 'a> {
+        Box::new(self.clone())
+    }
 }
 
 impl<'a> PineFrom<'a, NA> for NA {}
 
 // pine type that represent variable name
+#[derive(Debug, PartialEq, Clone)]
 pub struct PineVar<'a>(pub &'a str);
 impl<'a> PineStaticType for PineVar<'a> {
     fn static_type() -> (DataType, SecondType) {
@@ -296,11 +323,16 @@ impl<'a> PineType<'a> for PineVar<'a> {
     fn get_type(&self) -> (DataType, SecondType) {
         <Self as PineStaticType>::static_type()
     }
+
+    fn copy(&'a self) -> Box<dyn PineType<'a> + 'a> {
+        Box::new(self.clone())
+    }
 }
 impl<'a> PineFrom<'a, PineVar<'a>> for PineVar<'a> {}
 
 // pine tuple type
 pub struct Tuple<'a>(pub Vec<Box<dyn PineType<'a> + 'a>>);
+
 impl<'a> PineStaticType for Tuple<'a> {
     fn static_type() -> (DataType, SecondType) {
         (DataType::Tuple, SecondType::Simple)
@@ -310,10 +342,16 @@ impl<'a> PineType<'a> for Tuple<'a> {
     fn get_type(&self) -> (DataType, SecondType) {
         <Self as PineStaticType>::static_type()
     }
+
+    fn copy(&'a self) -> Box<dyn PineType<'a> + 'a> {
+        let new_vec = self.0.iter().map(|it| it.copy()).collect();
+        Box::new(Tuple(new_vec))
+    }
 }
 impl<'a> PineFrom<'a, Tuple<'a>> for Tuple<'a> {}
 
 // pine callable type
+#[derive(Debug, PartialEq, Clone)]
 pub struct Callable<'a> {
     func: fn(
         HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
@@ -328,6 +366,10 @@ impl<'a> PineStaticType for Callable<'a> {
 impl<'a> PineType<'a> for Callable<'a> {
     fn get_type(&self) -> (DataType, SecondType) {
         <Self as PineStaticType>::static_type()
+    }
+
+    fn copy(&'a self) -> Box<dyn PineType<'a> + 'a> {
+        Box::new(self.clone())
     }
 }
 impl<'a> PineFrom<'a, Callable<'a>> for Callable<'a> {}
@@ -371,6 +413,7 @@ impl<'a> Callable<'a> {
 pub struct Object<'a> {
     obj: Box<dyn PineClass<'a> + 'a>,
 }
+
 impl<'a> PineStaticType for Object<'a> {
     fn static_type() -> (DataType, SecondType) {
         (DataType::Object, SecondType::Simple)
@@ -379,6 +422,10 @@ impl<'a> PineStaticType for Object<'a> {
 impl<'a> PineType<'a> for Object<'a> {
     fn get_type(&self) -> (DataType, SecondType) {
         <Self as PineStaticType>::static_type()
+    }
+
+    fn copy(&'a self) -> Box<dyn PineType<'a> + 'a> {
+        self.obj.copy()
     }
 }
 impl<'a> PineFrom<'a, Object<'a>> for Object<'a> {}
@@ -519,6 +566,10 @@ mod tests {
 
         fn set(&self, _n: &str, _p: Box<dyn PineType<'a> + 'a>) -> Result<(), ConvertErr> {
             Err(ConvertErr::NotSupportOperator)
+        }
+
+        fn copy(&'a self) -> Box<dyn PineType<'a> + 'a> {
+            Box::new(Object::new(Box::new(A)))
         }
     }
 

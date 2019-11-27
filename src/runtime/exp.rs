@@ -1,4 +1,4 @@
-use super::context::{Ctx, Runner};
+use super::context::{Ctx, RVRunner, Runner};
 use super::op::{binary_op_run, unary_op_run};
 use crate::ast::name::VarName;
 use crate::ast::num::Numeral;
@@ -45,6 +45,21 @@ impl<'a> Runner<'a> for Exp<'a> {
             Exp::BinaryExp(ref op, ref exp1, ref exp2) => binary_op_run(op, exp1, exp2, _context),
             _ => unreachable!(),
         }
+    }
+}
+
+impl<'a> RVRunner<'a> for Exp<'a> {
+    fn rv_run(
+        &'a self,
+        context: &mut dyn Ctx<'a>,
+    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+        self.run(context)
+        // match *self {
+        //     Exp::VarName(VarName(s)) => {
+        //         context.
+        //     },
+
+        // }
     }
 }
 
@@ -170,6 +185,10 @@ mod tests {
                     "object" => Ok(Box::new(Object::new(Box::new(A)))),
                     _ => Err(ConvertErr::NotSupportOperator),
                 }
+            }
+
+            fn copy(&'a self) -> Box<dyn PineType<'a> + 'a> {
+                Box::new(Object::new(Box::new(A)))
             }
         }
 

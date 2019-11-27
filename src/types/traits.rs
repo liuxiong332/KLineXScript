@@ -48,6 +48,8 @@ pub trait PineType<'a> {
     //     Err(ConvertErr::NotCompatible)
     // }
     fn get_type(&self) -> (DataType, SecondType);
+
+    fn copy(&'a self) -> Box<dyn PineType<'a> + 'a>;
 }
 
 pub fn downcast<'a, T: PineStaticType + 'a>(
@@ -71,6 +73,8 @@ pub trait PineClass<'a> {
     fn set(&self, _name: &str, _property: Box<dyn PineType<'a> + 'a>) -> Result<(), ConvertErr> {
         Err(ConvertErr::NotSupportOperator)
     }
+
+    fn copy(&'a self) -> Box<dyn PineType<'a> + 'a>;
 }
 
 pub trait PineFrom<'a, D: 'a> {

@@ -1,5 +1,6 @@
 use super::context::{Context, ContextType, Ctx, Runner, StmtRunner};
 use super::function::Function;
+use crate::ast::name::VarName;
 use crate::ast::stat_expr_types::{
     Assignment, Block, DataType, ForRange, FunctionCall, FunctionDef, IfThenElse, Statement,
     VarAssignment,
@@ -10,24 +11,24 @@ use crate::types::{
 };
 
 impl<'a> StmtRunner<'a> for Statement<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), ConvertErr> {
+    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), ConvertErr> {
         match *self {
             Statement::None => Ok(()),
             Statement::Break => Err(ConvertErr::Break),
             Statement::Continue => Err(ConvertErr::Continue),
-            Statement::Assignment(ref assign) => assign.run(context),
-            Statement::VarAssignment(ref var_assign) => var_assign.run(context),
-            Statement::Ite(ref ite) => StmtRunner::run(ite.as_ref(), context),
-            Statement::ForRange(ref fr) => StmtRunner::run(fr.as_ref(), context),
-            Statement::FuncCall(ref fun_call) => StmtRunner::run(fun_call.as_ref(), context),
-            Statement::FuncDef(ref fun_def) => fun_def.run(context),
+            Statement::Assignment(ref assign) => assign.st_run(context),
+            Statement::VarAssignment(ref var_assign) => var_assign.st_run(context),
+            Statement::Ite(ref ite) => StmtRunner::st_run(ite.as_ref(), context),
+            Statement::ForRange(ref fr) => StmtRunner::st_run(fr.as_ref(), context),
+            Statement::FuncCall(ref fun_call) => StmtRunner::st_run(fun_call.as_ref(), context),
+            Statement::FuncDef(ref fun_def) => fun_def.st_run(context),
             _ => Err(ConvertErr::NotSupportOperator),
         }
     }
 }
 
 impl<'a> StmtRunner<'a> for Assignment<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), ConvertErr> {
+    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), ConvertErr> {
         let name = self.name.0;
         if context.contains_declare(name) {
             return Err(ConvertErr::NameDeclared);
@@ -72,7 +73,7 @@ where
 }
 
 impl<'a> StmtRunner<'a> for VarAssignment<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), ConvertErr> {
+    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), ConvertErr> {
         let name = self.name.0;
         if !context.contains_declare(name) {
             return Err(ConvertErr::NameNotDeclard);
@@ -107,7 +108,7 @@ impl<'a> Runner<'a> for IfThenElse<'a> {
 }
 
 impl<'a> StmtRunner<'a> for IfThenElse<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), ConvertErr> {
+    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), ConvertErr> {
         match Runner::run(self, context) {
             Ok(_) => Ok(()),
             Err(e) => Err(e),
@@ -157,12 +158,33 @@ impl<'a> Runner<'a> for ForRange<'a> {
 }
 
 impl<'a> StmtRunner<'a> for ForRange<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), ConvertErr> {
+    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), ConvertErr> {
         match Runner::run(self, context) {
             Ok(_) => Ok(()),
             Err(e) => Err(e),
         }
     }
+}
+
+fn extract_args<'a>(
+    context: &mut dyn Ctx<'a>,
+    exp: &'a FunctionCall<'a>,
+) -> Result<
+    (
+        Vec<Box<dyn PineType<'a> + 'a>>,
+        Vec<(&'a str, Box<dyn PineType<'a> + 'a>)>,
+    ),
+    ConvertErr,
+> {
+    let mut ret_pos = vec![];
+    for exp in exp.pos_args.iter() {
+        ret_pos.push(exp.run(context)?);
+    }
+    let mut ret_dict = vec![];
+    for (n, exp) in exp.dict_args.iter() {
+        ret_dict.push((n.0, exp.run(context)?));
+    }
+    Ok((ret_pos, ret_dict))
 }
 
 impl<'a> Runner<'a> for FunctionCall<'a> {
@@ -171,15 +193,13 @@ impl<'a> Runner<'a> for FunctionCall<'a> {
         match result.get_type() {
             (FirstType::Callable, SecondType::Simple) => {
                 let callable = downcast::<Callable>(result).unwrap();
-                let mut pos_args = vec![];
-                for exp in self.pos_args.iter() {
-                    pos_args.push(exp.run(context)?);
-                }
-                let mut dict_args = vec![];
-                for (n, exp) in self.dict_args.iter() {
-                    dict_args.push((n.0, exp.run(context)?));
-                }
+                let (pos_args, dict_args) = extract_args(context, self)?;
                 callable.call(pos_args, dict_args)
+            }
+            (FirstType::Function, SecondType::Simple) => {
+                let callable = downcast::<Function>(result).unwrap();
+                let (pos_args, dict_args) = extract_args(context, self)?;
+                callable.call(context, pos_args, dict_args)
             }
             _ => Err(ConvertErr::NotSupportOperator),
         }
@@ -187,7 +207,7 @@ impl<'a> Runner<'a> for FunctionCall<'a> {
 }
 
 impl<'a> StmtRunner<'a> for FunctionCall<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), ConvertErr> {
+    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), ConvertErr> {
         match Runner::run(self, context) {
             Ok(_) => Ok(()),
             Err(e) => Err(e),
@@ -196,7 +216,7 @@ impl<'a> StmtRunner<'a> for FunctionCall<'a> {
 }
 
 impl<'a> StmtRunner<'a> for FunctionDef<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), ConvertErr> {
+    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), ConvertErr> {
         let func = Function::new(self);
         context.create_var(self.name.0, Box::new(func));
         Ok(())
@@ -206,7 +226,7 @@ impl<'a> StmtRunner<'a> for FunctionDef<'a> {
 impl<'a> Runner<'a> for Block<'a> {
     fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
         for st in self.stmts.iter() {
-            st.run(context)?;
+            st.st_run(context)?;
         }
         if let Some(ref exp) = self.ret_stmt {
             exp.run(context)
@@ -250,15 +270,15 @@ mod tests {
         )));
         let mut context = Context::new(None, ContextType::Normal);
 
-        assert_eq!(assign1.run(&mut context), Ok(()));
+        assert_eq!(assign1.st_run(&mut context), Ok(()));
         test_val(&mut context, 12);
 
         context.clear_declare();
-        assert_eq!(assign2.run(&mut context), Ok(()));
+        assert_eq!(assign2.st_run(&mut context), Ok(()));
         test_val(&mut context, 12);
 
         context.clear_declare();
-        assert_eq!(assign3.run(&mut context), Ok(()));
+        assert_eq!(assign3.st_run(&mut context), Ok(()));
         test_val(&mut context, 23);
     }
 
@@ -277,10 +297,10 @@ mod tests {
             assert_eq!(s, Box::new(Series::from(Some(int_val))));
             context.update_var("hello", s);
         };
-        assert_eq!(assign1.run(&mut context), Ok(()));
+        assert_eq!(assign1.st_run(&mut context), Ok(()));
         test_val(&mut context, 24);
 
-        assert_eq!(assign2.run(&mut context), Ok(()));
+        assert_eq!(assign2.st_run(&mut context), Ok(()));
         test_val(&mut context, 36);
     }
 

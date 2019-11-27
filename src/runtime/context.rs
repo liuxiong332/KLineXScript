@@ -143,7 +143,7 @@ pub trait RVRunner<'a> {
 }
 
 pub trait StmtRunner<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), ConvertErr>;
+    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), ConvertErr>;
 }
 
 #[cfg(test)]

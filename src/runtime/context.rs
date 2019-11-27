@@ -134,6 +134,7 @@ pub trait Runner<'a> {
     fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr>;
 }
 
+// Evaluate  the expression with right-value.
 pub trait RVRunner<'a> {
     fn rv_run(
         &'a self,

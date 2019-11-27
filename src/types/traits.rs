@@ -31,6 +31,7 @@ pub enum ConvertErr {
     InvalidTypeCast,
     InvalidNADeclarer,
 
+    VarNotFound,            // The variable not found in context
     InvalidVarType(String), // The variable type is invalid.
     NameNotDeclard,
 
@@ -49,7 +50,7 @@ pub trait PineType<'a> {
     // }
     fn get_type(&self) -> (DataType, SecondType);
 
-    fn copy(&'a self) -> Box<dyn PineType<'a> + 'a>;
+    fn copy(&self) -> Box<dyn PineType<'a> + 'a>;
 }
 
 pub fn downcast<'a, T: PineStaticType + 'a>(
@@ -74,7 +75,7 @@ pub trait PineClass<'a> {
         Err(ConvertErr::NotSupportOperator)
     }
 
-    fn copy(&'a self) -> Box<dyn PineType<'a> + 'a>;
+    fn copy(&self) -> Box<dyn PineType<'a> + 'a>;
 }
 
 pub trait PineFrom<'a, D: 'a> {

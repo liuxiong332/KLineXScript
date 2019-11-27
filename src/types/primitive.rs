@@ -64,7 +64,7 @@ impl<'a> PineType<'a> for Int {
         <Self as PineStaticType>::static_type()
     }
 
-    fn copy(&'a self) -> Box<dyn PineType<'a> + 'a> {
+    fn copy(&self) -> Box<dyn PineType<'a> + 'a> {
         Box::new(self.clone())
     }
 }
@@ -161,7 +161,7 @@ impl<'a> PineType<'a> for Float {
         <Self as PineStaticType>::static_type()
     }
 
-    fn copy(&'a self) -> Box<dyn PineType<'a> + 'a> {
+    fn copy(&self) -> Box<dyn PineType<'a> + 'a> {
         Box::new(self.clone())
     }
 }
@@ -205,7 +205,7 @@ impl<'a> PineType<'a> for Bool {
         <Self as PineStaticType>::static_type()
     }
 
-    fn copy(&'a self) -> Box<dyn PineType<'a> + 'a> {
+    fn copy(&self) -> Box<dyn PineType<'a> + 'a> {
         Box::new(self.clone())
     }
 }
@@ -257,7 +257,7 @@ impl<'a> PineType<'a> for Color<'a> {
         <Self as PineStaticType>::static_type()
     }
 
-    fn copy(&'a self) -> Box<dyn PineType<'a> + 'a> {
+    fn copy(&self) -> Box<dyn PineType<'a> + 'a> {
         Box::new(self.clone())
     }
 }
@@ -276,7 +276,7 @@ impl<'a> PineType<'a> for String {
         <Self as PineStaticType>::static_type()
     }
 
-    fn copy(&'a self) -> Box<dyn PineType<'a> + 'a> {
+    fn copy(&self) -> Box<dyn PineType<'a> + 'a> {
         Box::new(self.clone())
     }
 }
@@ -291,7 +291,7 @@ impl<'a> PineFrom<'a, String> for String {
 }
 
 // pine na type
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Default)]
 pub struct NA;
 
 impl PineStaticType for NA {
@@ -304,7 +304,7 @@ impl<'a> PineType<'a> for NA {
         <Self as PineStaticType>::static_type()
     }
 
-    fn copy(&'a self) -> Box<dyn PineType<'a> + 'a> {
+    fn copy(&self) -> Box<dyn PineType<'a> + 'a> {
         Box::new(self.clone())
     }
 }
@@ -324,7 +324,7 @@ impl<'a> PineType<'a> for PineVar<'a> {
         <Self as PineStaticType>::static_type()
     }
 
-    fn copy(&'a self) -> Box<dyn PineType<'a> + 'a> {
+    fn copy(&self) -> Box<dyn PineType<'a> + 'a> {
         Box::new(self.clone())
     }
 }
@@ -343,7 +343,7 @@ impl<'a> PineType<'a> for Tuple<'a> {
         <Self as PineStaticType>::static_type()
     }
 
-    fn copy(&'a self) -> Box<dyn PineType<'a> + 'a> {
+    fn copy(&self) -> Box<dyn PineType<'a> + 'a> {
         let new_vec = self.0.iter().map(|it| it.copy()).collect();
         Box::new(Tuple(new_vec))
     }
@@ -368,7 +368,7 @@ impl<'a> PineType<'a> for Callable<'a> {
         <Self as PineStaticType>::static_type()
     }
 
-    fn copy(&'a self) -> Box<dyn PineType<'a> + 'a> {
+    fn copy(&self) -> Box<dyn PineType<'a> + 'a> {
         Box::new(self.clone())
     }
 }
@@ -424,7 +424,7 @@ impl<'a> PineType<'a> for Object<'a> {
         <Self as PineStaticType>::static_type()
     }
 
-    fn copy(&'a self) -> Box<dyn PineType<'a> + 'a> {
+    fn copy(&self) -> Box<dyn PineType<'a> + 'a> {
         self.obj.copy()
     }
 }
@@ -568,7 +568,7 @@ mod tests {
             Err(ConvertErr::NotSupportOperator)
         }
 
-        fn copy(&'a self) -> Box<dyn PineType<'a> + 'a> {
+        fn copy(&self) -> Box<dyn PineType<'a> + 'a> {
             Box::new(Object::new(Box::new(A)))
         }
     }

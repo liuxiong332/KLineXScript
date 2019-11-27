@@ -66,7 +66,7 @@ impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> PineType<'a> f
         (<D as PineStaticType>::static_type().0, SecondType::Series)
     }
 
-    fn copy(&'a self) -> Box<dyn PineType<'a> + 'a> {
+    fn copy(&self) -> Box<dyn PineType<'a> + 'a> {
         let series = self.clone();
         Box::new(series)
     }

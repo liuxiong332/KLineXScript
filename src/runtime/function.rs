@@ -18,7 +18,7 @@ impl<'a> PineType<'a> for Function<'a> {
         <Self as PineStaticType>::static_type()
     }
 
-    fn copy(&'a self) -> Box<dyn PineType<'a> + 'a> {
+    fn copy(&self) -> Box<dyn PineType<'a> + 'a> {
         Box::new(self.clone())
     }
 }

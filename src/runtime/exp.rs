@@ -30,7 +30,7 @@ impl<'a> Runner<'a> for Exp<'a> {
             Exp::Tuple(ref tuple) => {
                 let mut col: Vec<Box<dyn PineType<'a> + 'a>> = vec![];
                 for exp in tuple.iter() {
-                    col.push(exp.run(_context)?)
+                    col.push(exp.rv_run(_context)?)
                 }
                 Ok(Box::new(Tuple(col)))
             }
@@ -53,13 +53,17 @@ impl<'a> RVRunner<'a> for Exp<'a> {
         &'a self,
         context: &mut dyn Ctx<'a>,
     ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
-        self.run(context)
-        // match *self {
-        //     Exp::VarName(VarName(s)) => {
-        //         context.
-        //     },
-
-        // }
+        match *self {
+            Exp::VarName(VarName(name)) => match context.move_var(name) {
+                None => Err(ConvertErr::VarNotFound),
+                Some(s) => {
+                    let ret = s.copy();
+                    context.update_var(name, s);
+                    Ok(ret)
+                }
+            },
+            _ => self.run(context),
+        }
     }
 }
 
@@ -170,7 +174,7 @@ mod tests {
     use super::*;
     use crate::runtime::context::{Context, ContextType};
     use crate::types::PineClass;
-
+    use std::fmt::Debug;
     #[test]
     fn prefix_exp_test() {
         struct A;
@@ -187,7 +191,7 @@ mod tests {
                 }
             }
 
-            fn copy(&'a self) -> Box<dyn PineType<'a> + 'a> {
+            fn copy(&self) -> Box<dyn PineType<'a> + 'a> {
                 Box::new(Object::new(Box::new(A)))
             }
         }
@@ -237,5 +241,84 @@ mod tests {
             downcast::<Int>(exp.run(&mut context).unwrap()),
             Ok(Box::new(Some(1)))
         );
+    }
+
+    #[test]
+    fn var_rv_test() {
+        let exp = Exp::VarName(VarName("hello"));
+        let mut context = Context::new(None, ContextType::Normal);
+        context.create_var("hello", Box::new(Some(1)));
+
+        assert_eq!(
+            downcast::<Int>(exp.rv_run(&mut context).unwrap()),
+            Ok(Box::new(Some(1)))
+        );
+    }
+
+    #[test]
+    fn simple_exp_test() {
+        fn simple_exp<'a, D: PineStaticType + PartialEq + Debug>(exp: Exp<'a>, v: D) {
+            let mut context = Context::new(None, ContextType::Normal);
+            assert_eq!(
+                downcast::<D>(exp.run(&mut context).unwrap()),
+                Ok(Box::new(v))
+            );
+        }
+
+        simple_exp::<NA>(Exp::Na, NA);
+        simple_exp::<Bool>(Exp::Bool(false), false);
+        simple_exp(Exp::Num(Numeral::Float(0f64)), Some(0f64));
+        simple_exp(Exp::Num(Numeral::Int(1)), Some(1));
+        simple_exp(Exp::Str(String::from("hello")), String::from("hello"));
+        simple_exp(Exp::Color("#12"), Color("#12"));
+        simple_exp(Exp::VarName(VarName("name")), PineVar("name"));
+        simple_exp(
+            Exp::TypeCast(Box::new(TypeCast {
+                data_type: DataType::Int,
+                exp: Exp::Num(Numeral::Float(1.2)),
+            })),
+            Some(1),
+        );
+    }
+
+    #[test]
+    fn ret_tuple_exp_test() {
+        let exp = Exp::RetTuple(Box::new(vec![VarName("name")]));
+        let mut context = Context::new(None, ContextType::Normal);
+
+        let tuple_res = downcast::<Tuple>(exp.run(&mut context).unwrap()).unwrap();
+        let vec_res: Vec<Box<PineVar>> = tuple_res
+            .0
+            .into_iter()
+            .map(|s| downcast::<PineVar>(s).unwrap())
+            .collect();
+        assert_eq!(vec_res, vec![Box::new(PineVar("name"))]);
+    }
+
+    #[test]
+    fn tuple_exp_test() {
+        let exp = Exp::Tuple(Box::new(vec![Exp::VarName(VarName("name"))]));
+        let mut context = Context::new(None, ContextType::Normal);
+        context.create_var("name", Box::new(Some(1)));
+
+        let tuple_res = downcast::<Tuple>(exp.run(&mut context).unwrap()).unwrap();
+        let vec_res: Vec<Box<Int>> = tuple_res
+            .0
+            .into_iter()
+            .map(|s| downcast::<Int>(s).unwrap())
+            .collect();
+        assert_eq!(vec_res, vec![Box::new(Some(1))]);
+    }
+
+    #[test]
+    fn type_cast_exp_test() {
+        let exp = Exp::TypeCast(Box::new(TypeCast {
+            data_type: DataType::Int,
+            exp: Exp::Num(Numeral::Float(1.2)),
+        }));
+        let mut context = Context::new(None, ContextType::Normal);
+
+        let res = downcast::<Int>(exp.run(&mut context).unwrap()).unwrap();
+        assert_eq!(res, Box::new(Some(1)));
     }
 }

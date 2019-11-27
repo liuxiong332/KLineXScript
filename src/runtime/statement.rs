@@ -1,6 +1,5 @@
-use super::context::{Context, ContextType, Ctx, Runner, StmtRunner};
+use super::context::{Context, ContextType, Ctx, RVRunner, Runner, StmtRunner};
 use super::function::Function;
-use crate::ast::name::VarName;
 use crate::ast::stat_expr_types::{
     Assignment, Block, DataType, ForRange, FunctionCall, FunctionDef, IfThenElse, Statement,
     VarAssignment,
@@ -22,7 +21,6 @@ impl<'a> StmtRunner<'a> for Statement<'a> {
             Statement::ForRange(ref fr) => StmtRunner::st_run(fr.as_ref(), context),
             Statement::FuncCall(ref fun_call) => StmtRunner::st_run(fun_call.as_ref(), context),
             Statement::FuncDef(ref fun_def) => fun_def.st_run(context),
-            _ => Err(ConvertErr::NotSupportOperator),
         }
     }
 }
@@ -189,7 +187,7 @@ fn extract_args<'a>(
 
 impl<'a> Runner<'a> for FunctionCall<'a> {
     fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
-        let result = self.method.run(context)?;
+        let result = self.method.rv_run(context)?;
         match result.get_type() {
             (FirstType::Callable, SecondType::Simple) => {
                 let callable = downcast::<Callable>(result).unwrap();
@@ -229,7 +227,7 @@ impl<'a> Runner<'a> for Block<'a> {
             st.st_run(context)?;
         }
         if let Some(ref exp) = self.ret_stmt {
-            exp.run(context)
+            exp.rv_run(context)
         } else {
             Ok(Box::new(NA))
         }
@@ -323,6 +321,59 @@ mod tests {
         assert_eq!(Int::implicity_from(result.unwrap()), Ok(Box::new(Some(10))));
 
         assert!(context.move_var("a").is_none());
+    }
+
+    #[test]
+    fn func_call_exp_test() {
+        use std::collections::HashMap;
+        let exp = FunctionCall {
+            method: Exp::VarName(VarName("name")),
+            pos_args: vec![Exp::Bool(true)],
+            dict_args: vec![],
+        };
+        let mut context = Context::new(None, ContextType::Normal);
+
+        fn test_func<'a>(
+            mut h: HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
+        ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+            match h.remove("arg") {
+                None => Err(ConvertErr::NotValidParam),
+                Some(arg) => {
+                    println!("{:?}", arg.get_type());
+                    Ok(arg)
+                }
+            }
+        }
+
+        context.create_var("name", Box::new(Callable::new(test_func, vec!["arg"])));
+
+        let res = downcast::<Bool>(exp.run(&mut context).unwrap()).unwrap();
+        assert_eq!(res, Box::new(true));
+    }
+
+    #[test]
+    fn func_call_exp2_test() {
+        use crate::ast::stat_expr_types::Exp;
+        use std::collections::HashMap;
+
+        let exp = FunctionCall {
+            method: Exp::VarName(VarName("name")),
+            pos_args: vec![Exp::Bool(true)],
+            dict_args: vec![],
+        };
+        let def_exp = FunctionDef {
+            name: VarName("name"),
+            params: vec![VarName("arg")],
+            body: Block {
+                stmts: vec![],
+                ret_stmt: Some(Exp::VarName(VarName("arg"))),
+            },
+        };
+        let mut context = Context::new(None, ContextType::Normal);
+        context.create_var("name", Box::new(Function::new(&def_exp)));
+
+        let res = downcast::<Bool>(exp.run(&mut context).unwrap()).unwrap();
+        assert_eq!(res, Box::new(true));
     }
 
     // #[test]

@@ -1,4 +1,4 @@
-use super::context::{Context, Ctx, Runner};
+use super::context::{Context, Ctx, RVRunner, Runner};
 use super::exp::Exp;
 use crate::ast::op::{BinaryOp, UnaryOp};
 use crate::types::{
@@ -12,9 +12,9 @@ pub fn unary_op_run<'a>(
     context: &mut (dyn Ctx<'a>),
 ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
     match op {
-        UnaryOp::Plus => exp.run(context),
+        UnaryOp::Plus => exp.rv_run(context),
         UnaryOp::Minus => {
-            let val = exp.run(context)?;
+            let val = exp.rv_run(context)?;
             match val.get_type() {
                 (FirstType::Int, SecondType::Simple) => {
                     Ok(Box::new(downcast::<Int>(val).unwrap().negative()) as Box<dyn PineType>)
@@ -26,7 +26,7 @@ pub fn unary_op_run<'a>(
             }
         }
         UnaryOp::BoolNot => {
-            let val = exp.run(context)?;
+            let val = exp.rv_run(context)?;
             let bool_val = Bool::implicity_from(val)?;
             match *bool_val {
                 true => Ok(Box::new(false)),
@@ -64,28 +64,28 @@ pub fn binary_op_run<'a, 'b>(
 ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
     match op {
         BinaryOp::BoolAnd => {
-            let val1 = exp1.run(context)?;
+            let val1 = exp1.rv_run(context)?;
             let bval1 = Bool::implicity_from(val1)?;
             if *bval1 == false {
                 return Ok(Box::new(false));
             }
-            let val2 = exp2.run(context)?;
+            let val2 = exp2.rv_run(context)?;
             let bval2 = Bool::implicity_from(val2)?;
             Ok(bval2)
         }
         BinaryOp::BoolOr => {
-            let val1 = exp1.run(context)?;
+            let val1 = exp1.rv_run(context)?;
             let bval1 = Bool::implicity_from(val1)?;
             if *bval1 == true {
                 return Ok(Box::new(true));
             }
-            let val2 = exp2.run(context)?;
+            let val2 = exp2.rv_run(context)?;
             let bval2 = Bool::implicity_from(val2)?;
             Ok(bval2)
         }
         _ => {
-            let val1 = exp1.run(context)?;
-            let val2 = exp2.run(context)?;
+            let val1 = exp1.rv_run(context)?;
+            let val2 = exp2.rv_run(context)?;
             match (op, val1.get_type(), val2.get_type()) {
                 (op, (FirstType::Float, SecondType::Simple), _)
                 | (op, _, (FirstType::Float, SecondType::Simple)) => {
@@ -112,6 +112,7 @@ pub fn binary_op_run<'a, 'b>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ast::name::VarName;
     use crate::ast::num::Numeral;
     use crate::runtime::context::ContextType;
     use crate::types::PineStaticType;
@@ -253,6 +254,79 @@ mod tests {
         assert_eq!(
             biop_runner(BinaryOp::BoolOr, Exp::Bool(false), Exp::Bool(false)),
             Ok(Box::new(false))
+        );
+    }
+
+    fn biop_rv_runner<'a, D: PineStaticType>(
+        op: BinaryOp,
+        v1: Exp<'a>,
+        v2: Exp<'a>,
+    ) -> Result<Box<D>, ConvertErr> {
+        let mut context = Context::new(None, ContextType::Normal);
+        context.create_var("arg1", Box::new(Some(4)));
+        context.create_var("arg2", Box::new(Some(2)));
+
+        downcast::<D>(binary_op_run(&op, &Box::new(v1), &Box::new(v2), &mut context).unwrap())
+    }
+
+    fn var_exp<'a>(var: &'a str) -> Exp<'a> {
+        Exp::VarName(VarName(var))
+    }
+
+    #[test]
+    fn rv_op_test() {
+        assert_eq!(
+            biop_rv_runner(BinaryOp::Plus, var_exp("arg1"), var_exp("arg2")),
+            Ok(Box::new(Some(6)))
+        );
+        assert_eq!(
+            biop_rv_runner(BinaryOp::Minus, var_exp("arg1"), var_exp("arg2")),
+            Ok(Box::new(Some(2)))
+        );
+        assert_eq!(
+            biop_rv_runner(BinaryOp::Mul, var_exp("arg1"), var_exp("arg2")),
+            Ok(Box::new(Some(8)))
+        );
+        assert_eq!(
+            biop_rv_runner(BinaryOp::Div, var_exp("arg1"), var_exp("arg2")),
+            Ok(Box::new(Some(2)))
+        );
+        assert_eq!(
+            biop_rv_runner(BinaryOp::Mod, var_exp("arg1"), var_exp("arg2")),
+            Ok(Box::new(Some(0)))
+        );
+
+        assert_eq!(
+            biop_rv_runner(BinaryOp::Eq, var_exp("arg1"), var_exp("arg2")),
+            Ok(Box::new(false))
+        );
+        assert_eq!(
+            biop_rv_runner(BinaryOp::Neq, var_exp("arg1"), var_exp("arg2")),
+            Ok(Box::new(true))
+        );
+        assert_eq!(
+            biop_rv_runner(BinaryOp::Lt, var_exp("arg1"), var_exp("arg2")),
+            Ok(Box::new(false))
+        );
+        assert_eq!(
+            biop_rv_runner(BinaryOp::Leq, var_exp("arg1"), var_exp("arg2")),
+            Ok(Box::new(false))
+        );
+        assert_eq!(
+            biop_rv_runner(BinaryOp::Gt, var_exp("arg1"), var_exp("arg2")),
+            Ok(Box::new(true))
+        );
+        assert_eq!(
+            biop_rv_runner(BinaryOp::Geq, var_exp("arg1"), var_exp("arg2")),
+            Ok(Box::new(true))
+        );
+        assert_eq!(
+            biop_rv_runner(BinaryOp::BoolAnd, var_exp("arg1"), var_exp("arg2")),
+            Ok(Box::new(true))
+        );
+        assert_eq!(
+            biop_rv_runner(BinaryOp::BoolOr, var_exp("arg1"), var_exp("arg2")),
+            Ok(Box::new(true))
         );
     }
 }

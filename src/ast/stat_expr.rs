@@ -27,13 +27,13 @@ pub fn exp2(input: &str) -> PineResult<Exp2> {
         map(string_lit, Exp2::Str),
         map(color_lit, Exp2::Color),
         map(bracket_expr, Exp2::Exp),
-        map(rettupledef, |varnames| Exp2::RetTuple(Box::new(varnames))), // match [a, b]
-        map(tupledef, |exps| Exp2::Tuple(Box::new(exps))),               // match [a, b + c]
-        map(type_cast, |exp| Exp2::TypeCast(Box::new(exp))),             // match float(b)
-        map(prefix_exp_ws, |exp| Exp2::PrefixExp(Box::new(exp))),        // match a.b.c
-        map(func_call_ws, |exp| Exp2::FuncCall(Box::new(exp))),          // match a(b)
-        map(ref_call, |exp| Exp2::RefCall(Box::new(exp))),               // match a[b]
-        map(varname_ws, Exp2::VarName),                                  // match a
+        // map(rettupledef, |varnames| Exp2::RetTuple(Box::new(varnames))), // match [a, b]
+        map(tupledef, |exps| Exp2::Tuple(Box::new(exps))), // match [a, b + c]
+        map(type_cast, |exp| Exp2::TypeCast(Box::new(exp))), // match float(b)
+        map(prefix_exp_ws, |exp| Exp2::PrefixExp(Box::new(exp))), // match a.b.c
+        map(func_call_ws, |exp| Exp2::FuncCall(Box::new(exp))), // match a(b)
+        map(ref_call, |exp| Exp2::RefCall(Box::new(exp))), // match a[b]
+        map(varname_ws, Exp2::VarName),                    // match a
     ))(input)
 }
 

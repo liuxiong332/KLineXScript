@@ -244,7 +244,7 @@ impl<'a> From<Exp2<'a>> for Exp<'a> {
             Exp2::Str(s) => Exp::Str(s),
             Exp2::Color(s) => Exp::Color(s),
             Exp2::VarName(f) => Exp::VarName(f),
-            Exp2::RetTuple(p) => Exp::RetTuple(p),
+            // Exp2::RetTuple(p) => Exp::RetTuple(p),
             Exp2::Tuple(t) => Exp::Tuple(t),
             Exp2::TypeCast(t) => Exp::TypeCast(t),
             Exp2::FuncCall(t) => Exp::FuncCall(t),

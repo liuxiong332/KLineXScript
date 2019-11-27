@@ -37,7 +37,7 @@ impl<'a> StmtRunner<'a> for Assignment<'a> {
         if self.var && context.contains_var(name) {
             return Ok(());
         }
-        let val = self.val.run(context)?;
+        let val = self.val.rv_run(context)?;
         let true_val: Box<dyn PineType<'a> + 'a> = match self.var_type {
             None => val,
             Some(DataType::Int) => Int::explicity_from(val)?,
@@ -76,7 +76,7 @@ impl<'a> StmtRunner<'a> for VarAssignment<'a> {
         if !context.contains_declare(name) {
             return Err(ConvertErr::NameNotDeclard);
         }
-        let val = self.val.run(context)?;
+        let val = self.val.rv_run(context)?;
         let exist_val = context.move_var(name).unwrap();
         match exist_val.get_type() {
             (FirstType::Bool, _) => update_series::<Bool>(context, name, exist_val, val),
@@ -91,7 +91,7 @@ impl<'a> StmtRunner<'a> for VarAssignment<'a> {
 
 impl<'a> Runner<'a> for IfThenElse<'a> {
     fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
-        let cond = self.cond.run(context)?;
+        let cond = self.cond.rv_run(context)?;
         let cond_bool = Bool::implicity_from(cond)?;
         if *cond_bool {
             let mut new_context = Context::new(Some(context), ContextType::IfElseBlock);
@@ -137,13 +137,13 @@ impl<'a> Runner<'a> for ForRange<'a> {
                 }
                 Err(ConvertErr::Break) => {
                     if let Some(ref exp) = self.do_blk.ret_stmt {
-                        ret_val = Runner::run(exp, &mut new_context)?
+                        ret_val = exp.rv_run(&mut new_context)?
                     }
                     break;
                 }
                 Err(ConvertErr::Continue) => {
                     if let Some(ref exp) = self.do_blk.ret_stmt {
-                        ret_val = Runner::run(exp, &mut new_context)?
+                        ret_val = exp.rv_run(&mut new_context)?
                     }
                     continue;
                 }
@@ -267,6 +267,7 @@ mod tests {
             Some(DataType::Int),
         )));
         let mut context = Context::new(None, ContextType::Normal);
+        context.create_var("newvar", Box::new(Some(100)));
 
         assert_eq!(assign1.st_run(&mut context), Ok(()));
         test_val(&mut context, 12);
@@ -281,12 +282,31 @@ mod tests {
     }
 
     #[test]
+    fn rv_assignment_test() {
+        let assign = Statement::Assignment(Box::new(Assignment::new(
+            VarName("myvar"),
+            Exp::VarName(VarName("newvar")),
+            false,
+            None,
+        )));
+        let mut context = Context::new(None, ContextType::Normal);
+        context.create_var("newvar", Box::new(Some(100)));
+
+        assert_eq!(assign.st_run(&mut context), Ok(()));
+        let val = Int::explicity_from(context.move_var("myvar").unwrap());
+        assert_eq!(val, Ok(Box::new(Some(100))));
+        context.update_var("myvar", val.unwrap());
+    }
+
+    #[test]
     fn var_assignment_test() {
         let assign1 = VarAssignment::new(VarName("hello"), Exp::Num(Numeral::Int(24)));
         let assign2 = VarAssignment::new(VarName("hello"), Exp::Num(Numeral::Int(36)));
+        let assign3 = VarAssignment::new(VarName("hello"), Exp::VarName(VarName("newvar")));
 
         let mut context = Context::new(None, ContextType::Normal);
         context.create_var("hello", Box::new(Some(12)));
+        context.create_var("newvar", Box::new(Some(100)));
         context.create_declare("hello");
 
         let test_val = |context: &mut Context, int_val| {
@@ -300,6 +320,29 @@ mod tests {
 
         assert_eq!(assign2.st_run(&mut context), Ok(()));
         test_val(&mut context, 36);
+
+        assert_eq!(assign3.st_run(&mut context), Ok(()));
+        test_val(&mut context, 100);
+    }
+
+    #[test]
+    fn if_then_else_test() {
+        let ite = IfThenElse::new(
+            Exp::VarName(VarName("cond")),
+            Block::new(vec![], Some(Exp::VarName(VarName("then")))),
+            Some(Block::new(vec![], Some(Exp::VarName(VarName("else"))))),
+        );
+        let mut context = Context::new(None, ContextType::Normal);
+        context.create_var("cond", Box::new(true));
+        context.create_var("then", Box::new(Some(2)));
+        context.create_var("else", Box::new(Some(4)));
+
+        assert_eq!(
+            downcast::<Int>(ite.run(&mut context).unwrap()),
+            Ok(Box::new(Some(2)))
+        );
+        // If-Then-Else Run as statement
+        assert_eq!(ite.st_run(&mut context), Ok(()));
     }
 
     #[test]
@@ -338,10 +381,7 @@ mod tests {
         ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
             match h.remove("arg") {
                 None => Err(ConvertErr::NotValidParam),
-                Some(arg) => {
-                    println!("{:?}", arg.get_type());
-                    Ok(arg)
-                }
+                Some(arg) => Ok(arg),
             }
         }
 

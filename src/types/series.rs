@@ -1,6 +1,5 @@
-use super::traits::{
-    downcast, ConvertErr, DataType, PineFrom, PineStaticType, PineType, SecondType,
-};
+use super::downcast::downcast;
+use super::traits::{ConvertErr, DataType, PineFrom, PineStaticType, PineType, SecondType};
 use std::convert::From;
 use std::marker::PhantomData;
 use std::mem;
@@ -27,6 +26,14 @@ impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> Series<'a, D> 
         Series {
             current: D::default(),
             history: vec![],
+            phantom: PhantomData,
+        }
+    }
+
+    pub fn from_vec(history: Vec<D>) -> Series<'a, D> {
+        Series {
+            current: D::default(),
+            history,
             phantom: PhantomData,
         }
     }

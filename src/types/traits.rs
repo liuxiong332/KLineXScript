@@ -1,6 +1,7 @@
 #[derive(Debug, PartialEq)]
 pub enum SecondType {
     Simple,
+    Array,
     Series,
 }
 
@@ -53,19 +54,6 @@ pub trait PineType<'a> {
     fn get_type(&self) -> (DataType, SecondType);
 
     fn copy(&self) -> Box<dyn PineType<'a> + 'a>;
-}
-
-pub fn downcast<'a, T: PineStaticType + 'a>(
-    item: Box<dyn PineType<'a> + 'a>,
-) -> Result<Box<T>, ConvertErr> {
-    if T::static_type() == item.get_type() {
-        unsafe {
-            let raw: *mut dyn PineType<'a> = Box::into_raw(item);
-            Ok(Box::from_raw(raw as *mut T))
-        }
-    } else {
-        Err(ConvertErr::NotCompatible)
-    }
 }
 
 pub trait PineClass<'a> {

@@ -1,4 +1,7 @@
-use crate::types::{ConvertErr, PineType, NA};
+use crate::types::{
+    Bool, Color, ConvertErr, DataType, Float, Int, PineFrom, PineStaticType, PineType, SecondType,
+    Series, NA,
+};
 use std::collections::{HashMap, HashSet};
 
 pub trait Ctx<'a> {
@@ -42,6 +45,22 @@ pub struct Context<'a, 'b> {
     declare_vars: HashSet<&'a str>,
 }
 
+fn commit_series<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a>(
+    val: Box<dyn PineType<'a> + 'a>,
+) -> Box<dyn PineType<'a> + 'a> {
+    let mut series: Box<Series<D>> = Series::implicity_from(val).unwrap();
+    series.commit();
+    series
+}
+
+fn roll_back_series<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a>(
+    val: Box<dyn PineType<'a> + 'a>,
+) -> Box<dyn PineType<'a> + 'a> {
+    let mut series: Box<Series<D>> = Series::implicity_from(val).unwrap();
+    series.roll_back();
+    series
+}
+
 impl<'a, 'b> Context<'a, 'b> {
     pub fn new(parent: Option<&'b mut (dyn 'b + Ctx<'a>)>, t: ContextType) -> Context<'a, 'b> {
         Context {
@@ -70,6 +89,36 @@ impl<'a, 'b> Context<'a, 'b> {
             if let Some(ret_val) = f(val) {
                 parent.create_var(name, ret_val);
             }
+        }
+    }
+
+    pub fn commit(&mut self) {
+        let keys: Vec<&'a str> = self.vars.keys().cloned().collect();
+        for k in keys {
+            let val = self.move_var(k).unwrap();
+            let ret_val = match val.get_type() {
+                (DataType::Float, SecondType::Series) => commit_series::<Float>(val),
+                (DataType::Int, SecondType::Series) => commit_series::<Int>(val),
+                (DataType::Color, SecondType::Series) => commit_series::<Color>(val),
+                (DataType::Bool, SecondType::Series) => commit_series::<Bool>(val),
+                _ => val,
+            };
+            self.update_var(k, ret_val);
+        }
+    }
+
+    pub fn roll_back(&mut self) {
+        let keys: Vec<&'a str> = self.vars.keys().cloned().collect();
+        for k in keys {
+            let val = self.move_var(k).unwrap();
+            let ret_val = match val.get_type() {
+                (DataType::Float, SecondType::Series) => roll_back_series::<Float>(val),
+                (DataType::Int, SecondType::Series) => roll_back_series::<Int>(val),
+                (DataType::Color, SecondType::Series) => roll_back_series::<Color>(val),
+                (DataType::Bool, SecondType::Series) => roll_back_series::<Bool>(val),
+                _ => val,
+            };
+            self.update_var(k, ret_val);
         }
     }
 }

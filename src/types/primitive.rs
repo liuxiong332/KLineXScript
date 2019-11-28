@@ -1,6 +1,7 @@
+use super::downcast::downcast;
 use super::traits::{
-    downcast, Arithmetic, ConvertErr, DataType, Negative, PineClass, PineFrom, PineStaticType,
-    PineType, SecondType,
+    Arithmetic, ConvertErr, DataType, Negative, PineClass, PineFrom, PineStaticType, PineType,
+    SecondType,
 };
 use std::collections::HashMap;
 

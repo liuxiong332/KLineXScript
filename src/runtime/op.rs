@@ -3,7 +3,7 @@ use super::exp::Exp;
 use crate::ast::op::{BinaryOp, UnaryOp};
 use crate::types::{
     downcast, Arithmetic, Bool, ConvertErr, DataType as FirstType, Float, Int, Negative, PineFrom,
-    PineType, SecondType,
+    PineType, SecondType, Series,
 };
 
 pub fn unary_op_run<'a>(
@@ -91,6 +91,13 @@ pub fn binary_op_run<'a, 'b>(
                 | (op, _, (FirstType::Float, SecondType::Simple)) => {
                     let f1 = Float::implicity_from(val1)?;
                     let f2 = Float::implicity_from(val2)?;
+                    Ok(bi_operate(op, f1, f2))
+                }
+                (op, (FirstType::Float, SecondType::Series), _)
+                | (op, _, (FirstType::Float, SecondType::Series)) => {
+                    let f1: Box<Series<Float>> = Series::implicity_from(val1)?;
+                    let f2: Box<Series<Float>> = Series::implicity_from(val2)?;
+                    println!("f1 f2 {:?} {:?}", f1, f2);
                     Ok(bi_operate(op, f1, f2))
                 }
                 (op, (FirstType::Int, SecondType::Simple), _)

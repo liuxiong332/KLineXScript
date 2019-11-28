@@ -1,10 +1,13 @@
 use super::downcast::downcast;
-use super::traits::{ConvertErr, DataType, PineFrom, PineStaticType, PineType, SecondType};
-use std::convert::From;
+use super::traits::{
+    Arithmetic, ConvertErr, DataType, PineFrom, PineStaticType, PineType, SecondType,
+};
+use std::cmp::{Ordering, PartialEq, PartialOrd};
+use std::convert::{From, Into};
 use std::marker::PhantomData;
 use std::mem;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 pub struct Series<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> {
     current: D,
     history: Vec<D>,
@@ -20,6 +23,12 @@ impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> From<D> for Se
             phantom: PhantomData,
             na_val: D::default(),
         }
+    }
+}
+
+impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> Into<Vec<D>> for Series<'a, D> {
+    fn into(self) -> Vec<D> {
+        self.history
     }
 }
 
@@ -102,6 +111,51 @@ impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> PineFrom<'a, S
             })),
             _ => Err(ConvertErr::NotCompatible),
         }
+    }
+}
+
+impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + Arithmetic + 'a> Arithmetic
+    for Series<'a, D>
+{
+    fn add(mut self, other: Self) -> Self {
+        self.current = self.current.add(other.current);
+        self
+    }
+
+    fn minus(mut self, other: Self) -> Self {
+        self.current = self.current.minus(other.current);
+        self
+    }
+
+    fn mul(mut self, other: Self) -> Self {
+        self.current = self.current.mul(other.current);
+        self
+    }
+
+    fn div(mut self, other: Self) -> Self {
+        self.current = self.current.div(other.current);
+        self
+    }
+
+    fn rem(mut self, other: Self) -> Self {
+        self.current = self.current.rem(other.current);
+        self
+    }
+}
+
+impl<'a, D: PartialOrd + Default + PineStaticType + PineType<'a> + Clone + 'a> PartialOrd
+    for Series<'a, D>
+{
+    fn partial_cmp(&self, other: &Series<'a, D>) -> Option<Ordering> {
+        self.current.partial_cmp(&other.current)
+    }
+}
+
+impl<'a, D: PartialEq + Default + PineStaticType + PineType<'a> + Clone + 'a> PartialEq
+    for Series<'a, D>
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.current.eq(&other.current)
     }
 }
 

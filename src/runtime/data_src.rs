@@ -32,7 +32,7 @@ impl<'a, 'b> DataSrc<'a, 'b> {
         vars: HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
         callback: &'a dyn Callback,
     ) -> DataSrc<'a, 'b> {
-        let mut context = Context::new(None, ContextType::Normal);
+        let mut context = Context::new_with_callback(callback);
         for (k, v) in vars.into_iter() {
             context.create_var(k, v);
         }
@@ -107,6 +107,7 @@ mod tests {
         let mut data = HashMap::new();
         data.insert("close", vec![Some(10f64), Some(100f64)]);
 
+        assert_eq!(datasrc.run(data), Ok(()));
         datasrc.context.map_var("hello", |hv| match hv {
             None => None,
             Some(v) => {
@@ -117,6 +118,5 @@ mod tests {
                 Some(ser)
             }
         });
-        assert_eq!(datasrc.run(data), Ok(()));
     }
 }

@@ -1,3 +1,4 @@
+use super::data_src::Callback;
 use crate::types::{
     Bool, Callable, Color, ConvertErr, DataType, Float, Int, PineFrom, PineStaticType, PineType,
     SecondType, Series, NA,
@@ -27,6 +28,8 @@ pub trait Ctx<'a> {
     fn clear_declare(&mut self);
 
     fn get_type(&self) -> ContextType;
+
+    fn get_callback(&self) -> Option<&'a dyn Callback>;
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -48,6 +51,7 @@ pub struct Context<'a, 'b> {
     callables: Vec<Box<Callable<'a>>>,
     declare_vars: HashSet<&'a str>,
 
+    callback: Option<&'a dyn Callback>,
     first_commit: bool,
 }
 
@@ -75,6 +79,19 @@ impl<'a, 'b> Context<'a, 'b> {
             vars: HashMap::new(),
             callables: vec![],
             declare_vars: HashSet::new(),
+            callback: None,
+            first_commit: false,
+        }
+    }
+
+    pub fn new_with_callback(callback: &'a dyn Callback) -> Context<'a, 'b> {
+        Context {
+            parent: None,
+            context_type: ContextType::Normal,
+            vars: HashMap::new(),
+            callables: vec![],
+            declare_vars: HashSet::new(),
+            callback: Some(callback),
             first_commit: false,
         }
     }
@@ -210,6 +227,10 @@ impl<'a, 'b> Ctx<'a> for Context<'a, 'b> {
 
     fn get_type(&self) -> ContextType {
         self.context_type
+    }
+
+    fn get_callback(&self) -> Option<&'a dyn Callback> {
+        self.callback
     }
 }
 

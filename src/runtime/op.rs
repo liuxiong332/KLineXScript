@@ -1,4 +1,4 @@
-use super::context::{Context, Ctx, RVRunner, Runner};
+use super::context::{Ctx, RVRunner};
 use super::exp::Exp;
 use crate::ast::op::{BinaryOp, UnaryOp};
 use crate::types::{
@@ -114,7 +114,7 @@ mod tests {
     use super::*;
     use crate::ast::name::VarName;
     use crate::ast::num::Numeral;
-    use crate::runtime::context::ContextType;
+    use crate::runtime::context::{Context, ContextType};
     use crate::types::PineStaticType;
 
     #[test]

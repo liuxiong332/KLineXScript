@@ -1,4 +1,4 @@
-use crate::types::{ConvertErr, Object, PineType, NA};
+use crate::types::{ConvertErr, PineType, NA};
 use std::collections::{HashMap, HashSet};
 
 pub trait Ctx<'a> {

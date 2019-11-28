@@ -1,5 +1,5 @@
-mod context;
-mod exp;
-mod function;
-mod op;
-mod statement;
+pub mod context;
+pub mod exp;
+pub mod function;
+pub mod op;
+pub mod statement;

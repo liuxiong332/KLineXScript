@@ -35,6 +35,8 @@ pub enum ConvertErr {
     InvalidVarType(String), // The variable type is invalid.
     NameNotDeclard,
 
+    TupleMismatch, // count of Left and Right side of assignment is not the same
+
     Continue,
     Break,
 }

@@ -49,7 +49,12 @@ pub fn gen_condition<'a>(cond: Exp<'a>, exp1: Exp<'a>, exp2: Exp<'a>) -> Exp<'a>
 }
 
 pub fn gen_assign<'a>(name: &'a str, val: Exp<'a>) -> Statement<'a> {
-    Statement::Assignment(Box::new(Assignment::new(VarName(name), val, false, None)))
+    Statement::Assignment(Box::new(Assignment::new(
+        vec![VarName(name)],
+        val,
+        false,
+        None,
+    )))
 }
 
 pub fn gen_func_def<'a>(name: &'a str, params: Vec<&'a str>, body: Block<'a>) -> Statement<'a> {

@@ -99,7 +99,7 @@ pub enum DataType {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Assignment<'a> {
-    pub name: VarName<'a>,
+    pub names: Vec<VarName<'a>>,
     pub val: Exp<'a>,
     pub var_type: Option<DataType>,
     pub var: bool,
@@ -107,13 +107,13 @@ pub struct Assignment<'a> {
 
 impl<'a> Assignment<'a> {
     pub fn new(
-        name: VarName<'a>,
+        names: Vec<VarName<'a>>,
         val: Exp<'a>,
         var: bool,
         var_type: Option<DataType>,
     ) -> Assignment<'a> {
         Assignment {
-            name,
+            names,
             val,
             var,
             var_type,

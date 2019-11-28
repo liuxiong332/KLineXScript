@@ -229,6 +229,10 @@ pub fn exp_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<Exp>
     }
 }
 
+fn assign_lv_names<'a>(input: &'a str) -> PineResult<Vec<VarName<'a>>> {
+    alt((map(varname_ws, |name| vec![name]), rettupledef))(input)
+}
+
 fn assign_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<Assignment> {
     move |input: &'a str| {
         let exp_parser = || exp_with_indent(indent);
@@ -237,23 +241,24 @@ fn assign_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<Assig
                 tuple((
                     tag("var"),
                     eat_sep(datatype),
-                    varname_ws,
+                    assign_lv_names,
                     eat_sep(tag("=")),
                     exp_parser(),
                 )),
                 |s| Assignment::new(s.2, s.4, true, Some(s.1)),
             ),
             map(
-                tuple((tag("var"), varname_ws, eat_sep(tag("=")), exp_parser())),
+                tuple((tag("var"), assign_lv_names, eat_sep(tag("=")), exp_parser())),
                 |s| Assignment::new(s.1, s.3, true, None),
             ),
             map(
-                tuple((datatype, varname_ws, eat_sep(tag("=")), exp_parser())),
+                tuple((datatype, assign_lv_names, eat_sep(tag("=")), exp_parser())),
                 |s| Assignment::new(s.1, s.3, false, Some(s.0)),
             ),
-            map(tuple((varname, eat_sep(tag("=")), exp_parser())), |s| {
-                Assignment::new(s.0, s.2, false, None)
-            }),
+            map(
+                tuple((assign_lv_names, eat_sep(tag("=")), exp_parser())),
+                |s| Assignment::new(s.0, s.2, false, None),
+            ),
         ))(input)
     }
 }
@@ -343,7 +348,7 @@ pub fn block(input: &str) -> PineResult<Block> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::num::Numeral;
+
     #[test]
     fn rettupledef_test() {
         assert_eq!(
@@ -408,7 +413,7 @@ mod tests {
             Ok((
                 "",
                 Statement::Assignment(Box::new(Assignment::new(
-                    VarName("m"),
+                    vec![VarName("m")],
                     Exp::Condition(Box::new(Condition {
                         cond: Exp::VarName(VarName("a")),
                         exp1: Exp::VarName(VarName("b")),
@@ -424,7 +429,7 @@ mod tests {
             Ok((
                 "",
                 Statement::Assignment(Box::new(Assignment::new(
-                    VarName("m"),
+                    vec![VarName("m")],
                     Exp::Na,
                     false,
                     None
@@ -445,7 +450,7 @@ mod tests {
             Ok((
                 "",
                 Statement::Assignment(Box::new(Assignment::new(
-                    VarName("a"),
+                    vec![VarName("a")],
                     Exp::VarName(VarName("b")),
                     false,
                     None
@@ -506,7 +511,7 @@ mod tests {
             Ok((
                 "",
                 Statement::Assignment(Box::new(Assignment::new(
-                    VarName("a"),
+                    vec![VarName("a")],
                     Exp::VarName(VarName("close")),
                     false,
                     None
@@ -532,7 +537,7 @@ mod tests {
             Ok((
                 "",
                 Statement::Assignment(Box::new(Assignment::new(
-                    VarName("m"),
+                    vec![VarName("m")],
                     Exp::PrefixExp(Box::new(PrefixExp {
                         var_chain: vec![VarName("a"), VarName("b"), VarName("c")]
                     })),

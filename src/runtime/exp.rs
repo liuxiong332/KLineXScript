@@ -171,9 +171,8 @@ impl<'a> Runner<'a> for RefCall<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::stat_expr_types::FunctionCall;
     use crate::runtime::context::{Context, ContextType};
-    use crate::types::{Callable, PineClass};
+    use crate::types::PineClass;
     use std::fmt::Debug;
 
     #[test]

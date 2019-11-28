@@ -12,7 +12,7 @@ pub use utils::*;
 fn expr_test() {
     let add_expr = Block::new(
         vec![Statement::Assignment(Box::new(Assignment::new(
-            VarName("a"),
+            vec![VarName("a")],
             Exp::BinaryExp(
                 BinaryOp::Plus,
                 Box::new(Exp::BinaryExp(
@@ -87,7 +87,7 @@ fn func_def_test() {
                     params: vec![VarName("s")],
                     body: Block::new(
                         vec![Statement::Assignment(Box::new(Assignment::new(
-                            VarName("isEqual"),
+                            vec![VarName("isEqual")],
                             Exp::BinaryExp(
                                 BinaryOp::Eq,
                                 Box::new(Exp::VarName(VarName("s")),),

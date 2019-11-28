@@ -92,7 +92,7 @@ var bool m = true
 fn variable_declare_test() {
     let gen_assign = |var, var_type| {
         Statement::Assignment(Box::new(Assignment::new(
-            VarName("m"),
+            vec![VarName("m")],
             Exp::Bool(true),
             var,
             var_type,

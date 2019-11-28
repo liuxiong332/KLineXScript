@@ -1,12 +1,13 @@
 use super::context::{Context, ContextType, Ctx, RVRunner, Runner, StmtRunner};
 use super::function::Function;
+use crate::ast::name::VarName;
 use crate::ast::stat_expr_types::{
     Assignment, Block, DataType, ForRange, FunctionCall, FunctionDef, IfThenElse, Statement,
     VarAssignment,
 };
 use crate::types::{
     downcast, Bool, Callable, Color, ConvertErr, DataType as FirstType, Float, Int, PineFrom,
-    PineStaticType, PineType, SecondType, Series, NA,
+    PineStaticType, PineType, SecondType, Series, Tuple, NA,
 };
 
 impl<'a> StmtRunner<'a> for Statement<'a> {
@@ -25,9 +26,23 @@ impl<'a> StmtRunner<'a> for Statement<'a> {
     }
 }
 
-impl<'a> StmtRunner<'a> for Assignment<'a> {
-    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), ConvertErr> {
-        let name = self.name.0;
+trait RunnerForName<'a> {
+    fn run_name(
+        &'a self,
+        context: &mut dyn Ctx<'a>,
+        name: &VarName<'a>,
+        val: Box<dyn PineType<'a> + 'a>,
+    ) -> Result<(), ConvertErr>;
+}
+
+impl<'a> RunnerForName<'a> for Assignment<'a> {
+    fn run_name(
+        &'a self,
+        context: &mut dyn Ctx<'a>,
+        vn: &VarName<'a>,
+        val: Box<dyn PineType<'a> + 'a>,
+    ) -> Result<(), ConvertErr> {
+        let name = vn.0;
         if context.contains_declare(name) {
             return Err(ConvertErr::NameDeclared);
         }
@@ -37,7 +52,7 @@ impl<'a> StmtRunner<'a> for Assignment<'a> {
         if self.var && context.contains_var(name) {
             return Ok(());
         }
-        let val = self.val.rv_run(context)?;
+        // let val = self.val.rv_run(context)?;
         let true_val: Box<dyn PineType<'a> + 'a> = match self.var_type {
             None => val,
             Some(DataType::Int) => Int::explicity_from(val)?,
@@ -52,6 +67,30 @@ impl<'a> StmtRunner<'a> for Assignment<'a> {
         }
         context.create_var(name, true_val);
         Ok(())
+    }
+}
+
+impl<'a> StmtRunner<'a> for Assignment<'a> {
+    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), ConvertErr> {
+        let val = self.val.rv_run(context)?;
+        if self.names.len() == 1 {
+            return self.run_name(context, &self.names[0], val);
+        }
+        match val.get_type() {
+            (FirstType::Tuple, SecondType::Simple) => {
+                let mut tuple = downcast::<Tuple>(val)?;
+
+                if tuple.0.len() != self.names.len() {
+                    return Err(ConvertErr::TupleMismatch);
+                }
+
+                for n in self.names.iter().rev() {
+                    self.run_name(context, n, tuple.0.pop().unwrap())?;
+                }
+                Ok(())
+            }
+            _ => Err(ConvertErr::NotSupportOperator),
+        }
     }
 }
 
@@ -134,6 +173,7 @@ impl<'a> Runner<'a> for ForRange<'a> {
             match self.do_blk.run(&mut new_context) {
                 Ok(val) => {
                     ret_val = val;
+                    iter += step;
                 }
                 Err(ConvertErr::Break) => {
                     if let Some(ref exp) = self.do_blk.ret_stmt {
@@ -145,11 +185,11 @@ impl<'a> Runner<'a> for ForRange<'a> {
                     if let Some(ref exp) = self.do_blk.ret_stmt {
                         ret_val = exp.rv_run(&mut new_context)?
                     }
+                    iter += step;
                     continue;
                 }
                 e => return e,
             }
-            iter += step;
         }
         Ok(ret_val)
     }
@@ -249,19 +289,19 @@ mod tests {
             context.update_var("hello", val.unwrap());
         };
         let assign1 = Statement::Assignment(Box::new(Assignment::new(
-            VarName("hello"),
+            vec![VarName("hello")],
             Exp::Num(Numeral::Int(12)),
             false,
             None,
         )));
         let assign2 = Statement::Assignment(Box::new(Assignment::new(
-            VarName("hello"),
+            vec![VarName("hello")],
             Exp::Num(Numeral::Int(23)),
             true,
             None,
         )));
         let assign3 = Statement::Assignment(Box::new(Assignment::new(
-            VarName("hello"),
+            vec![VarName("hello")],
             Exp::Num(Numeral::Int(23)),
             false,
             Some(DataType::Int),
@@ -284,7 +324,7 @@ mod tests {
     #[test]
     fn rv_assignment_test() {
         let assign = Statement::Assignment(Box::new(Assignment::new(
-            VarName("myvar"),
+            vec![VarName("myvar")],
             Exp::VarName(VarName("newvar")),
             false,
             None,
@@ -296,6 +336,32 @@ mod tests {
         let val = Int::explicity_from(context.move_var("myvar").unwrap());
         assert_eq!(val, Ok(Box::new(Some(100))));
         context.update_var("myvar", val.unwrap());
+    }
+
+    #[test]
+    fn tuple_assignment_test() {
+        let assign = Statement::Assignment(Box::new(Assignment::new(
+            vec![VarName("var1"), VarName("var2")],
+            Exp::Tuple(Box::new(vec![
+                Exp::VarName(VarName("nv1")),
+                Exp::VarName(VarName("nv2")),
+            ])),
+            false,
+            None,
+        )));
+        let mut context = Context::new(None, ContextType::Normal);
+        context.create_var("nv1", Box::new(Some(100)));
+        context.create_var("nv2", Box::new(Some(200)));
+
+        assert_eq!(assign.st_run(&mut context), Ok(()));
+        assert_eq!(
+            Int::explicity_from(context.move_var("var1").unwrap()),
+            Ok(Box::new(Some(100)))
+        );
+        assert_eq!(
+            Int::explicity_from(context.move_var("var2").unwrap()),
+            Ok(Box::new(Some(200)))
+        );
     }
 
     #[test]
@@ -348,7 +414,7 @@ mod tests {
     #[test]
     fn for_range_test() {
         let assign = Statement::Assignment(Box::new(Assignment::new(
-            VarName("a"),
+            vec![VarName("a")],
             Exp::Num(Numeral::Int(1)),
             false,
             None,
@@ -394,7 +460,6 @@ mod tests {
     #[test]
     fn func_call_exp2_test() {
         use crate::ast::stat_expr_types::Exp;
-        use std::collections::HashMap;
 
         let exp = FunctionCall {
             method: Exp::VarName(VarName("name")),
@@ -416,18 +481,33 @@ mod tests {
         assert_eq!(res, Box::new(true));
     }
 
-    // #[test]
-    // fn for_range_break_test() {
-    //     let block = Block::new(vec![Statement::Break], Some(Exp::VarName(VarName("i"))));
-    //     let for_range = ForRange::new(VarName("i"), 1, 10, None, block);
+    #[test]
+    fn for_range_break_test() {
+        let block = Block::new(vec![Statement::Break], Some(Exp::VarName(VarName("i"))));
+        let for_range = ForRange::new(VarName("i"), 1, 10, None, block);
 
-    //     let mut context = Context::new(None, ContextType::Normal);
+        let mut context = Context::new(None, ContextType::Normal);
 
-    //     let result = Runner::run(&for_range, &mut context);
-    //     assert!(result.is_ok());
+        let result = Runner::run(&for_range, &mut context);
+        assert!(result.is_ok());
 
-    //     assert_eq!(Int::implicity_from(result.unwrap()), Ok(Box::new(Some(10))));
+        assert_eq!(Int::implicity_from(result.unwrap()), Ok(Box::new(Some(1))));
 
-    //     assert!(context.move_var("a").is_none());
-    // }
+        assert!(context.move_var("a").is_none());
+    }
+
+    #[test]
+    fn for_range_continue_test() {
+        let block = Block::new(vec![Statement::Continue], Some(Exp::VarName(VarName("i"))));
+        let for_range = ForRange::new(VarName("i"), 1, 10, None, block);
+
+        let mut context = Context::new(None, ContextType::Normal);
+
+        let result = Runner::run(&for_range, &mut context);
+        assert!(result.is_ok());
+
+        assert_eq!(Int::implicity_from(result.unwrap()), Ok(Box::new(Some(9))));
+
+        assert!(context.move_var("a").is_none());
+    }
 }

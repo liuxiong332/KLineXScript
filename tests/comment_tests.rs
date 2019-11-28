@@ -24,7 +24,7 @@ fn comment_test() {
                 })),
                 Statement::None,
                 Statement::Assignment(Box::new(Assignment::new(
-                    VarName("a"),
+                    vec![VarName("a")],
                     Exp::VarName(VarName("close")),
                     false,
                     None

@@ -1,8 +1,9 @@
 use crate::types::{
-    Bool, Color, ConvertErr, DataType, Float, Int, PineFrom, PineStaticType, PineType, SecondType,
-    Series, NA,
+    Bool, Callable, Color, ConvertErr, DataType, Float, Int, PineFrom, PineStaticType, PineType,
+    SecondType, Series, NA,
 };
 use std::collections::{HashMap, HashSet};
+use std::mem;
 
 pub trait Ctx<'a> {
     fn create_var(
@@ -16,6 +17,8 @@ pub trait Ctx<'a> {
     fn move_var(&mut self, name: &'a str) -> Option<Box<dyn PineType<'a> + 'a>>;
 
     fn contains_var(&self, name: &'a str) -> bool;
+
+    fn create_callable(&mut self, call: Box<Callable<'a>>);
 
     fn create_declare(&mut self, name: &'a str);
 
@@ -42,7 +45,10 @@ pub struct Context<'a, 'b> {
     context_type: ContextType,
 
     vars: HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
+    callables: Vec<Box<Callable<'a>>>,
     declare_vars: HashSet<&'a str>,
+
+    first_commit: bool,
 }
 
 fn commit_series<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a>(
@@ -67,7 +73,9 @@ impl<'a, 'b> Context<'a, 'b> {
             parent,
             context_type: t,
             vars: HashMap::new(),
+            callables: vec![],
             declare_vars: HashSet::new(),
+            first_commit: false,
         }
     }
 
@@ -105,9 +113,12 @@ impl<'a, 'b> Context<'a, 'b> {
             };
             self.update_var(k, ret_val);
         }
+        if !self.first_commit {
+            self.first_commit = true;
+        }
     }
 
-    pub fn roll_back(&mut self) {
+    pub fn roll_back(&mut self) -> Result<(), ConvertErr> {
         let keys: Vec<&'a str> = self.vars.keys().cloned().collect();
         for k in keys {
             let val = self.move_var(k).unwrap();
@@ -120,6 +131,21 @@ impl<'a, 'b> Context<'a, 'b> {
             };
             self.update_var(k, ret_val);
         }
+        let callables = mem::replace(&mut self.callables, vec![]);
+        for callable in callables.iter() {
+            callable.back(self)?;
+        }
+        mem::replace(&mut self.callables, callables);
+        Ok(())
+    }
+
+    pub fn run_callbacks(&mut self) -> Result<(), ConvertErr> {
+        let callables = mem::replace(&mut self.callables, vec![]);
+        for callable in callables.iter() {
+            callable.run(self)?;
+        }
+        mem::replace(&mut self.callables, callables);
+        Ok(())
     }
 }
 
@@ -159,6 +185,14 @@ impl<'a, 'b> Ctx<'a> for Context<'a, 'b> {
             parent.contains_var(name)
         } else {
             false
+        }
+    }
+
+    fn create_callable(&mut self, call: Box<Callable<'a>>) {
+        if let Some(ref mut v) = self.parent {
+            v.create_callable(call);
+        } else if !self.first_commit {
+            self.callables.push(call);
         }
     }
 
@@ -227,6 +261,35 @@ mod tests {
             Int::implicity_from(context1.move_var("hello").unwrap()),
             Ok(Box::new(Some(100)))
         );
+    }
+
+    #[test]
+    fn callable_context_test() {
+        // Parent context create callable
+        let mut context1 = Context::new(None, ContextType::Normal);
+        context1.create_callable(Box::new(Callable::new(None, None, vec![])));
+        assert_eq!(context1.callables.len(), 1);
+
+        {
+            // Child context create callable
+            let mut context2 = Context::new(Some(&mut context1), ContextType::Normal);
+            context2.create_callable(Box::new(Callable::new(None, None, vec![])));
+        }
+        assert_eq!(context1.callables.len(), 2);
+
+        context1.commit();
+
+        // After commit, parent context and child context should not add callable by create callable
+        context1.create_callable(Box::new(Callable::new(None, None, vec![])));
+        {
+            let mut context2 = Context::new(Some(&mut context1), ContextType::Normal);
+            context2.create_callable(Box::new(Callable::new(None, None, vec![])));
+        }
+        assert_eq!(context1.callables.len(), 2);
+
+        assert_eq!(context1.roll_back(), Ok(()));
+        assert_eq!(context1.run_callbacks(), Ok(()));
+        assert_eq!(context1.callables.len(), 2);
     }
 
     #[test]

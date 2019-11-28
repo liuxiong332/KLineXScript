@@ -3,7 +3,6 @@ use super::traits::{
     Arithmetic, ConvertErr, DataType, Negative, PineClass, PineFrom, PineStaticType, PineType,
     SecondType,
 };
-use std::collections::HashMap;
 
 // pine int type
 pub type Int = Option<i32>;
@@ -351,66 +350,6 @@ impl<'a> PineType<'a> for Tuple<'a> {
 }
 impl<'a> PineFrom<'a, Tuple<'a>> for Tuple<'a> {}
 
-// pine callable type
-#[derive(Debug, PartialEq, Clone)]
-pub struct Callable<'a> {
-    func: fn(
-        HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
-    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr>,
-    param_names: Vec<&'static str>,
-}
-impl<'a> PineStaticType for Callable<'a> {
-    fn static_type() -> (DataType, SecondType) {
-        (DataType::Callable, SecondType::Simple)
-    }
-}
-impl<'a> PineType<'a> for Callable<'a> {
-    fn get_type(&self) -> (DataType, SecondType) {
-        <Self as PineStaticType>::static_type()
-    }
-
-    fn copy(&self) -> Box<dyn PineType<'a> + 'a> {
-        Box::new(self.clone())
-    }
-}
-impl<'a> PineFrom<'a, Callable<'a>> for Callable<'a> {}
-
-impl<'a> Callable<'a> {
-    pub fn new(
-        func: fn(
-            HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
-        ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr>,
-        param_names: Vec<&'static str>,
-    ) -> Callable<'a> {
-        Callable { func, param_names }
-    }
-
-    pub fn call(
-        &self,
-        pos_args: Vec<Box<dyn PineType<'a> + 'a>>,
-        dict_args: Vec<(&'a str, Box<dyn PineType<'a> + 'a>)>,
-    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
-        if pos_args.len() > self.param_names.len() {
-            return Err(ConvertErr::NotValidParam);
-        }
-
-        let mut all_args: HashMap<&'a str, Box<dyn PineType<'a> + 'a>> = HashMap::new();
-        for (i, val) in pos_args.into_iter().enumerate() {
-            let name = self.param_names[i];
-            all_args.insert(name, val);
-        }
-        for (name, val) in dict_args.into_iter() {
-            match self.param_names.iter().any(|&v| name == v) {
-                false => return Err(ConvertErr::NotValidParam),
-                true => {
-                    all_args.insert(name, val);
-                }
-            }
-        }
-        (self.func)(all_args)
-    }
-}
-
 pub struct Object<'a> {
     obj: Box<dyn PineClass<'a> + 'a>,
 }
@@ -521,31 +460,6 @@ mod tests {
         assert_eq!(
             Color::get_type(&Color("")),
             (DataType::Color, SecondType::Simple)
-        );
-    }
-
-    fn test_func<'a>(
-        mut args: HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
-    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
-        let (arg1, arg2) = (args.remove("arg1").unwrap(), args.remove("arg2").unwrap());
-        let s: Int =
-            Some(downcast::<Int>(arg1).unwrap().unwrap() + downcast::<Int>(arg2).unwrap().unwrap());
-        Ok(Box::new(s) as Box<dyn PineType>)
-    }
-
-    #[test]
-    fn callable_test() {
-        let callable = Callable::new(test_func, vec!["arg1", "arg2"]);
-        let call_res = callable.call(
-            vec![
-                Box::new(Some(1)) as Box<dyn PineType>,
-                Box::new(Some(2)) as Box<dyn PineType>,
-            ],
-            vec![],
-        );
-        assert_eq!(
-            downcast::<Int>(call_res.unwrap()).unwrap(),
-            Box::new(Some(3))
         );
     }
 

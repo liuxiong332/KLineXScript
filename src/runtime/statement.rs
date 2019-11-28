@@ -232,7 +232,9 @@ impl<'a> Runner<'a> for FunctionCall<'a> {
             (FirstType::Callable, SecondType::Simple) => {
                 let callable = downcast::<Callable>(result).unwrap();
                 let (pos_args, dict_args) = extract_args(context, self)?;
-                callable.call(pos_args, dict_args)
+                let result = callable.call(context, pos_args, dict_args);
+                context.create_callable(callable);
+                result
             }
             (FirstType::Function, SecondType::Simple) => {
                 let callable = downcast::<Function>(result).unwrap();
@@ -443,6 +445,7 @@ mod tests {
         let mut context = Context::new(None, ContextType::Normal);
 
         fn test_func<'a>(
+            _context: &mut dyn Ctx<'a>,
             mut h: HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
         ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
             match h.remove("arg") {
@@ -451,7 +454,10 @@ mod tests {
             }
         }
 
-        context.create_var("name", Box::new(Callable::new(test_func, vec!["arg"])));
+        context.create_var(
+            "name",
+            Box::new(Callable::new(Some(test_func), None, vec!["arg"])),
+        );
 
         let res = downcast::<Bool>(exp.run(&mut context).unwrap()).unwrap();
         assert_eq!(res, Box::new(true));

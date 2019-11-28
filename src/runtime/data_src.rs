@@ -3,7 +3,9 @@ use crate::ast::stat_expr_types::Block;
 use crate::types::{ConvertErr, Float, PineFrom, PineType, Series};
 use std::collections::HashMap;
 
-pub trait Callback {}
+pub trait Callback {
+    fn print(&self, _str: String) {}
+}
 
 pub struct DataSrc<'a, 'b> {
     context: Context<'a, 'b>,
@@ -58,6 +60,7 @@ impl<'a, 'b> DataSrc<'a, 'b> {
             self.context.commit();
             self.context.clear_declare();
         }
+        self.context.run_callbacks()?;
         Ok(())
     }
 
@@ -74,7 +77,7 @@ impl<'a, 'b> DataSrc<'a, 'b> {
 
     pub fn update(&mut self, data: HashMap<&'static str, Vec<Float>>) -> Result<(), ConvertErr> {
         let len = get_len(&data)?;
-        self.context.roll_back();
+        self.context.roll_back()?;
         self.run_data(data, len)
     }
 }

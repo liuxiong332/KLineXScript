@@ -9,6 +9,7 @@ pub struct Series<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> {
     current: D,
     history: Vec<D>,
     phantom: PhantomData<&'a D>,
+    na_val: D,
 }
 
 impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> From<D> for Series<'a, D> {
@@ -17,6 +18,7 @@ impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> From<D> for Se
             current: input,
             history: vec![],
             phantom: PhantomData,
+            na_val: D::default(),
         }
     }
 }
@@ -27,6 +29,7 @@ impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> Series<'a, D> 
             current: D::default(),
             history: vec![],
             phantom: PhantomData,
+            na_val: D::default(),
         }
     }
 
@@ -35,6 +38,7 @@ impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> Series<'a, D> 
             current: D::default(),
             history,
             phantom: PhantomData,
+            na_val: D::default(),
         }
     }
 
@@ -44,7 +48,7 @@ impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> Series<'a, D> 
             // m if m < 0 => Err(SeriesErr::Negative),
             0 => Ok(&self.current),
             m if m >= 1 && m <= len => Ok(&self.history[(len - i) as usize]),
-            _ => Err(ConvertErr::OutBound),
+            _ => Ok(&self.na_val),
         }
     }
 
@@ -94,6 +98,7 @@ impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> PineFrom<'a, S
                 current: *downcast::<D>(t).unwrap(),
                 history: vec![],
                 phantom: PhantomData,
+                na_val: D::default(),
             })),
             _ => Err(ConvertErr::NotCompatible),
         }

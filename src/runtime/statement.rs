@@ -9,6 +9,7 @@ use crate::types::{
     downcast, Bool, Callable, Color, DataType as FirstType, Float, Int, PineFrom, PineStaticType,
     PineType, RuntimeErr, SecondType, Series, Tuple, NA,
 };
+use std::fmt::Debug;
 
 impl<'a> StmtRunner<'a> for Statement<'a> {
     fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
@@ -35,29 +36,27 @@ trait RunnerForName<'a> {
     ) -> Result<(), RuntimeErr>;
 }
 
-fn series_from<'a, D: Default + PineStaticType + PineType<'a> + Clone + PineFrom<'a, D> + 'a>(
+fn from_series<'a, D: Default + PineStaticType + PineType<'a> + Clone + PineFrom<'a, D> + 'a>(
     val: Box<dyn PineType<'a> + 'a>,
     name: &'a str,
     context: &mut dyn Ctx<'a>,
 ) -> Result<(), RuntimeErr> {
-    let val = D::implicity_from(val)?;
-    let mut s: Box<Series<D>> = Box::new(Series::from(*val));
-    context.create_var(name, s);
+    context.create_var(name, val);
     Ok(())
 }
 
-fn series_update<'a, D: Default + PineStaticType + PineType<'a> + Clone + PineFrom<'a, D> + 'a>(
-    series: Box<dyn PineType<'a> + 'a>,
-    val: Box<dyn PineType<'a> + 'a>,
-    name: &'a str,
-    context: &mut dyn Ctx<'a>,
-) -> Result<(), RuntimeErr> {
-    let mut s: Box<Series<D>> = Series::implicity_from(series)?;
-    let val = D::implicity_from(val)?;
-    s.update(*val);
-    context.update_var(name, s);
-    Ok(())
-}
+// fn series_update<'a, D: Default + PineStaticType + PineType<'a> + Clone + PineFrom<'a, D> + 'a>(
+//     series: Box<dyn PineType<'a> + 'a>,
+//     val: Box<dyn PineType<'a> + 'a>,
+//     name: &'a str,
+//     context: &mut dyn Ctx<'a>,
+// ) -> Result<(), RuntimeErr> {
+//     let mut s: Box<Series<D>> = Series::implicity_from(series)?;
+//     let val = D::implicity_from(val)?;
+//     s.update(*val);
+//     context.update_var(name, s);
+//     Ok(())
+// }
 
 impl<'a> RunnerForName<'a> for Assignment<'a> {
     fn run_name(
@@ -89,23 +88,23 @@ impl<'a> RunnerForName<'a> for Assignment<'a> {
         if let (FirstType::NA, _) = true_val.get_type() {
             return Err(RuntimeErr::InvalidNADeclarer);
         }
+
         if true_val.get_type().1 == SecondType::Series {
-            print!("right val type {:?}", true_val.get_type());
             return match context.move_var(name) {
                 None => match true_val.get_type().0 {
-                    FirstType::Int => series_from::<Int>(true_val, name, context),
-                    FirstType::Float => series_from::<Float>(true_val, name, context),
-                    FirstType::Bool => series_from::<Bool>(true_val, name, context),
+                    FirstType::Int => from_series::<Int>(true_val, name, context),
+                    FirstType::Float => from_series::<Float>(true_val, name, context),
+                    FirstType::Bool => from_series::<Bool>(true_val, name, context),
                     _ => Err(RuntimeErr::TypeMismatch(String::from(
                         "Series type can only be Int, Float and Bool",
                     ))),
                 },
                 Some(current_val) => match current_val.get_type().0 {
-                    FirstType::Int => series_update::<Int>(current_val, true_val, name, context),
+                    FirstType::Int => update_series::<Int>(context, name, current_val, true_val),
                     FirstType::Float => {
-                        series_update::<Float>(current_val, true_val, name, context)
+                        update_series::<Float>(context, name, current_val, true_val)
                     }
-                    FirstType::Bool => series_update::<Bool>(current_val, true_val, name, context),
+                    FirstType::Bool => update_series::<Bool>(context, name, current_val, true_val),
                     _ => Err(RuntimeErr::TypeMismatch(String::from(
                         "Series type can only be Int, Float and Bool",
                     ))),
@@ -148,10 +147,11 @@ fn update_series<'a, 'b, D>(
     val: Box<dyn PineType<'a> + 'a>,
 ) -> Result<(), RuntimeErr>
 where
-    D: Default + PineType<'a> + PineStaticType + 'a + PineFrom<'a, D> + Clone,
+    D: Default + PineType<'a> + PineStaticType + 'a + PineFrom<'a, D> + Clone + Debug,
 {
     let mut s = Series::implicity_from(exist_val)?;
-    s.update(*D::implicity_from(val)?);
+    let v = D::implicity_from(val)?;
+    s.update(*v);
     context.update_var(name, s);
     Ok(())
 }
@@ -411,6 +411,41 @@ mod tests {
             Int::explicity_from(context.move_var("var2").unwrap()),
             Ok(Box::new(Some(200)))
         );
+    }
+
+    fn check_val<'a>(context: &mut dyn Ctx<'a>, varname: &'static str, val: Int) {
+        let res: Box<Series<Int>> =
+            Series::explicity_from(context.move_var(varname).unwrap()).unwrap();
+        let expect_val: Box<Series<Int>> = Box::new(Series::from(val));
+        assert_eq!(res, expect_val);
+        context.update_var("myvar", res);
+    }
+
+    #[test]
+    fn series_assignment_test() {
+        let assign = Statement::Assignment(Box::new(Assignment::new(
+            vec![VarName("myvar")],
+            Exp::VarName(VarName("newvar")),
+            false,
+            None,
+        )));
+        let mut context = Context::new(None, ContextType::Normal);
+        context.create_var("newvar", Box::new(Series::from(Some(100))));
+
+        assert_eq!(assign.st_run(&mut context), Ok(()));
+        check_val(&mut context, "myvar", Some(100));
+        context.commit();
+
+        context.clear_declare();
+        context.create_var("newvar", Box::new(Series::from(Some(100))));
+        assert_eq!(assign.st_run(&mut context), Ok(()));
+
+        let val: Box<Series<Int>> =
+            Series::explicity_from(context.move_var("myvar").unwrap()).unwrap();
+        let mut dest_s = Box::new(Series::from_vec(vec![Some(100)]));
+        dest_s.update(Some(100));
+        assert_eq!(val, dest_s);
+        context.update_var("myvar", val);
     }
 
     #[test]

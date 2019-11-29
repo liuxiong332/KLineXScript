@@ -62,7 +62,6 @@ fn gen_quote_str(quote_char: &'static str) -> impl Fn(&str) -> PineResult<String
             escaped(is_not(&ignore_chars[..]), '\\', one_of(ESCAPE_CODE)),
             tag(quote_char),
         )(input)?;
-        println!("out {}", out);
         match unescape(out) {
             Ok(res_str) => Ok((next_input, res_str)),
             Err(err_str) => Err(Err::Error(PineError::from_pine_kind(

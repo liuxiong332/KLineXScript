@@ -9,6 +9,7 @@ use crate::types::{
     downcast, Bool, Color, DataType as FirstType, Float, Int, Object, PineFrom, PineStaticType,
     PineType, PineVar, RuntimeErr, SecondType, Series, Tuple, NA,
 };
+use std::fmt::Debug;
 
 impl<'a> Runner<'a> for Exp<'a> {
     fn run(&'a self, _context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
@@ -121,7 +122,7 @@ impl<'a> Runner<'a> for Condition<'a> {
     }
 }
 
-fn get_slice<'a, D: Default + PineType<'a> + PineStaticType + 'a + Clone>(
+fn get_slice<'a, D: Default + PineType<'a> + PineStaticType + Debug + 'a + Clone>(
     context: &mut dyn Ctx<'a>,
     name: &'a str,
     obj: Box<dyn PineType<'a> + 'a>,

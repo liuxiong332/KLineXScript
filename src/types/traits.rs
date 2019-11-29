@@ -1,4 +1,6 @@
+use super::downcast::downcast_ref;
 use super::error::RuntimeErr;
+use std::fmt;
 
 #[derive(Debug, PartialEq)]
 pub enum SecondType {
@@ -36,6 +38,27 @@ pub trait PineType<'a> {
     fn get_type(&self) -> (DataType, SecondType);
 
     fn copy(&self) -> Box<dyn PineType<'a> + 'a>;
+}
+
+impl<'a> fmt::Debug for Box<dyn PineType<'a> + 'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use super::{Float, Int, Series};
+
+        let self_ref = &**self;
+        match self.get_type() {
+            (DataType::Int, SecondType::Simple) => downcast_ref::<Int>(self_ref).unwrap().fmt(f),
+            (DataType::Float, SecondType::Simple) => {
+                downcast_ref::<Float>(self_ref).unwrap().fmt(f)
+            }
+            (DataType::Int, SecondType::Series) => {
+                downcast_ref::<Series<Int>>(self_ref).unwrap().fmt(f)
+            }
+            (DataType::Float, SecondType::Series) => {
+                downcast_ref::<Series<Float>>(self_ref).unwrap().fmt(f)
+            }
+            _ => write!(f, "Unkown type"),
+        }
+    }
 }
 
 pub trait PineClass<'a> {

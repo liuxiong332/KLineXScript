@@ -1,7 +1,9 @@
+use super::downcast::downcast_ref;
 use super::{DataType, PineFrom, PineStaticType, PineType, RuntimeErr, SecondType, NA};
 use crate::runtime::context::Ctx;
 use std::cell::Cell;
 use std::collections::HashMap;
+use std::fmt;
 
 pub trait SeriesCall<'a> {
     fn step(
@@ -23,12 +25,33 @@ pub trait SeriesCall<'a> {
     fn copy(&self) -> Box<dyn SeriesCall<'a> + 'a>;
 }
 
+impl<'a> fmt::Debug for dyn SeriesCall<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s: &SeriesToArrayCall;
+        unsafe {
+            let raw: *const dyn SeriesCall<'a> = self;
+            let t = raw as *const SeriesToArrayCall;
+            s = t.as_ref().unwrap();
+        }
+        s.fmt(f)
+    }
+}
+
 pub struct SeriesToArrayCall<'a> {
     func: fn(
         context: &mut dyn Ctx<'a>,
         HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
     ) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr>,
     params: Cell<HashMap<&'a str, Box<dyn PineType<'a> + 'a>>>,
+}
+
+impl<'a> fmt::Debug for SeriesToArrayCall<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let val = self.params.take();
+        let res = write!(f, "{:?}", val);
+        self.params.set(val);
+        res
+    }
 }
 
 impl<'a> SeriesToArrayCall<'a> {
@@ -52,13 +75,14 @@ impl<'a> SeriesCall<'a> for SeriesToArrayCall<'a> {
         _p: HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
     ) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
         self.params.set(_p);
+        let newv = self.params.take();
+        self.params.set(newv);
         Ok(Box::new(NA))
     }
 
     fn run(&self, _context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
-        println!("Series run");
-        (self.func)(_context, self.params.take())?;
-        println!("Series run end");
+        let val = self.params.take();
+        (self.func)(_context, val)?;
         Ok(())
     }
 
@@ -84,6 +108,12 @@ pub struct Callable<'a> {
     >,
     caller: Option<Box<dyn SeriesCall<'a> + 'a>>,
     param_names: Vec<&'static str>,
+}
+
+impl<'a> fmt::Debug for Callable<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "param names: {:?}", self.param_names)
+    }
 }
 
 impl<'a> Clone for Callable<'a> {
@@ -140,7 +170,6 @@ impl<'a> Callable<'a> {
         pos_args: Vec<Box<dyn PineType<'a> + 'a>>,
         dict_args: Vec<(&'a str, Box<dyn PineType<'a> + 'a>)>,
     ) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
-        println!("call callable");
         if pos_args.len() > self.param_names.len() {
             return Err(RuntimeErr::NotValidParam);
         }
@@ -176,7 +205,6 @@ impl<'a> Callable<'a> {
     }
 
     pub fn run(&self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
-        println!("run callable");
         if let Some(ref caller) = self.caller {
             caller.run(context)
         } else {
@@ -242,5 +270,31 @@ mod tests {
 
         callable.back(&mut context).unwrap();
         callable.run(&mut context).unwrap();
+    }
+
+    #[test]
+    fn series_array_test() {
+        fn test_func<'a>(
+            _context: &mut dyn Ctx<'a>,
+            mut args: HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
+        ) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
+            let arg1 = args.remove("arg").unwrap();
+            let s: Box<Int> = downcast::<Int>(arg1).unwrap();
+            assert_eq!(s, Box::new(Some(10)));
+            Ok(s as Box<dyn PineType>)
+        }
+
+        let call = SeriesToArrayCall::new(test_func);
+        let mut context = Context::new(None, ContextType::Normal);
+
+        let mut map = HashMap::new();
+        map.insert("arg", Box::new(Some(100)) as Box<dyn PineType>);
+        assert!(call.step(&mut context, map).is_ok());
+
+        let mut map = HashMap::new();
+        map.insert("arg", Box::new(Some(10)) as Box<dyn PineType>);
+        assert!(call.step(&mut context, map).is_ok());
+
+        assert_eq!(call.run(&mut context), Ok(()));
     }
 }

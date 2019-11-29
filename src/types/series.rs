@@ -3,18 +3,19 @@ use super::error::RuntimeErr;
 use super::traits::{Arithmetic, DataType, PineFrom, PineStaticType, PineType, SecondType};
 use std::cmp::{Ordering, PartialEq, PartialOrd};
 use std::convert::{From, Into};
+use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::mem;
 
 #[derive(Debug, Clone)]
-pub struct Series<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> {
-    current: D,
+pub struct Series<'a, D: Clone + Debug + 'a> {
+    pub current: D,
     history: Vec<D>,
     phantom: PhantomData<&'a D>,
     na_val: D,
 }
 
-impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> From<D> for Series<'a, D> {
+impl<'a, D: Default + Clone + Debug + 'a> From<D> for Series<'a, D> {
     fn from(input: D) -> Self {
         Series {
             current: input,
@@ -25,13 +26,13 @@ impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> From<D> for Se
     }
 }
 
-impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> Into<Vec<D>> for Series<'a, D> {
+impl<'a, D: Clone + Debug + 'a> Into<Vec<D>> for Series<'a, D> {
     fn into(self) -> Vec<D> {
         self.history
     }
 }
 
-impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> Series<'a, D> {
+impl<'a, D: Default + PineType<'a> + Clone + Debug + 'a> Series<'a, D> {
     pub fn new() -> Series<'a, D> {
         Series {
             current: D::default(),
@@ -75,13 +76,13 @@ impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> Series<'a, D> 
     }
 }
 
-impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> PineStaticType for Series<'a, D> {
+impl<'a, D: PineStaticType + Clone + Debug + 'a> PineStaticType for Series<'a, D> {
     fn static_type() -> (DataType, SecondType) {
         (<D as PineStaticType>::static_type().0, SecondType::Series)
     }
 }
 
-impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> PineType<'a> for Series<'a, D> {
+impl<'a, D: PineStaticType + PineType<'a> + Clone + Debug + 'a> PineType<'a> for Series<'a, D> {
     fn get_type(&self) -> (DataType, SecondType) {
         (<D as PineStaticType>::static_type().0, SecondType::Series)
     }
@@ -92,7 +93,7 @@ impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> PineType<'a> f
     }
 }
 
-impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> PineFrom<'a, Series<'a, D>>
+impl<'a, D: Default + PineStaticType + Clone + Debug + 'a> PineFrom<'a, Series<'a, D>>
     for Series<'a, D>
 {
     fn explicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Series<'a, D>>, RuntimeErr> {
@@ -114,9 +115,7 @@ impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> PineFrom<'a, S
     }
 }
 
-impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + Arithmetic + 'a> Arithmetic
-    for Series<'a, D>
-{
+impl<'a, D: Clone + Arithmetic + Debug + 'a> Arithmetic for Series<'a, D> {
     fn add(mut self, other: Self) -> Self {
         self.current = self.current.add(other.current);
         self
@@ -143,17 +142,13 @@ impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + Arithmetic + 'a> A
     }
 }
 
-impl<'a, D: PartialOrd + Default + PineStaticType + PineType<'a> + Clone + 'a> PartialOrd
-    for Series<'a, D>
-{
+impl<'a, D: PartialOrd + Clone + Debug + 'a> PartialOrd for Series<'a, D> {
     fn partial_cmp(&self, other: &Series<'a, D>) -> Option<Ordering> {
         self.current.partial_cmp(&other.current)
     }
 }
 
-impl<'a, D: PartialEq + Default + PineStaticType + PineType<'a> + Clone + 'a> PartialEq
-    for Series<'a, D>
-{
+impl<'a, D: PartialEq + Clone + Debug + 'a> PartialEq for Series<'a, D> {
     fn eq(&self, other: &Self) -> bool {
         self.current.eq(&other.current)
     }

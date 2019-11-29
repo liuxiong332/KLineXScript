@@ -1,5 +1,6 @@
 use super::downcast::downcast;
 use super::error::RuntimeErr;
+use super::series::Series;
 use super::traits::{
     Arithmetic, DataType, Negative, PineClass, PineFrom, PineStaticType, PineType, SecondType,
 };
@@ -94,6 +95,10 @@ impl<'a> PineFrom<'a, Int> for Int {
     fn implicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Int>, RuntimeErr> {
         match t.get_type() {
             (DataType::Int, SecondType::Simple) => Ok(downcast::<Int>(t).unwrap()),
+            (DataType::Int, SecondType::Series) => {
+                let s = downcast::<Series<Int>>(t).unwrap();
+                Ok(Box::new(s.current))
+            }
             (DataType::NA, SecondType::Simple) => {
                 let i: Int = None;
                 Ok(Box::new(i))
@@ -166,13 +171,11 @@ impl<'a> PineType<'a> for Float {
     }
 }
 
-fn int2float<'a>(t: Box<dyn PineType<'a> + 'a>) -> Box<Float> {
-    let i: Box<Int> = downcast::<Int>(t).unwrap();
-    let f: Float = match *i {
+fn int2float<'a>(i: Int) -> Float {
+    match i {
         Some(i) => Some(i as f64),
         None => None,
-    };
-    Box::new(f)
+    }
 }
 
 impl<'a> PineFrom<'a, Float> for Float {
@@ -183,11 +186,22 @@ impl<'a> PineFrom<'a, Float> for Float {
     fn implicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Float>, RuntimeErr> {
         match t.get_type() {
             (DataType::Float, SecondType::Simple) => Ok(downcast::<Float>(t).unwrap()),
+            (DataType::Float, SecondType::Series) => {
+                let s = downcast::<Series<Float>>(t).unwrap();
+                Ok(Box::new(s.current))
+            }
             (DataType::NA, SecondType::Simple) => {
                 let i: Float = None;
                 Ok(Box::new(i))
             }
-            (DataType::Int, SecondType::Simple) => Ok(int2float(t)),
+            (DataType::Int, SecondType::Simple) => {
+                let i = downcast::<Int>(t).unwrap();
+                Ok(Box::new(int2float(*i)))
+            }
+            (DataType::Int, SecondType::Series) => {
+                let s = downcast::<Series<Int>>(t).unwrap();
+                Ok(Box::new(int2float(s.current)))
+            }
             _ => Err(RuntimeErr::NotCompatible),
         }
     }
@@ -218,6 +232,10 @@ impl<'a> PineFrom<'a, Bool> for Bool {
     fn implicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Bool>, RuntimeErr> {
         match t.get_type() {
             (DataType::Bool, SecondType::Simple) => Ok(downcast::<Bool>(t).unwrap()),
+            (DataType::Bool, SecondType::Series) => {
+                let s = downcast::<Series<Bool>>(t).unwrap();
+                Ok(Box::new(s.current))
+            }
             (DataType::NA, SecondType::Simple) => {
                 let i: Bool = false;
                 Ok(Box::new(i))

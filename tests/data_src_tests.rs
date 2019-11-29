@@ -21,7 +21,7 @@ fn pine_print<'a>(
     context: &mut dyn Ctx<'a>,
     mut param: HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
 ) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
-    println!("pine print, {:?}", param.keys());
+    println!("pine print Series run, {:?}", param.get("item"));
     match param.remove("item") {
         None => Err(RuntimeErr::NotSupportOperator),
         Some(item_val) => {

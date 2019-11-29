@@ -4,6 +4,7 @@ use crate::types::{
     SecondType, Series, NA,
 };
 use std::collections::{HashMap, HashSet};
+use std::fmt::Debug;
 use std::mem;
 
 pub trait Ctx<'a> {
@@ -47,7 +48,10 @@ pub struct Context<'a, 'b> {
     parent: Option<&'b mut (dyn 'b + Ctx<'a>)>,
     context_type: ContextType,
 
+    // variable map that defined by user and library.
     vars: HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
+    // All the Series type variable name
+    _series: Vec<&'a str>,
     callables: Vec<Box<Callable<'a>>>,
     declare_vars: HashSet<&'a str>,
 
@@ -55,7 +59,7 @@ pub struct Context<'a, 'b> {
     first_commit: bool,
 }
 
-fn commit_series<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a>(
+fn commit_series<'a, D: Default + PineStaticType + PineType<'a> + Clone + Debug + 'a>(
     val: Box<dyn PineType<'a> + 'a>,
 ) -> Box<dyn PineType<'a> + 'a> {
     let mut series: Box<Series<D>> = Series::implicity_from(val).unwrap();
@@ -63,7 +67,7 @@ fn commit_series<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a>(
     series
 }
 
-fn roll_back_series<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a>(
+fn roll_back_series<'a, D: Default + PineStaticType + PineType<'a> + Clone + Debug + 'a>(
     val: Box<dyn PineType<'a> + 'a>,
 ) -> Box<dyn PineType<'a> + 'a> {
     let mut series: Box<Series<D>> = Series::implicity_from(val).unwrap();
@@ -77,6 +81,7 @@ impl<'a, 'b> Context<'a, 'b> {
             parent,
             context_type: t,
             vars: HashMap::new(),
+            _series: vec![],
             callables: vec![],
             declare_vars: HashSet::new(),
             callback: None,
@@ -89,6 +94,7 @@ impl<'a, 'b> Context<'a, 'b> {
             parent: None,
             context_type: ContextType::Normal,
             vars: HashMap::new(),
+            _series: vec![],
             callables: vec![],
             declare_vars: HashSet::new(),
             callback: Some(callback),

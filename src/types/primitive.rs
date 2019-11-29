@@ -1,6 +1,6 @@
 use super::downcast::downcast;
 use super::traits::{
-    Arithmetic, ConvertErr, DataType, Negative, PineClass, PineFrom, PineStaticType, PineType,
+    Arithmetic, DataType, Negative, PineClass, PineFrom, PineStaticType, PineType, RuntimetErr,
     SecondType,
 };
 
@@ -71,7 +71,7 @@ impl<'a> PineType<'a> for Int {
 
 impl<'a> PineFrom<'a, Int> for Int {
     // NA -> Int Float -> Int
-    fn explicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Int>, ConvertErr> {
+    fn explicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Int>, RuntimetErr> {
         match t.get_type() {
             (DataType::Int, SecondType::Simple) => Ok(downcast::<Int>(t).unwrap()),
             (DataType::NA, SecondType::Simple) => {
@@ -86,19 +86,19 @@ impl<'a> PineFrom<'a, Int> for Int {
                 };
                 Ok(Box::new(i))
             }
-            _ => Err(ConvertErr::NotCompatible),
+            _ => Err(RuntimetErr::NotCompatible),
         }
     }
 
     // NA -> Int
-    fn implicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Int>, ConvertErr> {
+    fn implicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Int>, RuntimetErr> {
         match t.get_type() {
             (DataType::Int, SecondType::Simple) => Ok(downcast::<Int>(t).unwrap()),
             (DataType::NA, SecondType::Simple) => {
                 let i: Int = None;
                 Ok(Box::new(i))
             }
-            _ => Err(ConvertErr::NotCompatible),
+            _ => Err(RuntimetErr::NotCompatible),
         }
     }
 }
@@ -176,11 +176,11 @@ fn int2float<'a>(t: Box<dyn PineType<'a> + 'a>) -> Box<Float> {
 }
 
 impl<'a> PineFrom<'a, Float> for Float {
-    fn explicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Float>, ConvertErr> {
+    fn explicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Float>, RuntimetErr> {
         Self::implicity_from(t)
     }
 
-    fn implicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Float>, ConvertErr> {
+    fn implicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Float>, RuntimetErr> {
         match t.get_type() {
             (DataType::Float, SecondType::Simple) => Ok(downcast::<Float>(t).unwrap()),
             (DataType::NA, SecondType::Simple) => {
@@ -188,7 +188,7 @@ impl<'a> PineFrom<'a, Float> for Float {
                 Ok(Box::new(i))
             }
             (DataType::Int, SecondType::Simple) => Ok(int2float(t)),
-            _ => Err(ConvertErr::NotCompatible),
+            _ => Err(RuntimetErr::NotCompatible),
         }
     }
 }
@@ -211,11 +211,11 @@ impl<'a> PineType<'a> for Bool {
 }
 
 impl<'a> PineFrom<'a, Bool> for Bool {
-    fn explicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Bool>, ConvertErr> {
+    fn explicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Bool>, RuntimetErr> {
         Self::implicity_from(t)
     }
 
-    fn implicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Bool>, ConvertErr> {
+    fn implicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Bool>, RuntimetErr> {
         match t.get_type() {
             (DataType::Bool, SecondType::Simple) => Ok(downcast::<Bool>(t).unwrap()),
             (DataType::NA, SecondType::Simple) => {
@@ -239,7 +239,7 @@ impl<'a> PineFrom<'a, Bool> for Bool {
                 };
                 Ok(Box::new(b))
             }
-            _ => Err(ConvertErr::NotCompatible),
+            _ => Err(RuntimetErr::NotCompatible),
         }
     }
 }
@@ -282,10 +282,10 @@ impl<'a> PineType<'a> for String {
 }
 
 impl<'a> PineFrom<'a, String> for String {
-    fn implicity_from(_t: Box<dyn PineType<'a> + 'a>) -> Result<Box<String>, ConvertErr> {
+    fn implicity_from(_t: Box<dyn PineType<'a> + 'a>) -> Result<Box<String>, RuntimetErr> {
         match _t.get_type() {
             (DataType::String, SecondType::Simple) => Ok(downcast::<String>(_t)?),
-            _ => Err(ConvertErr::NotSupportOperator),
+            _ => Err(RuntimetErr::NotSupportOperator),
         }
     }
 }
@@ -375,11 +375,11 @@ impl<'a> Object<'a> {
         Object { obj }
     }
 
-    pub fn get(&self, name: &str) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+    pub fn get(&self, name: &str) -> Result<Box<dyn PineType<'a> + 'a>, RuntimetErr> {
         self.obj.get(name)
     }
 
-    pub fn set(&self, name: &str, property: Box<dyn PineType<'a> + 'a>) -> Result<(), ConvertErr> {
+    pub fn set(&self, name: &str, property: Box<dyn PineType<'a> + 'a>) -> Result<(), RuntimetErr> {
         self.obj.set(name, property)
     }
 }
@@ -429,7 +429,7 @@ mod tests {
         );
     }
 
-    fn from_bool<'a, D: PineType<'a> + 'a>(val: D) -> Result<Box<Bool>, ConvertErr> {
+    fn from_bool<'a, D: PineType<'a> + 'a>(val: D) -> Result<Box<Bool>, RuntimetErr> {
         downcast::<Bool>(Bool::implicity_from(Box::new(val)).unwrap())
     }
     #[test]
@@ -469,18 +469,18 @@ mod tests {
             "Custom A"
         }
 
-        fn get(&self, name: &str) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+        fn get(&self, name: &str) -> Result<Box<dyn PineType<'a> + 'a>, RuntimetErr> {
             match name {
                 "int1" => Ok(Box::new(Some(1i32))),
                 "int2" => Ok(Box::new(Some(2i32))),
                 "float1" => Ok(Box::new(Some(1f64))),
                 "float2" => Ok(Box::new(Some(2f64))),
-                _ => Err(ConvertErr::NotSupportOperator),
+                _ => Err(RuntimetErr::NotSupportOperator),
             }
         }
 
-        fn set(&self, _n: &str, _p: Box<dyn PineType<'a> + 'a>) -> Result<(), ConvertErr> {
-            Err(ConvertErr::NotSupportOperator)
+        fn set(&self, _n: &str, _p: Box<dyn PineType<'a> + 'a>) -> Result<(), RuntimetErr> {
+            Err(RuntimetErr::NotSupportOperator)
         }
 
         fn copy(&self) -> Box<dyn PineType<'a> + 'a> {

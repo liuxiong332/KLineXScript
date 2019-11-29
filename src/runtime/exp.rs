@@ -6,12 +6,12 @@ pub use crate::ast::stat_expr_types::{
     Condition, DataType, Exp, FunctionCall, PrefixExp, RefCall, Statement, TypeCast,
 };
 use crate::types::{
-    downcast, Bool, Color, ConvertErr, DataType as FirstType, Float, Int, Object, PineFrom,
+    downcast, Bool, Color, RuntimetErr, DataType as FirstType, Float, Int, Object, PineFrom,
     PineStaticType, PineType, PineVar, SecondType, Series, Tuple, NA,
 };
 
 impl<'a> Runner<'a> for Exp<'a> {
-    fn run(&'a self, _context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+    fn run(&'a self, _context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, RuntimetErr> {
         match *self {
             Exp::Na => Ok(Box::new(NA)),
             Exp::Bool(b) => Ok(Box::new(b)),
@@ -44,10 +44,10 @@ impl<'a> RVRunner<'a> for Exp<'a> {
     fn rv_run(
         &'a self,
         context: &mut dyn Ctx<'a>,
-    ) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+    ) -> Result<Box<dyn PineType<'a> + 'a>, RuntimetErr> {
         match *self {
             Exp::VarName(VarName(name)) => match context.move_var(name) {
-                None => Err(ConvertErr::VarNotFound),
+                None => Err(RuntimetErr::VarNotFound),
                 Some(s) => {
                     let ret = s.copy();
                     context.update_var(name, s);
@@ -67,7 +67,7 @@ impl<'a> RVRunner<'a> for Exp<'a> {
 }
 
 impl<'a> Runner<'a> for TypeCast<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, RuntimetErr> {
         let result = self.exp.rv_run(context)?;
         match self.data_type {
             DataType::Bool => Ok(Bool::explicity_from(result)?),
@@ -75,21 +75,21 @@ impl<'a> Runner<'a> for TypeCast<'a> {
             DataType::Float => Ok(Float::explicity_from(result)?),
             DataType::Color => Ok(Color::explicity_from(result)?),
             DataType::String => Ok(String::explicity_from(result)?),
-            _ => Err(ConvertErr::NotCompatible),
+            _ => Err(RuntimetErr::NotCompatible),
         }
     }
 }
 
 impl<'a> Runner<'a> for PrefixExp<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, RuntimetErr> {
         let varname = self.var_chain[0].0;
         let var = context.move_var(varname);
         if var.is_none() {
-            return Err(ConvertErr::NotSupportOperator);
+            return Err(RuntimetErr::NotSupportOperator);
         }
         let var_unwrap = var.unwrap();
         if var_unwrap.get_type() != (FirstType::Object, SecondType::Simple) {
-            return Err(ConvertErr::InvalidVarType(format!(
+            return Err(RuntimetErr::InvalidVarType(format!(
                 "Expect Object type, but get {:?}",
                 var_unwrap.get_type().0
             )));
@@ -102,7 +102,7 @@ impl<'a> Runner<'a> for PrefixExp<'a> {
                     let obj = downcast::<Object>(subobj).unwrap();
                     subobj = obj.get(name.0)?;
                 }
-                _ => return Err(ConvertErr::NotSupportOperator),
+                _ => return Err(RuntimetErr::NotSupportOperator),
             }
         }
         context.update_var(varname, object);
@@ -111,7 +111,7 @@ impl<'a> Runner<'a> for PrefixExp<'a> {
 }
 
 impl<'a> Runner<'a> for Condition<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, RuntimetErr> {
         let cond = self.cond.rv_run(context)?;
         let bool_val = Bool::implicity_from(cond)?;
         match *downcast::<Bool>(bool_val).unwrap() {
@@ -126,12 +126,12 @@ fn get_slice<'a, D: Default + PineType<'a> + PineStaticType + 'a + Clone>(
     name: &'a str,
     obj: Box<dyn PineType<'a> + 'a>,
     arg: Box<dyn PineType<'a> + 'a>,
-) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+) -> Result<Box<dyn PineType<'a> + 'a>, RuntimetErr> {
     let s: Box<Series<D>> = Series::implicity_from(obj)?;
     let arg_type = arg.get_type();
     let i = Int::implicity_from(arg)?;
     match *i {
-        None => Err(ConvertErr::InvalidVarType(format!(
+        None => Err(RuntimetErr::InvalidVarType(format!(
             "Expect simple int, but get {:?} {:?}",
             arg_type.1, arg_type.0
         ))),
@@ -144,16 +144,16 @@ fn get_slice<'a, D: Default + PineType<'a> + PineStaticType + 'a + Clone>(
 }
 
 impl<'a> Runner<'a> for RefCall<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, RuntimetErr> {
         let name = self.name.run(context)?;
         let arg = self.arg.run(context)?;
         if name.get_type() != (FirstType::PineVar, SecondType::Simple) {
-            return Err(ConvertErr::NotSupportOperator);
+            return Err(RuntimetErr::NotSupportOperator);
         }
         let varname = downcast::<PineVar>(name).unwrap().0;
         let var_opt = context.move_var(varname);
         if var_opt.is_none() {
-            return Err(ConvertErr::NotSupportOperator);
+            return Err(RuntimetErr::NotSupportOperator);
         }
 
         let var = var_opt.unwrap();
@@ -163,7 +163,7 @@ impl<'a> Runner<'a> for RefCall<'a> {
             (FirstType::Bool, _) => get_slice::<Bool>(context, varname, var, arg),
             (FirstType::Color, _) => get_slice::<Color>(context, varname, var, arg),
             (FirstType::String, _) => get_slice::<String>(context, varname, var, arg),
-            _ => Err(ConvertErr::NotSupportOperator),
+            _ => Err(RuntimetErr::NotSupportOperator),
         }
     }
 }
@@ -183,11 +183,11 @@ mod tests {
                 "Custom A"
             }
 
-            fn get(&self, name: &str) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+            fn get(&self, name: &str) -> Result<Box<dyn PineType<'a> + 'a>, RuntimetErr> {
                 match name {
                     "int" => Ok(Box::new(Some(1i32))),
                     "object" => Ok(Box::new(Object::new(Box::new(A)))),
-                    _ => Err(ConvertErr::NotSupportOperator),
+                    _ => Err(RuntimetErr::NotSupportOperator),
                 }
             }
 

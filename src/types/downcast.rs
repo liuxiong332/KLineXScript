@@ -1,21 +1,21 @@
-use super::{ConvertErr, PineStaticType, PineType};
+use super::{PineStaticType, PineType, RuntimetErr};
 
 pub fn downcast<'a, T: PineStaticType + 'a>(
     item: Box<dyn PineType<'a> + 'a>,
-) -> Result<Box<T>, ConvertErr> {
+) -> Result<Box<T>, RuntimetErr> {
     if T::static_type() == item.get_type() {
         unsafe {
             let raw: *mut dyn PineType<'a> = Box::into_raw(item);
             Ok(Box::from_raw(raw as *mut T))
         }
     } else {
-        Err(ConvertErr::NotCompatible)
+        Err(RuntimetErr::NotCompatible)
     }
 }
 
 pub fn downcast_ref<'a, T: PineStaticType + 'a>(
     item: &'a mut dyn PineType<'a>,
-) -> Result<&mut T, ConvertErr> {
+) -> Result<&mut T, RuntimetErr> {
     if T::static_type() == item.get_type() {
         unsafe {
             let raw: *mut dyn PineType<'a> = item;
@@ -23,6 +23,6 @@ pub fn downcast_ref<'a, T: PineStaticType + 'a>(
             Ok(t.as_mut().unwrap())
         }
     } else {
-        Err(ConvertErr::NotCompatible)
+        Err(RuntimetErr::NotCompatible)
     }
 }

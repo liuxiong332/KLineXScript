@@ -4,7 +4,7 @@ use pine::runtime::{
     data_src::{Callback, DataSrc},
 };
 use pine::types::{
-    Callable, ConvertErr, DataType, Float, PineFrom, PineType, SecondType, Series,
+    Callable, DataType, Float, PineFrom, PineType, RuntimetErr, SecondType, Series,
     SeriesToArrayCall, NA,
 };
 use std::collections::HashMap;
@@ -20,12 +20,12 @@ ma = close + close[1] + close[2] + close[3] + close[4]
 fn pine_print<'a>(
     context: &mut dyn Ctx<'a>,
     mut param: HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
-) -> Result<Box<dyn PineType<'a> + 'a>, ConvertErr> {
+) -> Result<Box<dyn PineType<'a> + 'a>, RuntimetErr> {
     match param.remove("item") {
-        None => Err(ConvertErr::NotSupportOperator),
+        None => Err(RuntimetErr::NotSupportOperator),
         Some(item_val) => {
             if item_val.get_type().1 != SecondType::Series {
-                return Err(ConvertErr::NotSupportOperator);
+                return Err(RuntimetErr::NotSupportOperator);
             }
             let items: Box<Series<Float>> = Series::implicity_from(item_val).unwrap();
             let vec: Vec<Float> = (*items).into();

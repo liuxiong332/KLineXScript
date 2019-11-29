@@ -23,7 +23,7 @@ pub enum DataType {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum ConvertErr {
+pub enum RuntimetErr {
     NotCompatible,
     NotValidParam,
     NotSupportOperator,

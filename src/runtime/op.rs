@@ -87,16 +87,22 @@ pub fn binary_op_run<'a, 'b>(
             let val1 = exp1.rv_run(context)?;
             let val2 = exp2.rv_run(context)?;
             match (op, val1.get_type(), val2.get_type()) {
-                (op, (FirstType::Float, SecondType::Simple), _)
-                | (op, _, (FirstType::Float, SecondType::Simple)) => {
-                    let f1 = Float::implicity_from(val1)?;
-                    let f2 = Float::implicity_from(val2)?;
-                    Ok(bi_operate(op, f1, f2))
-                }
                 (op, (FirstType::Float, SecondType::Series), _)
                 | (op, _, (FirstType::Float, SecondType::Series)) => {
                     let f1: Box<Series<Float>> = Series::implicity_from(val1)?;
                     let f2: Box<Series<Float>> = Series::implicity_from(val2)?;
+                    Ok(bi_operate(op, f1, f2))
+                }
+                (op, (FirstType::Int, SecondType::Series), _)
+                | (op, _, (FirstType::Int, SecondType::Series)) => {
+                    let d1: Box<Series<Int>> = Series::implicity_from(val1)?;
+                    let d2: Box<Series<Int>> = Series::implicity_from(val2)?;
+                    Ok(bi_operate(op, d1, d2))
+                }
+                (op, (FirstType::Float, SecondType::Simple), _)
+                | (op, _, (FirstType::Float, SecondType::Simple)) => {
+                    let f1 = Float::implicity_from(val1)?;
+                    let f2 = Float::implicity_from(val2)?;
                     Ok(bi_operate(op, f1, f2))
                 }
                 (op, (FirstType::Int, SecondType::Simple), _)

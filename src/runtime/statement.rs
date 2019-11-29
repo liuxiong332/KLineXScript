@@ -90,6 +90,7 @@ impl<'a> RunnerForName<'a> for Assignment<'a> {
             return Err(RuntimeErr::InvalidNADeclarer);
         }
         if true_val.get_type().1 == SecondType::Series {
+            print!("right val type {:?}", true_val.get_type());
             return match context.move_var(name) {
                 None => match true_val.get_type().0 {
                     FirstType::Int => series_from::<Int>(true_val, name, context),

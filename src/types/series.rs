@@ -1,6 +1,8 @@
 use super::downcast::downcast;
 use super::error::RuntimeErr;
-use super::traits::{Arithmetic, DataType, PineFrom, PineStaticType, PineType, SecondType};
+use super::traits::{
+    Arithmetic, DataType, PineFrom, PineRef, PineStaticType, PineType, SecondType,
+};
 use std::cmp::{Ordering, PartialEq, PartialOrd};
 use std::convert::{From, Into};
 use std::fmt::Debug;
@@ -87,9 +89,8 @@ impl<'a, D: PineStaticType + PineType<'a> + Clone + Debug + 'a> PineType<'a> for
         (<D as PineStaticType>::static_type().0, SecondType::Series)
     }
 
-    fn copy(&self) -> Box<dyn PineType<'a> + 'a> {
-        let series = self.clone();
-        Box::new(series)
+    fn copy(&self) -> PineRef<'a> {
+        PineRef::Box(Box::new(self.clone()))
     }
 }
 

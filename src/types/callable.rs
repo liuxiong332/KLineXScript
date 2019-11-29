@@ -1,5 +1,4 @@
-use super::downcast::downcast_ref;
-use super::{DataType, PineFrom, PineStaticType, PineType, RuntimeErr, SecondType, NA};
+use super::{DataType, PineFrom, PineRef, PineStaticType, PineType, RuntimeErr, SecondType, NA};
 use crate::runtime::context::Ctx;
 use std::cell::Cell;
 use std::collections::HashMap;
@@ -9,9 +8,9 @@ pub trait SeriesCall<'a> {
     fn step(
         &self,
         _context: &mut dyn Ctx<'a>,
-        _p: HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
-    ) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
-        Ok(Box::new(NA))
+        _p: HashMap<&'a str, PineRef<'a>>,
+    ) -> Result<PineRef<'a>, RuntimeErr> {
+        Ok(PineRef::Box(Box::new(NA)))
     }
 
     fn run(&self, _context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
@@ -40,9 +39,9 @@ impl<'a> fmt::Debug for dyn SeriesCall<'a> {
 pub struct SeriesToArrayCall<'a> {
     func: fn(
         context: &mut dyn Ctx<'a>,
-        HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
-    ) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr>,
-    params: Cell<HashMap<&'a str, Box<dyn PineType<'a> + 'a>>>,
+        HashMap<&'a str, PineRef<'a>>,
+    ) -> Result<PineRef<'a>, RuntimeErr>,
+    params: Cell<HashMap<&'a str, PineRef<'a>>>,
 }
 
 impl<'a> fmt::Debug for SeriesToArrayCall<'a> {
@@ -58,8 +57,8 @@ impl<'a> SeriesToArrayCall<'a> {
     pub fn new(
         func: fn(
             context: &mut dyn Ctx<'a>,
-            HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
-        ) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr>,
+            HashMap<&'a str, PineRef<'a>>,
+        ) -> Result<PineRef<'a>, RuntimeErr>,
     ) -> SeriesToArrayCall<'a> {
         SeriesToArrayCall {
             params: Cell::new(HashMap::new()),
@@ -72,12 +71,12 @@ impl<'a> SeriesCall<'a> for SeriesToArrayCall<'a> {
     fn step(
         &self,
         _context: &mut dyn Ctx<'a>,
-        _p: HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
-    ) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
+        _p: HashMap<&'a str, PineRef<'a>>,
+    ) -> Result<PineRef<'a>, RuntimeErr> {
         self.params.set(_p);
         let newv = self.params.take();
         self.params.set(newv);
-        Ok(Box::new(NA))
+        Ok(PineRef::Box(Box::new(NA)))
     }
 
     fn run(&self, _context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
@@ -88,7 +87,7 @@ impl<'a> SeriesCall<'a> for SeriesToArrayCall<'a> {
 
     fn copy(&self) -> Box<dyn SeriesCall<'a> + 'a> {
         let map = self.params.take();
-        let new_map: HashMap<&'a str, Box<dyn PineType<'a> + 'a>> =
+        let new_map: HashMap<&'a str, PineRef<'a>> =
             map.iter().map(|(&k, v)| (k, v.copy())).collect();
         self.params.set(map);
         Box::new(SeriesToArrayCall {
@@ -103,8 +102,8 @@ pub struct Callable<'a> {
     func: Option<
         fn(
             context: &mut dyn Ctx<'a>,
-            HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
-        ) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr>,
+            HashMap<&'a str, PineRef<'a>>,
+        ) -> Result<PineRef<'a>, RuntimeErr>,
     >,
     caller: Option<Box<dyn SeriesCall<'a> + 'a>>,
     param_names: Vec<&'static str>,
@@ -140,8 +139,8 @@ impl<'a> PineType<'a> for Callable<'a> {
         <Self as PineStaticType>::static_type()
     }
 
-    fn copy(&self) -> Box<dyn PineType<'a> + 'a> {
-        Box::new(self.clone())
+    fn copy(&self) -> PineRef<'a> {
+        PineRef::Box(Box::new(self.clone()))
     }
 }
 impl<'a> PineFrom<'a, Callable<'a>> for Callable<'a> {}
@@ -151,8 +150,8 @@ impl<'a> Callable<'a> {
         func: Option<
             fn(
                 context: &mut dyn Ctx<'a>,
-                HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
-            ) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr>,
+                HashMap<&'a str, PineRef<'a>>,
+            ) -> Result<PineRef<'a>, RuntimeErr>,
         >,
         caller: Option<Box<dyn SeriesCall<'a> + 'a>>,
         param_names: Vec<&'static str>,
@@ -167,14 +166,14 @@ impl<'a> Callable<'a> {
     pub fn call(
         &self,
         context: &mut dyn Ctx<'a>,
-        pos_args: Vec<Box<dyn PineType<'a> + 'a>>,
-        dict_args: Vec<(&'a str, Box<dyn PineType<'a> + 'a>)>,
-    ) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
+        pos_args: Vec<PineRef<'a>>,
+        dict_args: Vec<(&'a str, PineRef<'a>)>,
+    ) -> Result<PineRef<'a>, RuntimeErr> {
         if pos_args.len() > self.param_names.len() {
             return Err(RuntimeErr::NotValidParam);
         }
 
-        let mut all_args: HashMap<&'a str, Box<dyn PineType<'a> + 'a>> = HashMap::new();
+        let mut all_args: HashMap<&'a str, PineRef<'a>> = HashMap::new();
         for (i, val) in pos_args.into_iter().enumerate() {
             let name = self.param_names[i];
             all_args.insert(name, val);
@@ -192,7 +191,7 @@ impl<'a> Callable<'a> {
         } else if let Some(ref caller) = self.caller {
             caller.step(context, all_args)
         } else {
-            Ok(Box::new(NA))
+            Ok(PineRef::Box(Box::new(NA)))
         }
     }
 
@@ -222,12 +221,18 @@ mod tests {
 
     fn test_func<'a>(
         _context: &mut dyn Ctx<'a>,
-        mut args: HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
-    ) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
+        mut args: HashMap<&'a str, PineRef<'a>>,
+    ) -> Result<PineRef<'a>, RuntimeErr> {
         let (arg1, arg2) = (args.remove("arg1").unwrap(), args.remove("arg2").unwrap());
-        let s: Int =
-            Some(downcast::<Int>(arg1).unwrap().unwrap() + downcast::<Int>(arg2).unwrap().unwrap());
-        Ok(Box::new(s) as Box<dyn PineType>)
+        match (arg1, arg2) {
+            (PineRef::Box(a1), PineRef::Box(a2)) => {
+                let s: Int = Some(
+                    downcast::<Int>(a1).unwrap().unwrap() + downcast::<Int>(a2).unwrap().unwrap(),
+                );
+                Ok(PineRef::Box(Box::new(s) as Box<dyn PineType>))
+            }
+            _ => Err(RuntimeErr::NotSupportOperator),
+        }
     }
 
     #[test]
@@ -238,15 +243,15 @@ mod tests {
         let call_res = callable.call(
             &mut context,
             vec![
-                Box::new(Some(1)) as Box<dyn PineType>,
-                Box::new(Some(2)) as Box<dyn PineType>,
+                PineRef::Box(Box::new(Some(1)) as Box<dyn PineType>),
+                PineRef::Box(Box::new(Some(2)) as Box<dyn PineType>),
             ],
             vec![],
         );
-        assert_eq!(
-            downcast::<Int>(call_res.unwrap()).unwrap(),
-            Box::new(Some(3))
-        );
+        match call_res.unwrap() {
+            PineRef::Box(val) => assert_eq!(downcast::<Int>(val).unwrap(), Box::new(Some(3))),
+            _ => assert!(false),
+        }
     }
 
     #[test]
@@ -258,8 +263,8 @@ mod tests {
         );
         let gen_params = || {
             vec![
-                Box::new(Some(1)) as Box<dyn PineType>,
-                Box::new(Some(2)) as Box<dyn PineType>,
+                PineRef::Box(Box::new(Some(1)) as Box<dyn PineType>),
+                PineRef::Box(Box::new(Some(2)) as Box<dyn PineType>),
             ]
         };
 
@@ -276,23 +281,31 @@ mod tests {
     fn series_array_test() {
         fn test_func<'a>(
             _context: &mut dyn Ctx<'a>,
-            mut args: HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
-        ) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
+            mut args: HashMap<&'a str, PineRef<'a>>,
+        ) -> Result<PineRef<'a>, RuntimeErr> {
             let arg1 = args.remove("arg").unwrap();
-            let s: Box<Int> = downcast::<Int>(arg1).unwrap();
-            assert_eq!(s, Box::new(Some(10)));
-            Ok(s as Box<dyn PineType>)
+            match arg1 {
+                PineRef::Box(a1) => {
+                    let s: Box<Int> = downcast::<Int>(a1).unwrap();
+                    assert_eq!(s, Box::new(Some(10)));
+                    Ok(PineRef::Box(s as Box<dyn PineType>))
+                }
+                _ => unreachable!(),
+            }
         }
 
         let call = SeriesToArrayCall::new(test_func);
         let mut context = Context::new(None, ContextType::Normal);
 
         let mut map = HashMap::new();
-        map.insert("arg", Box::new(Some(100)) as Box<dyn PineType>);
+        map.insert(
+            "arg",
+            PineRef::Box(Box::new(Some(100)) as Box<dyn PineType>),
+        );
         assert!(call.step(&mut context, map).is_ok());
 
         let mut map = HashMap::new();
-        map.insert("arg", Box::new(Some(10)) as Box<dyn PineType>);
+        map.insert("arg", PineRef::Box(Box::new(Some(10)) as Box<dyn PineType>));
         assert!(call.step(&mut context, map).is_ok());
 
         assert_eq!(call.run(&mut context), Ok(()));

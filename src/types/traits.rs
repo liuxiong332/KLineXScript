@@ -1,6 +1,8 @@
 use super::downcast::downcast_ref;
 use super::error::RuntimeErr;
+use std::convert::AsRef;
 use std::fmt;
+use std::rc::Rc;
 
 #[derive(Debug, PartialEq)]
 pub enum SecondType {
@@ -37,26 +39,59 @@ pub trait PineType<'a> {
     // }
     fn get_type(&self) -> (DataType, SecondType);
 
-    fn copy(&self) -> Box<dyn PineType<'a> + 'a>;
+    fn copy(&self) -> PineRef<'a>;
 }
 
-impl<'a> fmt::Debug for Box<dyn PineType<'a> + 'a> {
+pub enum PineRef<'a> {
+    Box(Box<dyn PineType<'a> + 'a>),
+    Rc(Rc<dyn PineType<'a> + 'a>),
+}
+
+impl<'a> PineType<'a> for PineRef<'a> {
+    fn get_type(&self) -> (DataType, SecondType) {
+        match *self {
+            PineRef::Box(ref item) => item.get_type(),
+            PineRef::Rc(ref item) => item.get_type(),
+        }
+    }
+
+    fn copy(&self) -> PineRef<'a> {
+        match *self {
+            PineRef::Box(ref item) => item.copy(),
+            PineRef::Rc(ref item) => PineRef::Rc(Rc::clone(item)),
+        }
+    }
+}
+
+impl<'a> fmt::Debug for &(dyn PineType<'a> + 'a) {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use super::{Float, Int, Series};
 
-        let self_ref = &**self;
         match self.get_type() {
-            (DataType::Int, SecondType::Simple) => downcast_ref::<Int>(self_ref).unwrap().fmt(f),
-            (DataType::Float, SecondType::Simple) => {
-                downcast_ref::<Float>(self_ref).unwrap().fmt(f)
-            }
+            (DataType::Int, SecondType::Simple) => downcast_ref::<Int>(*self).unwrap().fmt(f),
+            (DataType::Float, SecondType::Simple) => downcast_ref::<Float>(*self).unwrap().fmt(f),
             (DataType::Int, SecondType::Series) => {
-                downcast_ref::<Series<Int>>(self_ref).unwrap().fmt(f)
+                downcast_ref::<Series<Int>>(*self).unwrap().fmt(f)
             }
             (DataType::Float, SecondType::Series) => {
-                downcast_ref::<Series<Float>>(self_ref).unwrap().fmt(f)
+                downcast_ref::<Series<Float>>(*self).unwrap().fmt(f)
             }
             _ => write!(f, "Unkown type"),
+        }
+    }
+}
+
+impl<'a> fmt::Debug for PineRef<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            PineRef::Box(ref item) => {
+                let self_ref = &**item;
+                self_ref.fmt(f)
+            }
+            PineRef::Rc(ref item) => {
+                let self_ref = &**item;
+                self_ref.fmt(f)
+            }
         }
     }
 }

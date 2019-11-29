@@ -97,7 +97,6 @@ pub fn binary_op_run<'a, 'b>(
                 | (op, _, (FirstType::Float, SecondType::Series)) => {
                     let f1: Box<Series<Float>> = Series::implicity_from(val1)?;
                     let f2: Box<Series<Float>> = Series::implicity_from(val2)?;
-                    println!("f1 f2 {:?} {:?}", f1, f2);
                     Ok(bi_operate(op, f1, f2))
                 }
                 (op, (FirstType::Int, SecondType::Simple), _)

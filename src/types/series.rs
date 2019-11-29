@@ -51,14 +51,15 @@ impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> Series<'a, D> 
         }
     }
 
-    pub fn index(&self, i: usize) -> Result<&D, ConvertErr> {
+    pub fn index(&self, i: usize) -> Result<Series<'a, D>, ConvertErr> {
         let len = self.history.len();
-        match i {
+        let val = match i {
             // m if m < 0 => Err(SeriesErr::Negative),
-            0 => Ok(&self.current),
-            m if m >= 1 && m <= len => Ok(&self.history[(len - i) as usize]),
-            _ => Ok(&self.na_val),
-        }
+            0 => self.current.clone(),
+            m if m >= 1 && m <= len => self.history[(len - i) as usize].clone(),
+            _ => self.na_val.clone(),
+        };
+        Ok(Series::from(val))
     }
 
     pub fn update(&mut self, current: D) {
@@ -168,9 +169,9 @@ mod tests {
     fn series_test() {
         let int: Int = Some(1);
         let mut series = <Series<Int> as From<Int>>::from(int);
-        assert_eq!(series.index(0), Ok(&Some(1)));
+        assert_eq!(series.index(0), Ok(Series::from(Some(1))));
         series.update(Some(2));
-        assert_eq!(series.index(0), Ok(&Some(2)));
+        assert_eq!(series.index(0), Ok(Series::from(Some(2))));
 
         series.commit();
         assert_eq!(series.history, vec![Some(2)]);

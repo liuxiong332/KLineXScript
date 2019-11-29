@@ -112,7 +112,6 @@ mod tests {
             None => None,
             Some(v) => {
                 let ser: Box<Series<Float>> = Series::implicity_from(v).unwrap();
-                print!("series {:?}", ser);
                 let expect_ser = Box::new(Series::from_vec(vec![Some(10f64), Some(100f64)]));
                 assert_eq!(ser, expect_ser);
                 Some(ser)

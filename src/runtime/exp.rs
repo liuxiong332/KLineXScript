@@ -136,7 +136,7 @@ fn get_slice<'a, D: Default + PineType<'a> + PineStaticType + 'a + Clone>(
             arg_type.1, arg_type.0
         ))),
         Some(i) => {
-            let res = Box::new(s.index(i as usize)?.clone());
+            let res = Box::new(s.index(i as usize)?);
             context.update_var(name, s);
             Ok(res)
         }
@@ -256,8 +256,8 @@ mod tests {
         context.create_var("hello", Box::new(series));
 
         assert_eq!(
-            downcast::<Int>(exp.run(&mut context).unwrap()),
-            Ok(Box::new(Some(1)))
+            downcast::<Series<Int>>(exp.run(&mut context).unwrap()),
+            Ok(Box::new(Series::from(Some(1))))
         );
     }
 

@@ -2,15 +2,15 @@ use super::context::{Ctx, RVRunner};
 use super::exp::Exp;
 use crate::ast::op::{BinaryOp, UnaryOp};
 use crate::types::{
-    downcast, Arithmetic, Bool, RuntimetErr, DataType as FirstType, Float, Int, Negative, PineFrom,
-    PineType, SecondType, Series,
+    downcast, Arithmetic, Bool, DataType as FirstType, Float, Int, Negative, PineFrom, PineType,
+    RuntimeErr, SecondType, Series,
 };
 
 pub fn unary_op_run<'a>(
     op: &UnaryOp,
     exp: &'a Box<Exp<'a>>,
     context: &mut (dyn Ctx<'a>),
-) -> Result<Box<dyn PineType<'a> + 'a>, RuntimetErr> {
+) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
     match op {
         UnaryOp::Plus => exp.rv_run(context),
         UnaryOp::Minus => {
@@ -22,7 +22,7 @@ pub fn unary_op_run<'a>(
                 (FirstType::Float, SecondType::Simple) => {
                     Ok(Box::new(downcast::<Float>(val).unwrap().negative()) as Box<dyn PineType>)
                 }
-                _ => Err(RuntimetErr::NotSupportOperator),
+                _ => Err(RuntimeErr::NotSupportOperator),
             }
         }
         UnaryOp::BoolNot => {
@@ -61,7 +61,7 @@ pub fn binary_op_run<'a, 'b>(
     exp1: &'a Box<Exp<'a>>,
     exp2: &'a Box<Exp<'a>>,
     context: &mut (dyn 'b + Ctx<'a>),
-) -> Result<Box<dyn PineType<'a> + 'a>, RuntimetErr> {
+) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
     match op {
         BinaryOp::BoolAnd => {
             let val1 = exp1.rv_run(context)?;
@@ -115,7 +115,7 @@ pub fn binary_op_run<'a, 'b>(
                 | (_, _, (FirstType::String, SecondType::Simple)) => Ok(Box::new(
                     *(String::implicity_from(val1)?) + &*(String::implicity_from(val2)?),
                 )),
-                _ => Err(RuntimetErr::NotSupportOperator),
+                _ => Err(RuntimeErr::NotSupportOperator),
             }
         }
     }
@@ -158,7 +158,7 @@ mod tests {
         op: BinaryOp,
         v1: Exp<'a>,
         v2: Exp<'a>,
-    ) -> Result<Box<D>, RuntimetErr> {
+    ) -> Result<Box<D>, RuntimeErr> {
         let mut context = Context::new(None, ContextType::Normal);
         downcast::<D>(binary_op_run(&op, &Box::new(v1), &Box::new(v2), &mut context).unwrap())
     }
@@ -273,7 +273,7 @@ mod tests {
         op: BinaryOp,
         v1: Exp<'a>,
         v2: Exp<'a>,
-    ) -> Result<Box<D>, RuntimetErr> {
+    ) -> Result<Box<D>, RuntimeErr> {
         let mut context = Context::new(None, ContextType::Normal);
         context.create_var("arg1", Box::new(Some(4)));
         context.create_var("arg2", Box::new(Some(2)));

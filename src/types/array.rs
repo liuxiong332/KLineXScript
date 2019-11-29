@@ -1,5 +1,5 @@
 use super::traits::{
-    downcast, RuntimetErr, DataType, PineFrom, PineStaticType, PineType, SecondType,
+    downcast, DataType, PineFrom, PineStaticType, PineType, RuntimeErr, SecondType,
 };
 
 impl<'a, D: PineStaticType> PineStaticType for Vec<D> {

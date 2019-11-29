@@ -1,6 +1,6 @@
 use super::data_src::Callback;
 use crate::types::{
-    Bool, Callable, Color, DataType, Float, Int, PineFrom, PineStaticType, PineType, RuntimetErr,
+    Bool, Callable, Color, DataType, Float, Int, PineFrom, PineStaticType, PineType, RuntimeErr,
     SecondType, Series, NA,
 };
 use std::collections::{HashMap, HashSet};
@@ -135,7 +135,7 @@ impl<'a, 'b> Context<'a, 'b> {
         }
     }
 
-    pub fn roll_back(&mut self) -> Result<(), RuntimetErr> {
+    pub fn roll_back(&mut self) -> Result<(), RuntimeErr> {
         let keys: Vec<&'a str> = self.vars.keys().cloned().collect();
         for k in keys {
             let val = self.move_var(k).unwrap();
@@ -156,7 +156,7 @@ impl<'a, 'b> Context<'a, 'b> {
         Ok(())
     }
 
-    pub fn run_callbacks(&mut self) -> Result<(), RuntimetErr> {
+    pub fn run_callbacks(&mut self) -> Result<(), RuntimeErr> {
         let callables = mem::replace(&mut self.callables, vec![]);
         for callable in callables.iter() {
             callable.run(self)?;
@@ -235,7 +235,7 @@ impl<'a, 'b> Ctx<'a> for Context<'a, 'b> {
 }
 
 pub trait Runner<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, RuntimetErr>;
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr>;
 }
 
 // Evaluate  the expression with right-value.
@@ -243,11 +243,11 @@ pub trait RVRunner<'a> {
     fn rv_run(
         &'a self,
         context: &mut dyn Ctx<'a>,
-    ) -> Result<Box<dyn PineType<'a> + 'a>, RuntimetErr>;
+    ) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr>;
 }
 
 pub trait StmtRunner<'a> {
-    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimetErr>;
+    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr>;
 }
 
 #[cfg(test)]

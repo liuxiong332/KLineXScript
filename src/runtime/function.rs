@@ -1,6 +1,6 @@
 use super::context::{Context, ContextType, Ctx, Runner};
 use crate::ast::stat_expr_types::FunctionDef;
-use crate::types::{DataType, PineFrom, PineStaticType, PineType, RuntimetErr, SecondType};
+use crate::types::{DataType, PineFrom, PineStaticType, PineType, RuntimeErr, SecondType};
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -35,9 +35,9 @@ impl<'a> Function<'a> {
         context: &mut dyn Ctx<'a>,
         pos_args: Vec<Box<dyn PineType<'a> + 'a>>,
         dict_args: Vec<(&'a str, Box<dyn PineType<'a> + 'a>)>,
-    ) -> Result<Box<dyn PineType<'a> + 'a>, RuntimetErr> {
+    ) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
         if pos_args.len() > self.def.params.len() {
-            return Err(RuntimetErr::NotValidParam);
+            return Err(RuntimeErr::NotValidParam);
         }
 
         let mut all_args: HashMap<&'a str, Box<dyn PineType<'a> + 'a>> = HashMap::new();
@@ -47,7 +47,7 @@ impl<'a> Function<'a> {
         }
         for (name, val) in dict_args.into_iter() {
             match self.def.params.iter().any(|&v| name == v.0) {
-                false => return Err(RuntimetErr::NotValidParam),
+                false => return Err(RuntimeErr::NotValidParam),
                 true => {
                     all_args.insert(name, val);
                 }

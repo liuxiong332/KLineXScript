@@ -6,14 +6,14 @@ pub mod op;
 pub mod statement;
 
 use crate::ast::stat_expr_types::Block;
-use crate::types::{PineType, RuntimetErr};
+use crate::types::{PineType, RuntimeErr};
 use context::{Context, ContextType, Ctx, Runner};
 use std::collections::HashMap;
 
 pub fn run<'a>(
     blk: &'a Block<'a>,
     vars: HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
-) -> Result<(), RuntimetErr> {
+) -> Result<(), RuntimeErr> {
     let mut context = Context::new(None, ContextType::Normal);
     for (k, v) in vars.into_iter() {
         context.create_var(k, v);

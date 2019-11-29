@@ -6,16 +6,16 @@ use crate::ast::stat_expr_types::{
     VarAssignment,
 };
 use crate::types::{
-    downcast, Bool, Callable, Color, RuntimetErr, DataType as FirstType, Float, Int, PineFrom,
-    PineStaticType, PineType, SecondType, Series, Tuple, NA,
+    downcast, Bool, Callable, Color, DataType as FirstType, Float, Int, PineFrom, PineStaticType,
+    PineType, RuntimeErr, SecondType, Series, Tuple, NA,
 };
 
 impl<'a> StmtRunner<'a> for Statement<'a> {
-    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimetErr> {
+    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
         match *self {
             Statement::None => Ok(()),
-            Statement::Break => Err(RuntimetErr::Break),
-            Statement::Continue => Err(RuntimetErr::Continue),
+            Statement::Break => Err(RuntimeErr::Break),
+            Statement::Continue => Err(RuntimeErr::Continue),
             Statement::Assignment(ref assign) => assign.st_run(context),
             Statement::VarAssignment(ref var_assign) => var_assign.st_run(context),
             Statement::Ite(ref ite) => StmtRunner::st_run(ite.as_ref(), context),
@@ -32,7 +32,31 @@ trait RunnerForName<'a> {
         context: &mut dyn Ctx<'a>,
         name: &VarName<'a>,
         val: Box<dyn PineType<'a> + 'a>,
-    ) -> Result<(), RuntimetErr>;
+    ) -> Result<(), RuntimeErr>;
+}
+
+fn series_from<'a, D: Default + PineStaticType + PineType<'a> + Clone + PineFrom<'a, D> + 'a>(
+    val: Box<dyn PineType<'a> + 'a>,
+    name: &'a str,
+    context: &mut dyn Ctx<'a>,
+) -> Result<(), RuntimeErr> {
+    let val = D::implicity_from(val)?;
+    let mut s: Box<Series<D>> = Box::new(Series::from(*val));
+    context.create_var(name, s);
+    Ok(())
+}
+
+fn series_update<'a, D: Default + PineStaticType + PineType<'a> + Clone + PineFrom<'a, D> + 'a>(
+    series: Box<dyn PineType<'a> + 'a>,
+    val: Box<dyn PineType<'a> + 'a>,
+    name: &'a str,
+    context: &mut dyn Ctx<'a>,
+) -> Result<(), RuntimeErr> {
+    let mut s: Box<Series<D>> = Series::implicity_from(series)?;
+    let val = D::implicity_from(val)?;
+    s.update(*val);
+    context.update_var(name, s);
+    Ok(())
 }
 
 impl<'a> RunnerForName<'a> for Assignment<'a> {
@@ -41,10 +65,10 @@ impl<'a> RunnerForName<'a> for Assignment<'a> {
         context: &mut dyn Ctx<'a>,
         vn: &VarName<'a>,
         val: Box<dyn PineType<'a> + 'a>,
-    ) -> Result<(), RuntimetErr> {
+    ) -> Result<(), RuntimeErr> {
         let name = vn.0;
         if context.contains_declare(name) {
-            return Err(RuntimetErr::NameDeclared);
+            return Err(RuntimeErr::NameDeclared);
         }
         context.create_declare(name);
 
@@ -60,10 +84,32 @@ impl<'a> RunnerForName<'a> for Assignment<'a> {
             Some(DataType::Float) => Float::explicity_from(val)?,
             Some(DataType::Color) => Color::explicity_from(val)?,
             Some(DataType::String) => String::explicity_from(val)?,
-            _ => return Err(RuntimetErr::InvalidTypeCast),
+            _ => return Err(RuntimeErr::InvalidTypeCast),
         };
         if let (FirstType::NA, _) = true_val.get_type() {
-            return Err(RuntimetErr::InvalidNADeclarer);
+            return Err(RuntimeErr::InvalidNADeclarer);
+        }
+        if true_val.get_type().1 == SecondType::Series {
+            return match context.move_var(name) {
+                None => match true_val.get_type().0 {
+                    FirstType::Int => series_from::<Int>(true_val, name, context),
+                    FirstType::Float => series_from::<Float>(true_val, name, context),
+                    FirstType::Bool => series_from::<Bool>(true_val, name, context),
+                    _ => Err(RuntimeErr::TypeMismatch(String::from(
+                        "Series type can only be Int, Float and Bool",
+                    ))),
+                },
+                Some(current_val) => match current_val.get_type().0 {
+                    FirstType::Int => series_update::<Int>(current_val, true_val, name, context),
+                    FirstType::Float => {
+                        series_update::<Float>(current_val, true_val, name, context)
+                    }
+                    FirstType::Bool => series_update::<Bool>(current_val, true_val, name, context),
+                    _ => Err(RuntimeErr::TypeMismatch(String::from(
+                        "Series type can only be Int, Float and Bool",
+                    ))),
+                },
+            };
         }
         context.create_var(name, true_val);
         Ok(())
@@ -71,7 +117,7 @@ impl<'a> RunnerForName<'a> for Assignment<'a> {
 }
 
 impl<'a> StmtRunner<'a> for Assignment<'a> {
-    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimetErr> {
+    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
         let val = self.val.rv_run(context)?;
         if self.names.len() == 1 {
             return self.run_name(context, &self.names[0], val);
@@ -81,7 +127,7 @@ impl<'a> StmtRunner<'a> for Assignment<'a> {
                 let mut tuple = downcast::<Tuple>(val)?;
 
                 if tuple.0.len() != self.names.len() {
-                    return Err(RuntimetErr::TupleMismatch);
+                    return Err(RuntimeErr::TupleMismatch);
                 }
 
                 for n in self.names.iter().rev() {
@@ -89,7 +135,7 @@ impl<'a> StmtRunner<'a> for Assignment<'a> {
                 }
                 Ok(())
             }
-            _ => Err(RuntimetErr::NotSupportOperator),
+            _ => Err(RuntimeErr::NotSupportOperator),
         }
     }
 }
@@ -99,7 +145,7 @@ fn update_series<'a, 'b, D>(
     name: &'a str,
     exist_val: Box<dyn PineType<'a> + 'a>,
     val: Box<dyn PineType<'a> + 'a>,
-) -> Result<(), RuntimetErr>
+) -> Result<(), RuntimeErr>
 where
     D: Default + PineType<'a> + PineStaticType + 'a + PineFrom<'a, D> + Clone,
 {
@@ -110,10 +156,10 @@ where
 }
 
 impl<'a> StmtRunner<'a> for VarAssignment<'a> {
-    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimetErr> {
+    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
         let name = self.name.0;
         if !context.contains_declare(name) {
-            return Err(RuntimetErr::NameNotDeclard);
+            return Err(RuntimeErr::NameNotDeclard);
         }
         let val = self.val.rv_run(context)?;
         let exist_val = context.move_var(name).unwrap();
@@ -123,13 +169,13 @@ impl<'a> StmtRunner<'a> for VarAssignment<'a> {
             (FirstType::Float, _) => update_series::<Float>(context, name, exist_val, val),
             (FirstType::Color, _) => update_series::<Color>(context, name, exist_val, val),
             (FirstType::String, _) => update_series::<String>(context, name, exist_val, val),
-            _ => Err(RuntimetErr::NotSupportOperator),
+            _ => Err(RuntimeErr::NotSupportOperator),
         }
     }
 }
 
 impl<'a> Runner<'a> for IfThenElse<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, RuntimetErr> {
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
         let cond = self.cond.rv_run(context)?;
         let cond_bool = Bool::implicity_from(cond)?;
         if *cond_bool {
@@ -145,7 +191,7 @@ impl<'a> Runner<'a> for IfThenElse<'a> {
 }
 
 impl<'a> StmtRunner<'a> for IfThenElse<'a> {
-    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimetErr> {
+    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
         match Runner::run(self, context) {
             Ok(_) => Ok(()),
             Err(e) => Err(e),
@@ -154,7 +200,7 @@ impl<'a> StmtRunner<'a> for IfThenElse<'a> {
 }
 
 impl<'a> Runner<'a> for ForRange<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, RuntimetErr> {
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
         let iter_name = self.var.0;
         let start = self.start;
         let end = self.end;
@@ -175,13 +221,13 @@ impl<'a> Runner<'a> for ForRange<'a> {
                     ret_val = val;
                     iter += step;
                 }
-                Err(RuntimetErr::Break) => {
+                Err(RuntimeErr::Break) => {
                     if let Some(ref exp) = self.do_blk.ret_stmt {
                         ret_val = exp.rv_run(&mut new_context)?
                     }
                     break;
                 }
-                Err(RuntimetErr::Continue) => {
+                Err(RuntimeErr::Continue) => {
                     if let Some(ref exp) = self.do_blk.ret_stmt {
                         ret_val = exp.rv_run(&mut new_context)?
                     }
@@ -196,7 +242,7 @@ impl<'a> Runner<'a> for ForRange<'a> {
 }
 
 impl<'a> StmtRunner<'a> for ForRange<'a> {
-    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimetErr> {
+    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
         match Runner::run(self, context) {
             Ok(_) => Ok(()),
             Err(e) => Err(e),
@@ -212,21 +258,21 @@ fn extract_args<'a>(
         Vec<Box<dyn PineType<'a> + 'a>>,
         Vec<(&'a str, Box<dyn PineType<'a> + 'a>)>,
     ),
-    RuntimetErr,
+    RuntimeErr,
 > {
     let mut ret_pos = vec![];
     for exp in exp.pos_args.iter() {
-        ret_pos.push(exp.run(context)?);
+        ret_pos.push(exp.rv_run(context)?);
     }
     let mut ret_dict = vec![];
     for (n, exp) in exp.dict_args.iter() {
-        ret_dict.push((n.0, exp.run(context)?));
+        ret_dict.push((n.0, exp.rv_run(context)?));
     }
     Ok((ret_pos, ret_dict))
 }
 
 impl<'a> Runner<'a> for FunctionCall<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, RuntimetErr> {
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
         let result = self.method.rv_run(context)?;
         match result.get_type() {
             (FirstType::Callable, SecondType::Simple) => {
@@ -241,13 +287,13 @@ impl<'a> Runner<'a> for FunctionCall<'a> {
                 let (pos_args, dict_args) = extract_args(context, self)?;
                 callable.call(context, pos_args, dict_args)
             }
-            _ => Err(RuntimetErr::NotSupportOperator),
+            _ => Err(RuntimeErr::NotSupportOperator),
         }
     }
 }
 
 impl<'a> StmtRunner<'a> for FunctionCall<'a> {
-    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimetErr> {
+    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
         match Runner::run(self, context) {
             Ok(_) => Ok(()),
             Err(e) => Err(e),
@@ -256,7 +302,7 @@ impl<'a> StmtRunner<'a> for FunctionCall<'a> {
 }
 
 impl<'a> StmtRunner<'a> for FunctionDef<'a> {
-    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimetErr> {
+    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
         let func = Function::new(self);
         context.create_var(self.name.0, Box::new(func));
         Ok(())
@@ -264,7 +310,7 @@ impl<'a> StmtRunner<'a> for FunctionDef<'a> {
 }
 
 impl<'a> Runner<'a> for Block<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, RuntimetErr> {
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
         for st in self.stmts.iter() {
             st.st_run(context)?;
         }
@@ -447,9 +493,9 @@ mod tests {
         fn test_func<'a>(
             _context: &mut dyn Ctx<'a>,
             mut h: HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
-        ) -> Result<Box<dyn PineType<'a> + 'a>, RuntimetErr> {
+        ) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
             match h.remove("arg") {
-                None => Err(RuntimetErr::NotValidParam),
+                None => Err(RuntimeErr::NotValidParam),
                 Some(arg) => Ok(arg),
             }
         }

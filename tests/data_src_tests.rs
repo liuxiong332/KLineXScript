@@ -4,7 +4,7 @@ use pine::runtime::{
     data_src::{Callback, DataSrc},
 };
 use pine::types::{
-    Callable, DataType, Float, PineFrom, PineType, RuntimetErr, SecondType, Series,
+    Callable, DataType, Float, PineFrom, PineType, RuntimeErr, SecondType, Series,
     SeriesToArrayCall, NA,
 };
 use std::collections::HashMap;
@@ -14,21 +14,27 @@ const MA_SCRIPT: &str = "
 ma = close + close[1] + close[2] + close[3] + close[4]
 // for i = 1 to 5
 //     ma := ma + close[i] 
-// print(ma)
+print(ma)
 ";
 
 fn pine_print<'a>(
     context: &mut dyn Ctx<'a>,
     mut param: HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
-) -> Result<Box<dyn PineType<'a> + 'a>, RuntimetErr> {
+) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
+    println!("pine print, {:?}", param.keys());
     match param.remove("item") {
-        None => Err(RuntimetErr::NotSupportOperator),
+        None => Err(RuntimeErr::NotSupportOperator),
         Some(item_val) => {
             if item_val.get_type().1 != SecondType::Series {
-                return Err(RuntimetErr::NotSupportOperator);
+                return Err(RuntimeErr::TypeMismatch(format!(
+                    "Expect Series, but get {:?}",
+                    item_val.get_type()
+                )));
             }
             let items: Box<Series<Float>> = Series::implicity_from(item_val).unwrap();
             let vec: Vec<Float> = (*items).into();
+            println!("vec, {:?}", vec);
+
             let s: String = vec
                 .into_iter()
                 .map(|v| match v {
@@ -69,8 +75,8 @@ fn datasrc_test() {
     let mut data = HashMap::new();
     data.insert(
         "close",
-        // vec![Some(1f64), Some(2f64), Some(3f64), Some(4f64), Some(5f64)],
-        vec![Some(1f64)],
+        vec![Some(1f64), Some(2f64), Some(3f64), Some(4f64), Some(5f64)],
+        // vec![Some(1f64)],
     );
 
     assert_eq!(datasrc.run(data), Ok(()));

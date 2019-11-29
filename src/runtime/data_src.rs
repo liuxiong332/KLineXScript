@@ -1,6 +1,6 @@
 use super::context::{Context, ContextType, Ctx, Runner};
 use crate::ast::stat_expr_types::Block;
-use crate::types::{Float, PineFrom, PineType, RuntimetErr, Series};
+use crate::types::{Float, PineFrom, PineType, RuntimeErr, Series};
 use std::collections::HashMap;
 
 pub trait Callback {
@@ -13,14 +13,14 @@ pub struct DataSrc<'a, 'b> {
     pub callback: &'a dyn Callback,
 }
 
-fn get_len(data: &HashMap<&'static str, Vec<Float>>) -> Result<usize, RuntimetErr> {
+fn get_len(data: &HashMap<&'static str, Vec<Float>>) -> Result<usize, RuntimeErr> {
     let lens: Vec<usize> = data.iter().map(|(_, v)| v.len()).collect();
     if lens.len() == 0 {
-        return Err(RuntimetErr::NotValidParam);
+        return Err(RuntimeErr::NotValidParam);
     }
     for l in &lens[1..] {
         if *l != lens[0] {
-            return Err(RuntimetErr::NotValidParam);
+            return Err(RuntimeErr::NotValidParam);
         }
     }
     Ok(lens[0])
@@ -47,7 +47,7 @@ impl<'a, 'b> DataSrc<'a, 'b> {
         &mut self,
         data: HashMap<&'static str, Vec<Float>>,
         len: usize,
-    ) -> Result<(), RuntimetErr> {
+    ) -> Result<(), RuntimeErr> {
         for i in 0..len {
             // Extract data into context
             for (k, v) in data.iter() {
@@ -64,7 +64,7 @@ impl<'a, 'b> DataSrc<'a, 'b> {
         Ok(())
     }
 
-    pub fn run(&mut self, data: HashMap<&'static str, Vec<Float>>) -> Result<(), RuntimetErr> {
+    pub fn run(&mut self, data: HashMap<&'static str, Vec<Float>>) -> Result<(), RuntimeErr> {
         let len = get_len(&data)?;
 
         // Create variable from the hash map
@@ -75,7 +75,7 @@ impl<'a, 'b> DataSrc<'a, 'b> {
         self.run_data(data, len)
     }
 
-    pub fn update(&mut self, data: HashMap<&'static str, Vec<Float>>) -> Result<(), RuntimetErr> {
+    pub fn update(&mut self, data: HashMap<&'static str, Vec<Float>>) -> Result<(), RuntimeErr> {
         let len = get_len(&data)?;
         self.context.roll_back()?;
         self.run_data(data, len)

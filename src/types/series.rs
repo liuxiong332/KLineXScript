@@ -1,7 +1,6 @@
 use super::downcast::downcast;
-use super::traits::{
-    Arithmetic, RuntimetErr, DataType, PineFrom, PineStaticType, PineType, SecondType,
-};
+use super::error::RuntimeErr;
+use super::traits::{Arithmetic, DataType, PineFrom, PineStaticType, PineType, SecondType};
 use std::cmp::{Ordering, PartialEq, PartialOrd};
 use std::convert::{From, Into};
 use std::marker::PhantomData;
@@ -51,7 +50,7 @@ impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> Series<'a, D> 
         }
     }
 
-    pub fn index(&self, i: usize) -> Result<Series<'a, D>, RuntimetErr> {
+    pub fn index(&self, i: usize) -> Result<Series<'a, D>, RuntimeErr> {
         let len = self.history.len();
         let val = match i {
             // m if m < 0 => Err(SeriesErr::Negative),
@@ -96,11 +95,11 @@ impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> PineType<'a> f
 impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> PineFrom<'a, Series<'a, D>>
     for Series<'a, D>
 {
-    fn explicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Series<'a, D>>, RuntimetErr> {
+    fn explicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Series<'a, D>>, RuntimeErr> {
         Self::implicity_from(t)
     }
 
-    fn implicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Series<'a, D>>, RuntimetErr> {
+    fn implicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Series<'a, D>>, RuntimeErr> {
         let data_type = <D as PineStaticType>::static_type().0;
         match t.get_type() {
             (d, SecondType::Series) if data_type == d => Ok(downcast::<Series<D>>(t).unwrap()),
@@ -110,7 +109,7 @@ impl<'a, D: Default + PineStaticType + PineType<'a> + Clone + 'a> PineFrom<'a, S
                 phantom: PhantomData,
                 na_val: D::default(),
             })),
-            _ => Err(RuntimetErr::NotCompatible),
+            _ => Err(RuntimeErr::NotCompatible),
         }
     }
 }

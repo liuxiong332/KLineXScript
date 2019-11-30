@@ -4,10 +4,22 @@ use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
 // PineRef contain the pointer to pine type object.
-#[derive(PartialEq, Debug)]
+#[derive(Debug)]
 pub enum PineRef<'a> {
     Box(Box<dyn PineType<'a> + 'a>),
     Rc(Rc<RefCell<dyn PineType<'a> + 'a>>),
+}
+
+impl<'a> PartialEq for PineRef<'a> {
+    fn eq(&self, other: &PineRef<'a>) -> bool {
+        match (self, other) {
+            (PineRef::Box(ref item1), PineRef::Box(ref item2)) => PartialEq::eq(item1, item2),
+            (PineRef::Rc(ref item1), PineRef::Rc(ref item2)) => {
+                PartialEq::eq(&*item1.borrow(), &*item2.borrow())
+            }
+            _ => false,
+        }
+    }
 }
 
 impl<'a> PineRef<'a> {

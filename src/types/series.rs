@@ -13,7 +13,7 @@ use std::mem;
 
 #[derive(Debug, Clone)]
 pub struct Series<'a, D: Clone + Debug + 'a> {
-    pub current: D,
+    current: D,
     history: Vec<D>,
     phantom: PhantomData<&'a D>,
     na_val: D,
@@ -77,6 +77,14 @@ impl<'a, D: Default + PineType<'a> + Clone + Debug + 'a> Series<'a, D> {
 
     pub fn roll_back(&mut self) {
         self.history.pop().unwrap();
+    }
+
+    pub fn get_current(&self) -> D {
+        self.current.clone()
+    }
+
+    pub fn get_history(&self) -> &Vec<D> {
+        &self.history
     }
 }
 

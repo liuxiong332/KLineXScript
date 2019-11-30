@@ -100,7 +100,7 @@ impl<'a> PineFrom<'a, Int> for Int {
             (DataType::Int, SecondType::Simple) => Ok(downcast_pf::<Int>(t).unwrap()),
             (DataType::Int, SecondType::Series) => {
                 let s = downcast_pf::<Series<Int>>(t).unwrap();
-                Ok(RefData::new_box(s.current))
+                Ok(RefData::new_box(s.get_current()))
             }
             (DataType::NA, SecondType::Simple) => {
                 let i: Int = None;
@@ -195,7 +195,7 @@ impl<'a> PineFrom<'a, Float> for Float {
             (DataType::Float, SecondType::Simple) => Ok(downcast_pf::<Float>(t).unwrap()),
             (DataType::Float, SecondType::Series) => {
                 let s = downcast_pf::<Series<Float>>(t).unwrap();
-                Ok(RefData::new_box(s.current))
+                Ok(RefData::new_box(s.get_current()))
             }
             (DataType::NA, SecondType::Simple) => {
                 let i: Float = None;
@@ -207,7 +207,7 @@ impl<'a> PineFrom<'a, Float> for Float {
             }
             (DataType::Int, SecondType::Series) => {
                 let s = downcast_pf::<Series<Int>>(t).unwrap();
-                Ok(RefData::new_box(int2float(s.current)))
+                Ok(RefData::new_box(int2float(s.get_current())))
             }
             _ => Err(RuntimeErr::NotCompatible),
         }
@@ -243,7 +243,7 @@ impl<'a> PineFrom<'a, Bool> for Bool {
             (DataType::Bool, SecondType::Simple) => Ok(downcast_pf::<Bool>(t).unwrap()),
             (DataType::Bool, SecondType::Series) => {
                 let s = downcast_pf::<Series<Bool>>(t).unwrap();
-                Ok(RefData::new_box(s.current))
+                Ok(RefData::new_box(s.get_current()))
             }
             (DataType::NA, SecondType::Simple) => {
                 let i: Bool = false;
@@ -399,9 +399,15 @@ impl<'a> PineFrom<'a, String> for String {
 
 impl ComplexType for String {}
 
-#[derive(PartialEq, Debug)]
+#[derive(Debug)]
 pub struct Object<'a> {
     obj: Box<dyn PineClass<'a> + 'a>,
+}
+
+impl<'a> PartialEq for Object<'a> {
+    fn eq(&self, other: &Object<'a>) -> bool {
+        PartialEq::eq(&*self.obj, &*other.obj)
+    }
 }
 
 impl<'a> PineStaticType for Object<'a> {

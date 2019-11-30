@@ -71,8 +71,8 @@ pub fn binary_op_run<'a, 'b>(
                 return Ok(PineRef::new_box(false));
             }
             let val2 = exp2.rv_run(context)?;
-            // let bval2 = Bool::implicity_from(val2)?;
-            Ok(val2)
+            let bval2 = Bool::implicity_from(val2)?;
+            Ok(bval2.into_pf())
         }
         BinaryOp::BoolOr => {
             let val1 = exp1.rv_run(context)?;
@@ -81,8 +81,8 @@ pub fn binary_op_run<'a, 'b>(
                 return Ok(PineRef::new_box(true));
             }
             let val2 = exp2.rv_run(context)?;
-            // let bval2 = Bool::implicity_from(val2)?;
-            Ok(val2)
+            let bval2 = Bool::implicity_from(val2)?;
+            Ok(bval2.into_pf())
         }
         _ => {
             let val1 = exp1.rv_run(context)?;

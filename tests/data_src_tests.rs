@@ -4,8 +4,8 @@ use pine::runtime::{
     data_src::{Callback, DataSrc},
 };
 use pine::types::{
-    Callable, DataType, Float, PineFrom, PineType, RuntimeErr, SecondType, Series,
-    SeriesToArrayCall, NA,
+    Callable, DataType, Float, PineFrom, PineRef, PineType, RefData, RuntimeErr, SecondType,
+    Series, SeriesToArrayCall, NA,
 };
 use std::collections::HashMap;
 
@@ -19,8 +19,8 @@ print(ma)
 
 fn pine_print<'a>(
     context: &mut dyn Ctx<'a>,
-    mut param: HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
-) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
+    mut param: HashMap<&'a str, PineRef<'a>>,
+) -> Result<PineRef<'a>, RuntimeErr> {
     println!("pine print Series run, {:?}", param.get("item"));
     match param.remove("item") {
         None => Err(RuntimeErr::NotSupportOperator),
@@ -31,12 +31,12 @@ fn pine_print<'a>(
                     item_val.get_type()
                 )));
             }
-            let items: Box<Series<Float>> = Series::implicity_from(item_val).unwrap();
-            let vec: Vec<Float> = (*items).into();
-            println!("vec, {:?}", vec);
+            let items: RefData<Series<Float>> = Series::implicity_from(item_val).unwrap();
+            println!("vec, {:?}", items);
 
-            let s: String = vec
-                .into_iter()
+            let s: String = items
+                .get_history()
+                .iter()
                 .map(|v| match v {
                     None => String::from("na"),
                     Some(f) => f.to_string(),
@@ -44,7 +44,7 @@ fn pine_print<'a>(
                 .collect::<Vec<String>>()
                 .join(",");
             context.get_callback().unwrap().print(s);
-            Ok(Box::new(NA))
+            Ok(PineRef::new(NA))
         }
     }
 }
@@ -54,7 +54,7 @@ fn datasrc_test() {
     struct MyCallback;
     impl Callback for MyCallback {
         fn print(&self, _str: String) {
-            assert_eq!(_str, String::from("na,na,na,na,3"));
+            assert_eq!(_str, String::from("na,na,na,na,15"));
         }
     }
 
@@ -63,11 +63,11 @@ fn datasrc_test() {
     let mut inner_vars = HashMap::new();
     inner_vars.insert(
         "print",
-        Box::new(Callable::new(
+        PineRef::new(Callable::new(
             None,
             Some(Box::new(SeriesToArrayCall::new(pine_print))),
             vec!["item"],
-        )) as Box<dyn PineType>,
+        )),
     );
 
     let mut datasrc = DataSrc::new(&ma_block, inner_vars, &MyCallback);

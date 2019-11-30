@@ -60,7 +60,7 @@ where
     D: Default + PartialEq + PineStaticType + PineType<'a> + Clone + Debug + 'a,
 {
     let mut series: RefData<Series<D>> = Series::implicity_from(val).unwrap();
-    // series.commit();
+    series.commit();
     series.into_pf()
 }
 
@@ -69,7 +69,7 @@ where
     D: Default + PartialEq + PineStaticType + PineType<'a> + Clone + Debug + 'a,
 {
     let mut series: RefData<Series<D>> = Series::implicity_from(val).unwrap();
-    // series.roll_back();
+    series.roll_back();
     series.into_pf()
 }
 

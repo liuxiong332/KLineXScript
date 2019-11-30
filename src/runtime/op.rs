@@ -113,7 +113,7 @@ pub fn binary_op_run<'a, 'b>(
                     Ok(bi_operate(op, d1, d2))
                 }
                 (BinaryOp::Plus, (FirstType::String, SecondType::Simple), _)
-                | (_, _, (FirstType::String, SecondType::Simple)) => Ok(PineRef::new(
+                | (_, _, (FirstType::String, SecondType::Simple)) => Ok(PineRef::new_rc(
                     String::implicity_from(val1)?.into_inner()
                         + &(String::implicity_from(val2)?.into_inner()),
                 )),

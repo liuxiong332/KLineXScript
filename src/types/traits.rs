@@ -1,8 +1,8 @@
 use super::downcast::downcast_ref;
 use super::error::RuntimeErr;
-use std::convert::AsRef;
+use super::pine_ref::PineRef;
+use super::ref_data::RefData;
 use std::fmt;
-use std::rc::Rc;
 
 #[derive(Debug, PartialEq)]
 pub enum SecondType {
@@ -28,6 +28,12 @@ pub enum DataType {
     Object,
 }
 
+#[derive(Debug, PartialEq)]
+pub enum Category {
+    Simple,
+    Complex,
+}
+
 pub trait PineStaticType {
     fn static_type() -> (DataType, SecondType);
 }
@@ -39,59 +45,49 @@ pub trait PineType<'a> {
     // }
     fn get_type(&self) -> (DataType, SecondType);
 
+    fn category(&self) -> Category {
+        Category::Simple
+    }
+
     fn copy(&self) -> PineRef<'a>;
 }
 
-pub enum PineRef<'a> {
-    Box(Box<dyn PineType<'a> + 'a>),
-    Rc(Rc<dyn PineType<'a> + 'a>),
-}
-
-impl<'a> PineType<'a> for PineRef<'a> {
-    fn get_type(&self) -> (DataType, SecondType) {
-        match *self {
-            PineRef::Box(ref item) => item.get_type(),
-            PineRef::Rc(ref item) => item.get_type(),
-        }
-    }
-
-    fn copy(&self) -> PineRef<'a> {
-        match *self {
-            PineRef::Box(ref item) => item.copy(),
-            PineRef::Rc(ref item) => PineRef::Rc(Rc::clone(item)),
-        }
-    }
-}
-
-impl<'a> fmt::Debug for &(dyn PineType<'a> + 'a) {
+impl<'a> fmt::Debug for dyn PineType<'a> + 'a {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use super::{Float, Int, Series};
 
         match self.get_type() {
-            (DataType::Int, SecondType::Simple) => downcast_ref::<Int>(*self).unwrap().fmt(f),
-            (DataType::Float, SecondType::Simple) => downcast_ref::<Float>(*self).unwrap().fmt(f),
+            (DataType::Int, SecondType::Simple) => downcast_ref::<Int>(self).unwrap().fmt(f),
+            (DataType::Float, SecondType::Simple) => downcast_ref::<Float>(self).unwrap().fmt(f),
             (DataType::Int, SecondType::Series) => {
-                downcast_ref::<Series<Int>>(*self).unwrap().fmt(f)
+                downcast_ref::<Series<Int>>(self).unwrap().fmt(f)
             }
             (DataType::Float, SecondType::Series) => {
-                downcast_ref::<Series<Float>>(*self).unwrap().fmt(f)
+                downcast_ref::<Series<Float>>(self).unwrap().fmt(f)
             }
             _ => write!(f, "Unkown type"),
         }
     }
 }
 
-impl<'a> fmt::Debug for PineRef<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            PineRef::Box(ref item) => {
-                let self_ref = &**item;
-                self_ref.fmt(f)
-            }
-            PineRef::Rc(ref item) => {
-                let self_ref = &**item;
-                self_ref.fmt(f)
-            }
+impl<'a> PartialEq for dyn PineType<'a> + 'a {
+    fn eq(&self, other: &(dyn PineType<'a> + 'a)) -> bool {
+        use super::{Float, Int, Series};
+
+        match self.get_type() {
+            (DataType::Int, SecondType::Simple) => downcast_ref::<Int>(self)
+                .unwrap()
+                .eq(downcast_ref::<Int>(other).unwrap()),
+            (DataType::Float, SecondType::Simple) => downcast_ref::<Float>(self)
+                .unwrap()
+                .eq(downcast_ref::<Float>(other).unwrap()),
+            (DataType::Int, SecondType::Series) => downcast_ref::<Series<Int>>(self)
+                .unwrap()
+                .eq(downcast_ref::<Series<Int>>(other).unwrap()),
+            (DataType::Float, SecondType::Series) => downcast_ref::<Series<Float>>(self)
+                .unwrap()
+                .eq(downcast_ref::<Series<Float>>(other).unwrap()),
+            _ => false,
         }
     }
 }
@@ -99,23 +95,39 @@ impl<'a> fmt::Debug for PineRef<'a> {
 pub trait PineClass<'a> {
     fn custom_type(&self) -> &str;
 
-    fn get(&self, name: &str) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr>;
+    fn get(&self, name: &str) -> Result<PineRef<'a>, RuntimeErr>;
 
-    fn set(&self, _name: &str, _property: Box<dyn PineType<'a> + 'a>) -> Result<(), RuntimeErr> {
+    fn set(&self, _name: &str, _property: PineRef<'a>) -> Result<(), RuntimeErr> {
         Err(RuntimeErr::NotSupportOperator)
     }
 
-    fn copy(&self) -> Box<dyn PineType<'a> + 'a>;
+    fn copy(&self) -> PineRef<'a>;
 }
 
-pub trait PineFrom<'a, D: 'a> {
+impl<'a> fmt::Debug for dyn PineClass<'a> + 'a {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Pine Class {}", self.custom_type())
+    }
+}
+
+impl<'a> PartialEq for dyn PineClass<'a> + 'a {
+    fn eq(&self, other: &(dyn PineClass<'a> + 'a)) -> bool {
+        if self.custom_type() == other.custom_type() {
+            true
+        } else {
+            false
+        }
+    }
+}
+
+pub trait PineFrom<'a, D: 'a + PartialEq + fmt::Debug> {
     // The user force type cast
-    fn explicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<D>, RuntimeErr> {
+    fn explicity_from(t: PineRef<'a>) -> Result<RefData<D>, RuntimeErr> {
         Self::implicity_from(t)
     }
 
     // Create this type from the source type for auto cast
-    fn implicity_from(_t: Box<dyn PineType<'a> + 'a>) -> Result<Box<D>, RuntimeErr> {
+    fn implicity_from(_t: PineRef<'a>) -> Result<RefData<D>, RuntimeErr> {
         Err(RuntimeErr::NotCompatible)
     }
 }
@@ -135,3 +147,7 @@ pub trait Arithmetic {
 
     fn rem(self, other: Self) -> Self;
 }
+
+pub trait SimpleType {}
+
+pub trait ComplexType {}

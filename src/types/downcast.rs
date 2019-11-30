@@ -1,4 +1,16 @@
-use super::{PineStaticType, PineType, RuntimeErr};
+use super::{PineRef, PineStaticType, PineType, RefData, RuntimeErr};
+use std::cell::RefCell;
+use std::fmt::Debug;
+use std::rc::Rc;
+pub fn downcast_pf<'a, T>(item: PineRef<'a>) -> Result<RefData<T>, RuntimeErr>
+where
+    T: PineStaticType + PartialEq + Debug + 'a,
+{
+    match item {
+        PineRef::Box(item) => Ok(RefData::Box(downcast::<'a, T>(item)?)),
+        PineRef::Rc(item) => Ok(RefData::Rc(downcast_rc::<'a, T>(item)?)),
+    }
+}
 
 pub fn downcast<'a, T: PineStaticType + 'a>(
     item: Box<dyn PineType<'a> + 'a>,
@@ -7,6 +19,19 @@ pub fn downcast<'a, T: PineStaticType + 'a>(
         unsafe {
             let raw: *mut dyn PineType<'a> = Box::into_raw(item);
             Ok(Box::from_raw(raw as *mut T))
+        }
+    } else {
+        Err(RuntimeErr::NotCompatible)
+    }
+}
+
+pub fn downcast_rc<'a, T: PineStaticType + 'a>(
+    item: Rc<RefCell<dyn PineType<'a> + 'a>>,
+) -> Result<Rc<RefCell<T>>, RuntimeErr> {
+    if T::static_type() == item.borrow().get_type() {
+        unsafe {
+            let raw: *const RefCell<dyn PineType<'a> + 'a> = Rc::into_raw(item);
+            Ok(Rc::from_raw(raw as *const RefCell<T>))
         }
     } else {
         Err(RuntimeErr::NotCompatible)

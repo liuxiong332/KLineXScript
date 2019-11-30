@@ -1,4 +1,7 @@
-use super::{DataType, PineFrom, PineRef, PineStaticType, PineType, RuntimeErr, SecondType, NA};
+use super::{
+    Category, ComplexType, DataType, PineFrom, PineRef, PineStaticType, PineType, RuntimeErr,
+    SecondType, NA,
+};
 use crate::runtime::context::Ctx;
 use std::cell::Cell;
 use std::collections::HashMap;
@@ -139,11 +142,23 @@ impl<'a> PineType<'a> for Callable<'a> {
         <Self as PineStaticType>::static_type()
     }
 
+    fn category(&self) -> Category {
+        Category::Complex
+    }
+
     fn copy(&self) -> PineRef<'a> {
         PineRef::Box(Box::new(self.clone()))
     }
 }
 impl<'a> PineFrom<'a, Callable<'a>> for Callable<'a> {}
+
+impl<'a> PartialEq for Callable<'a> {
+    fn eq(&self, other: &Callable<'a>) -> bool {
+        self.param_names == other.param_names
+    }
+}
+
+impl<'a> ComplexType for Callable<'a> {}
 
 impl<'a> Callable<'a> {
     pub fn new(

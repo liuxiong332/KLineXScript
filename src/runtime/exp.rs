@@ -6,27 +6,27 @@ pub use crate::ast::stat_expr_types::{
     Condition, DataType, Exp, FunctionCall, PrefixExp, RefCall, Statement, TypeCast,
 };
 use crate::types::{
-    downcast, Bool, Color, DataType as FirstType, Float, Int, Object, PineFrom, PineStaticType,
-    PineType, PineVar, RuntimeErr, SecondType, Series, Tuple, NA,
+    downcast_pf, Bool, Color, DataType as FirstType, Float, Int, Object, PineFrom, PineRef,
+    PineStaticType, PineType, PineVar, RefData, RuntimeErr, SecondType, Series, Tuple, NA,
 };
 use std::fmt::Debug;
 
 impl<'a> Runner<'a> for Exp<'a> {
-    fn run(&'a self, _context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
+    fn run(&'a self, _context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
         match *self {
-            Exp::Na => Ok(Box::new(NA)),
-            Exp::Bool(b) => Ok(Box::new(b)),
-            Exp::Num(Numeral::Float(f)) => Ok(Box::new(Some(f))),
-            Exp::Num(Numeral::Int(n)) => Ok(Box::new(Some(n))),
-            Exp::Str(ref s) => Ok(Box::new(String::from(s))),
-            Exp::Color(s) => Ok(Box::new(Color(s))),
-            Exp::VarName(VarName(s)) => Ok(Box::new(PineVar(s))),
+            Exp::Na => Ok(PineRef::new_box(NA)),
+            Exp::Bool(b) => Ok(PineRef::new_box(b)),
+            Exp::Num(Numeral::Float(f)) => Ok(PineRef::new_box(Some(f))),
+            Exp::Num(Numeral::Int(n)) => Ok(PineRef::new_box(Some(n))),
+            Exp::Str(ref s) => Ok(PineRef::new_rc(String::from(s))),
+            Exp::Color(s) => Ok(PineRef::new_box(Color(s))),
+            Exp::VarName(VarName(s)) => Ok(PineRef::new_box(PineVar(s))),
             Exp::Tuple(ref tuple) => {
-                let mut col: Vec<Box<dyn PineType<'a> + 'a>> = vec![];
+                let mut col: Vec<PineRef<'a>> = vec![];
                 for exp in tuple.iter() {
                     col.push(exp.run(_context)?)
                 }
-                Ok(Box::new(Tuple(col)))
+                Ok(PineRef::new_box(Tuple(col)))
             }
             Exp::TypeCast(ref type_cast) => type_cast.run(_context),
             Exp::FuncCall(ref func_call) => func_call.run(_context),
@@ -42,10 +42,7 @@ impl<'a> Runner<'a> for Exp<'a> {
 }
 
 impl<'a> RVRunner<'a> for Exp<'a> {
-    fn rv_run(
-        &'a self,
-        context: &mut dyn Ctx<'a>,
-    ) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
+    fn rv_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
         match *self {
             Exp::VarName(VarName(name)) => match context.move_var(name) {
                 None => Err(RuntimeErr::VarNotFound),
@@ -56,11 +53,11 @@ impl<'a> RVRunner<'a> for Exp<'a> {
                 }
             },
             Exp::Tuple(ref tuple) => {
-                let mut col: Vec<Box<dyn PineType<'a> + 'a>> = vec![];
+                let mut col: Vec<PineRef<'a>> = vec![];
                 for exp in tuple.iter() {
                     col.push(exp.rv_run(context)?)
                 }
-                Ok(Box::new(Tuple(col)))
+                Ok(PineRef::new_box(Tuple(col)))
             }
             _ => self.run(context),
         }
@@ -68,21 +65,21 @@ impl<'a> RVRunner<'a> for Exp<'a> {
 }
 
 impl<'a> Runner<'a> for TypeCast<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
         let result = self.exp.rv_run(context)?;
         match self.data_type {
-            DataType::Bool => Ok(Bool::explicity_from(result)?),
-            DataType::Int => Ok(Int::explicity_from(result)?),
-            DataType::Float => Ok(Float::explicity_from(result)?),
-            DataType::Color => Ok(Color::explicity_from(result)?),
-            DataType::String => Ok(String::explicity_from(result)?),
+            DataType::Bool => Ok(Bool::explicity_from(result)?.into_pf()),
+            DataType::Int => Ok(Int::explicity_from(result)?.into_pf()),
+            DataType::Float => Ok(Float::explicity_from(result)?.into_pf()),
+            DataType::Color => Ok(Color::explicity_from(result)?.into_pf()),
+            DataType::String => Ok(String::explicity_from(result)?.into_pf()),
             _ => Err(RuntimeErr::NotCompatible),
         }
     }
 }
 
 impl<'a> Runner<'a> for PrefixExp<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
         let varname = self.var_chain[0].0;
         let var = context.move_var(varname);
         if var.is_none() {
@@ -95,40 +92,43 @@ impl<'a> Runner<'a> for PrefixExp<'a> {
                 var_unwrap.get_type().0
             )));
         }
-        let object = downcast::<Object>(var_unwrap)?;
+        let object = downcast_pf::<Object>(var_unwrap)?;
         let mut subobj = object.get(self.var_chain[1].0)?;
         for name in self.var_chain[2..].iter() {
             match subobj.get_type() {
                 (FirstType::Object, SecondType::Simple) => {
-                    let obj = downcast::<Object>(subobj).unwrap();
+                    let obj = downcast_pf::<Object>(subobj).unwrap();
                     subobj = obj.get(name.0)?;
                 }
                 _ => return Err(RuntimeErr::NotSupportOperator),
             }
         }
-        context.update_var(varname, object);
+        context.update_var(varname, object.into_pf());
         Ok(subobj)
     }
 }
 
 impl<'a> Runner<'a> for Condition<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
         let cond = self.cond.rv_run(context)?;
         let bool_val = Bool::implicity_from(cond)?;
-        match *downcast::<Bool>(bool_val).unwrap() {
+        match *bool_val {
             true => self.exp1.rv_run(context),
             false => self.exp2.rv_run(context),
         }
     }
 }
 
-fn get_slice<'a, D: Default + PineType<'a> + PineStaticType + Debug + 'a + Clone>(
+fn get_slice<'a, D>(
     context: &mut dyn Ctx<'a>,
     name: &'a str,
-    obj: Box<dyn PineType<'a> + 'a>,
-    arg: Box<dyn PineType<'a> + 'a>,
-) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
-    let s: Box<Series<D>> = Series::implicity_from(obj)?;
+    obj: PineRef<'a>,
+    arg: PineRef<'a>,
+) -> Result<PineRef<'a>, RuntimeErr>
+where
+    D: Default + PineType<'a> + PineStaticType + PartialEq + Debug + 'a + Clone,
+{
+    let s: RefData<Series<D>> = Series::implicity_from(obj)?;
     let arg_type = arg.get_type();
     let i = Int::implicity_from(arg)?;
     match *i {
@@ -137,21 +137,21 @@ fn get_slice<'a, D: Default + PineType<'a> + PineStaticType + Debug + 'a + Clone
             arg_type.1, arg_type.0
         ))),
         Some(i) => {
-            let res = Box::new(s.index(i as usize)?);
-            context.update_var(name, s);
+            let res = PineRef::new_rc(s.index(i as usize)?);
+            context.update_var(name, s.into_pf());
             Ok(res)
         }
     }
 }
 
 impl<'a> Runner<'a> for RefCall<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
         let name = self.name.run(context)?;
         let arg = self.arg.run(context)?;
         if name.get_type() != (FirstType::PineVar, SecondType::Simple) {
             return Err(RuntimeErr::NotSupportOperator);
         }
-        let varname = downcast::<PineVar>(name).unwrap().0;
+        let varname = downcast_pf::<PineVar>(name).unwrap().0;
         let var_opt = context.move_var(varname);
         if var_opt.is_none() {
             return Err(RuntimeErr::NotSupportOperator);
@@ -184,16 +184,16 @@ mod tests {
                 "Custom A"
             }
 
-            fn get(&self, name: &str) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
+            fn get(&self, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
                 match name {
-                    "int" => Ok(Box::new(Some(1i32))),
-                    "object" => Ok(Box::new(Object::new(Box::new(A)))),
+                    "int" => Ok(PineRef::new_box(Some(1i32))),
+                    "object" => Ok(PineRef::new_rc(Object::new(Box::new(A)))),
                     _ => Err(RuntimeErr::NotSupportOperator),
                 }
             }
 
-            fn copy(&self) -> Box<dyn PineType<'a> + 'a> {
-                Box::new(Object::new(Box::new(A)))
+            fn copy(&self) -> PineRef<'a> {
+                PineRef::new_rc(Object::new(Box::new(A)))
             }
         }
 
@@ -202,11 +202,11 @@ mod tests {
         };
 
         let mut context = Context::new(None, ContextType::Normal);
-        context.create_var("obja", Box::new(Object::new(Box::new(A))));
+        context.create_var("obja", PineRef::new_rc(Object::new(Box::new(A))));
 
         assert_eq!(
-            downcast::<Int>(exp.run(&mut context).unwrap()),
-            Ok(Box::new(Some(1)))
+            downcast_pf::<Int>(exp.run(&mut context).unwrap()),
+            Ok(RefData::new_box(Some(1)))
         );
         // Context::new()
     }
@@ -220,8 +220,8 @@ mod tests {
         };
         let mut context = Context::new(None, ContextType::Normal);
         assert_eq!(
-            downcast::<Int>(cond_exp.run(&mut context).unwrap()),
-            Ok(Box::new(Some(1)))
+            downcast_pf::<Int>(cond_exp.run(&mut context).unwrap()),
+            Ok(RefData::new_box(Some(1)))
         );
     }
 
@@ -233,13 +233,13 @@ mod tests {
             exp2: Exp::VarName(VarName("exp2")),
         };
         let mut context = Context::new(None, ContextType::Normal);
-        context.create_var("cond", Box::new(true));
-        context.create_var("exp1", Box::new(Some(1)));
-        context.create_var("exp2", Box::new(Some(2)));
+        context.create_var("cond", PineRef::new_box(true));
+        context.create_var("exp1", PineRef::new_box(Some(1)));
+        context.create_var("exp2", PineRef::new_box(Some(2)));
 
         assert_eq!(
-            downcast::<Int>(cond_exp.run(&mut context).unwrap()),
-            Ok(Box::new(Some(1)))
+            downcast_pf::<Int>(cond_exp.run(&mut context).unwrap()),
+            Ok(RefData::new_box(Some(1)))
         );
     }
 
@@ -254,11 +254,11 @@ mod tests {
         let mut series: Series<Int> = Series::from(Some(1));
         series.commit();
         series.update(Some(2));
-        context.create_var("hello", Box::new(series));
+        context.create_var("hello", PineRef::new_rc(series));
 
         assert_eq!(
-            downcast::<Series<Int>>(exp.run(&mut context).unwrap()),
-            Ok(Box::new(Series::from(Some(1))))
+            downcast_pf::<Series<Int>>(exp.run(&mut context).unwrap()),
+            Ok(RefData::new_rc(Series::from(Some(1))))
         );
     }
 
@@ -266,21 +266,24 @@ mod tests {
     fn var_rv_test() {
         let exp = Exp::VarName(VarName("hello"));
         let mut context = Context::new(None, ContextType::Normal);
-        context.create_var("hello", Box::new(Some(1)));
+        context.create_var("hello", PineRef::new_box(Some(1)));
 
         assert_eq!(
-            downcast::<Int>(exp.rv_run(&mut context).unwrap()),
-            Ok(Box::new(Some(1)))
+            downcast_pf::<Int>(exp.rv_run(&mut context).unwrap()),
+            Ok(RefData::new_box(Some(1)))
         );
     }
 
     #[test]
     fn simple_exp_test() {
-        fn simple_exp<'a, D: PineStaticType + PartialEq + Debug>(exp: Exp<'a>, v: D) {
+        fn simple_exp<'a, D>(exp: Exp<'a>, v: D)
+        where
+            D: PineStaticType + PartialEq + Debug + PineType<'a> + 'a,
+        {
             let mut context = Context::new(None, ContextType::Normal);
             assert_eq!(
-                downcast::<D>(exp.run(&mut context).unwrap()),
-                Ok(Box::new(v))
+                downcast_pf::<D>(exp.run(&mut context).unwrap()),
+                Ok(RefData::new(v))
             );
         }
 
@@ -302,12 +305,15 @@ mod tests {
 
     #[test]
     fn simple_rv_exp_test() {
-        fn simple_exp<'a, D: PineStaticType + PartialEq + Debug>(exp: Exp<'a>, v: D) {
+        fn simple_exp<'a, D>(exp: Exp<'a>, v: D)
+        where
+            D: PineStaticType + PartialEq + Debug + PineType<'a> + 'a,
+        {
             let mut context = Context::new(None, ContextType::Normal);
-            context.create_var("name", Box::new(Some(1)));
+            context.create_var("name", PineRef::new_box(Some(1)));
             assert_eq!(
-                downcast::<D>(exp.rv_run(&mut context).unwrap()),
-                Ok(Box::new(v))
+                downcast_pf::<D>(exp.rv_run(&mut context).unwrap()),
+                Ok(RefData::new(v))
             );
         }
 
@@ -332,27 +338,29 @@ mod tests {
         let exp = Exp::Tuple(Box::new(vec![Exp::VarName(VarName("name"))]));
         let mut context = Context::new(None, ContextType::Normal);
 
-        let tuple_res = downcast::<Tuple>(exp.run(&mut context).unwrap()).unwrap();
-        let vec_res: Vec<Box<PineVar>> = tuple_res
+        let tuple_res = downcast_pf::<Tuple>(exp.run(&mut context).unwrap()).unwrap();
+        let vec_res: Vec<RefData<PineVar>> = tuple_res
+            .into_inner()
             .0
             .into_iter()
-            .map(|s| downcast::<PineVar>(s).unwrap())
+            .map(|s| downcast_pf::<PineVar>(s).unwrap())
             .collect();
-        assert_eq!(vec_res, vec![Box::new(PineVar("name"))]);
+        assert_eq!(vec_res, vec![RefData::new_box(PineVar("name"))]);
     }
 
     #[test]
     fn rv_tuple_exp_test() {
         let exp = Exp::Tuple(Box::new(vec![Exp::VarName(VarName("name"))]));
         let mut context = Context::new(None, ContextType::Normal);
-        context.create_var("name", Box::new(Some(1)));
+        context.create_var("name", PineRef::new_box(Some(1)));
 
-        let tuple_res = downcast::<Tuple>(exp.rv_run(&mut context).unwrap()).unwrap();
-        let vec_res: Vec<Box<Int>> = tuple_res
+        let tuple_res = downcast_pf::<Tuple>(exp.rv_run(&mut context).unwrap()).unwrap();
+        let vec_res: Vec<RefData<Int>> = tuple_res
+            .into_inner()
             .0
             .into_iter()
-            .map(|s| downcast::<Int>(s).unwrap())
+            .map(|s| downcast_pf::<Int>(s).unwrap())
             .collect();
-        assert_eq!(vec_res, vec![Box::new(Some(1))]);
+        assert_eq!(vec_res, vec![RefData::new_box(Some(1))]);
     }
 }

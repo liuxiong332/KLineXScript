@@ -1,6 +1,9 @@
 use super::context::{Context, ContextType, Ctx, Runner};
 use crate::ast::stat_expr_types::FunctionDef;
-use crate::types::{DataType, PineFrom, PineStaticType, PineType, RuntimeErr, SecondType};
+use crate::types::{
+    Category, ComplexType, DataType, PineFrom, PineRef, PineStaticType, PineType, RuntimeErr,
+    SecondType,
+};
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -18,12 +21,18 @@ impl<'a> PineType<'a> for Function<'a> {
         <Self as PineStaticType>::static_type()
     }
 
-    fn copy(&self) -> Box<dyn PineType<'a> + 'a> {
-        Box::new(self.clone())
+    fn category(&self) -> Category {
+        Category::Complex
+    }
+
+    fn copy(&self) -> PineRef<'a> {
+        PineRef::new_rc(self.clone())
     }
 }
 
 impl<'a> PineFrom<'a, Function<'a>> for Function<'a> {}
+
+impl<'a> ComplexType for Function<'a> {}
 
 impl<'a> Function<'a> {
     pub fn new(def: &'a FunctionDef<'a>) -> Function<'a> {
@@ -33,14 +42,14 @@ impl<'a> Function<'a> {
     pub fn call(
         &self,
         context: &mut dyn Ctx<'a>,
-        pos_args: Vec<Box<dyn PineType<'a> + 'a>>,
-        dict_args: Vec<(&'a str, Box<dyn PineType<'a> + 'a>)>,
-    ) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
+        pos_args: Vec<PineRef<'a>>,
+        dict_args: Vec<(&'a str, PineRef<'a>)>,
+    ) -> Result<PineRef<'a>, RuntimeErr> {
         if pos_args.len() > self.def.params.len() {
             return Err(RuntimeErr::NotValidParam);
         }
 
-        let mut all_args: HashMap<&'a str, Box<dyn PineType<'a> + 'a>> = HashMap::new();
+        let mut all_args: HashMap<&'a str, PineRef<'a>> = HashMap::new();
         for (i, val) in pos_args.into_iter().enumerate() {
             let name = self.def.params[i].0;
             all_args.insert(name, val);

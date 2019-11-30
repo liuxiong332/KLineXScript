@@ -1,6 +1,6 @@
 use super::context::{Context, ContextType, Ctx, Runner};
 use crate::ast::stat_expr_types::Block;
-use crate::types::{Float, PineFrom, PineType, RuntimeErr, Series};
+use crate::types::{Float, PineFrom, PineRef, PineType, RefData, RuntimeErr, Series};
 use std::collections::HashMap;
 
 pub trait Callback {
@@ -29,7 +29,7 @@ fn get_len(data: &HashMap<&'static str, Vec<Float>>) -> Result<usize, RuntimeErr
 impl<'a, 'b> DataSrc<'a, 'b> {
     pub fn new(
         blk: &'a Block<'a>,
-        vars: HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
+        vars: HashMap<&'a str, PineRef<'a>>,
         callback: &'a dyn Callback,
     ) -> DataSrc<'a, 'b> {
         let mut context = Context::new_with_callback(callback);
@@ -52,9 +52,9 @@ impl<'a, 'b> DataSrc<'a, 'b> {
             // Extract data into context
             for (k, v) in data.iter() {
                 let series = self.context.move_var(k).unwrap();
-                let mut float_s: Box<Series<Float>> = Series::implicity_from(series).unwrap();
+                let mut float_s: RefData<Series<Float>> = Series::implicity_from(series).unwrap();
                 float_s.update(v[i]);
-                self.context.update_var(k, float_s);
+                self.context.update_var(k, float_s.into_pf());
             }
             self.blk.run(&mut self.context)?;
             self.context.commit();
@@ -70,7 +70,7 @@ impl<'a, 'b> DataSrc<'a, 'b> {
         // Create variable from the hash map
         for (k, _) in data.iter() {
             let s: Series<Float> = Series::new();
-            self.context.create_var(k, Box::new(s));
+            self.context.create_var(k, PineRef::new_rc(s));
         }
         self.run_data(data, len)
     }
@@ -111,10 +111,10 @@ mod tests {
         datasrc.context.map_var("hello", |hv| match hv {
             None => None,
             Some(v) => {
-                let ser: Box<Series<Float>> = Series::implicity_from(v).unwrap();
-                let expect_ser = Box::new(Series::from_vec(vec![Some(10f64), Some(100f64)]));
+                let ser: RefData<Series<Float>> = Series::implicity_from(v).unwrap();
+                let expect_ser = RefData::new_rc(Series::from_vec(vec![Some(10f64), Some(100f64)]));
                 assert_eq!(ser, expect_ser);
-                Some(ser)
+                Some(ser.into_pf())
             }
         });
     }

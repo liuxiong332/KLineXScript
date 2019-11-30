@@ -1,26 +1,22 @@
 use super::data_src::Callback;
 use crate::types::{
-    Bool, Callable, Color, DataType, Float, Int, PineFrom, PineStaticType, PineType, RuntimeErr,
-    SecondType, Series, NA,
+    Bool, Callable, Color, DataType, Float, Int, PineFrom, PineRef, PineStaticType, PineType,
+    RefData, RuntimeErr, SecondType, Series, NA,
 };
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::mem;
 
 pub trait Ctx<'a> {
-    fn create_var(
-        &mut self,
-        name: &'a str,
-        val: Box<dyn PineType<'a> + 'a>,
-    ) -> Option<Box<dyn PineType<'a> + 'a>>;
+    fn create_var(&mut self, name: &'a str, val: PineRef<'a>) -> Option<PineRef<'a>>;
 
-    fn update_var(&mut self, name: &'a str, val: Box<dyn PineType<'a> + 'a>);
+    fn update_var(&mut self, name: &'a str, val: PineRef<'a>);
 
-    fn move_var(&mut self, name: &'a str) -> Option<Box<dyn PineType<'a> + 'a>>;
+    fn move_var(&mut self, name: &'a str) -> Option<PineRef<'a>>;
 
     fn contains_var(&self, name: &'a str) -> bool;
 
-    fn create_callable(&mut self, call: Box<Callable<'a>>);
+    fn create_callable(&mut self, call: RefData<Callable<'a>>);
 
     fn create_declare(&mut self, name: &'a str);
 
@@ -49,30 +45,32 @@ pub struct Context<'a, 'b> {
     context_type: ContextType,
 
     // variable map that defined by user and library.
-    vars: HashMap<&'a str, Box<dyn PineType<'a> + 'a>>,
+    vars: HashMap<&'a str, PineRef<'a>>,
     // All the Series type variable name
     _series: Vec<&'a str>,
-    callables: Vec<Box<Callable<'a>>>,
+    callables: Vec<RefData<Callable<'a>>>,
     declare_vars: HashSet<&'a str>,
 
     callback: Option<&'a dyn Callback>,
     first_commit: bool,
 }
 
-fn commit_series<'a, D: Default + PineStaticType + PineType<'a> + Clone + Debug + 'a>(
-    val: Box<dyn PineType<'a> + 'a>,
-) -> Box<dyn PineType<'a> + 'a> {
-    let mut series: Box<Series<D>> = Series::implicity_from(val).unwrap();
-    series.commit();
-    series
+fn commit_series<'a, D>(val: PineRef<'a>) -> PineRef<'a>
+where
+    D: Default + PartialEq + PineStaticType + PineType<'a> + Clone + Debug + 'a,
+{
+    let mut series: RefData<Series<D>> = Series::implicity_from(val).unwrap();
+    // series.commit();
+    series.into_pf()
 }
 
-fn roll_back_series<'a, D: Default + PineStaticType + PineType<'a> + Clone + Debug + 'a>(
-    val: Box<dyn PineType<'a> + 'a>,
-) -> Box<dyn PineType<'a> + 'a> {
-    let mut series: Box<Series<D>> = Series::implicity_from(val).unwrap();
-    series.roll_back();
-    series
+fn roll_back_series<'a, D>(val: PineRef<'a>) -> PineRef<'a>
+where
+    D: Default + PartialEq + PineStaticType + PineType<'a> + Clone + Debug + 'a,
+{
+    let mut series: RefData<Series<D>> = Series::implicity_from(val).unwrap();
+    // series.roll_back();
+    series.into_pf()
 }
 
 impl<'a, 'b> Context<'a, 'b> {
@@ -104,7 +102,7 @@ impl<'a, 'b> Context<'a, 'b> {
 
     pub fn map_var<F>(&mut self, name: &'a str, f: F)
     where
-        F: Fn(Option<Box<dyn PineType<'a> + 'a>>) -> Option<Box<dyn PineType<'a> + 'a>>,
+        F: Fn(Option<PineRef<'a>>) -> Option<PineRef<'a>>,
     {
         // Find in  current context
         let val = self.vars.remove(name);
@@ -173,15 +171,11 @@ impl<'a, 'b> Context<'a, 'b> {
 }
 
 impl<'a, 'b> Ctx<'a> for Context<'a, 'b> {
-    fn create_var(
-        &mut self,
-        name: &'a str,
-        val: Box<dyn PineType<'a> + 'a>,
-    ) -> Option<Box<dyn PineType<'a> + 'a>> {
+    fn create_var(&mut self, name: &'a str, val: PineRef<'a>) -> Option<PineRef<'a>> {
         self.vars.insert(name, val)
     }
 
-    fn update_var(&mut self, name: &'a str, val: Box<dyn PineType<'a> + 'a>) {
+    fn update_var(&mut self, name: &'a str, val: PineRef<'a>) {
         if self.vars.contains_key(name) {
             self.vars.insert(name, val);
         } else if let Some(ref mut parent) = self.parent {
@@ -190,12 +184,12 @@ impl<'a, 'b> Ctx<'a> for Context<'a, 'b> {
     }
 
     // Move the value for the specific name from this context or the parent context.
-    fn move_var(&mut self, name: &'a str) -> Option<Box<dyn PineType<'a> + 'a>> {
+    fn move_var(&mut self, name: &'a str) -> Option<PineRef<'a>> {
         // Insert the temporary NA into the name and move the original value out.
         if self.vars.contains_key(name) {
-            self.vars.insert(name, Box::new(NA))
+            self.vars.insert(name, PineRef::new_box(NA))
         } else if let Some(ref mut parent) = self.parent {
-            parent.create_var(name, Box::new(NA))
+            parent.create_var(name, PineRef::new_box(NA))
         } else {
             None
         }
@@ -211,7 +205,7 @@ impl<'a, 'b> Ctx<'a> for Context<'a, 'b> {
         }
     }
 
-    fn create_callable(&mut self, call: Box<Callable<'a>>) {
+    fn create_callable(&mut self, call: RefData<Callable<'a>>) {
         if let Some(ref mut v) = self.parent {
             v.create_callable(call);
         } else if !self.first_commit {
@@ -241,15 +235,12 @@ impl<'a, 'b> Ctx<'a> for Context<'a, 'b> {
 }
 
 pub trait Runner<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr>;
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr>;
 }
 
 // Evaluate  the expression with right-value.
 pub trait RVRunner<'a> {
-    fn rv_run(
-        &'a self,
-        context: &mut dyn Ctx<'a>,
-    ) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr>;
+    fn rv_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr>;
 }
 
 pub trait StmtRunner<'a> {
@@ -270,23 +261,23 @@ mod tests {
         context1.clear_declare();
         assert!(!context1.contains_declare("hello"));
 
-        context1.create_var("hello", Box::new(Some(1)));
+        context1.create_var("hello", PineRef::new_box(Some(1)));
         assert_eq!(
             Int::implicity_from(context1.move_var("hello").unwrap()),
-            Ok(Box::new(Some(1)))
+            Ok(RefData::new_box(Some(1)))
         );
 
-        context1.update_var("hello", Box::new(Some(10)));
+        context1.update_var("hello", PineRef::new_box(Some(10)));
         assert_eq!(
             Int::implicity_from(context1.move_var("hello").unwrap()),
-            Ok(Box::new(Some(10)))
+            Ok(RefData::new_box(Some(10)))
         );
         assert!(context1.contains_var("hello"));
 
-        context1.map_var("hello", |_| Some(Box::new(Some(100)) as Box<dyn PineType>));
+        context1.map_var("hello", |_| Some(PineRef::new_box(Some(100))));
         assert_eq!(
             Int::implicity_from(context1.move_var("hello").unwrap()),
-            Ok(Box::new(Some(100)))
+            Ok(RefData::new_box(Some(100)))
         );
     }
 
@@ -294,23 +285,23 @@ mod tests {
     fn callable_context_test() {
         // Parent context create callable
         let mut context1 = Context::new(None, ContextType::Normal);
-        context1.create_callable(Box::new(Callable::new(None, None, vec![])));
+        context1.create_callable(RefData::new_rc(Callable::new(None, None, vec![])));
         assert_eq!(context1.callables.len(), 1);
 
         {
             // Child context create callable
             let mut context2 = Context::new(Some(&mut context1), ContextType::Normal);
-            context2.create_callable(Box::new(Callable::new(None, None, vec![])));
+            context2.create_callable(RefData::new_rc(Callable::new(None, None, vec![])));
         }
         assert_eq!(context1.callables.len(), 2);
 
         context1.commit();
 
         // After commit, parent context and child context should not add callable by create callable
-        context1.create_callable(Box::new(Callable::new(None, None, vec![])));
+        context1.create_callable(RefData::new_rc(Callable::new(None, None, vec![])));
         {
             let mut context2 = Context::new(Some(&mut context1), ContextType::Normal);
-            context2.create_callable(Box::new(Callable::new(None, None, vec![])));
+            context2.create_callable(RefData::new_rc(Callable::new(None, None, vec![])));
         }
         assert_eq!(context1.callables.len(), 2);
 
@@ -322,10 +313,10 @@ mod tests {
     #[test]
     fn derive_context_test() {
         let mut context1 = Context::new(None, ContextType::Normal);
-        context1.create_var("hello", Box::new(Some(1)));
+        context1.create_var("hello", PineRef::new_box(Some(1)));
 
         let mut context2 = Context::new(Some(&mut context1), ContextType::Normal);
-        context2.create_var("hello2", Box::new(Some(2)));
+        context2.create_var("hello2", PineRef::new_box(Some(2)));
 
         let mov_res = context2.move_var("hello").unwrap();
         context2.update_var("hello", mov_res);

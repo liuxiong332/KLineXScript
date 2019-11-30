@@ -1,9 +1,11 @@
-use super::downcast::downcast;
+use super::downcast::downcast_pf;
 use super::error::RuntimeErr;
+use super::pine_ref::PineRef;
+use super::ref_data::RefData;
 use super::series::Series;
 use super::traits::{
-    Arithmetic, DataType, Negative, PineClass, PineFrom, PineRef, PineStaticType, PineType,
-    SecondType,
+    Arithmetic, Category, ComplexType, DataType, Negative, PineClass, PineFrom, PineStaticType,
+    PineType, SecondType, SimpleType,
 };
 
 // pine int type
@@ -73,41 +75,43 @@ impl<'a> PineType<'a> for Int {
 
 impl<'a> PineFrom<'a, Int> for Int {
     // NA -> Int Float -> Int
-    fn explicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Int>, RuntimeErr> {
+    fn explicity_from(t: PineRef<'a>) -> Result<RefData<Int>, RuntimeErr> {
         match t.get_type() {
-            (DataType::Int, SecondType::Simple) => Ok(downcast::<Int>(t).unwrap()),
+            (DataType::Int, SecondType::Simple) => Ok(downcast_pf::<Int>(t).unwrap()),
             (DataType::NA, SecondType::Simple) => {
                 let i: Int = None;
-                Ok(Box::new(i))
+                Ok(RefData::new_box(i))
             }
             (DataType::Float, SecondType::Simple) => {
-                let f: Box<Float> = downcast::<Float>(t).unwrap();
+                let f: RefData<Float> = downcast_pf::<Float>(t).unwrap();
                 let i: Int = match *f {
                     Some(f) => Some(f as i32),
                     None => None,
                 };
-                Ok(Box::new(i))
+                Ok(RefData::new_box(i))
             }
             _ => Err(RuntimeErr::NotCompatible),
         }
     }
 
     // NA -> Int
-    fn implicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Int>, RuntimeErr> {
+    fn implicity_from(t: PineRef<'a>) -> Result<RefData<Int>, RuntimeErr> {
         match t.get_type() {
-            (DataType::Int, SecondType::Simple) => Ok(downcast::<Int>(t).unwrap()),
+            (DataType::Int, SecondType::Simple) => Ok(downcast_pf::<Int>(t).unwrap()),
             (DataType::Int, SecondType::Series) => {
-                let s = downcast::<Series<Int>>(t).unwrap();
-                Ok(Box::new(s.current))
+                let s = downcast_pf::<Series<Int>>(t).unwrap();
+                Ok(RefData::new_box(s.current))
             }
             (DataType::NA, SecondType::Simple) => {
                 let i: Int = None;
-                Ok(Box::new(i))
+                Ok(RefData::new_box(i))
             }
             _ => Err(RuntimeErr::NotCompatible),
         }
     }
 }
+
+impl<'a> SimpleType for Int {}
 
 // pine float type
 pub type Float = Option<f64>;
@@ -157,11 +161,13 @@ impl Arithmetic for Float {
         }
     }
 }
+
 impl PineStaticType for Float {
     fn static_type() -> (DataType, SecondType) {
         (DataType::Float, SecondType::Simple)
     }
 }
+
 impl<'a> PineType<'a> for Float {
     fn get_type(&self) -> (DataType, SecondType) {
         <Self as PineStaticType>::static_type()
@@ -180,33 +186,35 @@ fn int2float<'a>(i: Int) -> Float {
 }
 
 impl<'a> PineFrom<'a, Float> for Float {
-    fn explicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Float>, RuntimeErr> {
+    fn explicity_from(t: PineRef<'a>) -> Result<RefData<Float>, RuntimeErr> {
         Self::implicity_from(t)
     }
 
-    fn implicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Float>, RuntimeErr> {
+    fn implicity_from(t: PineRef<'a>) -> Result<RefData<Float>, RuntimeErr> {
         match t.get_type() {
-            (DataType::Float, SecondType::Simple) => Ok(downcast::<Float>(t).unwrap()),
+            (DataType::Float, SecondType::Simple) => Ok(downcast_pf::<Float>(t).unwrap()),
             (DataType::Float, SecondType::Series) => {
-                let s = downcast::<Series<Float>>(t).unwrap();
-                Ok(Box::new(s.current))
+                let s = downcast_pf::<Series<Float>>(t).unwrap();
+                Ok(RefData::new_box(s.current))
             }
             (DataType::NA, SecondType::Simple) => {
                 let i: Float = None;
-                Ok(Box::new(i))
+                Ok(RefData::new_box(i))
             }
             (DataType::Int, SecondType::Simple) => {
-                let i = downcast::<Int>(t).unwrap();
-                Ok(Box::new(int2float(*i)))
+                let i = downcast_pf::<Int>(t).unwrap();
+                Ok(RefData::new_box(int2float(*i)))
             }
             (DataType::Int, SecondType::Series) => {
-                let s = downcast::<Series<Int>>(t).unwrap();
-                Ok(Box::new(int2float(s.current)))
+                let s = downcast_pf::<Series<Int>>(t).unwrap();
+                Ok(RefData::new_box(int2float(s.current)))
             }
             _ => Err(RuntimeErr::NotCompatible),
         }
     }
 }
+
+impl<'a> SimpleType for Float {}
 
 // pine bool type
 pub type Bool = bool;
@@ -226,42 +234,44 @@ impl<'a> PineType<'a> for Bool {
 }
 
 impl<'a> PineFrom<'a, Bool> for Bool {
-    fn explicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Bool>, RuntimeErr> {
+    fn explicity_from(t: PineRef<'a>) -> Result<RefData<Bool>, RuntimeErr> {
         Self::implicity_from(t)
     }
 
-    fn implicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Bool>, RuntimeErr> {
+    fn implicity_from(t: PineRef<'a>) -> Result<RefData<Bool>, RuntimeErr> {
         match t.get_type() {
-            (DataType::Bool, SecondType::Simple) => Ok(downcast::<Bool>(t).unwrap()),
+            (DataType::Bool, SecondType::Simple) => Ok(downcast_pf::<Bool>(t).unwrap()),
             (DataType::Bool, SecondType::Series) => {
-                let s = downcast::<Series<Bool>>(t).unwrap();
-                Ok(Box::new(s.current))
+                let s = downcast_pf::<Series<Bool>>(t).unwrap();
+                Ok(RefData::new_box(s.current))
             }
             (DataType::NA, SecondType::Simple) => {
                 let i: Bool = false;
-                Ok(Box::new(i))
+                Ok(RefData::new_box(i))
             }
             (DataType::Float, SecondType::Simple) => {
-                let f: Box<Float> = downcast::<Float>(t).unwrap();
+                let f: RefData<Float> = downcast_pf::<Float>(t).unwrap();
                 let b: Bool = match *f {
                     Some(_) => true,
                     None => false,
                 };
-                Ok(Box::new(b))
+                Ok(RefData::new_box(b))
             }
 
             (DataType::Int, SecondType::Simple) => {
-                let f: Box<Int> = downcast::<Int>(t).unwrap();
+                let f: RefData<Int> = downcast_pf::<Int>(t).unwrap();
                 let b: Bool = match *f {
                     Some(_) => true,
                     None => false,
                 };
-                Ok(Box::new(b))
+                Ok(RefData::new_box(b))
             }
             _ => Err(RuntimeErr::NotCompatible),
         }
     }
 }
+
+impl SimpleType for Bool {}
 
 // pine color type
 #[derive(Debug, PartialEq, Clone, Default)]
@@ -283,31 +293,7 @@ impl<'a> PineType<'a> for Color<'a> {
 
 impl<'a> PineFrom<'a, Color<'a>> for Color<'a> {}
 
-impl PineStaticType for String {
-    fn static_type() -> (DataType, SecondType) {
-        (DataType::String, SecondType::Simple)
-    }
-}
-
-// pine string type
-impl<'a> PineType<'a> for String {
-    fn get_type(&self) -> (DataType, SecondType) {
-        <Self as PineStaticType>::static_type()
-    }
-
-    fn copy(&self) -> PineRef<'a> {
-        PineRef::Box(Box::new(self.clone()))
-    }
-}
-
-impl<'a> PineFrom<'a, String> for String {
-    fn implicity_from(_t: Box<dyn PineType<'a> + 'a>) -> Result<Box<String>, RuntimeErr> {
-        match _t.get_type() {
-            (DataType::String, SecondType::Simple) => Ok(downcast::<String>(_t)?),
-            _ => Err(RuntimeErr::NotSupportOperator),
-        }
-    }
-}
+impl<'a> SimpleType for Color<'a> {}
 
 // pine na type
 #[derive(Debug, PartialEq, Clone, Default)]
@@ -329,6 +315,7 @@ impl<'a> PineType<'a> for NA {
 }
 
 impl<'a> PineFrom<'a, NA> for NA {}
+impl SimpleType for NA {}
 
 // pine type that represent variable name
 #[derive(Debug, PartialEq, Clone)]
@@ -349,8 +336,17 @@ impl<'a> PineType<'a> for PineVar<'a> {
 }
 impl<'a> PineFrom<'a, PineVar<'a>> for PineVar<'a> {}
 
+impl<'a> SimpleType for PineVar<'a> {}
+
 // pine tuple type
+#[derive(PartialEq, Debug)]
 pub struct Tuple<'a>(pub Vec<PineRef<'a>>);
+
+impl<'a> Clone for Tuple<'a> {
+    fn clone(&self) -> Self {
+        Tuple(self.0.iter().map(|v| v.copy()).collect())
+    }
+}
 
 impl<'a> PineStaticType for Tuple<'a> {
     fn static_type() -> (DataType, SecondType) {
@@ -369,6 +365,41 @@ impl<'a> PineType<'a> for Tuple<'a> {
 }
 impl<'a> PineFrom<'a, Tuple<'a>> for Tuple<'a> {}
 
+impl<'a> SimpleType for Tuple<'a> {}
+
+impl PineStaticType for String {
+    fn static_type() -> (DataType, SecondType) {
+        (DataType::String, SecondType::Simple)
+    }
+}
+
+// pine string type
+impl<'a> PineType<'a> for String {
+    fn get_type(&self) -> (DataType, SecondType) {
+        <Self as PineStaticType>::static_type()
+    }
+
+    fn category(&self) -> Category {
+        Category::Complex
+    }
+
+    fn copy(&self) -> PineRef<'a> {
+        PineRef::Box(Box::new(self.clone()))
+    }
+}
+
+impl<'a> PineFrom<'a, String> for String {
+    fn implicity_from(_t: PineRef<'a>) -> Result<RefData<String>, RuntimeErr> {
+        match _t.get_type() {
+            (DataType::String, SecondType::Simple) => Ok(downcast_pf::<String>(_t)?),
+            _ => Err(RuntimeErr::NotSupportOperator),
+        }
+    }
+}
+
+impl ComplexType for String {}
+
+#[derive(PartialEq, Debug)]
 pub struct Object<'a> {
     obj: Box<dyn PineClass<'a> + 'a>,
 }
@@ -383,22 +414,28 @@ impl<'a> PineType<'a> for Object<'a> {
         <Self as PineStaticType>::static_type()
     }
 
+    fn category(&self) -> Category {
+        Category::Complex
+    }
+
     fn copy(&self) -> PineRef<'a> {
-        PineRef::Box(self.obj.copy())
+        self.obj.copy()
     }
 }
 impl<'a> PineFrom<'a, Object<'a>> for Object<'a> {}
+
+impl<'a> ComplexType for Object<'a> {}
 
 impl<'a> Object<'a> {
     pub fn new(obj: Box<dyn PineClass<'a> + 'a>) -> Object<'a> {
         Object { obj }
     }
 
-    pub fn get(&self, name: &str) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
+    pub fn get(&self, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
         self.obj.get(name)
     }
 
-    pub fn set(&self, name: &str, property: Box<dyn PineType<'a> + 'a>) -> Result<(), RuntimeErr> {
+    pub fn set(&self, name: &str, property: PineRef<'a>) -> Result<(), RuntimeErr> {
         self.obj.set(name, property)
     }
 }
@@ -419,12 +456,12 @@ mod tests {
             (DataType::Int, SecondType::Simple)
         );
 
-        assert!(Int::implicity_from(Box::new(NA)).is_ok());
-        assert!(Int::explicity_from(Box::new(Some(3i32))).is_ok());
-        assert!(Int::explicity_from(Box::new(Some(3f64))).is_ok());
+        assert!(Int::implicity_from(PineRef::new_box(NA)).is_ok());
+        assert!(Int::explicity_from(PineRef::new_box(Some(3i32))).is_ok());
+        assert!(Int::explicity_from(PineRef::new_box(Some(3f64))).is_ok());
         assert_eq!(
-            downcast::<Int>(Int::explicity_from(Box::new(Some(3f64))).unwrap()),
-            Ok(Box::new(Some(3i32)))
+            Int::explicity_from(PineRef::new_box(Some(3f64))),
+            Ok(RefData::new_box(Some(3i32)))
         );
     }
 
@@ -439,17 +476,20 @@ mod tests {
             (DataType::Float, SecondType::Simple)
         );
 
-        assert!(Float::implicity_from(Box::new(NA)).is_ok());
-        assert!(Float::implicity_from(Box::new(Some(3f64))).is_ok());
-        assert!(Float::implicity_from(Box::new(Some(3i32))).is_ok());
+        assert!(Float::implicity_from(PineRef::new_box(NA)).is_ok());
+        assert!(Float::implicity_from(PineRef::new_box(Some(3f64))).is_ok());
+        assert!(Float::implicity_from(PineRef::new_box(Some(3i32))).is_ok());
         assert_eq!(
-            downcast::<Float>(Float::implicity_from(Box::new(Some(3i32))).unwrap()),
-            Ok(Box::new(Some(3f64)))
+            Float::implicity_from(PineRef::new_box(Some(3i32))),
+            Ok(RefData::new_box(Some(3f64)))
         );
     }
 
-    fn from_bool<'a, D: PineType<'a> + 'a>(val: D) -> Result<Box<Bool>, RuntimeErr> {
-        downcast::<Bool>(Bool::implicity_from(Box::new(val)).unwrap())
+    fn from_bool<'a, D>(val: D) -> Result<RefData<Bool>, RuntimeErr>
+    where
+        D: PineType<'a> + SimpleType + 'a,
+    {
+        Bool::implicity_from(PineRef::new_box(val))
     }
     #[test]
     fn bool_test() {
@@ -461,16 +501,16 @@ mod tests {
             <Bool as PineType>::get_type(&Bool::default()),
             (DataType::Bool, SecondType::Simple)
         );
-        assert_eq!(from_bool(true), Ok(Box::new(true)));
-        assert_eq!(from_bool(false), Ok(Box::new(false)));
+        assert_eq!(from_bool(true), Ok(RefData::new_box(true)));
+        assert_eq!(from_bool(false), Ok(RefData::new_box(false)));
 
-        assert_eq!(from_bool(NA), Ok(Box::new(false)));
+        assert_eq!(from_bool(NA), Ok(RefData::new_box(false)));
 
-        assert_eq!(from_bool(Some(3i32)), Ok(Box::new(true)));
-        assert_eq!(from_bool(None as Int), Ok(Box::new(false)));
+        assert_eq!(from_bool(Some(3i32)), Ok(RefData::new_box(true)));
+        assert_eq!(from_bool(None as Int), Ok(RefData::new_box(false)));
 
-        assert_eq!(from_bool(Some(3f64)), Ok(Box::new(true)));
-        assert_eq!(from_bool(None as Float), Ok(Box::new(false)));
+        assert_eq!(from_bool(Some(3f64)), Ok(RefData::new_box(true)));
+        assert_eq!(from_bool(None as Float), Ok(RefData::new_box(false)));
     }
 
     #[test]
@@ -488,22 +528,22 @@ mod tests {
             "Custom A"
         }
 
-        fn get(&self, name: &str) -> Result<Box<dyn PineType<'a> + 'a>, RuntimeErr> {
+        fn get(&self, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
             match name {
-                "int1" => Ok(Box::new(Some(1i32))),
-                "int2" => Ok(Box::new(Some(2i32))),
-                "float1" => Ok(Box::new(Some(1f64))),
-                "float2" => Ok(Box::new(Some(2f64))),
+                "int1" => Ok(PineRef::new_box(Some(1i32))),
+                "int2" => Ok(PineRef::new_box(Some(2i32))),
+                "float1" => Ok(PineRef::new_box(Some(1f64))),
+                "float2" => Ok(PineRef::new_box(Some(2f64))),
                 _ => Err(RuntimeErr::NotSupportOperator),
             }
         }
 
-        fn set(&self, _n: &str, _p: Box<dyn PineType<'a> + 'a>) -> Result<(), RuntimeErr> {
+        fn set(&self, _n: &str, _p: PineRef<'a>) -> Result<(), RuntimeErr> {
             Err(RuntimeErr::NotSupportOperator)
         }
 
-        fn copy(&self) -> Box<dyn PineType<'a> + 'a> {
-            Box::new(Object::new(Box::new(A)))
+        fn copy(&self) -> PineRef<'a> {
+            PineRef::new_rc(Object::new(Box::new(A)))
         }
     }
 
@@ -512,8 +552,8 @@ mod tests {
         let obj = Object::new(Box::new(A));
         assert_eq!(obj.get_type(), (DataType::Object, SecondType::Simple));
         assert_eq!(
-            downcast::<Int>(obj.get("int1").unwrap()).unwrap(),
-            Box::new(Some(1))
+            downcast_pf::<Int>(obj.get("int1").unwrap()).unwrap(),
+            RefData::new_box(Some(1))
         );
     }
 }

@@ -1,7 +1,9 @@
-use super::downcast::downcast;
+use super::downcast::downcast_pf;
 use super::error::RuntimeErr;
+use super::pine_ref::PineRef;
+use super::ref_data::RefData;
 use super::traits::{
-    Arithmetic, DataType, PineFrom, PineRef, PineStaticType, PineType, SecondType,
+    Arithmetic, Category, ComplexType, DataType, PineFrom, PineStaticType, PineType, SecondType,
 };
 use std::cmp::{Ordering, PartialEq, PartialOrd};
 use std::convert::{From, Into};
@@ -89,24 +91,29 @@ impl<'a, D: PineStaticType + PineType<'a> + Clone + Debug + 'a> PineType<'a> for
         (<D as PineStaticType>::static_type().0, SecondType::Series)
     }
 
+    fn category(&self) -> Category {
+        Category::Complex
+    }
+
     fn copy(&self) -> PineRef<'a> {
         PineRef::Box(Box::new(self.clone()))
     }
 }
 
-impl<'a, D: Default + PineStaticType + Clone + Debug + 'a> PineFrom<'a, Series<'a, D>>
-    for Series<'a, D>
+impl<'a, D> PineFrom<'a, Series<'a, D>> for Series<'a, D>
+where
+    D: Default + PineStaticType + PartialEq + Clone + Debug + PineType<'a> + 'a,
 {
-    fn explicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Series<'a, D>>, RuntimeErr> {
+    fn explicity_from(t: PineRef<'a>) -> Result<RefData<Series<'a, D>>, RuntimeErr> {
         Self::implicity_from(t)
     }
 
-    fn implicity_from(t: Box<dyn PineType<'a> + 'a>) -> Result<Box<Series<'a, D>>, RuntimeErr> {
+    fn implicity_from(t: PineRef<'a>) -> Result<RefData<Series<'a, D>>, RuntimeErr> {
         let data_type = <D as PineStaticType>::static_type().0;
         match t.get_type() {
-            (d, SecondType::Series) if data_type == d => Ok(downcast::<Series<D>>(t).unwrap()),
-            (d, SecondType::Simple) if data_type == d => Ok(Box::new(Series {
-                current: *downcast::<D>(t).unwrap(),
+            (d, SecondType::Series) if data_type == d => Ok(downcast_pf::<Series<D>>(t).unwrap()),
+            (d, SecondType::Simple) if data_type == d => Ok(RefData::new_rc(Series {
+                current: downcast_pf::<D>(t).unwrap().into_inner(),
                 history: vec![],
                 phantom: PhantomData,
                 na_val: D::default(),
@@ -154,6 +161,8 @@ impl<'a, D: PartialEq + Clone + Debug + 'a> PartialEq for Series<'a, D> {
         self.current.eq(&other.current)
     }
 }
+
+impl<'a, D: Clone + Debug + 'a> ComplexType for Series<'a, D> {}
 
 #[cfg(test)]
 mod tests {

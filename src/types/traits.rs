@@ -128,7 +128,10 @@ pub trait PineFrom<'a, D: 'a + PartialEq + fmt::Debug> {
 
     // Create this type from the source type for auto cast
     fn implicity_from(_t: PineRef<'a>) -> Result<RefData<D>, RuntimeErr> {
-        Err(RuntimeErr::NotCompatible)
+        Err(RuntimeErr::NotCompatible(format!(
+            "Cannot convert from {:?} to the specific type",
+            _t.get_type().0
+        )))
     }
 }
 

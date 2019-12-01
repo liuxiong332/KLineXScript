@@ -1,6 +1,6 @@
 #[derive(Debug, PartialEq)]
 pub enum RuntimeErr {
-    NotCompatible,
+    NotCompatible(String),
     NotValidParam,
     NotSupportOperator,
     OutBound,

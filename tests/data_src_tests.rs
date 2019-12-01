@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 const MA_SCRIPT: &str = "
 // ma = close
-ma = close + close[1] + close[2] + close[3] + close[4]
+ma = (close + close[1] + close[2] + close[3] + close[4]) / 5
 // for i = 1 to 5
 //     ma := ma + close[i] 
 print(ma)
@@ -54,7 +54,7 @@ fn datasrc_test() {
     struct MyCallback;
     impl Callback for MyCallback {
         fn print(&self, _str: String) {
-            assert_eq!(_str, String::from("na,na,na,na,15"));
+            assert_eq!(_str, String::from("na,na,na,na,3"));
         }
     }
 

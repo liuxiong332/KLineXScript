@@ -1,6 +1,7 @@
 use super::downcast::downcast_pf;
 use super::error::RuntimeErr;
 use super::pine_ref::PineRef;
+use super::primitive::{Bool, Float, Int, NA};
 use super::ref_data::RefData;
 use super::traits::{
     Arithmetic, Category, ComplexType, DataType, PineFrom, PineStaticType, PineType, SecondType,
@@ -110,10 +111,51 @@ impl<'a, D: PineStaticType + PineType<'a> + Clone + Debug + 'a> PineType<'a> for
 
 impl<'a, D> PineFrom<'a, Series<'a, D>> for Series<'a, D>
 where
-    D: Default + PineStaticType + PartialEq + Clone + Debug + PineType<'a> + 'a,
+    D: Default + PineStaticType + PartialEq + Clone + Debug + PineType<'a> + PineFrom<'a, D> + 'a,
 {
     fn explicity_from(t: PineRef<'a>) -> Result<RefData<Series<'a, D>>, RuntimeErr> {
-        Self::implicity_from(t)
+        let data_type = <D as PineStaticType>::static_type().0;
+        match t.get_type() {
+            (d, SecondType::Series) if data_type == d => Ok(downcast_pf::<Series<D>>(t).unwrap()),
+            (d, SecondType::Simple) if data_type == d => Ok(RefData::new_rc(Series {
+                current: downcast_pf::<D>(t).unwrap().into_inner(),
+                history: vec![],
+                phantom: PhantomData,
+                na_val: D::default(),
+            })),
+            (DataType::Int, SecondType::Series) => {
+                let series: RefData<Series<Int>> = Series::explicity_from(t)?;
+                let val: RefData<D> = D::explicity_from(PineRef::new(series.get_current()))?;
+                Ok(RefData::new_rc(Series::from(val.into_inner())))
+            }
+            (DataType::Int, SecondType::Simple) => Ok(RefData::new_rc(Series::from(
+                D::explicity_from(t)?.into_inner(),
+            ))),
+            (DataType::Float, SecondType::Series) => {
+                let series: RefData<Series<Float>> = Series::explicity_from(t)?;
+                let val: RefData<D> = D::explicity_from(PineRef::new(series.get_current()))?;
+                Ok(RefData::new_rc(Series::from(val.into_inner())))
+            }
+            (DataType::Float, SecondType::Simple) => Ok(RefData::new_rc(Series::from(
+                D::explicity_from(t)?.into_inner(),
+            ))),
+            (DataType::Bool, SecondType::Series) => {
+                let series: RefData<Series<Bool>> = Series::explicity_from(t)?;
+                let val: RefData<D> = D::explicity_from(PineRef::new(series.get_current()))?;
+                Ok(RefData::new_rc(Series::from(val.into_inner())))
+            }
+            (DataType::Bool, SecondType::Simple) => Ok(RefData::new_rc(Series::from(
+                D::explicity_from(t)?.into_inner(),
+            ))),
+            (DataType::NA, _) => Ok(RefData::new_rc(Series::from(
+                D::explicity_from(PineRef::new_box(NA))?.into_inner(),
+            ))),
+            _ => Err(RuntimeErr::NotCompatible(format!(
+                "Cannot convert from {:?} to {:?} series",
+                t.get_type(),
+                D::static_type()
+            ))),
+        }
     }
 
     fn implicity_from(t: PineRef<'a>) -> Result<RefData<Series<'a, D>>, RuntimeErr> {
@@ -126,7 +168,38 @@ where
                 phantom: PhantomData,
                 na_val: D::default(),
             })),
-            _ => Err(RuntimeErr::NotCompatible),
+            (DataType::Int, SecondType::Series) => {
+                let series: RefData<Series<Int>> = Series::implicity_from(t)?;
+                let val: RefData<D> = D::implicity_from(PineRef::new(series.get_current()))?;
+                Ok(RefData::new_rc(Series::from(val.into_inner())))
+            }
+            (DataType::Int, SecondType::Simple) => Ok(RefData::new_rc(Series::from(
+                D::implicity_from(t)?.into_inner(),
+            ))),
+            (DataType::Float, SecondType::Series) => {
+                let series: RefData<Series<Float>> = Series::implicity_from(t)?;
+                let val: RefData<D> = D::implicity_from(PineRef::new(series.get_current()))?;
+                Ok(RefData::new_rc(Series::from(val.into_inner())))
+            }
+            (DataType::Float, SecondType::Simple) => Ok(RefData::new_rc(Series::from(
+                D::implicity_from(t)?.into_inner(),
+            ))),
+            (DataType::Bool, SecondType::Series) => {
+                let series: RefData<Series<Bool>> = Series::implicity_from(t)?;
+                let val: RefData<D> = D::implicity_from(PineRef::new(series.get_current()))?;
+                Ok(RefData::new_rc(Series::from(val.into_inner())))
+            }
+            (DataType::Bool, SecondType::Simple) => Ok(RefData::new_rc(Series::from(
+                D::implicity_from(t)?.into_inner(),
+            ))),
+            (DataType::NA, _) => Ok(RefData::new_rc(Series::from(
+                D::implicity_from(PineRef::new_box(NA))?.into_inner(),
+            ))),
+            _ => Err(RuntimeErr::NotCompatible(format!(
+                "Cannot convert from {:?} to {:?} series",
+                t.get_type(),
+                D::static_type()
+            ))),
         }
     }
 }
@@ -180,7 +253,7 @@ mod tests {
     #[test]
     fn series_test() {
         let int: Int = Some(1);
-        let mut series = <Series<Int> as From<Int>>::from(int);
+        let mut series: Series<Int> = Series::from(int);
         assert_eq!(series.index(0), Ok(Series::from(Some(1))));
         series.update(Some(2));
         assert_eq!(series.index(0), Ok(Series::from(Some(2))));
@@ -191,5 +264,176 @@ mod tests {
 
         series.roll_back();
         assert_eq!(series.history, vec![]);
+    }
+
+    #[test]
+    fn int_series_test() {
+        let int: Int = Some(1);
+        // implicity converter
+        // Int => Series<Int>
+        let series: RefData<Series<Int>> = Series::implicity_from(PineRef::new(int)).unwrap();
+        assert_eq!(series.get_current(), int);
+
+        // Series<Int> => Series<Int>
+        let series2: RefData<Series<Int>> =
+            Series::implicity_from(PineRef::new(Series::from(Some(1)))).unwrap();
+        assert_eq!(series2.get_current(), int);
+
+        // NA => Series<Int>
+        let series3: RefData<Series<Int>> = Series::implicity_from(PineRef::new(NA)).unwrap();
+        assert_eq!(series3.get_current(), None);
+
+        // explicity converter
+        // Int => Series<Int>
+        let series4: RefData<Series<Int>> = Series::explicity_from(PineRef::new(int)).unwrap();
+        assert_eq!(series4.get_current(), int);
+
+        // Series<Int> => Series<Int>
+        let series5: RefData<Series<Int>> =
+            Series::explicity_from(PineRef::new(Series::from(Some(1)))).unwrap();
+        assert_eq!(series5.get_current(), int);
+
+        // NA => Series<Int>
+        let series6: RefData<Series<Int>> = Series::explicity_from(PineRef::new(NA)).unwrap();
+        assert_eq!(series6.get_current(), None);
+
+        // Float => Series<Int>
+        let series7: RefData<Series<Int>> =
+            Series::explicity_from(PineRef::new(Some(1f64))).unwrap();
+        assert_eq!(series7.get_current(), Some(1));
+
+        // Float => Series<Int>
+        let series8: RefData<Series<Int>> = Series::explicity_from(series7.into_pf()).unwrap();
+        assert_eq!(series8.get_current(), Some(1));
+    }
+
+    #[test]
+    fn float_series_test() {
+        // implicity converter
+        {
+            // Float => Series<Float>
+            let series: RefData<Series<Float>> =
+                Series::implicity_from(PineRef::new(Some(1f64))).unwrap();
+            assert_eq!(series.get_current(), Some(1f64));
+
+            // Series<Float> => Series<Float>
+            let series2: RefData<Series<Float>> =
+                Series::implicity_from(PineRef::new(Series::from(Some(1f64)))).unwrap();
+            assert_eq!(series2.get_current(), Some(1f64));
+
+            // Int => Series<Float>
+            let series3: RefData<Series<Float>> =
+                Series::implicity_from(PineRef::new(Some(1))).unwrap();
+            assert_eq!(series3.get_current(), Some(1f64));
+
+            // Series<Int> => Series<Float>
+            let series4: RefData<Series<Float>> =
+                Series::implicity_from(PineRef::new(Series::from(Some(1)))).unwrap();
+            assert_eq!(series4.get_current(), Some(1f64));
+
+            // NA => Series<Float>
+            let series5: RefData<Series<Float>> = Series::implicity_from(PineRef::new(NA)).unwrap();
+            assert_eq!(series5.get_current(), None);
+        }
+        // explicity converter
+        {
+            // Float => Series<Float>
+            let series: RefData<Series<Float>> =
+                Series::explicity_from(PineRef::new(Some(1f64))).unwrap();
+            assert_eq!(series.get_current(), Some(1f64));
+
+            // Series<Float> => Series<Float>
+            let series2: RefData<Series<Float>> =
+                Series::explicity_from(PineRef::new(Series::from(Some(1f64)))).unwrap();
+            assert_eq!(series2.get_current(), Some(1f64));
+
+            // Int => Series<Float>
+            let series3: RefData<Series<Float>> =
+                Series::explicity_from(PineRef::new(Some(1))).unwrap();
+            assert_eq!(series3.get_current(), Some(1f64));
+
+            // Series<Int> => Series<Float>
+            let series4: RefData<Series<Float>> =
+                Series::explicity_from(PineRef::new(Series::from(Some(1)))).unwrap();
+            assert_eq!(series4.get_current(), Some(1f64));
+
+            // NA => Series<Float>
+            let series5: RefData<Series<Float>> = Series::explicity_from(PineRef::new(NA)).unwrap();
+            assert_eq!(series5.get_current(), None);
+        }
+    }
+
+    #[test]
+    fn bool_series_test() {
+        // implicity converter
+        {
+            // Bool => Series<Bool>
+            let series: RefData<Series<Bool>> = Series::implicity_from(PineRef::new(true)).unwrap();
+            assert_eq!(series.get_current(), true);
+
+            // Series<Bool> => Series<Bool>
+            let series: RefData<Series<Bool>> =
+                Series::implicity_from(PineRef::new(Series::from(true))).unwrap();
+            assert_eq!(series.get_current(), true);
+
+            // Float => Series<Bool>
+            let series: RefData<Series<Bool>> =
+                Series::implicity_from(PineRef::new(Some(1f64))).unwrap();
+            assert_eq!(series.get_current(), true);
+
+            // Series<Float> => Series<Bool>
+            let series2: RefData<Series<Bool>> =
+                Series::implicity_from(PineRef::new(Series::from(Some(1f64)))).unwrap();
+            assert_eq!(series2.get_current(), true);
+
+            // Int => Series<Bool>
+            let series3: RefData<Series<Bool>> =
+                Series::implicity_from(PineRef::new(Some(1))).unwrap();
+            assert_eq!(series3.get_current(), true);
+
+            // Series<Int> => Series<Bool>
+            let series4: RefData<Series<Bool>> =
+                Series::implicity_from(PineRef::new(Series::from(Some(1)))).unwrap();
+            assert_eq!(series4.get_current(), true);
+
+            // NA => Series<Bool>
+            let series5: RefData<Series<Bool>> = Series::implicity_from(PineRef::new(NA)).unwrap();
+            assert_eq!(series5.get_current(), false);
+        }
+        // explicity converter
+        {
+            // Bool => Series<Bool>
+            let series: RefData<Series<Bool>> = Series::explicity_from(PineRef::new(true)).unwrap();
+            assert_eq!(series.get_current(), true);
+
+            // Series<Bool> => Series<Bool>
+            let series: RefData<Series<Bool>> =
+                Series::explicity_from(PineRef::new(Series::from(true))).unwrap();
+            assert_eq!(series.get_current(), true);
+
+            // Float => Series<Bool>
+            let series: RefData<Series<Bool>> =
+                Series::explicity_from(PineRef::new(Some(1f64))).unwrap();
+            assert_eq!(series.get_current(), true);
+
+            // Series<Float> => Series<Bool>
+            let series2: RefData<Series<Bool>> =
+                Series::explicity_from(PineRef::new(Series::from(Some(1f64)))).unwrap();
+            assert_eq!(series2.get_current(), true);
+
+            // Int => Series<Bool>
+            let series3: RefData<Series<Bool>> =
+                Series::explicity_from(PineRef::new(Some(1))).unwrap();
+            assert_eq!(series3.get_current(), true);
+
+            // Series<Int> => Series<Bool>
+            let series4: RefData<Series<Bool>> =
+                Series::explicity_from(PineRef::new(Series::from(Some(1)))).unwrap();
+            assert_eq!(series4.get_current(), true);
+
+            // NA => Series<Bool>
+            let series5: RefData<Series<Bool>> = Series::explicity_from(PineRef::new(NA)).unwrap();
+            assert_eq!(series5.get_current(), false);
+        }
     }
 }

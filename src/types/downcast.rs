@@ -2,6 +2,7 @@ use super::{PineRef, PineStaticType, PineType, RefData, RuntimeErr};
 use std::cell::RefCell;
 use std::fmt::Debug;
 use std::rc::Rc;
+
 pub fn downcast_pf<'a, T>(item: PineRef<'a>) -> Result<RefData<T>, RuntimeErr>
 where
     T: PineStaticType + PartialEq + Debug + 'a,
@@ -10,6 +11,27 @@ where
         PineRef::Box(item) => Ok(RefData::Box(downcast::<'a, T>(item)?)),
         PineRef::Rc(item) => Ok(RefData::Rc(downcast_rc::<'a, T>(item)?)),
     }
+}
+
+pub fn downcast_pf_ref<'a, 'b, T>(item: &'b PineRef<'a>) -> Result<&'b T, RuntimeErr>
+where
+    T: PineStaticType + PartialEq + Debug + 'a,
+{
+    match *item {
+        PineRef::Box(ref item) => downcast_ref(&**item),
+        PineRef::Rc(ref item) => unsafe {
+            let ptr = item.as_ptr() as *mut T;
+            Ok(ptr.as_ref().unwrap())
+        },
+    }
+}
+
+fn downcast_err<'a, T: PineStaticType + 'a>(item: &(dyn PineType<'a> + 'a)) -> RuntimeErr {
+    RuntimeErr::NotCompatible(format!(
+        "downcast from {:?} to {:?} is not allowed",
+        item.get_type(),
+        T::static_type()
+    ))
 }
 
 pub fn downcast<'a, T: PineStaticType + 'a>(
@@ -21,7 +43,7 @@ pub fn downcast<'a, T: PineStaticType + 'a>(
             Ok(Box::from_raw(raw as *mut T))
         }
     } else {
-        Err(RuntimeErr::NotCompatible)
+        Err(downcast_err::<T>(&*item))
     }
 }
 
@@ -34,12 +56,12 @@ pub fn downcast_rc<'a, T: PineStaticType + 'a>(
             Ok(Rc::from_raw(raw as *const RefCell<T>))
         }
     } else {
-        Err(RuntimeErr::NotCompatible)
+        Err(downcast_err::<T>(&*item.borrow()))
     }
 }
 
 pub fn downcast_ref<'a, 'b, T: PineStaticType + 'a>(
-    item: &'b dyn PineType<'a>,
+    item: &'b (dyn PineType<'a> + 'a),
 ) -> Result<&'b T, RuntimeErr> {
     if T::static_type() == item.get_type() {
         unsafe {
@@ -48,12 +70,12 @@ pub fn downcast_ref<'a, 'b, T: PineStaticType + 'a>(
             Ok(t.as_ref().unwrap())
         }
     } else {
-        Err(RuntimeErr::NotCompatible)
+        Err(downcast_err::<T>(item))
     }
 }
 
 pub fn downcast_mut<'a, 'b, T: PineStaticType + 'a>(
-    item: &'b mut dyn PineType<'a>,
+    item: &'b mut (dyn PineType<'a> + 'a),
 ) -> Result<&'b mut T, RuntimeErr> {
     if T::static_type() == item.get_type() {
         unsafe {
@@ -62,6 +84,6 @@ pub fn downcast_mut<'a, 'b, T: PineStaticType + 'a>(
             Ok(t.as_mut().unwrap())
         }
     } else {
-        Err(RuntimeErr::NotCompatible)
+        Err(downcast_err::<T>(item))
     }
 }

@@ -57,7 +57,7 @@ pub struct Context<'a, 'b> {
 
 fn commit_series<'a, D>(val: PineRef<'a>) -> PineRef<'a>
 where
-    D: Default + PartialEq + PineStaticType + PineType<'a> + Clone + Debug + 'a,
+    D: Default + PartialEq + PineStaticType + PineType<'a> + PineFrom<'a, D> + Clone + Debug + 'a,
 {
     let mut series: RefData<Series<D>> = Series::implicity_from(val).unwrap();
     series.commit();
@@ -66,7 +66,7 @@ where
 
 fn roll_back_series<'a, D>(val: PineRef<'a>) -> PineRef<'a>
 where
-    D: Default + PartialEq + PineStaticType + PineType<'a> + Clone + Debug + 'a,
+    D: Default + PartialEq + PineStaticType + PineType<'a> + PineFrom<'a, D> + Clone + Debug + 'a,
 {
     let mut series: RefData<Series<D>> = Series::implicity_from(val).unwrap();
     series.roll_back();

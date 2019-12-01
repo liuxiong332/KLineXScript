@@ -413,7 +413,8 @@ mod tests {
     fn check_val<'a>(context: &mut dyn Ctx<'a>, varname: &'static str, val: Int) {
         let res: RefData<Series<Int>> =
             Series::explicity_from(context.move_var(varname).unwrap()).unwrap();
-        let expect_val: RefData<Series<Int>> = RefData::new_rc(Series::from(val));
+        let series: Series<Int> = Series::from(val);
+        let expect_val: RefData<Series<Int>> = RefData::new_rc(series);
         assert_eq!(res, expect_val);
         context.update_var("myvar", res.into_pf());
     }

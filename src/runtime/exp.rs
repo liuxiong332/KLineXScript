@@ -67,13 +67,17 @@ impl<'a> RVRunner<'a> for Exp<'a> {
 impl<'a> Runner<'a> for TypeCast<'a> {
     fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
         let result = self.exp.rv_run(context)?;
-        match self.data_type {
-            DataType::Bool => Ok(Bool::explicity_from(result)?.into_pf()),
-            DataType::Int => Ok(Int::explicity_from(result)?.into_pf()),
-            DataType::Float => Ok(Float::explicity_from(result)?.into_pf()),
-            DataType::Color => Ok(Color::explicity_from(result)?.into_pf()),
-            DataType::String => Ok(String::explicity_from(result)?.into_pf()),
-            _ => Err(RuntimeErr::NotCompatible),
+        match &self.data_type {
+            &DataType::Bool => Ok(Bool::explicity_from(result)?.into_pf()),
+            &DataType::Int => Ok(Int::explicity_from(result)?.into_pf()),
+            &DataType::Float => Ok(Float::explicity_from(result)?.into_pf()),
+            &DataType::Color => Ok(Color::explicity_from(result)?.into_pf()),
+            &DataType::String => Ok(String::explicity_from(result)?.into_pf()),
+            _t => Err(RuntimeErr::NotCompatible(format!(
+                "Cannot convert {:?} to {:?}",
+                result.get_type(),
+                _t
+            ))),
         }
     }
 }
@@ -126,7 +130,7 @@ fn get_slice<'a, D>(
     arg: PineRef<'a>,
 ) -> Result<PineRef<'a>, RuntimeErr>
 where
-    D: Default + PineType<'a> + PineStaticType + PartialEq + Debug + 'a + Clone,
+    D: Default + PineType<'a> + PineStaticType + PartialEq + PineFrom<'a, D> + Debug + Clone + 'a,
 {
     let s: RefData<Series<D>> = Series::implicity_from(obj)?;
     let arg_type = arg.get_type();

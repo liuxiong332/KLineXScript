@@ -22,6 +22,8 @@ pub trait Ctx<'a> {
 
     fn contains_declare(&self, name: &'a str) -> bool;
 
+    fn contains_declare_scope(&self, name: &'a str) -> bool;
+
     fn clear_declare(&mut self);
 
     fn get_type(&self) -> ContextType;
@@ -123,6 +125,7 @@ impl<'a, 'b> Context<'a, 'b> {
 
     pub fn commit(&mut self) {
         let keys: Vec<&'a str> = self.vars.keys().cloned().collect();
+        let commited: HashSet<&(dyn PineType<'a> + 'a)> = HashSet::new();
         for k in keys {
             let val = self.move_var(k).unwrap();
             let ret_val = match val.get_type() {
@@ -218,6 +221,16 @@ impl<'a, 'b> Ctx<'a> for Context<'a, 'b> {
     }
 
     fn contains_declare(&self, name: &'a str) -> bool {
+        if self.declare_vars.contains(name) {
+            true
+        } else if let Some(parent) = &self.parent {
+            parent.contains_declare(name)
+        } else {
+            false
+        }
+    }
+
+    fn contains_declare_scope(&self, name: &'a str) -> bool {
         self.declare_vars.contains(name)
     }
 

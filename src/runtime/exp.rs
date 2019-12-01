@@ -146,8 +146,8 @@ impl<'a> Runner<'a> for Condition<'a> {
 }
 
 fn get_slice<'a, D>(
-    context: &mut dyn Ctx<'a>,
-    name: &'a str,
+    // context: &mut dyn Ctx<'a>,
+    // name: &'a str,
     obj: PineRef<'a>,
     arg: PineRef<'a>,
 ) -> Result<PineRef<'a>, RuntimeErr>
@@ -159,12 +159,12 @@ where
     let i = Int::implicity_from(arg)?;
     match *i {
         None => Err(RuntimeErr::InvalidVarType(format!(
-            "Expect simple int, but get {:?} {:?}",
-            arg_type.1, arg_type.0
+            "Expect simple int, but get {:?}",
+            arg_type
         ))),
         Some(i) => {
             let res = PineRef::new_rc(s.index(i as usize)?);
-            context.update_var(name, s.into_pf());
+            // context.update_var(name, s.into_pf());
             Ok(res)
         }
     }
@@ -172,24 +172,24 @@ where
 
 impl<'a> Runner<'a> for RefCall<'a> {
     fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
-        let name = self.name.run(context)?;
-        let arg = self.arg.run(context)?;
-        if name.get_type() != (FirstType::PineVar, SecondType::Simple) {
-            return Err(RuntimeErr::NotSupportOperator);
-        }
-        let varname = downcast_pf::<PineVar>(name).unwrap().0;
-        let var_opt = context.move_var(varname);
-        if var_opt.is_none() {
-            return Err(RuntimeErr::NotSupportOperator);
-        }
+        let var = self.name.rv_run(context)?;
+        let arg = self.arg.rv_run(context)?;
+        // if name.get_type() != (FirstType::PineVar, SecondType::Simple) {
+        //     return Err(RuntimeErr::NotSupportOperator);
+        // }
+        // let varname = downcast_pf::<PineVar>(name).unwrap().0;
+        // let var_opt = context.move_var(varname);
+        // if var_opt.is_none() {
+        //     return Err(RuntimeErr::NotSupportOperator);
+        // }
 
-        let var = var_opt.unwrap();
+        // let var = var_opt.unwrap();
         match var.get_type() {
-            (FirstType::Int, _) => get_slice::<Int>(context, varname, var, arg),
-            (FirstType::Float, _) => get_slice::<Float>(context, varname, var, arg),
-            (FirstType::Bool, _) => get_slice::<Bool>(context, varname, var, arg),
-            (FirstType::Color, _) => get_slice::<Color>(context, varname, var, arg),
-            (FirstType::String, _) => get_slice::<String>(context, varname, var, arg),
+            (FirstType::Int, _) => get_slice::<Int>(var, arg),
+            (FirstType::Float, _) => get_slice::<Float>(var, arg),
+            (FirstType::Bool, _) => get_slice::<Bool>(var, arg),
+            (FirstType::Color, _) => get_slice::<Color>(var, arg),
+            (FirstType::String, _) => get_slice::<String>(var, arg),
             _ => Err(RuntimeErr::NotSupportOperator),
         }
     }

@@ -10,10 +10,10 @@ use pine::types::{
 use std::collections::HashMap;
 
 const MA_SCRIPT: &str = "
-// ma = close
-ma = (close + close[1] + close[2] + close[3] + close[4]) / 5
-// for i = 1 to 5
-//     ma := ma + close[i] 
+ma = close
+// ma = (close + close[1] + close[2] + close[3] + close[4]) / 5
+for i = 1 to 5
+    ma := ma + close[i] 
 print(ma)
 ";
 

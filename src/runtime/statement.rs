@@ -69,7 +69,7 @@ impl<'a> RunnerForName<'a> for Assignment<'a> {
         val: PineRef<'a>,
     ) -> Result<(), RuntimeErr> {
         let name = vn.0;
-        if context.contains_declare(name) {
+        if context.contains_declare_scope(name) {
             return Err(RuntimeErr::NameDeclared);
         }
         context.create_declare(name);
@@ -155,6 +155,8 @@ where
     let mut s = Series::implicity_from(exist_val)?;
     let v = D::implicity_from(val)?;
     s.update(v.into_inner());
+    println!("Last value: {:?}", s);
+
     context.update_var(name, s.into_pf());
     Ok(())
 }
@@ -166,7 +168,10 @@ impl<'a> StmtRunner<'a> for VarAssignment<'a> {
             return Err(RuntimeErr::NameNotDeclard);
         }
         let val = self.val.rv_run(context)?;
+        // println!("Current val: {:?}", val);
+
         let exist_val = context.move_var(name).unwrap();
+        // println!("Current value: {:?}", exist_val);
         match exist_val.get_type() {
             (FirstType::Bool, _) => update_series::<Bool>(context, name, exist_val, val),
             (FirstType::Int, _) => update_series::<Int>(context, name, exist_val, val),
@@ -216,6 +221,7 @@ impl<'a> Runner<'a> for ForRange<'a> {
             -1
         };
         let mut iter = start;
+        println!("For range {:?} {:?} {:?}", start, end, step);
         let mut ret_val: PineRef<'a> = PineRef::new_box(NA);
         while (step > 0 && iter < end) || (step < 0 && iter > end) {
             let mut new_context = Context::new(Some(context), ContextType::ForRangeBlock);

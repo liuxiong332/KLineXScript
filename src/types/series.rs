@@ -4,7 +4,8 @@ use super::pine_ref::PineRef;
 use super::primitive::{Bool, Float, Int, NA};
 use super::ref_data::RefData;
 use super::traits::{
-    Arithmetic, Category, ComplexType, DataType, PineFrom, PineStaticType, PineType, SecondType,
+    Arithmetic, Category, ComplexType, DataType, Negative, PineFrom, PineStaticType, PineType,
+    SecondType,
 };
 use std::cmp::{Ordering, PartialEq, PartialOrd};
 use std::convert::{From, Into};
@@ -12,12 +13,23 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::mem;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Series<'a, D: Clone + Debug + 'a> {
     current: D,
     history: Vec<D>,
     phantom: PhantomData<&'a D>,
     na_val: D,
+}
+
+impl<'a, D: Default + Clone + Debug + 'a> Clone for Series<'a, D> {
+    fn clone(&self) -> Self {
+        Series {
+            current: self.current.clone(),
+            history: vec![],
+            phantom: PhantomData,
+            na_val: D::default(),
+        }
+    }
 }
 
 impl<'a, D: Default + Clone + Debug + 'a> From<D> for Series<'a, D> {
@@ -95,7 +107,9 @@ impl<'a, D: PineStaticType + Clone + Debug + 'a> PineStaticType for Series<'a, D
     }
 }
 
-impl<'a, D: PineStaticType + PineType<'a> + Clone + Debug + 'a> PineType<'a> for Series<'a, D> {
+impl<'a, D: PineStaticType + PineType<'a> + Default + Clone + Debug + 'a> PineType<'a>
+    for Series<'a, D>
+{
     fn get_type(&self) -> (DataType, SecondType) {
         (<D as PineStaticType>::static_type().0, SecondType::Series)
     }
@@ -201,6 +215,13 @@ where
                 D::static_type()
             ))),
         }
+    }
+}
+
+impl<'a, D: Clone + Negative<D> + Debug + 'a> Negative<Series<'a, D>> for Series<'a, D> {
+    fn negative(mut self) -> Series<'a, D> {
+        self.current = self.current.negative();
+        self
     }
 }
 

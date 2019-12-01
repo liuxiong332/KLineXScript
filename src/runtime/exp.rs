@@ -67,12 +67,34 @@ impl<'a> RVRunner<'a> for Exp<'a> {
 impl<'a> Runner<'a> for TypeCast<'a> {
     fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
         let result = self.exp.rv_run(context)?;
-        match &self.data_type {
-            &DataType::Bool => Ok(Bool::explicity_from(result)?.into_pf()),
-            &DataType::Int => Ok(Int::explicity_from(result)?.into_pf()),
-            &DataType::Float => Ok(Float::explicity_from(result)?.into_pf()),
-            &DataType::Color => Ok(Color::explicity_from(result)?.into_pf()),
-            &DataType::String => Ok(String::explicity_from(result)?.into_pf()),
+        match (&self.data_type, result.get_type().1) {
+            (&DataType::Bool, SecondType::Simple) => Ok(Bool::explicity_from(result)?.into_pf()),
+            (&DataType::Bool, SecondType::Series) => {
+                let s: RefData<Series<Bool>> = Series::explicity_from(result)?;
+                Ok(s.into_pf())
+            }
+            (&DataType::Int, SecondType::Simple) => Ok(Int::explicity_from(result)?.into_pf()),
+            (&DataType::Int, SecondType::Series) => {
+                let s: RefData<Series<Int>> = Series::explicity_from(result)?;
+                Ok(s.into_pf())
+            }
+            (&DataType::Float, SecondType::Simple) => Ok(Float::explicity_from(result)?.into_pf()),
+            (&DataType::Float, SecondType::Series) => {
+                let s: RefData<Series<Float>> = Series::explicity_from(result)?;
+                Ok(s.into_pf())
+            }
+            (&DataType::Color, SecondType::Simple) => Ok(Color::explicity_from(result)?.into_pf()),
+            (&DataType::Color, SecondType::Series) => {
+                let s: RefData<Series<Color>> = Series::explicity_from(result)?;
+                Ok(s.into_pf())
+            }
+            (&DataType::String, SecondType::Simple) => {
+                Ok(String::explicity_from(result)?.into_pf())
+            }
+            (&DataType::String, SecondType::Series) => {
+                let s: RefData<Series<String>> = Series::explicity_from(result)?;
+                Ok(s.into_pf())
+            }
             _t => Err(RuntimeErr::NotCompatible(format!(
                 "Cannot convert {:?} to {:?}",
                 result.get_type(),
@@ -278,19 +300,19 @@ mod tests {
         );
     }
 
+    fn simple_exp<'a, D>(exp: Exp<'a>, v: D)
+    where
+        D: PineStaticType + PartialEq + Debug + PineType<'a> + 'a,
+    {
+        let mut context = Context::new(None, ContextType::Normal);
+        assert_eq!(
+            downcast_pf::<D>(exp.run(&mut context).unwrap()),
+            Ok(RefData::new(v))
+        );
+    }
+
     #[test]
     fn simple_exp_test() {
-        fn simple_exp<'a, D>(exp: Exp<'a>, v: D)
-        where
-            D: PineStaticType + PartialEq + Debug + PineType<'a> + 'a,
-        {
-            let mut context = Context::new(None, ContextType::Normal);
-            assert_eq!(
-                downcast_pf::<D>(exp.run(&mut context).unwrap()),
-                Ok(RefData::new(v))
-            );
-        }
-
         simple_exp::<NA>(Exp::Na, NA);
         simple_exp::<Bool>(Exp::Bool(false), false);
         simple_exp(Exp::Num(Numeral::Float(0f64)), Some(0f64));
@@ -307,33 +329,82 @@ mod tests {
         );
     }
 
+    fn simple_rv_exp<'a, D>(exp: Exp<'a>, v: D)
+    where
+        D: PineStaticType + PartialEq + Debug + PineType<'a> + 'a,
+    {
+        let mut context = Context::new(None, ContextType::Normal);
+        context.create_var("name", PineRef::new_box(Some(1)));
+        context.create_var("series", PineRef::new(Series::from(Some(1))));
+        assert_eq!(
+            downcast_pf::<D>(exp.rv_run(&mut context).unwrap()),
+            Ok(RefData::new(v))
+        );
+    }
+
     #[test]
     fn simple_rv_exp_test() {
-        fn simple_exp<'a, D>(exp: Exp<'a>, v: D)
-        where
-            D: PineStaticType + PartialEq + Debug + PineType<'a> + 'a,
-        {
-            let mut context = Context::new(None, ContextType::Normal);
-            context.create_var("name", PineRef::new_box(Some(1)));
-            assert_eq!(
-                downcast_pf::<D>(exp.rv_run(&mut context).unwrap()),
-                Ok(RefData::new(v))
-            );
-        }
-
-        simple_exp::<NA>(Exp::Na, NA);
-        simple_exp::<Bool>(Exp::Bool(false), false);
-        simple_exp(Exp::Num(Numeral::Float(0f64)), Some(0f64));
-        simple_exp(Exp::Num(Numeral::Int(1)), Some(1));
-        simple_exp(Exp::Str(String::from("hello")), String::from("hello"));
-        simple_exp(Exp::Color("#12"), Color("#12"));
-        simple_exp(Exp::VarName(VarName("name")), Some(1));
-        simple_exp(
+        simple_rv_exp::<NA>(Exp::Na, NA);
+        simple_rv_exp::<Bool>(Exp::Bool(false), false);
+        simple_rv_exp(Exp::Num(Numeral::Float(0f64)), Some(0f64));
+        simple_rv_exp(Exp::Num(Numeral::Int(1)), Some(1));
+        simple_rv_exp(Exp::Str(String::from("hello")), String::from("hello"));
+        simple_rv_exp(Exp::Color("#12"), Color("#12"));
+        simple_rv_exp(Exp::VarName(VarName("name")), Some(1));
+        simple_rv_exp(
             Exp::TypeCast(Box::new(TypeCast {
                 data_type: DataType::Float,
                 exp: Exp::VarName(VarName("name")),
             })),
             Some(1f64),
+        );
+    }
+
+    #[test]
+    fn type_cast_test() {
+        simple_exp(
+            Exp::TypeCast(Box::new(TypeCast {
+                data_type: DataType::Int,
+                exp: Exp::Num(Numeral::Float(1.2)),
+            })),
+            Some(1),
+        );
+        simple_rv_exp(
+            Exp::TypeCast(Box::new(TypeCast {
+                data_type: DataType::Int,
+                exp: Exp::VarName(VarName("series")),
+            })),
+            Series::from(Some(1)),
+        );
+
+        simple_exp(
+            Exp::TypeCast(Box::new(TypeCast {
+                data_type: DataType::Float,
+                exp: Exp::Num(Numeral::Float(1.2)),
+            })),
+            Some(1.2),
+        );
+        simple_rv_exp(
+            Exp::TypeCast(Box::new(TypeCast {
+                data_type: DataType::Float,
+                exp: Exp::VarName(VarName("series")),
+            })),
+            Series::from(Some(1.0)),
+        );
+
+        simple_exp(
+            Exp::TypeCast(Box::new(TypeCast {
+                data_type: DataType::Bool,
+                exp: Exp::Num(Numeral::Float(1.2)),
+            })),
+            true,
+        );
+        simple_rv_exp(
+            Exp::TypeCast(Box::new(TypeCast {
+                data_type: DataType::Bool,
+                exp: Exp::VarName(VarName("series")),
+            })),
+            Series::from(true),
         );
     }
 

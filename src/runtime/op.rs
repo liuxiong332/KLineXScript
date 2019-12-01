@@ -20,9 +20,17 @@ pub fn unary_op_run<'a>(
                 (FirstType::Int, SecondType::Simple) => Ok(PineRef::new_box(
                     downcast_pf::<Int>(val).unwrap().negative(),
                 )),
+                (FirstType::Int, SecondType::Series) => {
+                    let s = downcast_pf::<Series<Int>>(val).unwrap();
+                    Ok(PineRef::new(Series::from(s.get_current().negative())))
+                }
                 (FirstType::Float, SecondType::Simple) => Ok(PineRef::new_box(
                     downcast_pf::<Float>(val).unwrap().negative(),
                 )),
+                (FirstType::Float, SecondType::Series) => {
+                    let s = downcast_pf::<Series<Float>>(val).unwrap();
+                    Ok(PineRef::new(Series::from(s.get_current().negative())))
+                }
                 _ => Err(RuntimeErr::NotSupportOperator),
             }
         }

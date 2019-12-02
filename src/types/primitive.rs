@@ -7,6 +7,7 @@ use super::traits::{
     Arithmetic, Category, ComplexType, DataType, Negative, PineClass, PineFrom, PineStaticType,
     PineType, SecondType, SimpleType,
 };
+use std::fmt;
 
 // pine int type
 pub type Int = Option<i32>;

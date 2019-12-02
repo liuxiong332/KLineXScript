@@ -3,6 +3,7 @@ pub enum RuntimeErr {
     NotCompatible(String),
     NotValidParam,
     NotSupportOperator,
+    NotImplement(String),
     OutBound,
     NameDeclared,
     InvalidTypeCast,

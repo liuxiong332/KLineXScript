@@ -6,6 +6,7 @@ use nom::Err;
 extern crate lazy_static;
 
 pub mod ast;
+pub mod libs;
 pub mod runtime;
 pub mod types;
 

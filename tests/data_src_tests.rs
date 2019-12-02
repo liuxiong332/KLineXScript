@@ -1,12 +1,6 @@
 extern crate pine;
-use pine::runtime::{
-    context::Ctx,
-    data_src::{Callback, DataSrc},
-};
-use pine::types::{
-    Callable, DataType, Float, PineFrom, PineRef, PineType, RefData, RuntimeErr, SecondType,
-    Series, SeriesToArrayCall, NA,
-};
+use pine::libs;
+use pine::runtime::data_src::{Callback, DataSrc};
 use std::collections::HashMap;
 
 const MA_SCRIPT: &str = "
@@ -19,38 +13,6 @@ ma := ma / N
 print(ma)
 ";
 
-fn pine_print<'a>(
-    context: &mut dyn Ctx<'a>,
-    mut param: HashMap<&'a str, PineRef<'a>>,
-) -> Result<PineRef<'a>, RuntimeErr> {
-    println!("pine print Series run, {:?}", param.get("item"));
-    match param.remove("item") {
-        None => Err(RuntimeErr::NotSupportOperator),
-        Some(item_val) => {
-            if item_val.get_type().1 != SecondType::Series {
-                return Err(RuntimeErr::TypeMismatch(format!(
-                    "Expect Series, but get {:?}",
-                    item_val.get_type()
-                )));
-            }
-            let items: RefData<Series<Float>> = Series::implicity_from(item_val).unwrap();
-            println!("vec, {:?}", items);
-
-            let s: String = items
-                .get_history()
-                .iter()
-                .map(|v| match v {
-                    None => String::from("na"),
-                    Some(f) => f.to_string(),
-                })
-                .collect::<Vec<String>>()
-                .join(",");
-            context.get_callback().unwrap().print(s);
-            Ok(PineRef::new(NA))
-        }
-    }
-}
-
 #[test]
 fn datasrc_test() {
     struct MyCallback;
@@ -62,15 +24,7 @@ fn datasrc_test() {
 
     let ma_block = pine::parse_all(MA_SCRIPT).unwrap();
 
-    let mut inner_vars = HashMap::new();
-    inner_vars.insert(
-        "print",
-        PineRef::new(Callable::new(
-            None,
-            Some(Box::new(SeriesToArrayCall::new(pine_print))),
-            vec!["item"],
-        )),
-    );
+    let inner_vars = libs::declare_vars();
 
     let mut datasrc = DataSrc::new(&ma_block, inner_vars, &MyCallback);
 

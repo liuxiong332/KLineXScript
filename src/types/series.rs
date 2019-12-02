@@ -119,7 +119,7 @@ impl<'a, D: PineStaticType + PineType<'a> + Default + Clone + Debug + 'a> PineTy
     }
 
     fn copy(&self) -> PineRef<'a> {
-        PineRef::Box(Box::new(self.clone()))
+        PineRef::new_rc(self.clone())
     }
 }
 

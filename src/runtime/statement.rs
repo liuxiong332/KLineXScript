@@ -94,22 +94,28 @@ impl<'a> RunnerForName<'a> for Assignment<'a> {
 
         if true_val.get_type().1 == SecondType::Series {
             return match context.move_var(name) {
-                None => match true_val.get_type().0 {
-                    FirstType::Int => from_series::<Int>(true_val, name, context),
-                    FirstType::Float => from_series::<Float>(true_val, name, context),
-                    FirstType::Bool => from_series::<Bool>(true_val, name, context),
-                    _ => Err(RuntimeErr::TypeMismatch(String::from(
-                        "Series type can only be Int, Float and Bool",
-                    ))),
-                },
+                None => {
+                    // When assignment, must copy new variable.
+                    let true_val = true_val.copy_inner();
+                    match true_val.get_type().0 {
+                        FirstType::Int => from_series::<Int>(true_val, name, context),
+                        FirstType::Float => from_series::<Float>(true_val, name, context),
+                        FirstType::Bool => from_series::<Bool>(true_val, name, context),
+                        _ => Err(RuntimeErr::TypeMismatch(format!(
+                            "Series type can only be Int, Float and Bool, but get {:?}",
+                            true_val.get_type()
+                        ))),
+                    }
+                }
                 Some(current_val) => match current_val.get_type().0 {
                     FirstType::Int => update_series::<Int>(context, name, current_val, true_val),
                     FirstType::Float => {
                         update_series::<Float>(context, name, current_val, true_val)
                     }
                     FirstType::Bool => update_series::<Bool>(context, name, current_val, true_val),
-                    _ => Err(RuntimeErr::TypeMismatch(String::from(
-                        "Series type can only be Int, Float and Bool",
+                    _ => Err(RuntimeErr::TypeMismatch(format!(
+                        "Series type can only be Int, Float and Bool, but get {:?}",
+                        current_val.get_type()
                     ))),
                 },
             };

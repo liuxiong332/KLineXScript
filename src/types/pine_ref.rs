@@ -51,6 +51,20 @@ impl<'a> PineRef<'a> {
             _ => unreachable!(),
         }
     }
+
+    pub fn as_ptr(&self) -> *const (dyn PineType<'a> + 'a) {
+        match self {
+            &PineRef::Box(ref item) => item.as_ref(),
+            &PineRef::Rc(ref item) => unsafe { item.as_ptr().as_ref().unwrap() },
+        }
+    }
+
+    pub fn copy_inner(&self) -> PineRef<'a> {
+        match *self {
+            PineRef::Box(ref item) => item.copy(),
+            PineRef::Rc(ref item) => item.borrow().copy(),
+        }
+    }
 }
 
 impl<'a> PineType<'a> for PineRef<'a> {

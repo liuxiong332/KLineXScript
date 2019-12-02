@@ -93,33 +93,6 @@ impl<'a> PartialEq for dyn PineType<'a> + 'a {
     }
 }
 
-impl<'a> Eq for dyn PineType<'a> + 'a {}
-
-impl<'a> Hash for dyn PineType<'a> + 'a {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        // self.id.hash(state);
-        // self.phone.hash(state);
-        use super::{Float, Int, Series};
-
-        match self.get_type() {
-            (DataType::Int, SecondType::Simple) => {
-                downcast_ref::<Int>(self).unwrap().hash(state);
-            }
-            _ => {}
-            // (DataType::Float, SecondType::Simple) => downcast_ref::<Float>(self)
-            //     .unwrap()
-            //     .eq(downcast_ref::<Float>(other).unwrap()),
-            // (DataType::Int, SecondType::Series) => downcast_ref::<Series<Int>>(self)
-            //     .unwrap()
-            //     .eq(downcast_ref::<Series<Int>>(other).unwrap()),
-            // (DataType::Float, SecondType::Series) => downcast_ref::<Series<Float>>(self)
-            //     .unwrap()
-            //     .eq(downcast_ref::<Series<Float>>(other).unwrap()),
-            // _ => false,
-        }
-    }
-}
-
 pub trait PineClass<'a> {
     fn custom_type(&self) -> &str;
 

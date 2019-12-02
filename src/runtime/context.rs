@@ -125,9 +125,14 @@ impl<'a, 'b> Context<'a, 'b> {
 
     pub fn commit(&mut self) {
         let keys: Vec<&'a str> = self.vars.keys().cloned().collect();
-        let commited: HashSet<&(dyn PineType<'a> + 'a)> = HashSet::new();
+        // The committed set used to make sure only one instance of series commmit.
+        let mut commited: HashSet<*const (dyn PineType<'a> + 'a)> = HashSet::new();
         for k in keys {
             let val = self.move_var(k).unwrap();
+            if commited.contains(&val.as_ptr()) {
+                continue;
+            }
+            commited.insert(val.as_ptr());
             let ret_val = match val.get_type() {
                 (DataType::Float, SecondType::Series) => commit_series::<Float>(val),
                 (DataType::Int, SecondType::Series) => commit_series::<Int>(val),

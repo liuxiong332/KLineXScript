@@ -1,3 +1,4 @@
+pub mod array;
 pub mod callable;
 pub mod downcast;
 pub mod error;

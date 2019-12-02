@@ -66,6 +66,10 @@ impl<'a> fmt::Debug for dyn PineType<'a> + 'a {
             (DataType::Float, SecondType::Series) => {
                 downcast_ref::<Series<Float>>(self).unwrap().fmt(f)
             }
+            (DataType::Int, SecondType::Array) => downcast_ref::<Vec<Int>>(self).unwrap().fmt(f),
+            (DataType::Float, SecondType::Array) => {
+                downcast_ref::<Vec<Float>>(self).unwrap().fmt(f)
+            }
             _ => write!(f, "Unkown type"),
         }
     }

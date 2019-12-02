@@ -161,8 +161,6 @@ where
     let mut s = Series::implicity_from(exist_val)?;
     let v = D::implicity_from(val)?;
     s.update(v.into_inner());
-    println!("Last value: {:?}", s);
-
     context.update_var(name, s.into_pf());
     Ok(())
 }
@@ -174,10 +172,8 @@ impl<'a> StmtRunner<'a> for VarAssignment<'a> {
             return Err(RuntimeErr::NameNotDeclard);
         }
         let val = self.val.rv_run(context)?;
-        // println!("Current val: {:?}", val);
 
         let exist_val = context.move_var(name).unwrap();
-        // println!("Current value: {:?}", exist_val);
         match exist_val.get_type() {
             (FirstType::Bool, _) => update_series::<Bool>(context, name, exist_val, val),
             (FirstType::Int, _) => update_series::<Int>(context, name, exist_val, val),
@@ -250,7 +246,6 @@ impl<'a> Runner<'a> for ForRange<'a> {
             -1
         };
         let mut iter = start;
-        println!("For range {:?} {:?} {:?}", start, end, step);
         let mut ret_val: PineRef<'a> = PineRef::new_box(NA);
         while (step > 0 && iter < end) || (step < 0 && iter > end) {
             let mut new_context = Context::new(Some(context), ContextType::ForRangeBlock);
@@ -559,6 +554,39 @@ mod tests {
     }
 
     #[test]
+    fn for_range_exp_test() {
+        let assign = Statement::Assignment(Box::new(Assignment::new(
+            vec![VarName("a")],
+            Exp::Num(Numeral::Int(1)),
+            false,
+            None,
+        )));
+        let block = Block::new(vec![assign], Some(Exp::Num(Numeral::Int(10))));
+        let for_range = ForRange::new(
+            VarName("i"),
+            Exp::VarName(VarName("start")),
+            Exp::VarName(VarName("end")),
+            Some(Exp::VarName(VarName("step"))),
+            block,
+        );
+
+        let mut context = Context::new(None, ContextType::Normal);
+        context.create_var("start", PineRef::new(Some(1)));
+        context.create_var("end", PineRef::new(Some(10)));
+        context.create_var("step", PineRef::new(Some(5)));
+
+        let result = Runner::run(&for_range, &mut context);
+        assert!(result.is_ok());
+
+        assert_eq!(
+            Int::implicity_from(result.unwrap()),
+            Ok(RefData::new_box(Some(10)))
+        );
+
+        assert!(context.move_var("a").is_none());
+    }
+
+    #[test]
     fn func_call_exp_test() {
         use std::collections::HashMap;
         let exp = FunctionCall {
@@ -614,7 +642,13 @@ mod tests {
     #[test]
     fn for_range_break_test() {
         let block = Block::new(vec![Statement::Break], Some(Exp::VarName(VarName("i"))));
-        let for_range = ForRange::new(VarName("i"), 1, 10, None, block);
+        let for_range = ForRange::new(
+            VarName("i"),
+            Exp::Num(Numeral::Int(1)),
+            Exp::Num(Numeral::Int(10)),
+            None,
+            block,
+        );
 
         let mut context = Context::new(None, ContextType::Normal);
 
@@ -632,7 +666,13 @@ mod tests {
     #[test]
     fn for_range_continue_test() {
         let block = Block::new(vec![Statement::Continue], Some(Exp::VarName(VarName("i"))));
-        let for_range = ForRange::new(VarName("i"), 1, 10, None, block);
+        let for_range = ForRange::new(
+            VarName("i"),
+            Exp::Num(Numeral::Int(1)),
+            Exp::Num(Numeral::Int(10)),
+            None,
+            block,
+        );
 
         let mut context = Context::new(None, ContextType::Normal);
 

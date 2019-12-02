@@ -217,10 +217,33 @@ impl<'a> StmtRunner<'a> for IfThenElse<'a> {
 impl<'a> Runner<'a> for ForRange<'a> {
     fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
         let iter_name = self.var.0;
-        let start = self.start;
-        let end = self.end;
-        let step = if let Some(s) = self.step {
-            s
+        let start: i32;
+        match *Int::implicity_from(self.start.rv_run(context)?)? {
+            Some(val) => start = val,
+            None => {
+                return Err(RuntimeErr::NotCompatible(format!(
+                    "The start index of for-range must be not na int, but get na"
+                )))
+            }
+        }
+        let end: i32;
+        match *Int::implicity_from(self.end.rv_run(context)?)? {
+            Some(val) => end = val,
+            None => {
+                return Err(RuntimeErr::NotCompatible(format!(
+                    "The start index of for-range must be not na int, but get na"
+                )))
+            }
+        }
+        let step = if let Some(s) = &self.step {
+            match *Int::implicity_from(s.rv_run(context)?)? {
+                Some(val) => val,
+                None => {
+                    return Err(RuntimeErr::NotCompatible(format!(
+                        "The start index of for-range must be not na int, but get na"
+                    )))
+                }
+            }
         } else if start < end {
             1
         } else {
@@ -514,7 +537,13 @@ mod tests {
             None,
         )));
         let block = Block::new(vec![assign], Some(Exp::Num(Numeral::Int(10))));
-        let for_range = ForRange::new(VarName("i"), 1, 10, None, block);
+        let for_range = ForRange::new(
+            VarName("i"),
+            Exp::Num(Numeral::Int(1)),
+            Exp::Num(Numeral::Int(10)),
+            None,
+            block,
+        );
 
         let mut context = Context::new(None, ContextType::Normal);
 

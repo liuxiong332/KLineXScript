@@ -156,10 +156,10 @@ fn for_range<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<ForRange> {
             tag("for"),
             varname_ws,
             eat_sep(tag("=")),
-            int_lit_ws,
+            exp, // int_lit_ws,
             eat_sep(tag("to")),
-            int_lit_ws,
-            opt(tuple((eat_sep(tag("by")), int_lit_ws))),
+            exp, // int_lit_ws,
+            opt(tuple((eat_sep(tag("by")), exp))),
             statement_end,
             block_with_indent(indent + 1),
         ))(input)?;
@@ -347,6 +347,7 @@ pub fn block(input: &str) -> PineResult<Block> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::num::Numeral;
     use super::*;
 
     #[test]
@@ -585,8 +586,8 @@ mod tests {
                 "",
                 ForRange::new(
                     VarName("a"),
-                    1,
-                    2,
+                    Exp::Num(Numeral::Int(1)),
+                    Exp::Num(Numeral::Int(2)),
                     None,
                     Block::new(vec![Statement::Break], Some(Exp::Bool(true))),
                 )

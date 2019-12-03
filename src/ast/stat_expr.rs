@@ -139,9 +139,12 @@ fn if_then_else<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<IfThenElse>
             ))),
         ))(input)?;
         if let Some((_, _, else_block)) = else_block {
-            Ok((input, IfThenElse::new(cond, then_block, Some(else_block))))
+            Ok((
+                input,
+                IfThenElse::new_no_ctxid(cond, then_block, Some(else_block)),
+            ))
         } else {
-            Ok((input, IfThenElse::new(cond, then_block, None)))
+            Ok((input, IfThenElse::new_no_ctxid(cond, then_block, None)))
         }
     }
 }
@@ -164,9 +167,12 @@ fn for_range<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<ForRange> {
             block_with_indent(indent + 1),
         ))(input)?;
         if let Some((_, step)) = by {
-            Ok((input, ForRange::new(var, start, end, Some(step), do_blk)))
+            Ok((
+                input,
+                ForRange::new_no_ctxid(var, start, end, Some(step), do_blk),
+            ))
         } else {
-            Ok((input, ForRange::new(var, start, end, None, do_blk)))
+            Ok((input, ForRange::new_no_ctxid(var, start, end, None, do_blk)))
         }
     }
 }
@@ -462,11 +468,11 @@ mod tests {
             statement_with_indent(1)("    a(arg1) \n"),
             Ok((
                 "",
-                Statement::FuncCall(Box::new(FunctionCall {
-                    method: Exp::VarName(VarName("a")),
-                    pos_args: vec![Exp::VarName(VarName("arg1"))],
-                    dict_args: vec![]
-                }))
+                Statement::FuncCall(Box::new(FunctionCall::new_no_ctxid(
+                    Exp::VarName(VarName("a")),
+                    vec![Exp::VarName(VarName("arg1"))],
+                    vec![]
+                )))
             ))
         );
         assert_eq!(
@@ -569,7 +575,7 @@ mod tests {
             if_then_else(0)("if true \n    break\n    true  \n"),
             Ok((
                 "",
-                IfThenElse::new(
+                IfThenElse::new_no_ctxid(
                     Exp::Bool(true),
                     Block::new(vec![Statement::Break], Some(Exp::Bool(true))),
                     None
@@ -584,7 +590,7 @@ mod tests {
             for_range(0)("for a = 1 to 2 \n    break\n    true  \n"),
             Ok((
                 "",
-                ForRange::new(
+                ForRange::new_no_ctxid(
                     VarName("a"),
                     Exp::Num(Numeral::Int(1)),
                     Exp::Num(Numeral::Int(2)),

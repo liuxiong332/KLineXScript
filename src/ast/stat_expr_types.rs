@@ -7,6 +7,36 @@ pub struct FunctionCall<'a> {
     pub method: Exp<'a>,
     pub pos_args: Vec<Exp<'a>>,
     pub dict_args: Vec<(VarName<'a>, Exp<'a>)>,
+    pub ctxid: i32,
+}
+
+impl<'a> FunctionCall<'a> {
+    pub fn new(
+        method: Exp<'a>,
+        pos_args: Vec<Exp<'a>>,
+        dict_args: Vec<(VarName<'a>, Exp<'a>)>,
+        ctxid: i32,
+    ) -> Self {
+        FunctionCall {
+            method,
+            pos_args,
+            dict_args,
+            ctxid,
+        }
+    }
+
+    pub fn new_no_ctxid(
+        method: Exp<'a>,
+        pos_args: Vec<Exp<'a>>,
+        dict_args: Vec<(VarName<'a>, Exp<'a>)>,
+    ) -> Self {
+        FunctionCall {
+            method,
+            pos_args,
+            dict_args,
+            ctxid: 0,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -149,16 +179,36 @@ impl<'a> Block<'a> {
 pub struct IfThenElse<'a> {
     pub cond: Exp<'a>,
     pub then_blk: Block<'a>,
+    pub then_ctxid: i32,
     // pub elseifs: Vec<(Exp<'a>, Block<'a>)>,
     pub else_blk: Option<Block<'a>>,
+    pub else_ctxid: i32,
 }
 
 impl<'a> IfThenElse<'a> {
-    pub fn new(cond: Exp<'a>, then_blk: Block<'a>, else_blk: Option<Block<'a>>) -> Self {
+    pub fn new(
+        cond: Exp<'a>,
+        then_blk: Block<'a>,
+        else_blk: Option<Block<'a>>,
+        then_ctxid: i32,
+        else_ctxid: i32,
+    ) -> Self {
+        IfThenElse {
+            cond,
+            then_blk,
+            then_ctxid,
+            else_blk,
+            else_ctxid,
+        }
+    }
+
+    pub fn new_no_ctxid(cond: Exp<'a>, then_blk: Block<'a>, else_blk: Option<Block<'a>>) -> Self {
         IfThenElse {
             cond,
             then_blk,
             else_blk,
+            then_ctxid: 0,
+            else_ctxid: 1,
         }
     }
 }
@@ -170,10 +220,29 @@ pub struct ForRange<'a> {
     pub end: Exp<'a>,
     pub step: Option<Exp<'a>>,
     pub do_blk: Block<'a>,
+    pub ctxid: i32,
 }
 
 impl<'a> ForRange<'a> {
     pub fn new(
+        var: VarName<'a>,
+        start: Exp<'a>,
+        end: Exp<'a>,
+        step: Option<Exp<'a>>,
+        do_blk: Block<'a>,
+        ctxid: i32,
+    ) -> Self {
+        ForRange {
+            var,
+            start,
+            end,
+            step,
+            do_blk,
+            ctxid,
+        }
+    }
+
+    pub fn new_no_ctxid(
         var: VarName<'a>,
         start: Exp<'a>,
         end: Exp<'a>,
@@ -186,6 +255,7 @@ impl<'a> ForRange<'a> {
             end,
             step,
             do_blk,
+            ctxid: 0,
         }
     }
 }

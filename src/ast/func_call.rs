@@ -79,11 +79,7 @@ pub fn func_call(input: &str) -> PineResult<FunctionCall> {
     ))(input)?;
     Ok((
         input,
-        FunctionCall {
-            method,
-            pos_args,
-            dict_args,
-        },
+        FunctionCall::new_no_ctxid(method, pos_args, dict_args),
     ))
 }
 
@@ -111,11 +107,11 @@ mod tests {
             func_call_ws("funa(arg1, arg2, a = true)"),
             Ok((
                 "",
-                FunctionCall {
-                    method: Exp::VarName(VarName("funa")),
-                    pos_args: vec![Exp::VarName(VarName("arg1")), Exp::VarName(VarName("arg2"))],
-                    dict_args: vec![(VarName("a"), Exp::Bool(true))]
-                }
+                FunctionCall::new_no_ctxid(
+                    Exp::VarName(VarName("funa")),
+                    vec![Exp::VarName(VarName("arg1")), Exp::VarName(VarName("arg2"))],
+                    vec![(VarName("a"), Exp::Bool(true))]
+                )
             ))
         );
 
@@ -123,11 +119,7 @@ mod tests {
             func_call_ws("funa()"),
             Ok((
                 "",
-                FunctionCall {
-                    method: Exp::VarName(VarName("funa")),
-                    pos_args: vec![],
-                    dict_args: vec![]
-                }
+                FunctionCall::new_no_ctxid(Exp::VarName(VarName("funa")), vec![], vec![])
             ))
         );
 
@@ -135,13 +127,13 @@ mod tests {
             func_call_ws("funa.funb()"),
             Ok((
                 "",
-                FunctionCall {
-                    method: Exp::PrefixExp(Box::new(PrefixExp {
+                FunctionCall::new_no_ctxid(
+                    Exp::PrefixExp(Box::new(PrefixExp {
                         var_chain: vec![VarName("funa"), VarName("funb")]
                     })),
-                    pos_args: vec![],
-                    dict_args: vec![]
-                }
+                    vec![],
+                    vec![]
+                )
             ))
         );
     }
@@ -151,15 +143,15 @@ mod tests {
             func_call_ws("funa(funb())"),
             Ok((
                 "",
-                FunctionCall {
-                    method: Exp::VarName(VarName("funa")),
-                    pos_args: vec![Exp::FuncCall(Box::new(FunctionCall {
-                        method: Exp::VarName(VarName("funb")),
-                        pos_args: vec![],
-                        dict_args: vec![]
-                    }))],
-                    dict_args: vec![]
-                }
+                FunctionCall::new_no_ctxid(
+                    Exp::VarName(VarName("funa")),
+                    vec![Exp::FuncCall(Box::new(FunctionCall::new_no_ctxid(
+                        Exp::VarName(VarName("funb")),
+                        vec![],
+                        vec![]
+                    )))],
+                    vec![]
+                )
             ))
         );
     }

@@ -64,7 +64,7 @@ fn var_assign_test() {
         Ok(Block::new(
             vec![
                 gen_assign("price", gen_name("close")),
-                Statement::Ite(Box::new(IfThenElse::new(
+                Statement::Ite(Box::new(IfThenElse::new_no_ctxid(
                     gen_binop(BinaryOp::Gt, gen_name("hl2"), gen_name("price")),
                     Block::new(
                         vec![Statement::VarAssignment(Box::new(VarAssignment::new(
@@ -140,7 +140,7 @@ fn if_stats_test() {
                 Statement::None,
                 gen_assign(
                     "x",
-                    Exp::Ite(Box::new(IfThenElse::new(
+                    Exp::Ite(Box::new(IfThenElse::new_no_ctxid(
                         gen_binop(BinaryOp::Gt, gen_name("close"), gen_name("open")),
                         Block::new(vec![], Some(gen_name("close"))),
                         Some(Block::new(vec![], Some(gen_name("open"))))
@@ -158,12 +158,12 @@ fn if_stats_test() {
                 Statement::None,
                 gen_assign(
                     "x",
-                    Exp::Ite(Box::new(IfThenElse::new(
+                    Exp::Ite(Box::new(IfThenElse::new_no_ctxid(
                         gen_binop(BinaryOp::Gt, gen_name("close"), gen_name("open")),
                         Block::new(
                             vec![gen_assign(
                                 "b",
-                                Exp::Ite(Box::new(IfThenElse::new(
+                                Exp::Ite(Box::new(IfThenElse::new_no_ctxid(
                                     gen_binop(
                                         BinaryOp::Gt,
                                         gen_name("close"),
@@ -201,11 +201,11 @@ fn gen_dot_func_call<'a>(
     pos_args: Vec<Exp<'a>>,
     dict_args: Vec<(VarName<'a>, Exp<'a>)>,
 ) -> Statement<'a> {
-    Statement::FuncCall(Box::new(FunctionCall {
-        method: gen_prefix(methods),
-        pos_args: pos_args,
-        dict_args: dict_args,
-    }))
+    Statement::FuncCall(Box::new(FunctionCall::new_no_ctxid(
+        gen_prefix(methods),
+        pos_args,
+        dict_args,
+    )))
 }
 
 #[test]
@@ -215,7 +215,7 @@ fn if_expr_test() {
         Ok(Block::new(
             vec![
                 Statement::None,
-                Statement::Ite(Box::new(IfThenElse::new(
+                Statement::Ite(Box::new(IfThenElse::new_no_ctxid(
                     gen_func_call(
                         "crossover",
                         vec![gen_name("source"), gen_name("lower")],

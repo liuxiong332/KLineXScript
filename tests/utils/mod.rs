@@ -16,11 +16,11 @@ pub fn gen_func_call<'a>(
     pos_args: Vec<Exp<'a>>,
     dict_args: Vec<(VarName<'a>, Exp<'a>)>,
 ) -> Exp<'a> {
-    Exp::FuncCall(Box::new(FunctionCall {
-        method: Exp::VarName(VarName(method)),
-        pos_args: pos_args,
-        dict_args: dict_args,
-    }))
+    Exp::FuncCall(Box::new(FunctionCall::new_no_ctxid(
+        Exp::VarName(VarName(method)),
+        pos_args,
+        dict_args,
+    )))
 }
 
 pub fn gen_ref_call<'a>(name: &'a str, exp: Exp<'a>) -> Exp<'a> {
@@ -70,9 +70,9 @@ pub fn gen_func_call_stmt<'a>(
     pos_args: Vec<Exp<'a>>,
     dict_args: Vec<(VarName<'a>, Exp<'a>)>,
 ) -> Statement<'a> {
-    Statement::FuncCall(Box::new(FunctionCall {
-        method: Exp::VarName(VarName(method)),
-        pos_args: pos_args,
-        dict_args: dict_args,
-    }))
+    Statement::FuncCall(Box::new(FunctionCall::new_no_ctxid(
+        Exp::VarName(VarName(method)),
+        pos_args,
+        dict_args,
+    )))
 }

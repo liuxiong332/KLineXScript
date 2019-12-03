@@ -505,7 +505,7 @@ mod tests {
 
     #[test]
     fn if_then_else_test() {
-        let ite = IfThenElse::new(
+        let ite = IfThenElse::new_no_ctxid(
             Exp::VarName(VarName("cond")),
             Block::new(vec![], Some(Exp::VarName(VarName("then")))),
             Some(Block::new(vec![], Some(Exp::VarName(VarName("else"))))),
@@ -532,7 +532,7 @@ mod tests {
             None,
         )));
         let block = Block::new(vec![assign], Some(Exp::Num(Numeral::Int(10))));
-        let for_range = ForRange::new(
+        let for_range = ForRange::new_no_ctxid(
             VarName("i"),
             Exp::Num(Numeral::Int(1)),
             Exp::Num(Numeral::Int(10)),
@@ -562,7 +562,7 @@ mod tests {
             None,
         )));
         let block = Block::new(vec![assign], Some(Exp::Num(Numeral::Int(10))));
-        let for_range = ForRange::new(
+        let for_range = ForRange::new_no_ctxid(
             VarName("i"),
             Exp::VarName(VarName("start")),
             Exp::VarName(VarName("end")),
@@ -589,11 +589,11 @@ mod tests {
     #[test]
     fn func_call_exp_test() {
         use std::collections::HashMap;
-        let exp = FunctionCall {
-            method: Exp::VarName(VarName("name")),
-            pos_args: vec![Exp::Bool(true)],
-            dict_args: vec![],
-        };
+        let exp = FunctionCall::new_no_ctxid(
+            Exp::VarName(VarName("name")),
+            vec![Exp::Bool(true)],
+            vec![],
+        );
         let mut context = Context::new(None, ContextType::Normal);
 
         fn test_func<'a>(
@@ -619,11 +619,11 @@ mod tests {
     fn func_call_exp2_test() {
         use crate::ast::stat_expr_types::Exp;
 
-        let exp = FunctionCall {
-            method: Exp::VarName(VarName("name")),
-            pos_args: vec![Exp::Bool(true)],
-            dict_args: vec![],
-        };
+        let exp = FunctionCall::new_no_ctxid(
+            Exp::VarName(VarName("name")),
+            vec![Exp::Bool(true)],
+            vec![],
+        );
         let def_exp = FunctionDef {
             name: VarName("name"),
             params: vec![VarName("arg")],
@@ -642,7 +642,7 @@ mod tests {
     #[test]
     fn for_range_break_test() {
         let block = Block::new(vec![Statement::Break], Some(Exp::VarName(VarName("i"))));
-        let for_range = ForRange::new(
+        let for_range = ForRange::new_no_ctxid(
             VarName("i"),
             Exp::Num(Numeral::Int(1)),
             Exp::Num(Numeral::Int(10)),
@@ -666,7 +666,7 @@ mod tests {
     #[test]
     fn for_range_continue_test() {
         let block = Block::new(vec![Statement::Continue], Some(Exp::VarName(VarName("i"))));
-        let for_range = ForRange::new(
+        let for_range = ForRange::new_no_ctxid(
             VarName("i"),
             Exp::Num(Numeral::Int(1)),
             Exp::Num(Numeral::Int(10)),

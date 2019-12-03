@@ -17,11 +17,11 @@ fn comment_test() {
         Ok(Block::new(
             vec![
                 Statement::None,
-                Statement::FuncCall(Box::new(FunctionCall {
-                    method: Exp::VarName(VarName("study")),
-                    pos_args: vec![Exp::Str(String::from("Test"))],
-                    dict_args: vec![]
-                })),
+                Statement::FuncCall(Box::new(FunctionCall::new_no_ctxid(
+                    Exp::VarName(VarName("study")),
+                    vec![Exp::Str(String::from("Test"))],
+                    vec![]
+                ))),
                 Statement::None,
                 Statement::Assignment(Box::new(Assignment::new(
                     vec![VarName("a")],
@@ -29,11 +29,11 @@ fn comment_test() {
                     false,
                     None
                 ))),
-                Statement::FuncCall(Box::new(FunctionCall {
-                    method: Exp::VarName(VarName("plot")),
-                    pos_args: vec![Exp::VarName(VarName("a"))],
-                    dict_args: vec![]
-                }))
+                Statement::FuncCall(Box::new(FunctionCall::new_no_ctxid(
+                    Exp::VarName(VarName("plot")),
+                    vec![Exp::VarName(VarName("a"))],
+                    vec![]
+                )))
             ],
             None
         ))

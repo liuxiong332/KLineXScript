@@ -22,11 +22,11 @@ fn datasrc_test() {
         }
     }
 
-    let ma_block = pine::parse_all(MA_SCRIPT).unwrap();
+    let mut ma_block = pine::parse_all(MA_SCRIPT).unwrap();
 
     let inner_vars = libs::declare_vars();
 
-    let mut datasrc = DataSrc::new(&ma_block, inner_vars, &MyCallback);
+    let mut datasrc = DataSrc::new(&mut ma_block, inner_vars, &MyCallback);
 
     let mut data = HashMap::new();
     data.insert(

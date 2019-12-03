@@ -1,4 +1,4 @@
-use super::context::{Context, ContextType, Ctx, RVRunner, Runner, StmtRunner};
+use super::context::{downcast_ctx, Context, ContextType, Ctx, RVRunner, Runner, StmtRunner};
 use super::function::Function;
 use crate::ast::name::VarName;
 use crate::ast::stat_expr_types::{
@@ -302,6 +302,19 @@ fn extract_args<'a>(
 impl<'a> Runner<'a> for FunctionCall<'a> {
     fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
         let result = self.method.rv_run(context)?;
+        let ctx_name = format!("@{:?}", self.ctxid);
+
+        let ctx_instance = downcast_ctx(context)?;
+        let sub_context;
+        // Get or create sub context for the function call context.
+        if !ctx_instance.contains_sub_context(&ctx_name) {
+            sub_context =
+                ctx_instance.create_sub_context(ctx_name.clone(), ContextType::FuncDefBlock);
+        } else {
+            sub_context = ctx_instance.get_sub_context(&ctx_name).unwrap();
+        }
+        let ctx_ref = &mut **sub_context;
+
         match result.get_type() {
             (FirstType::Callable, SecondType::Simple) => {
                 let callable = downcast_pf::<Callable>(result).unwrap();
@@ -312,8 +325,8 @@ impl<'a> Runner<'a> for FunctionCall<'a> {
             }
             (FirstType::Function, SecondType::Simple) => {
                 let callable = downcast_pf::<Function>(result).unwrap();
-                let (pos_args, dict_args) = extract_args(context, self)?;
-                callable.call(context, pos_args, dict_args)
+                let (pos_args, dict_args) = extract_args(ctx_ref, self)?;
+                callable.call(ctx_ref, pos_args, dict_args)
             }
             _ => Err(RuntimeErr::NotSupportOperator),
         }

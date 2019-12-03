@@ -62,10 +62,10 @@ impl<'a> Function<'a> {
                 }
             }
         }
-        let mut new_context = Context::new(Some(context), ContextType::FuncDefBlock);
+        // let mut new_context = Context::new(Some(context), ContextType::FuncDefBlock);
         for (k, v) in all_args {
-            new_context.create_var(k, v);
+            context.create_var(k, v);
         }
-        self.def.body.run(&mut new_context)
+        self.def.body.run(context)
     }
 }

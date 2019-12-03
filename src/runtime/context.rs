@@ -7,6 +7,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::mem;
 
+// lifetime 'a is the lifetime of Exp, 'c is the lifetime of Ctx Self's lifetime
 pub trait Ctx<'a> {
     fn create_var(&mut self, name: &'a str, val: PineRef<'a>) -> Option<PineRef<'a>>;
 
@@ -39,12 +40,14 @@ pub enum ContextType {
     FuncDefBlock,
 }
 
-// T is Context<_, _>, but in this situation, we cannot give Context<'c, 'd>
-// because there is no place to declare 'c and 'd lifetime.
-pub struct Context<'a, 'b> {
+// 'a is the lifetime of Exp, 'b is the parent context's lifetime, 'c is the context self's lifetime
+pub struct Context<'a, 'b, 'c> {
     // input: &'a str,
     parent: Option<&'b mut (dyn 'b + Ctx<'a>)>,
     context_type: ContextType,
+
+    // Child contexts that with parent self lifetime 'c
+    sub_contexts: HashMap<String, Box<dyn 'c + Ctx<'a>>>,
 
     // variable map that defined by user and library.
     vars: HashMap<&'a str, PineRef<'a>>,
@@ -55,6 +58,16 @@ pub struct Context<'a, 'b> {
 
     callback: Option<&'a dyn Callback>,
     first_commit: bool,
+}
+
+pub fn downcast_ctx<'a, 'b, 'c>(
+    item: &'c mut (dyn Ctx<'a> + 'c),
+) -> Result<&'c mut Context<'a, 'b, 'c>, RuntimeErr> {
+    unsafe {
+        let raw: *mut dyn Ctx<'a> = item;
+        let t = raw as *mut Context<'a, 'b, 'c>;
+        Ok(t.as_mut().unwrap())
+    }
 }
 
 fn commit_series<'a, D>(val: PineRef<'a>) -> PineRef<'a>
@@ -75,11 +88,12 @@ where
     series.into_pf()
 }
 
-impl<'a, 'b> Context<'a, 'b> {
-    pub fn new(parent: Option<&'b mut (dyn 'b + Ctx<'a>)>, t: ContextType) -> Context<'a, 'b> {
+impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
+    pub fn new(parent: Option<&'b mut (dyn 'b + Ctx<'a>)>, t: ContextType) -> Context<'a, 'b, 'c> {
         Context {
             parent,
             context_type: t,
+            sub_contexts: HashMap::new(),
             vars: HashMap::new(),
             _series: vec![],
             callables: vec![],
@@ -89,10 +103,11 @@ impl<'a, 'b> Context<'a, 'b> {
         }
     }
 
-    pub fn new_with_callback(callback: &'a dyn Callback) -> Context<'a, 'b> {
+    pub fn new_with_callback(callback: &'a dyn Callback) -> Context<'a, 'b, 'c> {
         Context {
             parent: None,
             context_type: ContextType::Normal,
+            sub_contexts: HashMap::new(),
             vars: HashMap::new(),
             _series: vec![],
             callables: vec![],
@@ -100,6 +115,23 @@ impl<'a, 'b> Context<'a, 'b> {
             callback: Some(callback),
             first_commit: false,
         }
+    }
+
+    pub fn set_parent(&mut self, parent: &'b mut (dyn 'b + Ctx<'a>)) {
+        self.parent = Some(parent);
+    }
+
+    pub fn create_sub_context(
+        &'c mut self,
+        name: String,
+        t: ContextType,
+    ) -> &mut Box<dyn Ctx<'a> + 'c>
+    where
+        'a: 'c,
+    {
+        let mut new_context = Box::new(Context::new(None, t));
+        self.set_sub_context(name.clone(), new_context);
+        self.get_sub_context(&name).unwrap()
     }
 
     pub fn map_var<F>(&mut self, name: &'a str, f: F)
@@ -176,9 +208,21 @@ impl<'a, 'b> Context<'a, 'b> {
         mem::replace(&mut self.callables, callables);
         Ok(())
     }
+
+    pub fn contains_sub_context(&self, name: &String) -> bool {
+        self.sub_contexts.contains_key(name)
+    }
+
+    pub fn get_sub_context(&mut self, name: &String) -> Option<&mut Box<dyn Ctx<'a> + 'c>> {
+        self.sub_contexts.get_mut(name)
+    }
+
+    pub fn set_sub_context(&mut self, name: String, sub_context: Box<dyn Ctx<'a> + 'c>) {
+        self.sub_contexts.insert(name, sub_context);
+    }
 }
 
-impl<'a, 'b> Ctx<'a> for Context<'a, 'b> {
+impl<'a, 'b, 'c> Ctx<'a> for Context<'a, 'b, 'c> {
     fn create_var(&mut self, name: &'a str, val: PineRef<'a>) -> Option<PineRef<'a>> {
         self.vars.insert(name, val)
     }

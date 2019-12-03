@@ -1,4 +1,5 @@
 use super::context::{Context, ContextType, Ctx, Runner};
+use super::ctxid_parser::CtxIdParser;
 use crate::ast::stat_expr_types::Block;
 use crate::types::{Float, PineFrom, PineRef, PineType, RefData, RuntimeErr, Series};
 use std::collections::HashMap;
@@ -7,8 +8,8 @@ pub trait Callback {
     fn print(&self, _str: String) {}
 }
 
-pub struct DataSrc<'a, 'b> {
-    context: Context<'a, 'b>,
+pub struct DataSrc<'a, 'b, 'c> {
+    context: Context<'a, 'b, 'c>,
     blk: &'a Block<'a>,
     pub callback: &'a dyn Callback,
 }
@@ -26,12 +27,13 @@ fn get_len(data: &HashMap<&'static str, Vec<Float>>) -> Result<usize, RuntimeErr
     Ok(lens[0])
 }
 
-impl<'a, 'b> DataSrc<'a, 'b> {
+impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
     pub fn new(
-        blk: &'a Block<'a>,
+        blk: &'a mut Block<'a>,
         vars: HashMap<&'a str, PineRef<'a>>,
         callback: &'a dyn Callback,
-    ) -> DataSrc<'a, 'b> {
+    ) -> DataSrc<'a, 'b, 'c> {
+        CtxIdParser::new().parse_blk(blk);
         let mut context = Context::new_with_callback(callback);
         for (k, v) in vars.into_iter() {
             context.create_var(k, v);
@@ -93,7 +95,7 @@ mod tests {
 
     #[test]
     fn datasrc_test() {
-        let blk = Block::new(
+        let mut blk = Block::new(
             vec![Statement::Assignment(Box::new(Assignment::new(
                 vec![VarName("hello")],
                 Exp::VarName(VarName("close")),
@@ -102,7 +104,7 @@ mod tests {
             )))],
             None,
         );
-        let mut datasrc = DataSrc::new(&blk, HashMap::new(), &MyCallback);
+        let mut datasrc = DataSrc::new(&mut blk, HashMap::new(), &MyCallback);
 
         let mut data = HashMap::new();
         data.insert("close", vec![Some(10f64), Some(100f64)]);

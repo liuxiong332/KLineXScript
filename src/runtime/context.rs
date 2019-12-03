@@ -129,7 +129,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
     where
         'a: 'c,
     {
-        let mut new_context = Box::new(Context::new(None, t));
+        let new_context = Box::new(Context::new(None, t));
         self.set_sub_context(name.clone(), new_context);
         self.get_sub_context(&name).unwrap()
     }

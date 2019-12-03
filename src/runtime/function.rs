@@ -1,4 +1,5 @@
 use super::context::{Context, ContextType, Ctx, Runner};
+use super::statement::process_assign_val;
 use crate::ast::stat_expr_types::FunctionDef;
 use crate::types::{
     Category, ComplexType, DataType, PineFrom, PineRef, PineStaticType, PineType, RuntimeErr,
@@ -64,8 +65,45 @@ impl<'a> Function<'a> {
         }
         // let mut new_context = Context::new(Some(context), ContextType::FuncDefBlock);
         for (k, v) in all_args {
-            context.create_var(k, v);
+            // context.create_var(k, v);
+            process_assign_val(v, context, k)?;
         }
         self.def.body.run(context)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ast::name::VarName;
+    use crate::ast::stat_expr_types::{Block, Exp};
+    use crate::types::series::Series;
+
+    #[test]
+    fn func_test() {
+        let func_def = FunctionDef {
+            name: VarName("hello"),
+            params: vec![VarName("arg1")],
+            body: Block::new(vec![], Some(Exp::VarName(VarName("arg1")))),
+        };
+        let func = Function::new(&func_def);
+        let mut ctx = Context::new(None, ContextType::FuncDefBlock);
+        assert_eq!(
+            func.call(&mut ctx, vec![PineRef::new(Series::from(Some(1)))], vec![]),
+            Ok(PineRef::new(Series::from(Some(1))))
+        );
+        assert_eq!(
+            func.call(&mut ctx, vec![PineRef::new(Series::from(Some(10)))], vec![]),
+            Ok(PineRef::new(Series::from(Some(10))))
+        );
+        ctx.commit();
+        assert_eq!(
+            func.call(
+                &mut ctx,
+                vec![PineRef::new(Series::from(Some(100)))],
+                vec![]
+            ),
+            Ok(PineRef::new(Series::from(Some(100))))
+        );
     }
 }

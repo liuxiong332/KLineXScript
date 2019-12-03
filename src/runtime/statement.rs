@@ -48,18 +48,40 @@ where
     Ok(())
 }
 
-// fn series_update<'a, D: Default + PineStaticType + PineType<'a> + Clone + PineFrom<'a, D> + 'a>(
-//     series: Box<dyn PineType<'a> + 'a>,
-//     val: Box<dyn PineType<'a> + 'a>,
-//     name: &'a str,
-//     context: &mut dyn Ctx<'a>,
-// ) -> Result<(), RuntimeErr> {
-//     let mut s: Box<Series<D>> = Series::implicity_from(series)?;
-//     let val = D::implicity_from(val)?;
-//     s.update(*val);
-//     context.update_var(name, s);
-//     Ok(())
-// }
+pub fn process_assign_val<'a>(
+    true_val: PineRef<'a>,
+    context: &mut dyn Ctx<'a>,
+    name: &'a str,
+) -> Result<(), RuntimeErr> {
+    if true_val.get_type().1 == SecondType::Series {
+        return match context.move_var(name) {
+            None => {
+                // When assignment, must copy new variable.
+                let true_val = true_val.copy_inner();
+                match true_val.get_type().0 {
+                    FirstType::Int => from_series::<Int>(true_val, name, context),
+                    FirstType::Float => from_series::<Float>(true_val, name, context),
+                    FirstType::Bool => from_series::<Bool>(true_val, name, context),
+                    _ => Err(RuntimeErr::TypeMismatch(format!(
+                        "Series type can only be Int, Float and Bool, but get {:?}",
+                        true_val.get_type()
+                    ))),
+                }
+            }
+            Some(current_val) => match current_val.get_type().0 {
+                FirstType::Int => update_series::<Int>(context, name, current_val, true_val),
+                FirstType::Float => update_series::<Float>(context, name, current_val, true_val),
+                FirstType::Bool => update_series::<Bool>(context, name, current_val, true_val),
+                _ => Err(RuntimeErr::TypeMismatch(format!(
+                    "Series type can only be Int, Float and Bool, but get {:?}",
+                    current_val.get_type()
+                ))),
+            },
+        };
+    }
+    context.create_var(name, true_val);
+    Ok(())
+}
 
 impl<'a> RunnerForName<'a> for Assignment<'a> {
     fn run_name(
@@ -92,36 +114,7 @@ impl<'a> RunnerForName<'a> for Assignment<'a> {
             return Err(RuntimeErr::InvalidNADeclarer);
         }
 
-        if true_val.get_type().1 == SecondType::Series {
-            return match context.move_var(name) {
-                None => {
-                    // When assignment, must copy new variable.
-                    let true_val = true_val.copy_inner();
-                    match true_val.get_type().0 {
-                        FirstType::Int => from_series::<Int>(true_val, name, context),
-                        FirstType::Float => from_series::<Float>(true_val, name, context),
-                        FirstType::Bool => from_series::<Bool>(true_val, name, context),
-                        _ => Err(RuntimeErr::TypeMismatch(format!(
-                            "Series type can only be Int, Float and Bool, but get {:?}",
-                            true_val.get_type()
-                        ))),
-                    }
-                }
-                Some(current_val) => match current_val.get_type().0 {
-                    FirstType::Int => update_series::<Int>(context, name, current_val, true_val),
-                    FirstType::Float => {
-                        update_series::<Float>(context, name, current_val, true_val)
-                    }
-                    FirstType::Bool => update_series::<Bool>(context, name, current_val, true_val),
-                    _ => Err(RuntimeErr::TypeMismatch(format!(
-                        "Series type can only be Int, Float and Bool, but get {:?}",
-                        current_val.get_type()
-                    ))),
-                },
-            };
-        }
-        context.create_var(name, true_val);
-        Ok(())
+        process_assign_val(true_val, context, name)
     }
 }
 

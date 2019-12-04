@@ -8,9 +8,10 @@
             "type": "lldb",
             "request": "launch",
             "name": "LLDB Launch",
-            "program": "${workspaceFolder}/target/debug/deps/data_src_tests-768db31d74545ae3.exe",
+            "program": "${workspaceFolder}/target/debug/data_src_tests-768db31d74545ae3.exe",
             "args": [],
             "cwd": "${workspaceFolder}",
+            "expressions": "native",
             "env": {
                 "PATH": "/C/Users/lx/Anaconda3:${env:PATH}"
             }

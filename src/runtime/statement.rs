@@ -205,14 +205,15 @@ impl<'a> StmtRunner<'a> for VarAssignment<'a> {
 
 impl<'a> Runner<'a> for IfThenElse<'a> {
     fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
+        println!("current vars: {:?}", context.get_var_keys());
         let cond = self.cond.rv_run(context)?;
         let cond_bool = Bool::implicity_from(cond)?;
         if *cond_bool {
-            let mut new_context = Context::new(Some(context), ContextType::IfElseBlock);
-            self.then_blk.run(&mut new_context)
+            let subctx = create_sub_ctx(context, self.then_ctxid, ContextType::IfElseBlock);
+            self.then_blk.run(subctx)
         } else if let Some(ref else_blk) = self.else_blk {
-            let mut new_context = Context::new(Some(context), ContextType::IfElseBlock);
-            else_blk.run(&mut new_context)
+            let subctx = create_sub_ctx(context, self.else_ctxid, ContextType::IfElseBlock);
+            else_blk.run(subctx)
         } else {
             Ok(PineRef::new_box(NA))
         }
@@ -319,24 +320,30 @@ fn extract_args<'a>(
     Ok((ret_pos, ret_dict))
 }
 
+pub fn create_sub_ctx<'a, 'b, 'c>(
+    context: &'c mut (dyn Ctx<'a> + 'c),
+    ctxid: i32,
+    ctx_type: ContextType,
+) -> &'c mut (dyn Ctx<'a> + 'c) {
+    let ctx_name = format!("@{:?}", ctxid);
+    let ctx_instance = downcast_ctx(context).unwrap();
+    let sub_context;
+    // Get or create sub context for the function call context.
+    if !ctx_instance.contains_sub_context(&ctx_name) {
+        sub_context = ctx_instance.create_sub_context(ctx_name.clone(), ctx_type);
+    } else {
+        sub_context = ctx_instance.get_sub_context(&ctx_name).unwrap();
+    }
+    &mut **sub_context
+}
+
 impl<'a> Runner<'a> for FunctionCall<'a> {
     fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
         let result = self.method.rv_run(context)?;
-        let ctx_name = format!("@{:?}", self.ctxid);
 
         let (pos_args, dict_args) = extract_args(context, self)?;
-        let ctx_instance = downcast_ctx(context)?;
-        let sub_context;
-        // Get or create sub context for the function call context.
-        if !ctx_instance.contains_sub_context(&ctx_name) {
-            sub_context =
-                ctx_instance.create_sub_context(ctx_name.clone(), ContextType::FuncDefBlock);
-        } else {
-            sub_context = ctx_instance.get_sub_context(&ctx_name).unwrap();
-        }
-        let ctx_ref = &mut **sub_context;
+        let ctx_ref = create_sub_ctx(context, self.ctxid, ContextType::FuncDefBlock);
 
-        println!("Result {:?}", result.get_type());
         match result.get_type() {
             (FirstType::Callable, SecondType::Simple) => {
                 let callable = downcast_pf::<Callable>(result).unwrap();

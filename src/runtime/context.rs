@@ -3,6 +3,7 @@ use crate::types::{
     Bool, Callable, Color, DataType, Float, Int, PineFrom, PineRef, PineStaticType, PineType,
     RefData, RuntimeErr, SecondType, Series, NA,
 };
+use std::cell;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::mem;
@@ -142,10 +143,6 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
         }
     }
 
-    pub fn set_parent(&mut self, parent: &'b mut (dyn 'b + Ctx<'a>)) {
-        self.parent = Some(parent);
-    }
-
     pub fn create_sub_context(
         &'c mut self,
         name: String,
@@ -153,9 +150,20 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
     ) -> &mut Box<dyn Ctx<'a> + 'c>
     where
         'a: 'c,
+        'b: 'c,
     {
-        let new_context = Box::new(Context::new(None, t));
-        self.set_sub_context(name.clone(), new_context);
+        let mut subctx = Box::new(Context::new(None, t));
+        unsafe {
+            subctx.parent = Some(mem::transmute::<usize, &mut Context<'a, 'b, 'c>>(
+                mem::transmute::<&Context<'a, 'b, 'c>, usize>(self),
+            ));
+            mem::transmute::<usize, &mut Context<'a, 'b, 'c>>(mem::transmute::<
+                &Context<'a, 'b, 'c>,
+                usize,
+            >(self))
+            .sub_contexts
+            .insert(name.clone(), subctx);
+        }
         self.get_sub_context(&name).unwrap()
     }
 

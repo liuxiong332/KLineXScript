@@ -60,6 +60,7 @@ impl<'a> fmt::Debug for dyn PineType<'a> + 'a {
         match self.get_type() {
             (DataType::Int, SecondType::Simple) => downcast_ref::<Int>(self).unwrap().fmt(f),
             (DataType::Float, SecondType::Simple) => downcast_ref::<Float>(self).unwrap().fmt(f),
+            (DataType::NA, SecondType::Simple) => write!(f, "NA"),
             (DataType::Int, SecondType::Series) => {
                 downcast_ref::<Series<Int>>(self).unwrap().fmt(f)
             }
@@ -77,7 +78,7 @@ impl<'a> fmt::Debug for dyn PineType<'a> + 'a {
 
 impl<'a> PartialEq for dyn PineType<'a> + 'a {
     fn eq(&self, other: &(dyn PineType<'a> + 'a)) -> bool {
-        use super::{Float, Int, Series};
+        use super::{Bool, Float, Int, Series};
 
         match self.get_type() {
             (DataType::Int, SecondType::Simple) => downcast_ref::<Int>(self)
@@ -86,12 +87,18 @@ impl<'a> PartialEq for dyn PineType<'a> + 'a {
             (DataType::Float, SecondType::Simple) => downcast_ref::<Float>(self)
                 .unwrap()
                 .eq(downcast_ref::<Float>(other).unwrap()),
+            (DataType::Bool, SecondType::Simple) => downcast_ref::<Bool>(self)
+                .unwrap()
+                .eq(downcast_ref::<Bool>(other).unwrap()),
             (DataType::Int, SecondType::Series) => downcast_ref::<Series<Int>>(self)
                 .unwrap()
                 .eq(downcast_ref::<Series<Int>>(other).unwrap()),
             (DataType::Float, SecondType::Series) => downcast_ref::<Series<Float>>(self)
                 .unwrap()
                 .eq(downcast_ref::<Series<Float>>(other).unwrap()),
+            (DataType::Bool, SecondType::Series) => downcast_ref::<Series<Bool>>(self)
+                .unwrap()
+                .eq(downcast_ref::<Series<Bool>>(other).unwrap()),
             _ => false,
         }
     }

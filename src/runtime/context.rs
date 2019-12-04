@@ -231,7 +231,13 @@ impl<'a, 'b, 'c> Ctx<'a> for Context<'a, 'b, 'c> {
         if self.vars.contains_key(name) {
             self.vars.insert(name, val);
         } else if let Some(ref mut parent) = self.parent {
-            parent.update_var(name, val);
+            if parent.contains_var(name) {
+                parent.update_var(name, val);
+            } else {
+                self.vars.insert(name, val);
+            }
+        } else {
+            self.vars.insert(name, val);
         }
     }
 
@@ -241,7 +247,7 @@ impl<'a, 'b, 'c> Ctx<'a> for Context<'a, 'b, 'c> {
         if self.vars.contains_key(name) {
             self.vars.insert(name, PineRef::new_box(NA))
         } else if let Some(ref mut parent) = self.parent {
-            parent.create_var(name, PineRef::new_box(NA))
+            parent.move_var(name)
         } else {
             None
         }

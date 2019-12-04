@@ -36,51 +36,72 @@ trait RunnerForName<'a> {
     ) -> Result<(), RuntimeErr>;
 }
 
-fn from_series<'a, D>(
-    val: PineRef<'a>,
-    name: &'a str,
-    context: &mut dyn Ctx<'a>,
-) -> Result<(), RuntimeErr>
-where
-    D: Default + PineStaticType + PineType<'a> + PartialEq + Clone + Debug + PineFrom<'a, D> + 'a,
-{
-    context.create_var(name, val);
-    Ok(())
-}
+// fn from_series<'a, D>(
+//     val: PineRef<'a>,
+//     name: &'a str,
+//     context: &mut dyn Ctx<'a>,
+// ) -> Result<(), RuntimeErr>
+// where
+//     D: Default + PineStaticType + PineType<'a> + PartialEq + Clone + Debug + PineFrom<'a, D> + 'a,
+// {
+//     context.create_var(name, val);
+//     Ok(())
+// }
 
 pub fn process_assign_val<'a>(
     true_val: PineRef<'a>,
     context: &mut dyn Ctx<'a>,
     name: &'a str,
 ) -> Result<(), RuntimeErr> {
-    if true_val.get_type().1 == SecondType::Series {
-        return match context.move_var(name) {
-            None => {
-                // When assignment, must copy new variable.
-                let true_val = true_val.copy_inner();
-                match true_val.get_type().0 {
-                    FirstType::Int => from_series::<Int>(true_val, name, context),
-                    FirstType::Float => from_series::<Float>(true_val, name, context),
-                    FirstType::Bool => from_series::<Bool>(true_val, name, context),
-                    _ => Err(RuntimeErr::TypeMismatch(format!(
-                        "Series type can only be Int, Float and Bool, but get {:?}",
-                        true_val.get_type()
-                    ))),
-                }
+    match context.move_var(name) {
+        None => {
+            // When assignment, must copy new variable.
+            let true_val = true_val.copy_inner();
+            context.create_var(name, true_val);
+            Ok(())
+        }
+        Some(current_val) => match (current_val.get_type(), true_val.get_type()) {
+            ((FirstType::Bool, SecondType::Series), _)
+            | (_, (FirstType::Bool, SecondType::Series)) => {
+                update_series::<Bool>(context, name, current_val, true_val)
             }
-            Some(current_val) => match current_val.get_type().0 {
-                FirstType::Int => update_series::<Int>(context, name, current_val, true_val),
-                FirstType::Float => update_series::<Float>(context, name, current_val, true_val),
-                FirstType::Bool => update_series::<Bool>(context, name, current_val, true_val),
-                _ => Err(RuntimeErr::TypeMismatch(format!(
+            ((FirstType::Float, SecondType::Series), _)
+            | (_, (FirstType::Float, SecondType::Series)) => {
+                update_series::<Float>(context, name, current_val, true_val)
+            }
+            ((FirstType::Int, SecondType::Series), _)
+            | (_, (FirstType::Int, SecondType::Series)) => {
+                update_series::<Int>(context, name, current_val, true_val)
+            }
+            ((_, SecondType::Series), _) | (_, (_, SecondType::Series)) => {
+                Err(RuntimeErr::TypeMismatch(format!(
                     "Series type can only be Int, Float and Bool, but get {:?}",
                     current_val.get_type()
-                ))),
-            },
-        };
+                )))
+            }
+            ((FirstType::Bool, SecondType::Simple), _)
+            | (_, (FirstType::Bool, SecondType::Simple)) => {
+                context.create_var(name, Bool::implicity_from(true_val)?.into_pf());
+                Ok(())
+            }
+            ((FirstType::Float, SecondType::Simple), _)
+            | (_, (FirstType::Float, SecondType::Simple)) => {
+                context.create_var(name, Float::implicity_from(true_val)?.into_pf());
+                Ok(())
+            }
+            ((FirstType::Int, SecondType::Simple), _)
+            | (_, (FirstType::Int, SecondType::Simple)) => {
+                context.create_var(name, Int::implicity_from(true_val)?.into_pf());
+                Ok(())
+            }
+            _ => {
+                return Err(RuntimeErr::TypeMismatch(format!(
+                    "Variable type can only be Int, Float and Bool, but get {:?}",
+                    true_val.get_type()
+                )))
+            }
+        },
     }
-    context.create_var(name, true_val);
-    Ok(())
 }
 
 impl<'a> RunnerForName<'a> for Assignment<'a> {
@@ -122,6 +143,7 @@ impl<'a> StmtRunner<'a> for Assignment<'a> {
     fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
         let val = self.val.rv_run(context)?;
         if self.names.len() == 1 {
+            println!("Assignment {:?}", val);
             return self.run_name(context, &self.names[0], val);
         }
         match val.get_type() {
@@ -154,6 +176,7 @@ where
     let mut s = Series::implicity_from(exist_val)?;
     let v = D::implicity_from(val)?;
     s.update(v.into_inner());
+    println!("current val {:?}", s);
     context.update_var(name, s.into_pf());
     Ok(())
 }
@@ -167,6 +190,7 @@ impl<'a> StmtRunner<'a> for VarAssignment<'a> {
         let val = self.val.rv_run(context)?;
 
         let exist_val = context.move_var(name).unwrap();
+        println!("Var assignment {:?}", val);
         match exist_val.get_type() {
             (FirstType::Bool, _) => update_series::<Bool>(context, name, exist_val, val),
             (FirstType::Int, _) => update_series::<Int>(context, name, exist_val, val),
@@ -241,27 +265,29 @@ impl<'a> Runner<'a> for ForRange<'a> {
         let mut iter = start;
         let mut ret_val: PineRef<'a> = PineRef::new_box(NA);
         while (step > 0 && iter < end) || (step < 0 && iter > end) {
-            let mut new_context = Context::new(Some(context), ContextType::ForRangeBlock);
-            new_context.create_var(iter_name, PineRef::new_box(Some(iter)));
-            match self.do_blk.run(&mut new_context) {
-                Ok(val) => {
-                    ret_val = val;
-                    iter += step;
-                }
-                Err(RuntimeErr::Break) => {
-                    if let Some(ref exp) = self.do_blk.ret_stmt {
-                        ret_val = exp.rv_run(&mut new_context)?
+            {
+                let mut new_context = Context::new(Some(context), ContextType::ForRangeBlock);
+                new_context.create_var(iter_name, PineRef::new_box(Some(iter)));
+                match self.do_blk.run(&mut new_context) {
+                    Ok(val) => {
+                        ret_val = val;
+                        iter += step;
                     }
-                    break;
-                }
-                Err(RuntimeErr::Continue) => {
-                    if let Some(ref exp) = self.do_blk.ret_stmt {
-                        ret_val = exp.rv_run(&mut new_context)?
+                    Err(RuntimeErr::Break) => {
+                        if let Some(ref exp) = self.do_blk.ret_stmt {
+                            ret_val = exp.rv_run(&mut new_context)?
+                        }
+                        break;
                     }
-                    iter += step;
-                    continue;
+                    Err(RuntimeErr::Continue) => {
+                        if let Some(ref exp) = self.do_blk.ret_stmt {
+                            ret_val = exp.rv_run(&mut new_context)?
+                        }
+                        iter += step;
+                        continue;
+                    }
+                    e => return e,
                 }
-                e => return e,
             }
         }
         Ok(ret_val)
@@ -297,6 +323,7 @@ impl<'a> Runner<'a> for FunctionCall<'a> {
         let result = self.method.rv_run(context)?;
         let ctx_name = format!("@{:?}", self.ctxid);
 
+        let (pos_args, dict_args) = extract_args(context, self)?;
         let ctx_instance = downcast_ctx(context)?;
         let sub_context;
         // Get or create sub context for the function call context.
@@ -311,14 +338,12 @@ impl<'a> Runner<'a> for FunctionCall<'a> {
         match result.get_type() {
             (FirstType::Callable, SecondType::Simple) => {
                 let callable = downcast_pf::<Callable>(result).unwrap();
-                let (pos_args, dict_args) = extract_args(context, self)?;
                 let result = callable.call(context, pos_args, dict_args);
                 context.create_callable(callable);
                 result
             }
             (FirstType::Function, SecondType::Simple) => {
                 let callable = downcast_pf::<Function>(result).unwrap();
-                let (pos_args, dict_args) = extract_args(ctx_ref, self)?;
                 callable.call(ctx_ref, pos_args, dict_args)
             }
             _ => Err(RuntimeErr::NotSupportOperator),
@@ -555,7 +580,6 @@ mod tests {
             Int::implicity_from(result.unwrap()),
             Ok(RefData::new_box(Some(10)))
         );
-
         assert!(context.move_var("a").is_none());
     }
 
@@ -630,6 +654,11 @@ mod tests {
             vec![Exp::Bool(true)],
             vec![],
         );
+        let series_exp = FunctionCall::new_no_ctxid(
+            Exp::VarName(VarName("name")),
+            vec![Exp::VarName(VarName("series"))],
+            vec![],
+        );
         let def_exp = FunctionDef {
             name: VarName("name"),
             params: vec![VarName("arg")],
@@ -643,6 +672,21 @@ mod tests {
 
         let res = downcast_pf::<Bool>(exp.run(&mut context).unwrap()).unwrap();
         assert_eq!(res, RefData::new_box(true));
+
+        let subctx = context
+            .get_sub_context(&(String::from("@") + &exp.ctxid.to_string()))
+            .unwrap();
+        assert_eq!(
+            downcast_ctx(&mut **subctx).unwrap().move_var("arg"),
+            Some(PineRef::new_box(true))
+        );
+
+        context.create_var("series", PineRef::new_rc(Series::from(Some(10))));
+        // println!("{:?}", context.move_var("series"));
+        assert_eq!(
+            series_exp.run(&mut context).unwrap(),
+            PineRef::new(Series::from(Some(10)))
+        );
     }
 
     #[test]

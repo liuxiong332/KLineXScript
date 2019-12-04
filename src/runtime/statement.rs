@@ -335,6 +335,7 @@ impl<'a> Runner<'a> for FunctionCall<'a> {
         }
         let ctx_ref = &mut **sub_context;
 
+        println!("Result {:?}", result.get_type());
         match result.get_type() {
             (FirstType::Callable, SecondType::Simple) => {
                 let callable = downcast_pf::<Callable>(result).unwrap();

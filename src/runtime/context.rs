@@ -296,6 +296,9 @@ impl<'a, 'b, 'c> Ctx<'a> for Context<'a, 'b, 'c> {
 
     fn clear_declare(&mut self) {
         self.declare_vars.clear();
+        for (_, v) in self.sub_contexts.iter_mut() {
+            v.clear_declare();
+        }
     }
 
     fn get_type(&self) -> ContextType {

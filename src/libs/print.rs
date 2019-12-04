@@ -1,7 +1,7 @@
 use crate::runtime::context::Ctx;
 use crate::types::{
-    Bool, Callable, DataType, Float, Int, PineFrom, PineRef, PineStaticType, PineType, RefData,
-    RuntimeErr, SecondType, Series, SeriesToArrayCall, NA,
+    Bool, Callable, DataType, Float, Int, ParamCollectCall, PineFrom, PineRef, PineStaticType,
+    PineType, RefData, RuntimeErr, SecondType, Series, NA,
 };
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -127,7 +127,7 @@ pub const VAR_NAME: &'static str = "print";
 pub fn declare_var<'a>() -> PineRef<'a> {
     PineRef::new(Callable::new(
         None,
-        Some(Box::new(SeriesToArrayCall::new(pine_print))),
+        Some(Box::new(ParamCollectCall::new(pine_print))),
         vec!["item"],
     ))
 }
@@ -144,7 +144,7 @@ mod tests {
         struct MyCallback;
         impl Callback for MyCallback {
             fn print(&self, _str: String) {
-                assert_eq!(_str, String::from("1,2"));
+                assert_eq!(_str, String::from("2"));
             }
         }
 

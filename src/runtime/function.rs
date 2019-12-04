@@ -1,4 +1,4 @@
-use super::context::{Context, ContextType, Ctx, Runner};
+use super::context::{downcast_ctx, Ctx, Runner};
 use super::statement::process_assign_val;
 use crate::ast::stat_expr_types::FunctionDef;
 use crate::types::{
@@ -66,7 +66,7 @@ impl<'a> Function<'a> {
         // let mut new_context = Context::new(Some(context), ContextType::FuncDefBlock);
         for (k, v) in all_args {
             // context.create_var(k, v);
-            process_assign_val(v, context, k)?;
+            process_assign_val(v, downcast_ctx(context).unwrap(), k)?;
         }
         self.def.body.run(context)
     }
@@ -77,6 +77,7 @@ mod tests {
     use super::*;
     use crate::ast::name::VarName;
     use crate::ast::stat_expr_types::{Block, Exp};
+    use crate::runtime::context::{Context, ContextType};
     use crate::types::series::Series;
 
     #[test]

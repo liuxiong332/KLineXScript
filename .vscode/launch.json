@@ -12,7 +12,7 @@
             "args": [],
             "cwd": "${workspaceFolder}",
             "env": {
-                "PATH": "${env:HOME}/bin:${env:PATH}"
+                "PATH": "/C/Users/lx/Anaconda3:${env:PATH}"
             }
         },
         {

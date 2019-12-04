@@ -1,4 +1,4 @@
-use super::context::{Ctx, RVRunner, Runner};
+use super::context::{Ctx, RVRunner, Runner, VarOperate};
 use super::op::{binary_op_run, unary_op_run};
 use crate::ast::name::VarName;
 use crate::ast::num::Numeral;

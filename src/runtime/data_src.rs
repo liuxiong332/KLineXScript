@@ -1,4 +1,4 @@
-use super::context::{Context, ContextType, Ctx, Runner};
+use super::context::{Context, ContextType, Ctx, Runner, VarOperate};
 use super::ctxid_parser::CtxIdParser;
 use crate::ast::stat_expr_types::Block;
 use crate::types::{Float, PineFrom, PineRef, PineType, RefData, RuntimeErr, Series};

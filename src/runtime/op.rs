@@ -1,4 +1,4 @@
-use super::context::{Ctx, RVRunner};
+use super::context::{Ctx, RVRunner, VarOperate};
 use super::exp::Exp;
 use crate::ast::op::{BinaryOp, UnaryOp};
 use crate::types::{

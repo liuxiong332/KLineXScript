@@ -1,4 +1,6 @@
-use super::context::{downcast_ctx, Context, ContextType, Ctx, RVRunner, Runner, StmtRunner};
+use super::context::{
+    downcast_ctx, Context, ContextType, Ctx, RVRunner, Runner, StmtRunner, VarOperate,
+};
 use super::function::Function;
 use crate::ast::name::VarName;
 use crate::ast::stat_expr_types::{
@@ -50,7 +52,7 @@ trait RunnerForName<'a> {
 
 pub fn process_assign_val<'a>(
     true_val: PineRef<'a>,
-    context: &mut dyn Ctx<'a>,
+    context: &mut dyn VarOperate<'a>,
     name: &'a str,
 ) -> Result<(), RuntimeErr> {
     match context.move_var(name) {
@@ -104,6 +106,22 @@ pub fn process_assign_val<'a>(
     }
 }
 
+fn update_series<'a, 'b, D>(
+    context: &mut (dyn 'b + VarOperate<'a>),
+    name: &'a str,
+    exist_val: PineRef<'a>,
+    val: PineRef<'a>,
+) -> Result<(), RuntimeErr>
+where
+    D: Default + PineType<'a> + PineStaticType + 'a + PineFrom<'a, D> + Clone + PartialEq + Debug,
+{
+    let mut s = Series::implicity_from(exist_val)?;
+    let v = D::implicity_from(val)?;
+    s.update(v.into_inner());
+    context.update_var(name, s.into_pf());
+    Ok(())
+}
+
 impl<'a> RunnerForName<'a> for Assignment<'a> {
     fn run_name(
         &'a self,
@@ -135,7 +153,7 @@ impl<'a> RunnerForName<'a> for Assignment<'a> {
             return Err(RuntimeErr::InvalidNADeclarer);
         }
 
-        process_assign_val(true_val, context, name)
+        process_assign_val(true_val, downcast_ctx(context).unwrap(), name)
     }
 }
 
@@ -164,23 +182,6 @@ impl<'a> StmtRunner<'a> for Assignment<'a> {
     }
 }
 
-fn update_series<'a, 'b, D>(
-    context: &mut (dyn 'b + Ctx<'a>),
-    name: &'a str,
-    exist_val: PineRef<'a>,
-    val: PineRef<'a>,
-) -> Result<(), RuntimeErr>
-where
-    D: Default + PineType<'a> + PineStaticType + 'a + PineFrom<'a, D> + Clone + PartialEq + Debug,
-{
-    let mut s = Series::implicity_from(exist_val)?;
-    let v = D::implicity_from(val)?;
-    s.update(v.into_inner());
-    println!("current val {:?}", s);
-    context.update_var(name, s.into_pf());
-    Ok(())
-}
-
 impl<'a> StmtRunner<'a> for VarAssignment<'a> {
     fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
         let name = self.name.0;
@@ -190,13 +191,13 @@ impl<'a> StmtRunner<'a> for VarAssignment<'a> {
         let val = self.val.rv_run(context)?;
 
         let exist_val = context.move_var(name).unwrap();
-        println!("Var assignment {:?}", val);
+        let ctx_instance = downcast_ctx(context).unwrap();
         match exist_val.get_type() {
-            (FirstType::Bool, _) => update_series::<Bool>(context, name, exist_val, val),
-            (FirstType::Int, _) => update_series::<Int>(context, name, exist_val, val),
-            (FirstType::Float, _) => update_series::<Float>(context, name, exist_val, val),
-            (FirstType::Color, _) => update_series::<Color>(context, name, exist_val, val),
-            (FirstType::String, _) => update_series::<String>(context, name, exist_val, val),
+            (FirstType::Bool, _) => update_series::<Bool>(ctx_instance, name, exist_val, val),
+            (FirstType::Int, _) => update_series::<Int>(ctx_instance, name, exist_val, val),
+            (FirstType::Float, _) => update_series::<Float>(ctx_instance, name, exist_val, val),
+            (FirstType::Color, _) => update_series::<Color>(ctx_instance, name, exist_val, val),
+            (FirstType::String, _) => update_series::<String>(ctx_instance, name, exist_val, val),
             _ => Err(RuntimeErr::NotSupportOperator),
         }
     }
@@ -339,7 +340,7 @@ impl<'a> Runner<'a> for FunctionCall<'a> {
         match result.get_type() {
             (FirstType::Callable, SecondType::Simple) => {
                 let callable = downcast_pf::<Callable>(result).unwrap();
-                let result = callable.call(context, pos_args, dict_args);
+                let result = callable.call(ctx_ref, pos_args, dict_args);
                 context.create_callable(callable);
                 result
             }

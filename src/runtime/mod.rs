@@ -8,7 +8,7 @@ pub mod statement;
 
 use crate::ast::stat_expr_types::Block;
 use crate::types::{PineRef, RuntimeErr};
-use context::{Context, ContextType, Ctx, Runner};
+use context::{Context, ContextType, Ctx, Runner, VarOperate};
 use std::collections::HashMap;
 
 pub fn run<'a>(blk: &'a Block<'a>, vars: HashMap<&'a str, PineRef<'a>>) -> Result<(), RuntimeErr> {

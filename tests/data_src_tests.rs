@@ -43,7 +43,7 @@ pine_ema(x, y) =>
     sum = 0.0
     sum := x + (y * sum[1] ? y * sum[1] : 0)
     sum
-res = pine_ema(close, 2)
+print(pine_ema(close, 2))
 ";
 
 #[test]
@@ -51,7 +51,7 @@ fn func_call_test() {
     struct MyCallback;
     impl Callback for MyCallback {
         fn print(&self, _str: String) {
-            assert_eq!(_str, String::from("2,8,16,32,64"));
+            assert_eq!(_str, String::from("2,8,24,64,160"));
         }
     }
 

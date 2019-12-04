@@ -7,14 +7,18 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::mem;
 
-// lifetime 'a is the lifetime of Exp, 'c is the lifetime of Ctx Self's lifetime
-pub trait Ctx<'a> {
+pub trait VarOperate<'a> {
     fn create_var(&mut self, name: &'a str, val: PineRef<'a>) -> Option<PineRef<'a>>;
 
     fn update_var(&mut self, name: &'a str, val: PineRef<'a>);
 
     fn move_var(&mut self, name: &'a str) -> Option<PineRef<'a>>;
 
+    fn get_var_keys(&self) -> Vec<&'a str>;
+}
+
+// lifetime 'a is the lifetime of Exp, 'c is the lifetime of Ctx Self's lifetime
+pub trait Ctx<'a>: VarOperate<'a> {
     fn contains_var(&self, name: &'a str) -> bool;
 
     fn create_callable(&mut self, call: RefData<Callable<'a>>);
@@ -77,6 +81,27 @@ where
     let mut series: RefData<Series<D>> = Series::implicity_from(val).unwrap();
     series.commit();
     series.into_pf()
+}
+
+pub fn commit_series_for_operator<'a>(operator: &mut dyn VarOperate<'a>) {
+    let keys: Vec<&'a str> = operator.get_var_keys();
+    // The committed set used to make sure only one instance of series commmit.
+    let mut commited: HashSet<*const (dyn PineType<'a> + 'a)> = HashSet::new();
+    for k in keys {
+        let val = operator.move_var(k).unwrap();
+        if commited.contains(&val.as_ptr()) {
+            continue;
+        }
+        commited.insert(val.as_ptr());
+        let ret_val = match val.get_type() {
+            (DataType::Float, SecondType::Series) => commit_series::<Float>(val),
+            (DataType::Int, SecondType::Series) => commit_series::<Int>(val),
+            (DataType::Color, SecondType::Series) => commit_series::<Color>(val),
+            (DataType::Bool, SecondType::Series) => commit_series::<Bool>(val),
+            _ => val,
+        };
+        operator.update_var(k, ret_val);
+    }
 }
 
 fn roll_back_series<'a, D>(val: PineRef<'a>) -> PineRef<'a>
@@ -156,24 +181,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
     }
 
     pub fn commit(&mut self) {
-        let keys: Vec<&'a str> = self.vars.keys().cloned().collect();
-        // The committed set used to make sure only one instance of series commmit.
-        let mut commited: HashSet<*const (dyn PineType<'a> + 'a)> = HashSet::new();
-        for k in keys {
-            let val = self.move_var(k).unwrap();
-            if commited.contains(&val.as_ptr()) {
-                continue;
-            }
-            commited.insert(val.as_ptr());
-            let ret_val = match val.get_type() {
-                (DataType::Float, SecondType::Series) => commit_series::<Float>(val),
-                (DataType::Int, SecondType::Series) => commit_series::<Int>(val),
-                (DataType::Color, SecondType::Series) => commit_series::<Color>(val),
-                (DataType::Bool, SecondType::Series) => commit_series::<Bool>(val),
-                _ => val,
-            };
-            self.update_var(k, ret_val);
-        }
+        commit_series_for_operator(self);
         // Commit the Series for all of the sub context.
         for (_, ctx) in self.sub_contexts.iter_mut() {
             downcast_ctx(&mut **ctx).unwrap().commit();
@@ -227,7 +235,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
     }
 }
 
-impl<'a, 'b, 'c> Ctx<'a> for Context<'a, 'b, 'c> {
+impl<'a, 'b, 'c> VarOperate<'a> for Context<'a, 'b, 'c> {
     fn create_var(&mut self, name: &'a str, val: PineRef<'a>) -> Option<PineRef<'a>> {
         self.vars.insert(name, val)
     }
@@ -258,6 +266,12 @@ impl<'a, 'b, 'c> Ctx<'a> for Context<'a, 'b, 'c> {
         }
     }
 
+    fn get_var_keys(&self) -> Vec<&'a str> {
+        self.vars.keys().cloned().collect()
+    }
+}
+
+impl<'a, 'b, 'c> Ctx<'a> for Context<'a, 'b, 'c> {
     fn contains_var(&self, name: &'a str) -> bool {
         if self.vars.contains_key(name) {
             true

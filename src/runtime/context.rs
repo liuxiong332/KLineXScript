@@ -174,6 +174,11 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             };
             self.update_var(k, ret_val);
         }
+        // Commit the Series for all of the sub context.
+        for (_, ctx) in self.sub_contexts.iter_mut() {
+            downcast_ctx(&mut **ctx).unwrap().commit();
+        }
+
         if !self.first_commit {
             self.first_commit = true;
         }
@@ -380,18 +385,36 @@ mod tests {
 
     #[test]
     fn derive_context_test() {
+        // hello is owned by context1, hello2 is owned by context2, hello3 is not owned by both context
         let mut context1 = Context::new(None, ContextType::Normal);
         context1.create_var("hello", PineRef::new_box(Some(1)));
 
         let mut context2 = Context::new(Some(&mut context1), ContextType::Normal);
         context2.create_var("hello2", PineRef::new_box(Some(2)));
 
-        let mov_res = context2.move_var("hello").unwrap();
-        context2.update_var("hello", mov_res);
+        assert_eq!(context2.contains_var("hello"), true);
+        let mov_res1 = context2.move_var("hello").unwrap();
+        assert_eq!(mov_res1, PineRef::new(Some(1)));
 
+        assert_eq!(context2.contains_var("hello2"), true);
+        let mov_res2 = context2.move_var("hello2").unwrap();
+        assert_eq!(mov_res2, PineRef::new(Some(2)));
+
+        assert_eq!(context2.contains_var("hello3"), false);
+        assert_eq!(context2.move_var("hello3"), None);
+
+        context2.update_var("hello", mov_res1);
         assert!(context2.vars.get("hello").is_none());
-        let parent = context2.parent.as_mut().unwrap();
-        assert!(parent.move_var("hello").is_some());
+        {
+            let parent = context2.parent.as_mut().unwrap();
+            assert!(parent.move_var("hello").is_some());
+        }
+
+        context2.update_var("hello2", mov_res2);
+        assert!(context2.vars.get("hello2").is_some());
+
+        context2.update_var("hello3", PineRef::new(Some(10)));
+        assert!(context2.vars.get("hello3").is_some());
 
         assert!(context2.contains_var("hello"));
         assert!(context2.contains_var("hello2"));

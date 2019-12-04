@@ -687,6 +687,13 @@ mod tests {
             series_exp.run(&mut context).unwrap(),
             PineRef::new(Series::from(Some(10)))
         );
+        context.commit();
+        context.update_var("series", PineRef::new_rc(Series::from(Some(100))));
+
+        assert_eq!(
+            series_exp.run(&mut context).unwrap(),
+            PineRef::new(Series::from_cur_history(Some(100), vec![Some(10)]))
+        );
     }
 
     #[test]

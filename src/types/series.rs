@@ -68,6 +68,15 @@ impl<'a, D: Default + PineType<'a> + Clone + Debug + 'a> Series<'a, D> {
         }
     }
 
+    pub fn from_cur_history(current: D, history: Vec<D>) -> Series<'a, D> {
+        Series {
+            current,
+            history,
+            phantom: PhantomData,
+            na_val: D::default(),
+        }
+    }
+
     pub fn index(&self, i: usize) -> Result<Series<'a, D>, RuntimeErr> {
         let len = self.history.len();
         let val = match i {
@@ -260,7 +269,7 @@ impl<'a, D: PartialOrd + Clone + Debug + 'a> PartialOrd for Series<'a, D> {
 
 impl<'a, D: PartialEq + Clone + Debug + 'a> PartialEq for Series<'a, D> {
     fn eq(&self, other: &Self) -> bool {
-        self.current.eq(&other.current)
+        self.current.eq(&other.current) && self.history.eq(&other.history)
     }
 }
 

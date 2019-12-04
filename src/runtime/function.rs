@@ -103,7 +103,10 @@ mod tests {
                 vec![PineRef::new(Series::from(Some(100)))],
                 vec![]
             ),
-            Ok(PineRef::new(Series::from(Some(100))))
+            Ok(PineRef::new(Series::from_cur_history(
+                Some(100),
+                vec![Some(10)]
+            )))
         );
     }
 }

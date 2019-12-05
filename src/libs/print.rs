@@ -1,10 +1,11 @@
-use crate::runtime::context::Ctx;
+use crate::runtime::context::{Context, Ctx};
 use crate::types::{
     Bool, Callable, DataType, Float, Int, ParamCollectCall, PineFrom, PineRef, PineStaticType,
     PineType, RefData, RuntimeErr, SecondType, Series, NA,
 };
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::rc::Rc;
 
 trait Format {
     fn fmt(&self) -> String;
@@ -38,7 +39,7 @@ impl Format for Bool {
     }
 }
 
-fn print_series<'a, D>(item_val: PineRef<'a>, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr>
+fn print_series<'a, D>(item_val: PineRef<'a>, context: Rc<Context<'a>>) -> Result<(), RuntimeErr>
 where
     D: Default
         + Format
@@ -61,7 +62,7 @@ where
     Ok(())
 }
 
-fn print_array<'a, D>(item_val: PineRef<'a>, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr>
+fn print_array<'a, D>(item_val: PineRef<'a>, context: Rc<Context<'a>>) -> Result<(), RuntimeErr>
 where
     D: Format + Clone + PartialEq + Debug + PineFrom<'a, D> + PineStaticType + 'a,
 {
@@ -79,7 +80,7 @@ where
     Ok(())
 }
 
-fn print_simple<'a, D>(item_val: PineRef<'a>, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr>
+fn print_simple<'a, D>(item_val: PineRef<'a>, context: Rc<Context<'a>>) -> Result<(), RuntimeErr>
 where
     D: Format + Clone + PartialEq + Debug + PineFrom<'a, D> + 'a,
 {
@@ -89,7 +90,7 @@ where
     Ok(())
 }
 
-fn print_val<'a>(item_val: PineRef<'a>, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
+fn print_val<'a>(item_val: PineRef<'a>, context: Rc<Context<'a>>) -> Result<(), RuntimeErr> {
     println!("print val type {:?}", item_val.get_type());
     match item_val.get_type() {
         (DataType::Float, SecondType::Series) => print_series::<Float>(item_val, context),
@@ -109,7 +110,7 @@ fn print_val<'a>(item_val: PineRef<'a>, context: &mut dyn Ctx<'a>) -> Result<(),
 }
 
 fn pine_print<'a>(
-    context: &mut dyn Ctx<'a>,
+    context: Rc<Context<'a>>,
     mut param: HashMap<&'a str, PineRef<'a>>,
 ) -> Result<PineRef<'a>, RuntimeErr> {
     println!("pine print Series run, {:?}", param.get("item"));
@@ -149,21 +150,21 @@ mod tests {
         }
 
         let callable = downcast_pf::<Callable>(declare_var()).unwrap();
-        let mut ctx = Context::new_with_callback(&MyCallback);
+        let mut ctx = Rc::new(Context::new_with_callback(&MyCallback));
         callable
-            .call(&mut ctx, vec![PineRef::new(Some(1f64))], vec![])
+            .call(ctx, vec![PineRef::new(Some(1f64))], vec![])
             .unwrap();
         callable
-            .call(&mut ctx, vec![PineRef::new(Some(2f64))], vec![])
+            .call(ctx, vec![PineRef::new(Some(2f64))], vec![])
             .unwrap();
-        callable.run(&mut ctx).unwrap();
+        callable.run(ctx).unwrap();
     }
 
     fn run_call<'a>(val: PineRef<'a>, callback: &'a dyn Callback) {
-        let mut ctx = Context::new_with_callback(callback);
+        let mut ctx = Rc::new(Context::new_with_callback(callback));
         let mut map = HashMap::new();
         map.insert("item", val);
-        assert!(pine_print(&mut ctx, map).is_ok());
+        assert!(pine_print(ctx, map).is_ok());
     }
 
     #[test]

@@ -10,12 +10,13 @@ use crate::ast::stat_expr_types::Block;
 use crate::types::{PineRef, RuntimeErr};
 use context::{Context, ContextType, Ctx, Runner, VarOperate};
 use std::collections::HashMap;
+use std::rc::Rc;
 
 pub fn run<'a>(blk: &'a Block<'a>, vars: HashMap<&'a str, PineRef<'a>>) -> Result<(), RuntimeErr> {
-    let mut context = Context::new(None, ContextType::Normal);
+    let context = Rc::new(Context::new(None, ContextType::Normal));
     for (k, v) in vars.into_iter() {
         context.create_var(k, v);
     }
-    blk.run(&mut context)?;
+    blk.run(&context)?;
     Ok(())
 }

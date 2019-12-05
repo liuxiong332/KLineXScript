@@ -1,4 +1,4 @@
-use super::context::{downcast_ctx, Ctx, Runner};
+use super::context::{downcast_ctx, Context, Runner};
 use super::statement::process_assign_val;
 use crate::ast::stat_expr_types::FunctionDef;
 use crate::types::{
@@ -6,6 +6,7 @@ use crate::types::{
     SecondType,
 };
 use std::collections::HashMap;
+use std::rc::Rc;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Function<'a> {
@@ -42,7 +43,7 @@ impl<'a> Function<'a> {
 
     pub fn call(
         &self,
-        context: &mut dyn Ctx<'a>,
+        context: Rc<Context<'a>>,
         pos_args: Vec<PineRef<'a>>,
         dict_args: Vec<(&'a str, PineRef<'a>)>,
     ) -> Result<PineRef<'a>, RuntimeErr> {
@@ -66,9 +67,9 @@ impl<'a> Function<'a> {
         // let mut new_context = Context::new(Some(context), ContextType::FuncDefBlock);
         for (k, v) in all_args {
             // context.create_var(k, v);
-            process_assign_val(v, downcast_ctx(context).unwrap(), k)?;
+            process_assign_val(v, &*context, k)?;
         }
-        self.def.body.run(context)
+        self.def.body.run(&context)
     }
 }
 
@@ -88,22 +89,18 @@ mod tests {
             body: Block::new(vec![], Some(Exp::VarName(VarName("arg1")))),
         };
         let func = Function::new(&func_def);
-        let mut ctx = Context::new(None, ContextType::FuncDefBlock);
+        let mut ctx = Rc::new(Context::new(None, ContextType::FuncDefBlock));
         assert_eq!(
-            func.call(&mut ctx, vec![PineRef::new(Series::from(Some(1)))], vec![]),
+            func.call(ctx, vec![PineRef::new(Series::from(Some(1)))], vec![]),
             Ok(PineRef::new(Series::from(Some(1))))
         );
         assert_eq!(
-            func.call(&mut ctx, vec![PineRef::new(Series::from(Some(10)))], vec![]),
+            func.call(ctx, vec![PineRef::new(Series::from(Some(10)))], vec![]),
             Ok(PineRef::new(Series::from(Some(10))))
         );
         ctx.commit();
         assert_eq!(
-            func.call(
-                &mut ctx,
-                vec![PineRef::new(Series::from(Some(100)))],
-                vec![]
-            ),
+            func.call(ctx, vec![PineRef::new(Series::from(Some(100)))], vec![]),
             Ok(PineRef::new(Series::from_cur_history(
                 Some(100),
                 vec![Some(10)]

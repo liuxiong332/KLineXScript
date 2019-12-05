@@ -3,13 +3,14 @@ use super::ctxid_parser::CtxIdParser;
 use crate::ast::stat_expr_types::Block;
 use crate::types::{Float, PineFrom, PineRef, PineType, RefData, RuntimeErr, Series};
 use std::collections::HashMap;
+use std::rc::Rc;
 
 pub trait Callback {
     fn print(&self, _str: String) {}
 }
 
-pub struct DataSrc<'a, 'b, 'c> {
-    context: Context<'a, 'b, 'c>,
+pub struct DataSrc<'a> {
+    context: Rc<Context<'a>>,
     blk: &'a Block<'a>,
     pub callback: &'a dyn Callback,
 }
@@ -27,14 +28,14 @@ fn get_len(data: &HashMap<&'static str, Vec<Float>>) -> Result<usize, RuntimeErr
     Ok(lens[0])
 }
 
-impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
+impl<'a> DataSrc<'a> {
     pub fn new(
         blk: &'a mut Block<'a>,
         vars: HashMap<&'a str, PineRef<'a>>,
         callback: &'a dyn Callback,
-    ) -> DataSrc<'a, 'b, 'c> {
+    ) -> DataSrc<'a> {
         CtxIdParser::new().parse_blk(blk);
-        let mut context = Context::new_with_callback(callback);
+        let mut context = Rc::new(Context::new_with_callback(callback));
         for (k, v) in vars.into_iter() {
             context.create_var(k, v);
         }
@@ -58,7 +59,7 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
                 float_s.update(v[i]);
                 self.context.update_var(k, float_s.into_pf());
             }
-            self.blk.run(&mut self.context)?;
+            self.blk.run(&self.context)?;
             self.context.commit();
             self.context.clear_declare();
             self.context.clear_is_run();

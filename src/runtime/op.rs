@@ -1,4 +1,4 @@
-use super::context::{Ctx, RVRunner, VarOperate};
+use super::context::{Context, Ctx, RVRunner, VarOperate};
 use super::exp::Exp;
 use crate::ast::op::{BinaryOp, UnaryOp};
 use crate::types::{
@@ -6,11 +6,12 @@ use crate::types::{
     PineType, RefData, RuntimeErr, SecondType, Series,
 };
 use std::fmt::Debug;
+use std::rc::Rc;
 
 pub fn unary_op_run<'a>(
     op: &UnaryOp,
     exp: &'a Box<Exp<'a>>,
-    context: &mut (dyn Ctx<'a>),
+    context: &Rc<Context<'a>>,
 ) -> Result<PineRef<'a>, RuntimeErr> {
     match op {
         UnaryOp::Plus => exp.rv_run(context),
@@ -69,7 +70,7 @@ pub fn binary_op_run<'a, 'b>(
     op: &BinaryOp,
     exp1: &'a Box<Exp<'a>>,
     exp2: &'a Box<Exp<'a>>,
-    context: &mut (dyn 'b + Ctx<'a>),
+    context: &Rc<Context<'a>>,
 ) -> Result<PineRef<'a>, RuntimeErr> {
     match op {
         BinaryOp::BoolAnd => {
@@ -144,14 +145,14 @@ mod tests {
         let exp = Box::new(Exp::Num(Numeral::Int(1)));
         let exp2 = Box::new(Exp::Bool(true));
 
-        let mut context = Context::new(None, ContextType::Normal);
+        let mut context = Rc::new(Context::new(None, ContextType::Normal));
         assert_eq!(
-            downcast_pf::<Int>(unary_op_run(&UnaryOp::Minus, &exp, &mut context,).unwrap()),
+            downcast_pf::<Int>(unary_op_run(&UnaryOp::Minus, &exp, &context,).unwrap()),
             Ok(RefData::new_box(Some(-1)))
         );
 
         assert_eq!(
-            downcast_pf::<Bool>(unary_op_run(&UnaryOp::BoolNot, &exp2, &mut context,).unwrap()),
+            downcast_pf::<Bool>(unary_op_run(&UnaryOp::BoolNot, &exp2, &context).unwrap()),
             Ok(RefData::new_box(false))
         );
     }
@@ -169,8 +170,8 @@ mod tests {
         v1: Exp<'a>,
         v2: Exp<'a>,
     ) -> Result<RefData<D>, RuntimeErr> {
-        let mut context = Context::new(None, ContextType::Normal);
-        downcast_pf::<D>(binary_op_run(&op, &Box::new(v1), &Box::new(v2), &mut context).unwrap())
+        let mut context = Rc::new(Context::new(None, ContextType::Normal));
+        downcast_pf::<D>(binary_op_run(&op, &Box::new(v1), &Box::new(v2), &context).unwrap())
     }
 
     #[test]
@@ -284,11 +285,11 @@ mod tests {
         v1: Exp<'a>,
         v2: Exp<'a>,
     ) -> Result<RefData<D>, RuntimeErr> {
-        let mut context = Context::new(None, ContextType::Normal);
+        let mut context = Rc::new(Context::new(None, ContextType::Normal));
         context.create_var("arg1", PineRef::new_box(Some(4)));
         context.create_var("arg2", PineRef::new_box(Some(2)));
 
-        downcast_pf::<D>(binary_op_run(&op, &Box::new(v1), &Box::new(v2), &mut context).unwrap())
+        downcast_pf::<D>(binary_op_run(&op, &Box::new(v1), &Box::new(v2), &context).unwrap())
     }
 
     fn var_exp<'a>(var: &'a str) -> Exp<'a> {

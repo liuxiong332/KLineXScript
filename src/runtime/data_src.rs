@@ -61,6 +61,7 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
             self.blk.run(&mut self.context)?;
             self.context.commit();
             self.context.clear_declare();
+            self.context.clear_is_run();
         }
         self.context.run_callbacks()?;
         Ok(())

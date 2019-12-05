@@ -3,7 +3,6 @@ use crate::types::{
     Bool, Callable, Color, DataType, Float, Int, PineFrom, PineRef, PineStaticType, PineType,
     RefData, RuntimeErr, SecondType, Series, NA,
 };
-use std::cell;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::mem;
@@ -31,6 +30,14 @@ pub trait Ctx<'a>: VarOperate<'a> {
     fn contains_declare_scope(&self, name: &'a str) -> bool;
 
     fn clear_declare(&mut self);
+
+    fn any_declare(&self) -> bool;
+
+    fn set_is_run(&mut self, is_run: bool);
+
+    fn get_is_run(&self) -> bool;
+
+    fn clear_is_run(&mut self);
 
     fn get_type(&self) -> ContextType;
 
@@ -63,6 +70,8 @@ pub struct Context<'a, 'b, 'c> {
 
     callback: Option<&'a dyn Callback>,
     first_commit: bool,
+
+    is_run: bool,
 }
 
 pub fn downcast_ctx<'a, 'b, 'c>(
@@ -126,6 +135,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             declare_vars: HashSet::new(),
             callback: None,
             first_commit: false,
+            is_run: false,
         }
     }
 
@@ -140,6 +150,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             declare_vars: HashSet::new(),
             callback: Some(callback),
             first_commit: false,
+            is_run: false,
         }
     }
 
@@ -154,6 +165,9 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
     {
         let mut subctx = Box::new(Context::new(None, t));
         unsafe {
+            // Force the &Context to &mut Context to prevent the rust's borrow checker
+            // When the sub context borrow the parent context, the parent context should not
+            // use by the rust's borrow rules.
             subctx.parent = Some(mem::transmute::<usize, &mut Context<'a, 'b, 'c>>(
                 mem::transmute::<&Context<'a, 'b, 'c>, usize>(self),
             ));
@@ -192,7 +206,11 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
         commit_series_for_operator(self);
         // Commit the Series for all of the sub context.
         for (_, ctx) in self.sub_contexts.iter_mut() {
-            downcast_ctx(&mut **ctx).unwrap().commit();
+            // If this context does not declare variables, so this context is not run,
+            // we need not commit the series.
+            if ctx.get_is_run() {
+                downcast_ctx(&mut **ctx).unwrap().commit();
+            }
         }
 
         if !self.first_commit {
@@ -320,6 +338,25 @@ impl<'a, 'b, 'c> Ctx<'a> for Context<'a, 'b, 'c> {
         self.declare_vars.clear();
         for (_, v) in self.sub_contexts.iter_mut() {
             v.clear_declare();
+        }
+    }
+
+    fn any_declare(&self) -> bool {
+        !self.declare_vars.is_empty()
+    }
+
+    fn set_is_run(&mut self, is_run: bool) {
+        self.is_run = is_run;
+    }
+
+    fn get_is_run(&self) -> bool {
+        self.is_run
+    }
+
+    fn clear_is_run(&mut self) {
+        self.is_run = false;
+        for (_, subctx) in self.sub_contexts.iter_mut() {
+            subctx.clear_is_run();
         }
     }
 

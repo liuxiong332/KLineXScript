@@ -161,7 +161,6 @@ impl<'a> StmtRunner<'a> for Assignment<'a> {
     fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
         let val = self.val.rv_run(context)?;
         if self.names.len() == 1 {
-            println!("Assignment {:?}", val);
             return self.run_name(context, &self.names[0], val);
         }
         match val.get_type() {
@@ -205,15 +204,18 @@ impl<'a> StmtRunner<'a> for VarAssignment<'a> {
 
 impl<'a> Runner<'a> for IfThenElse<'a> {
     fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
-        println!("current vars: {:?}", context.get_var_keys());
         let cond = self.cond.rv_run(context)?;
         let cond_bool = Bool::implicity_from(cond)?;
         if *cond_bool {
             let subctx = create_sub_ctx(context, self.then_ctxid, ContextType::IfElseBlock);
-            self.then_blk.run(subctx)
+            let result = self.then_blk.run(subctx);
+            subctx.set_is_run(true);
+            result
         } else if let Some(ref else_blk) = self.else_blk {
             let subctx = create_sub_ctx(context, self.else_ctxid, ContextType::IfElseBlock);
-            else_blk.run(subctx)
+            let result = else_blk.run(subctx);
+            subctx.set_is_run(true);
+            result
         } else {
             Ok(PineRef::new_box(NA))
         }
@@ -337,6 +339,16 @@ pub fn create_sub_ctx<'a, 'b, 'c>(
     &mut **sub_context
 }
 
+pub fn get_sub_ctx<'a, 'b, 'c>(
+    context: &'c mut (dyn Ctx<'a> + 'c),
+    ctxid: i32,
+) -> &'c mut (dyn Ctx<'a> + 'c) {
+    let ctx_name = format!("@{:?}", ctxid);
+    let ctx_instance = downcast_ctx(context).unwrap();
+    let sub_context = ctx_instance.get_sub_context(&ctx_name).unwrap();
+    &mut **sub_context
+}
+
 impl<'a> Runner<'a> for FunctionCall<'a> {
     fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
         let result = self.method.rv_run(context)?;
@@ -348,12 +360,15 @@ impl<'a> Runner<'a> for FunctionCall<'a> {
             (FirstType::Callable, SecondType::Simple) => {
                 let callable = downcast_pf::<Callable>(result).unwrap();
                 let result = callable.call(ctx_ref, pos_args, dict_args);
+                ctx_ref.set_is_run(true);
                 context.create_callable(callable);
                 result
             }
             (FirstType::Function, SecondType::Simple) => {
                 let callable = downcast_pf::<Function>(result).unwrap();
-                callable.call(ctx_ref, pos_args, dict_args)
+                let result = callable.call(ctx_ref, pos_args, dict_args);
+                ctx_ref.set_is_run(true);
+                result
             }
             _ => Err(RuntimeErr::NotSupportOperator),
         }

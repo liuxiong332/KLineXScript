@@ -43,7 +43,7 @@ impl<'a> Function<'a> {
 
     pub fn call(
         &self,
-        context: Rc<Context<'a>>,
+        context: &Rc<Context<'a>>,
         pos_args: Vec<PineRef<'a>>,
         dict_args: Vec<(&'a str, PineRef<'a>)>,
     ) -> Result<PineRef<'a>, RuntimeErr> {
@@ -67,7 +67,7 @@ impl<'a> Function<'a> {
         // let mut new_context = Context::new(Some(context), ContextType::FuncDefBlock);
         for (k, v) in all_args {
             // context.create_var(k, v);
-            process_assign_val(v, &*context, k)?;
+            process_assign_val(v, &**context, k)?;
         }
         self.def.body.run(&context)
     }
@@ -91,16 +91,16 @@ mod tests {
         let func = Function::new(&func_def);
         let mut ctx = Rc::new(Context::new(None, ContextType::FuncDefBlock));
         assert_eq!(
-            func.call(ctx, vec![PineRef::new(Series::from(Some(1)))], vec![]),
+            func.call(&ctx, vec![PineRef::new(Series::from(Some(1)))], vec![]),
             Ok(PineRef::new(Series::from(Some(1))))
         );
         assert_eq!(
-            func.call(ctx, vec![PineRef::new(Series::from(Some(10)))], vec![]),
+            func.call(&ctx, vec![PineRef::new(Series::from(Some(10)))], vec![]),
             Ok(PineRef::new(Series::from(Some(10))))
         );
         ctx.commit();
         assert_eq!(
-            func.call(ctx, vec![PineRef::new(Series::from(Some(100)))], vec![]),
+            func.call(&ctx, vec![PineRef::new(Series::from(Some(100)))], vec![]),
             Ok(PineRef::new(Series::from_cur_history(
                 Some(100),
                 vec![Some(10)]

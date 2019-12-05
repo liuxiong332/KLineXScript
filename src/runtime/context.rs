@@ -196,18 +196,20 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub fn commit(self: Rc<Self>) {
+    pub fn commit(&self) {
         commit_series_for_operator(&*self);
 
         // Commit the Series for all of the sub context.
-        let keys = self.sub_contexts.borrow().keys();
+        let subctxs = self.sub_contexts.borrow();
+        let keys = subctxs.keys();
 
         for key in keys.into_iter() {
             // If this context does not declare variables, so this context is not run,
             // we need not commit the series.
             let (name, ctx) = self.sub_contexts.borrow_mut().remove_entry(key).unwrap();
+            let ctx = downcast_ctx(ctx).unwrap();
             if ctx.get_is_run() {
-                downcast_ctx(ctx).unwrap().commit();
+                ctx.commit();
             }
             self.sub_contexts.borrow_mut().insert(name, ctx);
         }
@@ -232,39 +234,31 @@ impl<'a> Context<'a> {
         }
         let callables = self.callables.replace(vec![]);
         for callable in callables.iter() {
-            callable.back(self)?;
+            callable.back(&self)?;
         }
         // mem::replace(&mut self.callables, callables);
         self.callables.replace(callables);
         Ok(())
     }
 
-    pub fn run_callbacks(self: Rc<Self>) -> Result<(), RuntimeErr> {
-        let callables = self.callables.replace(vec![]);
+    pub fn run_callbacks(this: &Rc<Self>) -> Result<(), RuntimeErr> {
+        let callables = this.callables.replace(vec![]);
         for callable in callables.iter() {
-            callable.run(Rc::clone(&self))?;
+            callable.run(this)?;
         }
-        self.callables.replace(callables);
+        this.callables.replace(callables);
         Ok(())
     }
 
-    pub fn contains_sub_context(self: Rc<Self>, name: &String) -> bool {
+    pub fn contains_sub_context(&self, name: &String) -> bool {
         self.sub_contexts.borrow().contains_key(name)
     }
 
-    pub fn get_sub_context<'b>(&'b self, name: &String) -> Option<&'b Rc<Context<'a>>> {
-        self.sub_contexts.borrow().get(name)
-    }
-
-    pub fn set_sub_context(self: Rc<Self>, name: String, sub_context: Rc<Context<'a>>) {
-        self.sub_contexts.borrow_mut().insert(name, sub_context);
-    }
-
-    pub fn move_sub_context(self: Rc<Self>, name: &String) -> Option<Rc<Context<'a>>> {
+    pub fn move_sub_context(&self, name: &String) -> Option<Rc<Context<'a>>> {
         self.sub_contexts.borrow_mut().remove(name)
     }
 
-    pub fn update_sub_context(self: Rc<Self>, name: String, subctx: Rc<Context<'a>>) {
+    pub fn update_sub_context(&self, name: String, subctx: Rc<Context<'a>>) {
         self.sub_contexts.borrow_mut().insert(name, subctx);
     }
 }
@@ -462,7 +456,7 @@ mod tests {
         assert_eq!(context1.callables.borrow().len(), 2);
 
         assert_eq!(context1.roll_back(), Ok(()));
-        assert_eq!(context1.run_callbacks(), Ok(()));
+        assert_eq!(Context::run_callbacks(&context1), Ok(()));
         assert_eq!(context1.callables.borrow().len(), 2);
     }
 

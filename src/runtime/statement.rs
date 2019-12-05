@@ -354,14 +354,14 @@ impl<'a> Runner<'a> for FunctionCall<'a> {
         match result.get_type() {
             (FirstType::Callable, SecondType::Simple) => {
                 let callable = downcast_pf::<Callable>(result).unwrap();
-                let result = callable.call(ctx_ref, pos_args, dict_args);
+                let result = callable.call(&ctx_ref, pos_args, dict_args);
                 ctx_ref.set_is_run(true);
                 context.create_callable(callable);
                 result
             }
             (FirstType::Function, SecondType::Simple) => {
                 let callable = downcast_pf::<Function>(result).unwrap();
-                let result = callable.call(ctx_ref, pos_args, dict_args);
+                let result = callable.call(&ctx_ref, pos_args, dict_args);
                 ctx_ref.set_is_run(true);
                 result
             }
@@ -646,7 +646,7 @@ mod tests {
         let mut context = Rc::new(Context::new(None, ContextType::Normal));
 
         fn test_func<'a>(
-            _context: Rc<Context<'a>>,
+            _context: &Rc<Context<'a>>,
             mut h: HashMap<&'a str, PineRef<'a>>,
         ) -> Result<PineRef<'a>, RuntimeErr> {
             match h.remove("arg") {

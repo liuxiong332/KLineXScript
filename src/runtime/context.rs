@@ -181,6 +181,33 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
         self.get_sub_context(&name).unwrap()
     }
 
+    pub fn create_move_sub_context(
+        &'c mut self,
+        name: String,
+        t: ContextType,
+    ) -> Box<dyn Ctx<'a> + 'c>
+    where
+        'a: 'c,
+        'b: 'c,
+    {
+        let mut subctx = Box::new(Context::new(None, t));
+        unsafe {
+            // Force the &Context to &mut Context to prevent the rust's borrow checker
+            // When the sub context borrow the parent context, the parent context should not
+            // use by the rust's borrow rules.
+            subctx.parent = Some(mem::transmute::<usize, &mut Context<'a, 'b, 'c>>(
+                mem::transmute::<&Context<'a, 'b, 'c>, usize>(self),
+            ));
+            mem::transmute::<usize, &mut Context<'a, 'b, 'c>>(mem::transmute::<
+                &Context<'a, 'b, 'c>,
+                usize,
+            >(self))
+            .sub_contexts
+            .insert(name.clone(), subctx);
+        }
+        self.move_sub_context(&name).unwrap()
+    }
+
     pub fn map_var<F>(&mut self, name: &'a str, f: F)
     where
         F: Fn(Option<PineRef<'a>>) -> Option<PineRef<'a>>,
@@ -258,6 +285,14 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
 
     pub fn set_sub_context(&mut self, name: String, sub_context: Box<dyn Ctx<'a> + 'c>) {
         self.sub_contexts.insert(name, sub_context);
+    }
+
+    pub fn move_sub_context(&mut self, name: &String) -> Option<Box<dyn Ctx<'a> + 'c>> {
+        self.sub_contexts.remove(name)
+    }
+
+    pub fn update_sub_context(&mut self, name: String, subctx: Box<dyn Ctx<'a> + 'c>) {
+        self.sub_contexts.insert(name, subctx);
     }
 }
 

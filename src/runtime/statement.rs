@@ -268,32 +268,32 @@ impl<'a> Runner<'a> for ForRange<'a> {
         };
         let mut iter = start;
         let mut ret_val: PineRef<'a> = PineRef::new_box(NA);
+        let mut subctx = create_move_sub_ctx(context, self.ctxid, ContextType::ForRangeBlock);
         while (step > 0 && iter < end) || (step < 0 && iter > end) {
-            {
-                let mut new_context = Context::new(Some(context), ContextType::ForRangeBlock);
-                new_context.create_var(iter_name, PineRef::new_box(Some(iter)));
-                match self.do_blk.run(&mut new_context) {
-                    Ok(val) => {
-                        ret_val = val;
-                        iter += step;
-                    }
-                    Err(RuntimeErr::Break) => {
-                        if let Some(ref exp) = self.do_blk.ret_stmt {
-                            ret_val = exp.rv_run(&mut new_context)?
-                        }
-                        break;
-                    }
-                    Err(RuntimeErr::Continue) => {
-                        if let Some(ref exp) = self.do_blk.ret_stmt {
-                            ret_val = exp.rv_run(&mut new_context)?
-                        }
-                        iter += step;
-                        continue;
-                    }
-                    e => return e,
+            subctx.create_var(iter_name, PineRef::new_box(Some(iter)));
+
+            match self.do_blk.run(&mut *subctx) {
+                Ok(val) => {
+                    ret_val = val;
+                    iter += step;
                 }
+                Err(RuntimeErr::Break) => {
+                    if let Some(ref exp) = self.do_blk.ret_stmt {
+                        ret_val = exp.rv_run(&mut *subctx)?
+                    }
+                    break;
+                }
+                Err(RuntimeErr::Continue) => {
+                    if let Some(ref exp) = self.do_blk.ret_stmt {
+                        ret_val = exp.rv_run(&mut *subctx)?
+                    }
+                    iter += step;
+                    continue;
+                }
+                e => return e,
             }
         }
+        update_sub_ctx(context, self.ctxid, subctx);
         Ok(ret_val)
     }
 }
@@ -337,6 +337,33 @@ pub fn create_sub_ctx<'a, 'b, 'c>(
         sub_context = ctx_instance.get_sub_context(&ctx_name).unwrap();
     }
     &mut **sub_context
+}
+
+pub fn create_move_sub_ctx<'a, 'b, 'c>(
+    context: &'c mut (dyn Ctx<'a> + 'c),
+    ctxid: i32,
+    ctx_type: ContextType,
+) -> Box<dyn Ctx<'a> + 'c> {
+    let ctx_name = format!("@{:?}", ctxid);
+    let ctx_instance = downcast_ctx(context).unwrap();
+    let sub_context;
+    // Get or create sub context for the function call context.
+    if !ctx_instance.contains_sub_context(&ctx_name) {
+        sub_context = ctx_instance.create_move_sub_context(ctx_name.clone(), ctx_type);
+    } else {
+        sub_context = ctx_instance.move_sub_context(&ctx_name).unwrap();
+    }
+    sub_context
+}
+
+pub fn update_sub_ctx<'a, 'b, 'c>(
+    context: &'c mut (dyn Ctx<'a> + 'c),
+    ctxid: i32,
+    subctx: Box<dyn Ctx<'a> + 'c>,
+) {
+    let ctx_name = format!("@{:?}", ctxid);
+    let ctx_instance = downcast_ctx(context).unwrap();
+    ctx_instance.update_sub_context(ctx_name, subctx);
 }
 
 pub fn get_sub_ctx<'a, 'b, 'c>(

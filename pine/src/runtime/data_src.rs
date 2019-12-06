@@ -6,6 +6,8 @@ use std::collections::HashMap;
 
 pub trait Callback {
     fn print(&self, _str: String) {}
+
+    fn plot(&self, floats: Vec<f64>) {}
 }
 
 pub struct DataSrc<'a, 'b, 'c> {

@@ -17,6 +17,11 @@ impl<'p> Callback for PyCallbackObj<'p> {
         let print_method = self.pyobj.getattr(self.py, "print");
         let result = print_method.unwrap().call(self.py, (_str,), None).unwrap();
     }
+
+    fn plot(&self, floats: Vec<f64>) {
+        let plot_method = self.pyobj.getattr(self.py, "plot");
+        let result = plot_method.unwrap().call(self.py, (floats,), None).unwrap();
+    }
 }
 
 #[pyfunction]

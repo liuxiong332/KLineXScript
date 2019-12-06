@@ -1,0 +1,5 @@
+pine_ema(x, y) =>
+    sum = 0.0
+    sum := x + (y * sum[1] ? y * sum[1] : 0)
+    sum
+print(pine_ema(close, 2))

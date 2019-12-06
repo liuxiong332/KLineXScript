@@ -14,4 +14,5 @@ pine_macd() =>
     osc = dif - dem
     osc
 
-print(pine_macd())
+// print(pine_macd())
+plot(pine_macd())

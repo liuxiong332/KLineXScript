@@ -268,32 +268,34 @@ impl<'a> Runner<'a> for ForRange<'a> {
         };
         let mut iter = start;
         let mut ret_val: PineRef<'a> = PineRef::new_box(NA);
-        let mut subctx = create_move_sub_ctx(context, self.ctxid, ContextType::ForRangeBlock);
+        let subctx = create_sub_ctx(context, self.ctxid, ContextType::ForRangeBlock);
         while (step > 0 && iter < end) || (step < 0 && iter > end) {
             subctx.create_var(iter_name, PineRef::new_box(Some(iter)));
 
-            match self.do_blk.run(&mut *subctx) {
+            match self.do_blk.run(subctx) {
                 Ok(val) => {
                     ret_val = val;
                     iter += step;
                 }
                 Err(RuntimeErr::Break) => {
                     if let Some(ref exp) = self.do_blk.ret_stmt {
-                        ret_val = exp.rv_run(&mut *subctx)?
+                        ret_val = exp.rv_run(subctx)?
                     }
                     break;
                 }
                 Err(RuntimeErr::Continue) => {
                     if let Some(ref exp) = self.do_blk.ret_stmt {
-                        ret_val = exp.rv_run(&mut *subctx)?
+                        ret_val = exp.rv_run(subctx)?
                     }
                     iter += step;
                     continue;
                 }
                 e => return e,
             }
+            subctx.clear_declare();
         }
-        update_sub_ctx(context, self.ctxid, subctx);
+        subctx.set_is_run(true);
+        // update_sub_ctx(context, self.ctxid, subctx);
         Ok(ret_val)
     }
 }

@@ -103,3 +103,31 @@ fn if_else_test() {
 
     assert_eq!(datasrc.run(data), Ok(()));
 }
+
+const FOR_RANGE_SCRIPT: &str = "
+float val = 0
+
+for i = 1 to 5
+    var sum = 0.0
+    sum := sum + 1
+    val := sum
+";
+
+#[test]
+fn for_range_test() {
+    struct MyCallback;
+    impl Callback for MyCallback {
+        fn print(&self, _str: String) {
+            assert_eq!(_str, String::from("4,8"));
+        }
+    }
+
+    let mut func_block = pine::parse_all(FOR_RANGE_SCRIPT).unwrap();
+    let inner_vars = libs::declare_vars();
+    let mut datasrc = DataSrc::new(&mut func_block, inner_vars, &MyCallback);
+
+    let mut data = HashMap::new();
+    data.insert("close", vec![Some(1f64), Some(3f64)]);
+
+    assert_eq!(datasrc.run(data), Ok(()));
+}

@@ -1,0 +1,17 @@
+
+pine_ema(x, y) =>
+    alpha = 2 / (y + 1)
+    sum = 0.0
+    sum := alpha * x + (1 - alpha) * (sum[1] ? sum[1] : 0)
+    sum
+
+pine_macd() => 
+    // DIF=EMA_{{(close,12)}}-EMA_{{(close,26)}}
+    dif = pine_ema(close, 12.0) - pine_ema(close, 26.0)
+    // DEM=EMA_{{(DIF,9)}}
+    dem = pine_ema(dif, 9.0)
+    //OSC=DIF-DEM=DIF-MACD
+    osc = dif - dem
+    osc
+
+print(pine_macd())

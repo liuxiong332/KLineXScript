@@ -168,15 +168,22 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             // Force the &Context to &mut Context to prevent the rust's borrow checker
             // When the sub context borrow the parent context, the parent context should not
             // use by the rust's borrow rules.
-            subctx.parent = Some(mem::transmute::<usize, &mut Context<'a, 'b, 'c>>(
-                mem::transmute::<&Context<'a, 'b, 'c>, usize>(self),
-            ));
-            mem::transmute::<usize, &mut Context<'a, 'b, 'c>>(mem::transmute::<
-                &Context<'a, 'b, 'c>,
-                usize,
-            >(self))
-            .sub_contexts
-            .insert(name.clone(), subctx);
+
+            // subctx.parent = Some(mem::transmute::<usize, &mut Context<'a, 'b, 'c>>(
+            //     mem::transmute::<&Context<'a, 'b, 'c>, usize>(self),
+            // ));
+            // mem::transmute::<usize, &mut Context<'a, 'b, 'c>>(mem::transmute::<
+            //     &Context<'a, 'b, 'c>,
+            //     usize,
+            // >(self))
+            // .sub_contexts
+            // .insert(name.clone(), subctx);
+            let ptr: *mut Context<'a, 'b, 'c> = self;
+            subctx.parent = Some(ptr.as_mut().unwrap());
+            ptr.as_mut()
+                .unwrap()
+                .sub_contexts
+                .insert(name.clone(), subctx);
         }
         self.get_sub_context(&name).unwrap()
     }

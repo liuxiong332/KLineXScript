@@ -1,4 +1,5 @@
 use super::error::{PineError, PineErrorKind, PineResult};
+use super::input::Input;
 use nom::{
     branch::alt,
     bytes::complete::{escaped, is_not, tag, take_until},
@@ -54,15 +55,15 @@ pub fn unescape(buf: &str) -> Result<String, &'static str> {
     }
 }
 
-fn gen_quote_str(quote_char: &'static str) -> impl Fn(&str) -> PineResult<String> {
-    move |input: &str| {
+fn gen_quote_str(quote_char: &'static str) -> impl Fn(Input) -> PineResult<String> {
+    move |input: Input| {
         let ignore_chars = ["\n\\", quote_char].join("");
         let (next_input, out) = delimited(
             tag(quote_char),
             escaped(is_not(&ignore_chars[..]), '\\', one_of(ESCAPE_CODE)),
             tag(quote_char),
         )(input)?;
-        match unescape(out) {
+        match unescape(out.src) {
             Ok(res_str) => Ok((next_input, res_str)),
             Err(err_str) => Err(Err::Error(PineError::from_pine_kind(
                 input,
@@ -72,13 +73,16 @@ fn gen_quote_str(quote_char: &'static str) -> impl Fn(&str) -> PineResult<String
     }
 }
 
-pub fn string_lit(input: &str) -> PineResult<String> {
+pub fn string_lit(input: Input) -> PineResult<String> {
     alt((gen_quote_str("\""), gen_quote_str("'")))(input)
 }
 
 #[cfg(test)]
 mod tests {
+    use super::super::input::Position;
     use super::*;
+    use std::convert::TryInto;
+
     #[test]
     fn unescape_test() {
         assert_eq!(unescape(r"\\hello"), Ok(String::from("\\hello")));
@@ -91,13 +95,24 @@ mod tests {
 
     #[test]
     fn string_lit_test() {
+        let test_input = Input::new_with_str(r"'hello \' world'ding");
+        let input_len: u32 = test_input.len().try_into().unwrap();
         assert_eq!(
-            string_lit(r"'hello \' world'ding"),
-            Ok(("ding", String::from("hello ' world")))
+            string_lit(test_input),
+            Ok((
+                Input::new("ding", Position::new(0, input_len - 4), Position::max()),
+                String::from("hello ' world")
+            ))
         );
+
+        let test_input = Input::new_with_str("\"hello \' world\"ding");
+        let input_len: u32 = test_input.len().try_into().unwrap();
         assert_eq!(
-            string_lit("\"hello \' world\"ding"),
-            Ok(("ding", String::from("hello ' world")))
-        )
+            string_lit(test_input),
+            Ok((
+                Input::new("ding", Position::new(0, input_len - 4), Position::max()),
+                String::from("hello ' world")
+            ))
+        );
     }
 }

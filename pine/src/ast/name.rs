@@ -1,17 +1,18 @@
 use super::error::{PineError, PineErrorKind, PineResult};
+use super::input::Input;
 use super::utils::skip_ws;
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while},
     combinator::recognize,
     sequence::pair,
-    Err,
+    Err, InputTake,
 };
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct VarName<'a>(pub &'a str);
 
-fn reserved(input: &str) -> PineResult {
+fn reserved(input: Input) -> PineResult {
     alt((
         tag("and"),
         tag("or"),
@@ -29,14 +30,14 @@ fn reserved(input: &str) -> PineResult {
     ))(input)
 }
 
-fn alpha_or_underscore(input: &str) -> PineResult {
-    match input.chars().next().map(|t: char| {
+fn alpha_or_underscore(input: Input) -> PineResult {
+    match input.src.chars().next().map(|t: char| {
         let b = t.is_alphabetic() || t == '_';
         (t, b)
     }) {
-        Some((_, true)) => Ok((&input[1..], &input[0..1])),
+        Some((_, true)) => Ok(input.take_split(1)),
         _ => Err(Err::Error(PineError::from_pine_kind(
-            &input[1..],
+            input,
             PineErrorKind::InvalidIdentifier("The identifier must start with alphabetic or _"),
         ))),
     }
@@ -47,7 +48,7 @@ fn is_alphanum_or_underscore(input: char) -> bool {
     input.is_alphanumeric() || input == '_'
 }
 
-pub fn varname(input: &str) -> PineResult<VarName> {
+pub fn varname(input: Input) -> PineResult<VarName> {
     let (input, name) = recognize(pair(
         alpha_or_underscore,
         take_while(is_alphanum_or_underscore),
@@ -60,32 +61,64 @@ pub fn varname(input: &str) -> PineResult<VarName> {
             )));
         }
     }
-    Ok((input, VarName(name)))
+    Ok((input, VarName(name.src)))
 }
 
-pub fn varname_ws(input: &str) -> PineResult<VarName> {
+pub fn varname_ws(input: Input) -> PineResult<VarName> {
     let (input, _) = skip_ws(input)?;
     varname(input)
 }
 
 #[cfg(test)]
 mod tests {
+    use super::super::input::Position;
     use super::*;
+    use std::convert::TryInto;
 
     #[test]
     fn name_test() {
-        assert_eq!(reserved("na"), Ok(("", "na")));
-        assert_eq!(alpha_or_underscore("_hello"), Ok(("hello", "_")));
-        assert_eq!(alpha_or_underscore("hello"), Ok(("ello", "h")));
-        assert!(alpha_or_underscore("2hello").is_err());
+        let test_input = Input::new_with_str("na");
+        assert_eq!(
+            reserved(test_input),
+            Ok(test_input.take_split(test_input.len()))
+        );
 
-        assert_eq!(varname_ws(" hello_world"), Ok(("", VarName("hello_world"))));
-        assert_eq!(varname_ws(" hed_12s"), Ok(("", VarName("hed_12s"))));
+        let test_input = Input::new_with_str("_hello");
+        assert_eq!(
+            alpha_or_underscore(test_input),
+            Ok((
+                Input::new("hello", Position::new(0, 1), Position::max()),
+                Input::new_u32("_", 0, 0, 0, 1)
+            ))
+        );
 
-        assert_eq!(varname("myVar"), Ok(("", VarName("myVar"))));
-        assert_eq!(varname("_myVar"), Ok(("", VarName("_myVar"))));
-        assert_eq!(varname("my123Var"), Ok(("", VarName("my123Var"))));
-        assert_eq!(varname("MAX_LEN"), Ok(("", VarName("MAX_LEN"))));
-        assert_eq!(varname("max_len"), Ok(("", VarName("max_len"))));
+        assert_eq!(
+            alpha_or_underscore(Input::new_with_str("hello")),
+            Ok((
+                Input::new("ello", Position::new(0, 1), Position::max()),
+                Input::new_u32("h", 0, 0, 0, 1)
+            ))
+        );
+        assert!(alpha_or_underscore(Input::new_with_str("2hello")).is_err());
+
+        fn test_varname(s: &str, res: &str) {
+            let test_input = Input::new_with_str(s);
+            let input_len: u32 = test_input.len().try_into().unwrap();
+            assert_eq!(
+                varname_ws(test_input),
+                Ok((
+                    Input::new("", Position::new(0, input_len), Position::max()),
+                    VarName(res)
+                ))
+            );
+        }
+
+        test_varname(" hello_world", "hello_world");
+        test_varname(" hed_12s", "hed_12s");
+        test_varname("myVar", "myVar");
+        test_varname("_myVar", "_myVar");
+        test_varname("my123Var", "my123Var");
+        test_varname("MAX_LEN", "MAX_LEN");
+        test_varname("max_len", "max_len");
     }
 }

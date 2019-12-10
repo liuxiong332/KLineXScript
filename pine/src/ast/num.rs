@@ -1,3 +1,4 @@
+use super::input::Input;
 use nom::{
     branch::alt,
     bytes::complete::tag,
@@ -18,8 +19,10 @@ pub enum Numeral {
     Int(i32),
 }
 
-pub fn underscore_digit_str(s: &str) -> PineResult<String> {
-    map(separated_list(tag("_"), digit1), |s| s.join(""))(s)
+pub fn underscore_digit_str(s: Input) -> PineResult<String> {
+    map(separated_list(tag("_"), digit1), |v: Vec<Input>| {
+        v.into_iter().map(|s| s.src).collect::<Vec<&str>>().join("")
+    })(s)
 }
 
 // pub fn signed_int(s: &str) -> PineResult<i32> {
@@ -33,7 +36,7 @@ pub fn underscore_digit_str(s: &str) -> PineResult<String> {
 //     }
 // }
 
-pub fn decimal(input: &str) -> PineResult<i32> {
+pub fn decimal(input: Input) -> PineResult<i32> {
     let (next_s, num_str) = underscore_digit_str(input).unwrap();
     // let (next_s, num_str) = digit1(input)?;
     match i32::from_str_radix(&num_str, 10) {
@@ -45,44 +48,44 @@ pub fn decimal(input: &str) -> PineResult<i32> {
     }
 }
 
-pub fn int_lit(input: &str) -> PineResult<i32> {
+pub fn int_lit(input: Input) -> PineResult<i32> {
     let (input, (sign, lit)) =
         tuple((opt(terminated(alt((tag("+"), tag("-"))), skip_ws)), decimal))(input)?;
     match sign {
-        Some("+") | None => Ok((input, lit)),
-        Some("-") => Ok((input, -lit)),
+        Some(Input { src: "+", .. }) | None => Ok((input, lit)),
+        Some(Input { src: "-", .. }) => Ok((input, -lit)),
         _ => unreachable!(),
     }
 }
 
-pub fn int_lit_ws(input: &str) -> PineResult<i32> {
+pub fn int_lit_ws(input: Input) -> PineResult<i32> {
     let (input, _) = skip_ws(input)?;
     int_lit(input)
 }
 
-pub fn float_mag(input: &str) -> PineResult<i32> {
+pub fn float_mag(input: Input) -> PineResult<i32> {
     preceded(alt((tag("e"), tag("E"))), float_sgn_suffix)(input)
 }
 
-pub fn float_sgn_suffix(input: &str) -> PineResult<i32> {
+pub fn float_sgn_suffix(input: Input) -> PineResult<i32> {
     let (input, sign) = opt(alt((tag("+"), tag("-"))))(input)?;
     let (input, num) = decimal(input)?;
     match sign {
-        Some("+") | None => Ok((input, num)),
-        Some("-") => Ok((input, -num)),
+        Some(Input { src: "+", .. }) | None => Ok((input, num)),
+        Some(Input { src: "-", .. }) => Ok((input, -num)),
         _ => Ok((input, 0)),
     }
 }
 
-pub fn num_lit(input: &str) -> PineResult<Numeral> {
+pub fn num_lit(input: Input) -> PineResult<Numeral> {
     let (input, out) = recognize(tuple((
         opt(decimal),
         opt(preceded(tag("."), decimal)),
         opt(float_mag),
     )))(input)?;
-    if let Ok(n) = i32::from_str_radix(out, 10) {
+    if let Ok(n) = i32::from_str_radix(out.src, 10) {
         Ok((input, Numeral::Int(n)))
-    } else if let Ok(f) = f64::from_str(out) {
+    } else if let Ok(f) = f64::from_str(out.src) {
         Ok((input, Numeral::Float(f)))
     } else {
         Err(Err::Error(PineError::from_pine_kind(
@@ -93,27 +96,53 @@ pub fn num_lit(input: &str) -> PineResult<Numeral> {
 }
 
 // match float or int. e.g. 2.12 2.12e121 .111e11  1221
-pub fn num_lit_ws(input: &str) -> PineResult<Numeral> {
+pub fn num_lit_ws(input: Input) -> PineResult<Numeral> {
     let (input, _) = skip_ws(input)?;
     num_lit(input)
 }
 
 #[cfg(test)]
 mod tests {
+    use super::super::input::Position;
     use super::*;
+    use std::convert::TryInto;
 
     #[test]
     fn signed_int_test() {
-        assert_eq!(num_lit_ws("121.1"), Ok(("", Numeral::Float(121.1))));
-        assert_eq!(num_lit_ws("121"), Ok(("", Numeral::Int(121))));
-        assert_eq!(num_lit_ws("121e1"), Ok(("", Numeral::Float(121e1))));
-        assert_eq!(num_lit_ws("121.1e1"), Ok(("", Numeral::Float(121.1e1))));
+        fn test_lit_ws(s: &str, res: Numeral) {
+            let test_input = Input::new_with_str(s);
+            let input_len: u32 = test_input.len().try_into().unwrap();
+            assert_eq!(
+                num_lit_ws(test_input),
+                Ok((
+                    Input::new("", Position::new(0, input_len), Position::max()),
+                    res
+                ))
+            );
+        }
+
+        test_lit_ws("121.1", Numeral::Float(121.1));
+        test_lit_ws("121", Numeral::Int(121));
+        test_lit_ws("121e1", Numeral::Float(121e1));
+        test_lit_ws("121.1e1", Numeral::Float(121.1e1));
     }
 
     #[test]
     fn int_test() {
-        assert_eq!(int_lit_ws(" + 121"), Ok(("", 121i32)));
-        assert_eq!(int_lit_ws(" - 121"), Ok(("", -121i32)));
-        assert_eq!(int_lit_ws(" 121"), Ok(("", 121)));
+        fn test_int_ws(s: &str, res: i32) {
+            let test_input = Input::new_with_str(s);
+            let input_len: u32 = test_input.len().try_into().unwrap();
+            assert_eq!(
+                int_lit_ws(test_input),
+                Ok((
+                    Input::new("", Position::new(0, input_len), Position::max()),
+                    res
+                ))
+            );
+        }
+
+        test_int_ws(" + 121", 121i32);
+        test_int_ws(" - 121", -121i32);
+        test_int_ws(" 121", 121);
     }
 }

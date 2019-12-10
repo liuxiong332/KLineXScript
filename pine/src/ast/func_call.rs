@@ -6,6 +6,7 @@ use nom::{
 };
 
 use super::error::{PineError, PineErrorKind, PineResult};
+use super::input::Input;
 use super::name::{varname_ws, VarName};
 use super::stat_expr::{callable_expr, exp};
 use super::stat_expr_types::{Exp, FunctionCall};
@@ -17,7 +18,7 @@ struct FuncCallArg<'a> {
     arg: Exp<'a>,
 }
 
-fn func_call_arg(input: &str) -> PineResult<FuncCallArg> {
+fn func_call_arg(input: Input) -> PineResult<FuncCallArg> {
     if let Ok((input, result)) = map(tuple((varname_ws, eat_sep(tag("=")), exp)), |s| {
         FuncCallArg {
             name: Some(s.0),
@@ -32,7 +33,7 @@ fn func_call_arg(input: &str) -> PineResult<FuncCallArg> {
     }
 }
 
-fn func_call_args(input: &str) -> PineResult<(Vec<Exp>, Vec<(VarName, Exp)>)> {
+fn func_call_args(input: Input) -> PineResult<(Vec<Exp>, Vec<(VarName, Exp)>)> {
     let (input, arg1) = opt(func_call_arg)(input)?;
     if arg1.is_none() {
         return Ok((input, (vec![], vec![])));
@@ -72,7 +73,7 @@ fn func_call_args(input: &str) -> PineResult<(Vec<Exp>, Vec<(VarName, Exp)>)> {
     Ok((cur_input, (pos_args, dict_args)))
 }
 
-pub fn func_call(input: &str) -> PineResult<FunctionCall> {
+pub fn func_call(input: Input) -> PineResult<FunctionCall> {
     let (input, (method, (pos_args, dict_args))) = tuple((
         callable_expr,
         delimited(eat_sep(tag("(")), func_call_args, eat_sep(tag(")"))),
@@ -83,76 +84,87 @@ pub fn func_call(input: &str) -> PineResult<FunctionCall> {
     ))
 }
 
-pub fn func_call_ws(input: &str) -> PineResult<FunctionCall> {
+pub fn func_call_ws(input: Input) -> PineResult<FunctionCall> {
     eat_sep(func_call)(input)
 }
 
 #[cfg(test)]
 mod tests {
+    use super::super::input::Position;
     use super::*;
     use crate::ast::stat_expr_types::PrefixExp;
-    #[test]
-    fn func_call_test() {
-        assert_eq!(
-            func_call_arg("a = true"),
-            Ok((
-                "",
-                FuncCallArg {
-                    name: Some(VarName("a")),
-                    arg: Exp::Bool(true)
-                }
-            ))
-        );
-        assert_eq!(
-            func_call_ws("funa(arg1, arg2, a = true)"),
-            Ok((
-                "",
-                FunctionCall::new_no_ctxid(
-                    Exp::VarName(VarName("funa")),
-                    vec![Exp::VarName(VarName("arg1")), Exp::VarName(VarName("arg2"))],
-                    vec![(VarName("a"), Exp::Bool(true))]
-                )
-            ))
-        );
+    use std::convert::TryInto;
+    use std::fmt::Debug;
 
+    fn check_res<'a, F, O>(s: &'a str, handler: F, res: O)
+    where
+        F: Fn(Input<'a>) -> PineResult<O>,
+        O: Debug + PartialEq,
+    {
+        let test_input = Input::new_with_str(s);
+        let input_len: u32 = test_input.len().try_into().unwrap();
         assert_eq!(
-            func_call_ws("funa()"),
+            handler(test_input),
             Ok((
-                "",
-                FunctionCall::new_no_ctxid(Exp::VarName(VarName("funa")), vec![], vec![])
-            ))
-        );
-
-        assert_eq!(
-            func_call_ws("funa.funb()"),
-            Ok((
-                "",
-                FunctionCall::new_no_ctxid(
-                    Exp::PrefixExp(Box::new(PrefixExp {
-                        var_chain: vec![VarName("funa"), VarName("funb")]
-                    })),
-                    vec![],
-                    vec![]
-                )
+                Input::new("", Position::new(0, input_len), Position::max()),
+                res
             ))
         );
     }
+
+    #[test]
+    fn func_call_test() {
+        check_res(
+            "a = true",
+            func_call_arg,
+            FuncCallArg {
+                name: Some(VarName("a")),
+                arg: Exp::Bool(true),
+            },
+        );
+        check_res(
+            "funa(arg1, arg2, a = true)",
+            func_call_ws,
+            FunctionCall::new_no_ctxid(
+                Exp::VarName(VarName("funa")),
+                vec![Exp::VarName(VarName("arg1")), Exp::VarName(VarName("arg2"))],
+                vec![(VarName("a"), Exp::Bool(true))],
+            ),
+        );
+
+        check_res(
+            "funa()",
+            func_call_ws,
+            FunctionCall::new_no_ctxid(Exp::VarName(VarName("funa")), vec![], vec![]),
+        );
+
+        check_res(
+            "funa.funb()",
+            func_call_ws,
+            FunctionCall::new_no_ctxid(
+                Exp::PrefixExp(Box::new(PrefixExp {
+                    var_chain: vec![VarName("funa"), VarName("funb")],
+                })),
+                vec![],
+                vec![],
+            ),
+        );
+    }
+
     #[test]
     fn func_call_recursive_test() {
-        assert_eq!(
-            func_call_ws("funa(funb())"),
-            Ok((
-                "",
-                FunctionCall::new_no_ctxid(
-                    Exp::VarName(VarName("funa")),
-                    vec![Exp::FuncCall(Box::new(FunctionCall::new_no_ctxid(
-                        Exp::VarName(VarName("funb")),
-                        vec![],
-                        vec![]
-                    )))],
-                    vec![]
-                )
-            ))
+        check_res(
+            "funa(funb())",
+            func_call_ws,
+            FunctionCall::new_no_ctxid(
+                Exp::VarName(VarName("funa")),
+                vec![Exp::FuncCall(Box::new(FunctionCall::new_no_ctxid(
+                    Exp::VarName(VarName("funb")),
+                    vec![],
+                    vec![],
+                )))],
+                vec![],
+            ),
         );
     }
 }

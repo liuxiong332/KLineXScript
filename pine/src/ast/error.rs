@@ -1,3 +1,4 @@
+use super::input::Input;
 use nom::error::{ErrorKind, ParseError};
 use nom::Err;
 use nom::IResult;
@@ -24,7 +25,7 @@ pub struct PineError<I> {
     pub errors: Vec<(I, PineErrorKind)>,
 }
 
-pub type PineResult<'a, O = &'a str> = IResult<&'a str, O, PineError<&'a str>>;
+pub type PineResult<'a, O = Input<'a>> = IResult<Input<'a>, O, PineError<Input<'a>>>;
 
 impl<I> PineError<I> {
     pub fn from_pine_kind(input: I, kind: PineErrorKind) -> Self {

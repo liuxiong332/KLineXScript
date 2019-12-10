@@ -9,6 +9,7 @@ use nom::{
 use super::color::color_lit;
 use super::error::PineResult;
 use super::func_call::{func_call, func_call_ws};
+use super::input::Input;
 use super::name::{varname, varname_ws, VarName};
 use super::num::{int_lit_ws, num_lit_ws};
 use super::op::*;
@@ -18,7 +19,7 @@ use super::trans::flatexp_from_components;
 use super::utils::{eat_sep, eat_statement, statement_end, statement_indent};
 
 // exp2 contain the expressions that can apply the binary operators(+,-,*,/) and unary operators(+,-)
-pub fn exp2(input: &str) -> PineResult<Exp2> {
+pub fn exp2(input: Input) -> PineResult<Exp2> {
     alt((
         value(Exp2::Na, eat_sep(tag("na"))),
         value(Exp2::Bool(true), eat_sep(tag("true"))),
@@ -37,17 +38,17 @@ pub fn exp2(input: &str) -> PineResult<Exp2> {
     ))(input)
 }
 
-pub fn unopexp2(input: &str) -> PineResult<(Vec<UnaryOp>, Exp2)> {
+pub fn unopexp2(input: Input) -> PineResult<(Vec<UnaryOp>, Exp2)> {
     tuple((many0(unary_op), exp2))(input)
 }
 
-pub fn flatexp(input: &str) -> PineResult<FlatExp> {
+pub fn flatexp(input: Input) -> PineResult<FlatExp> {
     let (input, head) = unopexp2(input)?;
     let (input, binop_chain) = many0(tuple((binary_op, unopexp2)))(input)?;
     Ok((input, flatexp_from_components(head, binop_chain)))
 }
 
-pub fn exp(input: &str) -> PineResult<Exp> {
+pub fn exp(input: Input) -> PineResult<Exp> {
     alt((
         map(condition, |exp| Exp::Condition(Box::new(exp))), // match a ? b : c
         map(flatexp, Exp::from),
@@ -55,7 +56,7 @@ pub fn exp(input: &str) -> PineResult<Exp> {
 }
 
 // The left return tuple of expression `[a, b] = [1, 2]` that contain variable name between square brackets
-fn rettupledef(input: &str) -> PineResult<Vec<VarName>> {
+fn rettupledef(input: Input) -> PineResult<Vec<VarName>> {
     eat_sep(delimited(
         eat_sep(tag("[")),
         separated_list(eat_sep(tag(",")), varname_ws),
@@ -64,7 +65,7 @@ fn rettupledef(input: &str) -> PineResult<Vec<VarName>> {
 }
 
 // The right tuple of expression `[a, b] = [1, 2]` that contain expressions splited by dot between square brackets
-fn tupledef(input: &str) -> PineResult<Vec<Exp>> {
+fn tupledef(input: Input) -> PineResult<Vec<Exp>> {
     eat_sep(delimited(
         eat_sep(tag("[")),
         separated_list(eat_sep(tag(",")), exp),
@@ -72,13 +73,13 @@ fn tupledef(input: &str) -> PineResult<Vec<Exp>> {
     ))(input)
 }
 
-fn type_cast(input: &str) -> PineResult<TypeCast> {
+fn type_cast(input: Input) -> PineResult<TypeCast> {
     let (input, (data_type, _, e, _)) =
         tuple((eat_sep(datatype), eat_sep(tag("(")), exp, eat_sep(tag(")"))))(input)?;
     Ok((input, TypeCast { data_type, exp: e }))
 }
 
-pub fn callable_expr(input: &str) -> PineResult<Exp> {
+pub fn callable_expr(input: Input) -> PineResult<Exp> {
     alt((
         delimited(tag("("), exp, eat_sep(tag(")"))),
         map(prefix_exp, |exp| Exp::PrefixExp(Box::new(exp))), // match a.b.c
@@ -86,7 +87,7 @@ pub fn callable_expr(input: &str) -> PineResult<Exp> {
     ))(input)
 }
 
-fn ref_call(input: &str) -> PineResult<RefCall> {
+fn ref_call(input: Input) -> PineResult<RefCall> {
     let (input, (name, arg)) = tuple((
         eat_sep(callable_expr),
         delimited(eat_sep(tag("[")), exp, eat_sep(tag("]"))),
@@ -94,11 +95,11 @@ fn ref_call(input: &str) -> PineResult<RefCall> {
     Ok((input, RefCall { name, arg }))
 }
 
-fn bracket_expr(input: &str) -> PineResult<Exp> {
+fn bracket_expr(input: Input) -> PineResult<Exp> {
     delimited(eat_sep(tag("(")), exp, eat_sep(tag(")")))(input)
 }
 
-fn condition(input: &str) -> PineResult<Condition> {
+fn condition(input: Input) -> PineResult<Condition> {
     let (input, (cond, _, exp1, _, exp2)) = tuple((
         map(flatexp, |s| Exp::from(s)),
         eat_sep(tag("?")),
@@ -109,7 +110,7 @@ fn condition(input: &str) -> PineResult<Condition> {
     Ok((input, Condition { cond, exp1, exp2 }))
 }
 
-fn prefix_exp(input: &str) -> PineResult<PrefixExp> {
+fn prefix_exp(input: Input) -> PineResult<PrefixExp> {
     let (input, (prefix, _, names)) =
         tuple((varname, tag("."), separated_list(tag("."), varname)))(input)?;
 
@@ -121,12 +122,12 @@ fn prefix_exp(input: &str) -> PineResult<PrefixExp> {
     ))
 }
 
-fn prefix_exp_ws(input: &str) -> PineResult<PrefixExp> {
+fn prefix_exp_ws(input: Input) -> PineResult<PrefixExp> {
     eat_sep(prefix_exp)(input)
 }
 
-fn if_then_else<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<IfThenElse> {
-    move |input: &'a str| {
+fn if_then_else<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResult<IfThenElse> {
+    move |input: Input<'a>| {
         let (input, (_, cond, _, then_block, else_block)) = tuple((
             tag("if"),
             exp,
@@ -149,12 +150,12 @@ fn if_then_else<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<IfThenElse>
     }
 }
 
-fn if_then_else_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<IfThenElse> {
-    move |input: &'a str| preceded(statement_indent(indent), if_then_else(indent))(input)
+fn if_then_else_with_indent<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResult<IfThenElse> {
+    move |input: Input<'a>| preceded(statement_indent(indent), if_then_else(indent))(input)
 }
 
-fn for_range<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<ForRange> {
-    move |input: &'a str| {
+fn for_range<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResult<ForRange> {
+    move |input: Input<'a>| {
         let (input, (_, var, _, start, _, end, by, _, do_blk)) = tuple((
             tag("for"),
             varname_ws,
@@ -177,12 +178,12 @@ fn for_range<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<ForRange> {
     }
 }
 
-fn for_range_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<ForRange> {
-    move |input: &'a str| preceded(statement_indent(indent), for_range(indent))(input)
+fn for_range_with_indent<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResult<ForRange> {
+    move |input: Input<'a>| preceded(statement_indent(indent), for_range(indent))(input)
 }
 
-fn function_def_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<FunctionDef> {
-    move |input: &'a str| {
+fn function_def_with_indent<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResult<FunctionDef> {
+    move |input: Input<'a>| {
         let (input, (_, name, _, params, _, _, body)) = tuple((
             statement_indent(indent),
             varname,
@@ -202,7 +203,7 @@ fn function_def_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult
     }
 }
 
-fn datatype(input: &str) -> PineResult<DataType> {
+fn datatype(input: Input) -> PineResult<DataType> {
     let (input, label) = alt((
         tag("float"),
         tag("int"),
@@ -212,7 +213,7 @@ fn datatype(input: &str) -> PineResult<DataType> {
         tag("line"),
         tag("label"),
     ))(input)?;
-    let data_type = match label {
+    let data_type = match label.src {
         "float" => DataType::Float,
         "int" => DataType::Int,
         "bool" => DataType::Bool,
@@ -225,8 +226,8 @@ fn datatype(input: &str) -> PineResult<DataType> {
     Ok((input, data_type))
 }
 
-pub fn exp_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<Exp> {
-    move |input: &'a str| {
+pub fn exp_with_indent<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResult<Exp> {
+    move |input: Input<'a>| {
         alt((
             terminated(exp, statement_end),
             map(eat_sep(if_then_else(indent)), |s| Exp::Ite(Box::new(s))),
@@ -235,12 +236,12 @@ pub fn exp_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<Exp>
     }
 }
 
-fn assign_lv_names<'a>(input: &'a str) -> PineResult<Vec<VarName<'a>>> {
+fn assign_lv_names<'a>(input: Input<'a>) -> PineResult<Vec<VarName<'a>>> {
     alt((map(varname_ws, |name| vec![name]), rettupledef))(input)
 }
 
-fn assign_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<Assignment> {
-    move |input: &'a str| {
+fn assign_with_indent<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResult<Assignment> {
+    move |input: Input<'a>| {
         let exp_parser = || exp_with_indent(indent);
         alt((
             map(
@@ -269,8 +270,8 @@ fn assign_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<Assig
     }
 }
 
-fn var_assign_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<VarAssignment> {
-    move |input: &'a str| {
+fn var_assign_with_indent<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResult<VarAssignment> {
+    move |input: Input<'a>| {
         map(
             tuple((varname, eat_sep(tag(":=")), exp_with_indent(indent))),
             |s| VarAssignment::new(s.0, s.2),
@@ -278,8 +279,8 @@ fn var_assign_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<V
     }
 }
 
-fn block_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<Block> {
-    move |input: &'a str| {
+fn block_with_indent<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResult<Block> {
+    move |input: Input<'a>| {
         let gen_indent = statement_indent(indent);
 
         let mut stmts: Vec<Statement<'a>> = vec![];
@@ -311,9 +312,9 @@ fn block_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<Block>
     }
 }
 
-fn statement_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<Statement> {
+fn statement_with_indent<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResult<Statement> {
     let gen_indent = statement_indent(indent);
-    move |input: &'a str| {
+    move |input: Input<'a>| {
         alt((
             value(Statement::Break, eat_statement(&gen_indent, tag("break"))),
             value(
@@ -343,261 +344,263 @@ fn statement_with_indent<'a>(indent: usize) -> impl Fn(&'a str) -> PineResult<St
     }
 }
 
-pub fn statement(input: &str) -> PineResult<Statement> {
+pub fn statement(input: Input) -> PineResult<Statement> {
     statement_with_indent(0)(input)
 }
 
-pub fn block(input: &str) -> PineResult<Block> {
+pub fn block(input: Input) -> PineResult<Block> {
     block_with_indent(0)(input)
 }
 
 #[cfg(test)]
 mod tests {
+    use super::super::input::Position;
     use super::super::num::Numeral;
     use super::*;
+    use std::convert::TryInto;
+    use std::fmt::Debug;
+
+    fn check_res_input<'a, F, O>(s: &'a str, handler: F, res: O, res_input: &'a str)
+    where
+        F: Fn(Input<'a>) -> PineResult<O>,
+        O: Debug + PartialEq,
+    {
+        let test_input = Input::new_with_str(s);
+        let input_len = test_input.len() - res_input.len();
+        let consume_input = Input::new_with_start(&s[..input_len], Position::new(0, 0));
+        assert_eq!(
+            handler(test_input),
+            Ok((
+                Input::new(res_input, consume_input.end, Position::max()),
+                res
+            ))
+        );
+    }
+
+    fn check_res<'a, F, O>(s: &'a str, handler: F, res: O)
+    where
+        F: Fn(Input<'a>) -> PineResult<O>,
+        O: Debug + PartialEq,
+    {
+        check_res_input(s, handler, res, "")
+    }
 
     #[test]
     fn rettupledef_test() {
-        assert_eq!(
-            rettupledef(" [hello, good]"),
-            Ok(("", vec![VarName("hello"), VarName("good")]))
+        check_res(
+            " [hello, good]",
+            rettupledef,
+            vec![VarName("hello"), VarName("good")],
         );
-        assert_eq!(
-            rettupledef(" [hello, good,  my]hello"),
-            Ok((
-                "hello",
-                vec![VarName("hello"), VarName("good"), VarName("my")]
-            ))
+        check_res_input(
+            " [hello, good,  my]hello",
+            rettupledef,
+            vec![VarName("hello"), VarName("good"), VarName("my")],
+            "hello",
         );
 
-        assert_eq!(
-            rettupledef(" [ hello  , good ]"),
-            Ok(("", vec![VarName("hello"), VarName("good")]))
+        check_res(
+            " [ hello  , good ]",
+            rettupledef,
+            vec![VarName("hello"), VarName("good")],
         );
     }
 
     #[test]
     fn tupledef_test() {
-        assert_eq!(
-            tupledef(" [ hello , true ]"),
-            Ok(("", vec![Exp::VarName(VarName("hello")), Exp::Bool(true),]))
+        check_res(
+            " [ hello , true ]",
+            tupledef,
+            vec![Exp::VarName(VarName("hello")), Exp::Bool(true)],
         );
     }
 
     #[test]
     fn ref_call_test() {
-        assert_eq!(
-            ref_call("hello[true]"),
-            Ok((
-                "",
-                RefCall {
-                    name: Exp::VarName(VarName("hello")),
-                    arg: Exp::Bool(true)
-                }
-            ))
+        check_res(
+            "hello[true]",
+            ref_call,
+            RefCall {
+                name: Exp::VarName(VarName("hello")),
+                arg: Exp::Bool(true),
+            },
         );
     }
 
     #[test]
     fn condition_test() {
-        assert_eq!(
-            condition("a ? b : c"),
-            Ok((
-                "",
-                Condition {
-                    cond: Exp::VarName(VarName("a")),
-                    exp1: Exp::VarName(VarName("b")),
-                    exp2: Exp::VarName(VarName("c")),
-                }
-            ))
+        check_res(
+            "a ? b : c",
+            condition,
+            Condition {
+                cond: Exp::VarName(VarName("a")),
+                exp1: Exp::VarName(VarName("b")),
+                exp2: Exp::VarName(VarName("c")),
+            },
         );
     }
 
     #[test]
     fn condition_statement_test() {
-        assert_eq!(
-            statement_with_indent(0)("m = a ? b : c \n"),
-            Ok((
-                "",
-                Statement::Assignment(Box::new(Assignment::new(
-                    vec![VarName("m")],
-                    Exp::Condition(Box::new(Condition {
-                        cond: Exp::VarName(VarName("a")),
-                        exp1: Exp::VarName(VarName("b")),
-                        exp2: Exp::VarName(VarName("c")),
-                    })),
-                    false,
-                    None
-                )))
-            ))
+        check_res(
+            "m = a ? b : c \n",
+            statement_with_indent(0),
+            Statement::Assignment(Box::new(Assignment::new(
+                vec![VarName("m")],
+                Exp::Condition(Box::new(Condition {
+                    cond: Exp::VarName(VarName("a")),
+                    exp1: Exp::VarName(VarName("b")),
+                    exp2: Exp::VarName(VarName("c")),
+                })),
+                false,
+                None,
+            ))),
         );
-        assert_eq!(
-            statement_with_indent(0)("m = na \n"),
-            Ok((
-                "",
-                Statement::Assignment(Box::new(Assignment::new(
-                    vec![VarName("m")],
-                    Exp::Na,
-                    false,
-                    None
-                )))
-            ))
+        check_res(
+            "m = na \n",
+            statement_with_indent(0),
+            Statement::Assignment(Box::new(Assignment::new(
+                vec![VarName("m")],
+                Exp::Na,
+                false,
+                None,
+            ))),
         );
     }
 
     #[test]
     fn statement_test() {
-        assert_eq!(
-            statement_with_indent(1)("    break \n"),
-            Ok(("", Statement::Break))
+        check_res("    break \n", statement_with_indent(1), Statement::Break);
+
+        check_res(
+            "a = b \n",
+            statement_with_indent(0),
+            Statement::Assignment(Box::new(Assignment::new(
+                vec![VarName("a")],
+                Exp::VarName(VarName("b")),
+                false,
+                None,
+            ))),
+        );
+        check_res(
+            "    a(arg1) \n",
+            statement_with_indent(1),
+            Statement::FuncCall(Box::new(FunctionCall::new_no_ctxid(
+                Exp::VarName(VarName("a")),
+                vec![Exp::VarName(VarName("arg1"))],
+                vec![],
+            ))),
+        );
+        check_res(
+            "    a(arg1) => b \n",
+            statement_with_indent(1),
+            Statement::FuncDef(Box::new(FunctionDef {
+                name: VarName("a"),
+                params: vec![VarName("arg1")],
+                body: Block {
+                    stmts: vec![],
+                    ret_stmt: Some(Exp::VarName(VarName("b"))),
+                },
+            })),
         );
 
-        assert_eq!(
-            statement_with_indent(0)("a = b \n"),
-            Ok((
-                "",
-                Statement::Assignment(Box::new(Assignment::new(
-                    vec![VarName("a")],
-                    Exp::VarName(VarName("b")),
-                    false,
-                    None
-                )))
-            ))
-        );
-        assert_eq!(
-            statement_with_indent(1)("    a(arg1) \n"),
-            Ok((
-                "",
-                Statement::FuncCall(Box::new(FunctionCall::new_no_ctxid(
-                    Exp::VarName(VarName("a")),
-                    vec![Exp::VarName(VarName("arg1"))],
-                    vec![]
-                )))
-            ))
-        );
-        assert_eq!(
-            statement_with_indent(1)("    a(arg1) => b \n"),
-            Ok((
-                "",
-                Statement::FuncDef(Box::new(FunctionDef {
-                    name: VarName("a"),
-                    params: vec![VarName("arg1")],
-                    body: Block {
-                        stmts: vec![],
-                        ret_stmt: Some(Exp::VarName(VarName("b")))
-                    }
-                }))
-            ))
+        check_res(
+            "    a(arg1) => \n        b \n",
+            statement_with_indent(1),
+            Statement::FuncDef(Box::new(FunctionDef {
+                name: VarName("a"),
+                params: vec![VarName("arg1")],
+                body: Block {
+                    stmts: vec![],
+                    ret_stmt: Some(Exp::VarName(VarName("b"))),
+                },
+            })),
         );
 
-        assert_eq!(
-            statement_with_indent(1)("    a(arg1) => \n        b \n"),
-            Ok((
-                "",
-                Statement::FuncDef(Box::new(FunctionDef {
-                    name: VarName("a"),
-                    params: vec![VarName("arg1")],
-                    body: Block {
-                        stmts: vec![],
-                        ret_stmt: Some(Exp::VarName(VarName("b")))
-                    }
-                }))
-            ))
-        );
-
-        assert_eq!(
-            statement_with_indent(1)("    //helo world \na = close"),
-            Ok(("a = close", Statement::None))
+        check_res_input(
+            "    //helo world \na = close",
+            statement_with_indent(1),
+            Statement::None,
+            "a = close",
         );
     }
 
     #[test]
     fn assignment_test() {
-        assert_eq!(
-            statement_with_indent(0)("a = close // This is also a comment\n"),
-            Ok((
-                "",
-                Statement::Assignment(Box::new(Assignment::new(
-                    vec![VarName("a")],
-                    Exp::VarName(VarName("close")),
-                    false,
-                    None
-                )))
-            ))
+        check_res(
+            "a = close // This is also a comment\n",
+            statement_with_indent(0),
+            Statement::Assignment(Box::new(Assignment::new(
+                vec![VarName("a")],
+                Exp::VarName(VarName("close")),
+                false,
+                None,
+            ))),
         );
-        assert_eq!(
-            statement_with_indent(0)("a := close\n"),
-            Ok((
-                "",
-                Statement::VarAssignment(Box::new(VarAssignment::new(
-                    VarName("a"),
-                    Exp::VarName(VarName("close")),
-                )))
-            ))
+        check_res(
+            "a := close\n",
+            statement_with_indent(0),
+            Statement::VarAssignment(Box::new(VarAssignment::new(
+                VarName("a"),
+                Exp::VarName(VarName("close")),
+            ))),
         );
     }
 
     #[test]
     fn prefix_exp_test() {
-        assert_eq!(
-            statement_with_indent(0)("m = a.b.c \n"),
-            Ok((
-                "",
-                Statement::Assignment(Box::new(Assignment::new(
-                    vec![VarName("m")],
-                    Exp::PrefixExp(Box::new(PrefixExp {
-                        var_chain: vec![VarName("a"), VarName("b"), VarName("c")]
-                    })),
-                    false,
-                    None
-                )))
-            ))
+        check_res(
+            "m = a.b.c \n",
+            statement_with_indent(0),
+            Statement::Assignment(Box::new(Assignment::new(
+                vec![VarName("m")],
+                Exp::PrefixExp(Box::new(PrefixExp {
+                    var_chain: vec![VarName("a"), VarName("b"), VarName("c")],
+                })),
+                false,
+                None,
+            ))),
         )
     }
 
     #[test]
     fn block_test() {
-        assert_eq!(
-            block_with_indent(1)("    break \n    continue \n    true \nhello"),
-            Ok((
-                "hello",
-                Block::new(
-                    vec![Statement::Break, Statement::Continue],
-                    Some(Exp::Bool(true))
-                )
-            ))
+        check_res_input(
+            "    break \n    continue \n    true \nhello",
+            block_with_indent(1),
+            Block::new(
+                vec![Statement::Break, Statement::Continue],
+                Some(Exp::Bool(true)),
+            ),
+            "hello",
         );
     }
 
     #[test]
     fn if_then_else_test() {
-        assert_eq!(
-            if_then_else(0)("if true \n    break\n    true  \n"),
-            Ok((
-                "",
-                IfThenElse::new_no_ctxid(
-                    Exp::Bool(true),
-                    Block::new(vec![Statement::Break], Some(Exp::Bool(true))),
-                    None
-                )
-            ))
+        check_res(
+            "if true \n    break\n    true  \n",
+            if_then_else(0),
+            IfThenElse::new_no_ctxid(
+                Exp::Bool(true),
+                Block::new(vec![Statement::Break], Some(Exp::Bool(true))),
+                None,
+            ),
         );
     }
 
     #[test]
     fn for_range_test() {
-        assert_eq!(
-            for_range(0)("for a = 1 to 2 \n    break\n    true  \n"),
-            Ok((
-                "",
-                ForRange::new_no_ctxid(
-                    VarName("a"),
-                    Exp::Num(Numeral::Int(1)),
-                    Exp::Num(Numeral::Int(2)),
-                    None,
-                    Block::new(vec![Statement::Break], Some(Exp::Bool(true))),
-                )
-            ))
+        check_res(
+            "for a = 1 to 2 \n    break\n    true  \n",
+            for_range(0),
+            ForRange::new_no_ctxid(
+                VarName("a"),
+                Exp::Num(Numeral::Int(1)),
+                Exp::Num(Numeral::Int(2)),
+                None,
+                Block::new(vec![Statement::Break], Some(Exp::Bool(true))),
+            ),
         );
     }
 }

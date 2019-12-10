@@ -1,4 +1,5 @@
 use super::error::PineResult;
+use super::input::Input;
 use super::utils::skip_ws;
 use nom::{branch::alt, bytes::complete::tag, combinator::value};
 
@@ -26,7 +27,7 @@ pub enum UnaryOp {
     BoolNot,
 }
 
-pub fn unary_op(input: &str) -> PineResult<UnaryOp> {
+pub fn unary_op(input: Input) -> PineResult<UnaryOp> {
     let (input, _) = skip_ws(input)?;
     alt((
         value(UnaryOp::Plus, tag("+")),
@@ -35,7 +36,7 @@ pub fn unary_op(input: &str) -> PineResult<UnaryOp> {
     ))(input)
 }
 
-pub fn binary_op(input: &str) -> PineResult<BinaryOp> {
+pub fn binary_op(input: Input) -> PineResult<BinaryOp> {
     let (input, _) = skip_ws(input)?;
     alt((
         value(BinaryOp::Plus, tag("+")),
@@ -56,29 +57,55 @@ pub fn binary_op(input: &str) -> PineResult<BinaryOp> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::input::Position;
     use super::*;
+    use std::convert::TryInto;
+
+    fn test_op(s: &str, op: BinaryOp) {
+        let test_input = Input::new_with_str(s);
+        let input_len: u32 = test_input.len().try_into().unwrap();
+        assert_eq!(
+            binary_op(test_input),
+            Ok((
+                Input::new("", Position::new(0, input_len), Position::max()),
+                op
+            ))
+        );
+    }
 
     #[test]
     fn binary_op_test() {
-        assert_eq!(binary_op(" +"), Ok(("", BinaryOp::Plus)));
-        assert_eq!(binary_op(" -"), Ok(("", BinaryOp::Minus)));
-        assert_eq!(binary_op(" *"), Ok(("", BinaryOp::Mul)));
-        assert_eq!(binary_op(" /"), Ok(("", BinaryOp::Div)));
-        assert_eq!(binary_op(" %"), Ok(("", BinaryOp::Mod)));
-        assert_eq!(binary_op(" >"), Ok(("", BinaryOp::Gt)));
-        assert_eq!(binary_op(" >="), Ok(("", BinaryOp::Geq)));
-        assert_eq!(binary_op(" <"), Ok(("", BinaryOp::Lt)));
-        assert_eq!(binary_op(" <="), Ok(("", BinaryOp::Leq)));
-        assert_eq!(binary_op(" =="), Ok(("", BinaryOp::Eq)));
-        assert_eq!(binary_op(" !="), Ok(("", BinaryOp::Neq)));
-        assert_eq!(binary_op(" and"), Ok(("", BinaryOp::BoolAnd)));
-        assert_eq!(binary_op(" or"), Ok(("", BinaryOp::BoolOr)));
+        test_op(" +", BinaryOp::Plus);
+        test_op(" -", BinaryOp::Minus);
+        test_op(" *", BinaryOp::Mul);
+        test_op(" /", BinaryOp::Div);
+        test_op(" %", BinaryOp::Mod);
+        test_op(" >", BinaryOp::Gt);
+        test_op(" >=", BinaryOp::Geq);
+        test_op(" <", BinaryOp::Lt);
+        test_op(" <=", BinaryOp::Leq);
+        test_op(" ==", BinaryOp::Eq);
+        test_op(" !=", BinaryOp::Neq);
+        test_op(" and", BinaryOp::BoolAnd);
+        test_op(" or", BinaryOp::BoolOr);
+    }
+
+    fn test_unary_op(s: &str, op: UnaryOp) {
+        let test_input = Input::new_with_str(s);
+        let input_len: u32 = test_input.len().try_into().unwrap();
+        assert_eq!(
+            unary_op(test_input),
+            Ok((
+                Input::new("", Position::new(0, input_len), Position::max()),
+                op
+            ))
+        );
     }
 
     #[test]
     fn unary_op_test() {
-        assert_eq!(unary_op(" +"), Ok(("", UnaryOp::Plus)));
-        assert_eq!(unary_op(" -"), Ok(("", UnaryOp::Minus)));
-        assert_eq!(unary_op(" not"), Ok(("", UnaryOp::BoolNot)));
+        test_unary_op(" +", UnaryOp::Plus);
+        test_unary_op(" -", UnaryOp::Minus);
+        test_unary_op(" not", UnaryOp::BoolNot);
     }
 }

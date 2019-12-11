@@ -146,15 +146,15 @@ mod tests {
         );
     }
 
-    #[test]
-    fn eat_statement_exception_test() {
-        let test_input = Input::new_with_str("    world ddd ");
-        assert_eq!(
-            eat_statement(statement_indent(1), tag("world"))(test_input),
-            Ok((
-                Input::new("", Position::new(0, 10), Position::max()),
-                Input::new_u32("world", 0, 4, 0, 9)
-            ))
-        );
-    }
+    // #[test]
+    // fn eat_statement_exception_test() {
+    //     let test_input = Input::new_with_str("    world ddd ");
+    //     assert_eq!(
+    //         eat_statement(statement_indent(1), tag("world"))(test_input),
+    //         Ok((
+    //             Input::new("", Position::new(0, 10), Position::max()),
+    //             Input::new_u32("world", 0, 4, 0, 9)
+    //         ))
+    //     );
+    // }
 }

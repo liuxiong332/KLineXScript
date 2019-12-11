@@ -1,5 +1,5 @@
 use super::error::{PineError, PineErrorKind, PineResult};
-use super::input::{Input, Position};
+use super::input::{Input, Position, StrRange};
 use super::utils::skip_ws;
 use nom::{
     bytes::complete::{tag, take_while},

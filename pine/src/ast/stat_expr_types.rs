@@ -1,4 +1,5 @@
 use super::color::ColorNode;
+use super::input::{Input, Position};
 use super::name::VarName;
 use super::num::Numeral;
 use super::op::{BinaryOp, UnaryOp};
@@ -9,20 +10,24 @@ pub struct FunctionCall<'a> {
     pub pos_args: Vec<Exp<'a>>,
     pub dict_args: Vec<(VarName<'a>, Exp<'a>)>,
     pub ctxid: i32,
+    pub input: Input<'a>,
 }
 
 impl<'a> FunctionCall<'a> {
+    #[inline]
     pub fn new(
         method: Exp<'a>,
         pos_args: Vec<Exp<'a>>,
         dict_args: Vec<(VarName<'a>, Exp<'a>)>,
         ctxid: i32,
+        input: Input<'a>,
     ) -> Self {
         FunctionCall {
             method,
             pos_args,
             dict_args,
             ctxid,
+            input,
         }
     }
 
@@ -36,6 +41,7 @@ impl<'a> FunctionCall<'a> {
             pos_args,
             dict_args,
             ctxid: 0,
+            input: Input::new("", Position::new(0, 0), Position::max()),
         }
     }
 }
@@ -44,6 +50,22 @@ impl<'a> FunctionCall<'a> {
 pub struct RefCall<'a> {
     pub name: Exp<'a>,
     pub arg: Exp<'a>,
+    pub input: Input<'a>,
+}
+
+impl<'a> RefCall<'a> {
+    #[inline]
+    pub fn new(name: Exp<'a>, arg: Exp<'a>, input: Input<'a>) -> RefCall<'a> {
+        RefCall { name, arg, input }
+    }
+
+    pub fn new_no_input(name: Exp<'a>, arg: Exp<'a>) -> RefCall<'a> {
+        RefCall {
+            name,
+            arg,
+            input: Input::new("", Position::new(0, 0), Position::max()),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -51,6 +73,29 @@ pub struct Condition<'a> {
     pub cond: Exp<'a>,
     pub exp1: Exp<'a>,
     pub exp2: Exp<'a>,
+    pub input: Input<'a>,
+}
+
+impl<'a> Condition<'a> {
+    #[inline]
+    pub fn new(cond: Exp<'a>, exp1: Exp<'a>, exp2: Exp<'a>, input: Input<'a>) -> Condition<'a> {
+        Condition {
+            cond,
+            exp1,
+            exp2,
+            input,
+        }
+    }
+
+    #[inline]
+    pub fn new_no_input(cond: Exp<'a>, exp1: Exp<'a>, exp2: Exp<'a>) -> Condition<'a> {
+        Condition {
+            cond,
+            exp1,
+            exp2,
+            input: Input::new_empty(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -110,11 +155,44 @@ pub enum Exp2<'a> {
 pub struct TypeCast<'a> {
     pub data_type: DataType,
     pub exp: Exp<'a>,
+    pub input: Input<'a>,
+}
+
+impl<'a> TypeCast<'a> {
+    pub fn new(data_type: DataType, exp: Exp<'a>, input: Input<'a>) -> TypeCast<'a> {
+        TypeCast {
+            data_type,
+            exp,
+            input,
+        }
+    }
+
+    pub fn new_no_input(data_type: DataType, exp: Exp<'a>) -> TypeCast<'a> {
+        TypeCast {
+            data_type,
+            exp,
+            input: Input::new_empty(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PrefixExp<'a> {
     pub var_chain: Vec<VarName<'a>>,
+    pub input: Input<'a>,
+}
+
+impl<'a> PrefixExp<'a> {
+    pub fn new(var_chain: Vec<VarName<'a>>, input: Input<'a>) -> PrefixExp<'a> {
+        PrefixExp { var_chain, input }
+    }
+
+    pub fn new_no_input(var_chain: Vec<VarName<'a>>) -> PrefixExp<'a> {
+        PrefixExp {
+            var_chain,
+            input: Input::new_empty(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -134,10 +212,27 @@ pub struct Assignment<'a> {
     pub val: Exp<'a>,
     pub var_type: Option<DataType>,
     pub var: bool,
+    pub input: Input<'a>,
 }
 
 impl<'a> Assignment<'a> {
     pub fn new(
+        names: Vec<VarName<'a>>,
+        val: Exp<'a>,
+        var: bool,
+        var_type: Option<DataType>,
+        input: Input<'a>,
+    ) -> Assignment<'a> {
+        Assignment {
+            names,
+            val,
+            var,
+            var_type,
+            input,
+        }
+    }
+
+    pub fn new_no_input(
         names: Vec<VarName<'a>>,
         val: Exp<'a>,
         var: bool,
@@ -148,6 +243,7 @@ impl<'a> Assignment<'a> {
             val,
             var,
             var_type,
+            input: Input::new_empty(),
         }
     }
 }
@@ -156,11 +252,20 @@ impl<'a> Assignment<'a> {
 pub struct VarAssignment<'a> {
     pub name: VarName<'a>,
     pub val: Exp<'a>,
+    pub input: Input<'a>,
 }
 
 impl<'a> VarAssignment<'a> {
-    pub fn new(name: VarName<'a>, val: Exp<'a>) -> VarAssignment<'a> {
-        VarAssignment { name, val }
+    pub fn new(name: VarName<'a>, val: Exp<'a>, input: Input<'a>) -> VarAssignment<'a> {
+        VarAssignment { name, val, input }
+    }
+
+    pub fn new_no_input(name: VarName<'a>, val: Exp<'a>) -> VarAssignment<'a> {
+        VarAssignment {
+            name,
+            val,
+            input: Input::new_empty(),
+        }
     }
 }
 
@@ -168,11 +273,28 @@ impl<'a> VarAssignment<'a> {
 pub struct Block<'a> {
     pub stmts: Vec<Statement<'a>>,
     pub ret_stmt: Option<Exp<'a>>,
+    pub input: Input<'a>,
 }
 
 impl<'a> Block<'a> {
-    pub fn new(stmts: Vec<Statement<'a>>, ret_stmt: Option<Exp<'a>>) -> Block<'a> {
-        Block { stmts, ret_stmt }
+    pub fn new(
+        stmts: Vec<Statement<'a>>,
+        ret_stmt: Option<Exp<'a>>,
+        input: Input<'a>,
+    ) -> Block<'a> {
+        Block {
+            stmts,
+            ret_stmt,
+            input,
+        }
+    }
+
+    pub fn new_no_input(stmts: Vec<Statement<'a>>, ret_stmt: Option<Exp<'a>>) -> Block<'a> {
+        Block {
+            stmts,
+            ret_stmt,
+            input: Input::new_empty(),
+        }
     }
 }
 
@@ -184,6 +306,7 @@ pub struct IfThenElse<'a> {
     // pub elseifs: Vec<(Exp<'a>, Block<'a>)>,
     pub else_blk: Option<Block<'a>>,
     pub else_ctxid: i32,
+    pub input: Input<'a>,
 }
 
 impl<'a> IfThenElse<'a> {
@@ -193,6 +316,7 @@ impl<'a> IfThenElse<'a> {
         else_blk: Option<Block<'a>>,
         then_ctxid: i32,
         else_ctxid: i32,
+        input: Input<'a>,
     ) -> Self {
         IfThenElse {
             cond,
@@ -200,6 +324,7 @@ impl<'a> IfThenElse<'a> {
             then_ctxid,
             else_blk,
             else_ctxid,
+            input,
         }
     }
 
@@ -210,6 +335,7 @@ impl<'a> IfThenElse<'a> {
             else_blk,
             then_ctxid: 0,
             else_ctxid: 1,
+            input: Input::new_empty(),
         }
     }
 }
@@ -222,6 +348,7 @@ pub struct ForRange<'a> {
     pub step: Option<Exp<'a>>,
     pub do_blk: Block<'a>,
     pub ctxid: i32,
+    pub input: Input<'a>,
 }
 
 impl<'a> ForRange<'a> {
@@ -232,6 +359,7 @@ impl<'a> ForRange<'a> {
         step: Option<Exp<'a>>,
         do_blk: Block<'a>,
         ctxid: i32,
+        input: Input<'a>,
     ) -> Self {
         ForRange {
             var,
@@ -240,6 +368,7 @@ impl<'a> ForRange<'a> {
             step,
             do_blk,
             ctxid,
+            input,
         }
     }
 
@@ -257,6 +386,7 @@ impl<'a> ForRange<'a> {
             step,
             do_blk,
             ctxid: 0,
+            input: Input::new_empty(),
         }
     }
 }
@@ -266,6 +396,7 @@ pub struct FunctionDef<'a> {
     pub name: VarName<'a>,
     pub params: Vec<VarName<'a>>,
     pub body: Block<'a>,
+    pub input: Input<'a>,
 }
 
 #[derive(Clone, Debug, PartialEq)]

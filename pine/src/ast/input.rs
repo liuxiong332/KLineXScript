@@ -84,6 +84,10 @@ impl<'a> Input<'a> {
         Input::new(src, start, end)
     }
 
+    pub fn new_empty() -> Input<'a> {
+        Input::new("", Position::new(0, 0), Position::max())
+    }
+
     pub fn len(&self) -> usize {
         self.src.len()
     }

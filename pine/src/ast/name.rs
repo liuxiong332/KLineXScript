@@ -9,8 +9,24 @@ use nom::{
     Err, InputTake,
 };
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct VarName<'a>(pub &'a str);
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct VarName<'a> {
+    pub value: &'a str,
+    pub input: Input<'a>,
+}
+
+impl<'a> VarName<'a> {
+    pub fn new(value: &'a str, input: Input<'a>) -> VarName<'a> {
+        VarName { value, input }
+    }
+
+    pub fn new_no_input(value: &'a str) -> VarName<'a> {
+        VarName {
+            value,
+            input: Input::new_empty(),
+        }
+    }
+}
 
 fn reserved(input: Input) -> PineResult {
     alt((
@@ -61,7 +77,7 @@ pub fn varname(input: Input) -> PineResult<VarName> {
             )));
         }
     }
-    Ok((input, VarName(name.src)))
+    Ok((input, VarName::new(name.src, name)))
 }
 
 pub fn varname_ws(input: Input) -> PineResult<VarName> {
@@ -101,24 +117,24 @@ mod tests {
         );
         assert!(alpha_or_underscore(Input::new_with_str("2hello")).is_err());
 
-        fn test_varname(s: &str, res: &str) {
+        fn test_varname(s: &str, res: &str, col: u32) {
             let test_input = Input::new_with_str(s);
             let input_len: u32 = test_input.len().try_into().unwrap();
             assert_eq!(
                 varname_ws(test_input),
                 Ok((
                     Input::new("", Position::new(0, input_len), Position::max()),
-                    VarName(res)
+                    VarName::new(res, Input::new_with_start(res, Position::new(0, col)))
                 ))
             );
         }
 
-        test_varname(" hello_world", "hello_world");
-        test_varname(" hed_12s", "hed_12s");
-        test_varname("myVar", "myVar");
-        test_varname("_myVar", "_myVar");
-        test_varname("my123Var", "my123Var");
-        test_varname("MAX_LEN", "MAX_LEN");
-        test_varname("max_len", "max_len");
+        test_varname(" hello_world", "hello_world", 1);
+        test_varname(" hed_12s", "hed_12s", 1);
+        test_varname("myVar", "myVar", 0);
+        test_varname("_myVar", "_myVar", 0);
+        test_varname("my123Var", "my123Var", 0);
+        test_varname("MAX_LEN", "MAX_LEN", 0);
+        test_varname("max_len", "max_len", 0);
     }
 }

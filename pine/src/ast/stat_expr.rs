@@ -357,7 +357,6 @@ mod tests {
     use super::super::input::Position;
     use super::super::num::Numeral;
     use super::*;
-    use std::convert::TryInto;
     use std::fmt::Debug;
 
     fn check_res_input<'a, F, O>(s: &'a str, handler: F, res: O, res_input: &'a str)

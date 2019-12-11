@@ -16,6 +16,7 @@ pub enum PineErrorKind {
     InvalidFuncCallArgs(&'static str),
     IncorrectIndent,
     CannotInferType,
+    NotEndOfInput, // expect end of input, but not
 }
 
 #[derive(Debug, PartialEq)]

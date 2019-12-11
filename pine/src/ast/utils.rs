@@ -1,5 +1,5 @@
 use super::comment::comment;
-use super::error::PineResult;
+use super::error::{PineError, PineErrorKind, PineResult};
 use super::input::Input;
 use nom::{
     branch::alt,
@@ -7,6 +7,7 @@ use nom::{
     combinator::recognize,
     multi::{count, many0},
     sequence::{delimited, preceded, tuple},
+    Err,
 };
 
 pub fn is_ws(c: char) -> bool {
@@ -32,10 +33,21 @@ pub fn statement_indent<'a>(indent_count: usize) -> impl Fn(Input<'a>) -> PineRe
     move |input: Input<'a>| recognize(count(alt((tag("    "), tag("\t"))), indent_count))(input)
 }
 
+pub fn input_end<'a>(input: Input<'a>) -> PineResult {
+    if input.len() == 0 {
+        Ok((input, Input::new_with_start("", input.start)))
+    } else {
+        Err(Err::Error(PineError::from_pine_kind(
+            input,
+            PineErrorKind::NotEndOfInput,
+        )))
+    }
+}
+
 pub fn statement_end<'a>(input: Input<'a>) -> PineResult {
     recognize(tuple((
         many0(alt((tag(" "), tag("\t")))),
-        alt((tag("\n"), tag("\r\n"), comment)),
+        alt((tag("\n"), tag("\r\n"), comment, input_end)),
     )))(input)
 }
 
@@ -53,7 +65,6 @@ mod tests {
     use super::*;
     use nom::bytes::complete::tag;
     use nom::InputTake;
-    use std::convert::TryInto;
 
     #[test]
     fn separate_test() {
@@ -121,6 +132,27 @@ mod tests {
             eat_statement(statement_indent(1), tag("world"))(test_input),
             Ok((
                 Input::new("hd", Position::new(1, 0), Position::max()),
+                Input::new_u32("world", 0, 4, 0, 9)
+            ))
+        );
+
+        let test_input = Input::new_with_str("    world ");
+        assert_eq!(
+            eat_statement(statement_indent(1), tag("world"))(test_input),
+            Ok((
+                Input::new("", Position::new(0, 10), Position::max()),
+                Input::new_u32("world", 0, 4, 0, 9)
+            ))
+        );
+    }
+
+    #[test]
+    fn eat_statement_exception_test() {
+        let test_input = Input::new_with_str("    world ddd ");
+        assert_eq!(
+            eat_statement(statement_indent(1), tag("world"))(test_input),
+            Ok((
+                Input::new("", Position::new(0, 10), Position::max()),
                 Input::new_u32("world", 0, 4, 0, 9)
             ))
         );

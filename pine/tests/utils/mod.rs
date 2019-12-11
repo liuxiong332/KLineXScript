@@ -37,7 +37,7 @@ pub fn gen_prefix(vars: Vec<&str>) -> Exp {
 }
 
 pub fn gen_int(num: i32) -> Exp<'static> {
-    Exp::Num(Numeral::Int(num))
+    Exp::Num(Numeral::from_i32(num))
 }
 
 pub fn gen_name(name: &str) -> Exp {

@@ -1,4 +1,3 @@
-use super::error::PineErrorKind;
 use nom::{
     error::{ErrorKind, ParseError},
     Compare, CompareResult, Err, ExtendInto, FindSubstring, FindToken, IResult, InputIter,
@@ -39,12 +38,6 @@ impl Position {
 pub struct StrRange {
     start: Position,
     end: Position,
-}
-
-#[derive(Debug, PartialEq)]
-pub struct PineInputError<'a> {
-    input: Input<'a>,
-    code: PineErrorKind,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]

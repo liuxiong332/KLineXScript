@@ -16,10 +16,10 @@ impl<'a> Runner<'a> for Exp<'a> {
         match *self {
             Exp::Na => Ok(PineRef::new_box(NA)),
             Exp::Bool(b) => Ok(PineRef::new_box(b)),
-            Exp::Num(Numeral::Float(f)) => Ok(PineRef::new_box(Some(f))),
-            Exp::Num(Numeral::Int(n)) => Ok(PineRef::new_box(Some(n))),
+            Exp::Num(Numeral::Float(f)) => Ok(PineRef::new_box(Some(f.value))),
+            Exp::Num(Numeral::Int(n)) => Ok(PineRef::new_box(Some(n.value))),
             Exp::Str(ref s) => Ok(PineRef::new_rc(String::from(s))),
-            Exp::Color(s) => Ok(PineRef::new_box(Color(s))),
+            Exp::Color(s) => Ok(PineRef::new_box(Color(s.value))),
             Exp::VarName(VarName(s)) => Ok(PineRef::new_box(PineVar(s))),
             Exp::Tuple(ref tuple) => {
                 let mut col: Vec<PineRef<'a>> = vec![];
@@ -198,6 +198,8 @@ impl<'a> Runner<'a> for RefCall<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ast::color::ColorNode;
+    use crate::ast::num::Numeral;
     use crate::runtime::context::{Context, ContextType};
     use crate::types::PineClass;
     use std::fmt::Debug;
@@ -241,8 +243,8 @@ mod tests {
     fn condition_test() {
         let cond_exp = Condition {
             cond: Exp::Bool(true),
-            exp1: Exp::Num(Numeral::Int(1)),
-            exp2: Exp::Num(Numeral::Int(2)),
+            exp1: Exp::Num(Numeral::from_i32(1)),
+            exp2: Exp::Num(Numeral::from_i32(2)),
         };
         let mut context = Context::new(None, ContextType::Normal);
         assert_eq!(
@@ -273,7 +275,7 @@ mod tests {
     fn ref_call_test() {
         let exp = RefCall {
             name: Exp::VarName(VarName("hello")),
-            arg: Exp::Num(Numeral::Int(1)),
+            arg: Exp::Num(Numeral::from_i32(1)),
         };
 
         let mut context = Context::new(None, ContextType::Normal);
@@ -315,15 +317,15 @@ mod tests {
     fn simple_exp_test() {
         simple_exp::<NA>(Exp::Na, NA);
         simple_exp::<Bool>(Exp::Bool(false), false);
-        simple_exp(Exp::Num(Numeral::Float(0f64)), Some(0f64));
-        simple_exp(Exp::Num(Numeral::Int(1)), Some(1));
+        simple_exp(Exp::Num(Numeral::from_f64(0f64)), Some(0f64));
+        simple_exp(Exp::Num(Numeral::from_i32(1)), Some(1));
         simple_exp(Exp::Str(String::from("hello")), String::from("hello"));
-        simple_exp(Exp::Color("#12"), Color("#12"));
+        simple_exp(Exp::Color(ColorNode::from_str("#12")), Color("#12"));
         simple_exp(Exp::VarName(VarName("name")), PineVar("name"));
         simple_exp(
             Exp::TypeCast(Box::new(TypeCast {
                 data_type: DataType::Int,
-                exp: Exp::Num(Numeral::Float(1.2)),
+                exp: Exp::Num(Numeral::from_f64(1.2)),
             })),
             Some(1),
         );
@@ -346,10 +348,10 @@ mod tests {
     fn simple_rv_exp_test() {
         simple_rv_exp::<NA>(Exp::Na, NA);
         simple_rv_exp::<Bool>(Exp::Bool(false), false);
-        simple_rv_exp(Exp::Num(Numeral::Float(0f64)), Some(0f64));
-        simple_rv_exp(Exp::Num(Numeral::Int(1)), Some(1));
+        simple_rv_exp(Exp::Num(Numeral::from_f64(0f64)), Some(0f64));
+        simple_rv_exp(Exp::Num(Numeral::from_i32(1)), Some(1));
         simple_rv_exp(Exp::Str(String::from("hello")), String::from("hello"));
-        simple_rv_exp(Exp::Color("#12"), Color("#12"));
+        simple_rv_exp(Exp::Color(ColorNode::from_str("#12")), Color("#12"));
         simple_rv_exp(Exp::VarName(VarName("name")), Some(1));
         simple_rv_exp(
             Exp::TypeCast(Box::new(TypeCast {
@@ -365,7 +367,7 @@ mod tests {
         simple_exp(
             Exp::TypeCast(Box::new(TypeCast {
                 data_type: DataType::Int,
-                exp: Exp::Num(Numeral::Float(1.2)),
+                exp: Exp::Num(Numeral::from_f64(1.2)),
             })),
             Some(1),
         );
@@ -380,7 +382,7 @@ mod tests {
         simple_exp(
             Exp::TypeCast(Box::new(TypeCast {
                 data_type: DataType::Float,
-                exp: Exp::Num(Numeral::Float(1.2)),
+                exp: Exp::Num(Numeral::from_f64(1.2)),
             })),
             Some(1.2),
         );
@@ -395,7 +397,7 @@ mod tests {
         simple_exp(
             Exp::TypeCast(Box::new(TypeCast {
                 data_type: DataType::Bool,
-                exp: Exp::Num(Numeral::Float(1.2)),
+                exp: Exp::Num(Numeral::from_f64(1.2)),
             })),
             true,
         );

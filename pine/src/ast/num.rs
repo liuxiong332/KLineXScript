@@ -1,4 +1,4 @@
-use super::input::Input;
+use super::input::{Input, Position};
 use nom::{
     branch::alt,
     bytes::complete::tag,
@@ -14,9 +14,49 @@ use super::error::{PineError, PineErrorKind, PineResult};
 use super::utils::skip_ws;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Numeral {
-    Float(f64),
-    Int(i32),
+pub struct IntNode<'a> {
+    pub value: i32,
+    pub input: Input<'a>,
+}
+
+impl<'a> IntNode<'a> {
+    pub fn new(value: i32, input: Input<'a>) -> IntNode<'a> {
+        IntNode { value, input }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FloatNode<'a> {
+    pub value: f64,
+    pub input: Input<'a>,
+}
+
+impl<'a> FloatNode<'a> {
+    pub fn new(value: f64, input: Input<'a>) -> FloatNode<'a> {
+        FloatNode { value, input }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Numeral<'a> {
+    Float(FloatNode<'a>),
+    Int(IntNode<'a>),
+}
+
+impl<'a> Numeral<'a> {
+    pub fn from_i32(val: i32) -> Numeral<'a> {
+        Numeral::Int(IntNode::new(
+            val,
+            Input::new("", Position::new(0, 0), Position::max()),
+        ))
+    }
+
+    pub fn from_f64(val: f64) -> Numeral<'a> {
+        Numeral::Float(FloatNode::new(
+            val,
+            Input::new("", Position::new(0, 0), Position::max()),
+        ))
+    }
 }
 
 pub fn underscore_digit_str(s: Input) -> PineResult<String> {
@@ -84,9 +124,9 @@ pub fn num_lit(input: Input) -> PineResult<Numeral> {
         opt(float_mag),
     )))(input)?;
     if let Ok(n) = i32::from_str_radix(out.src, 10) {
-        Ok((input, Numeral::Int(n)))
+        Ok((input, Numeral::Int(IntNode::new(n, out))))
     } else if let Ok(f) = f64::from_str(out.src) {
-        Ok((input, Numeral::Float(f)))
+        Ok((input, Numeral::Float(FloatNode::new(f, out))))
     } else {
         Err(Err::Error(PineError::from_pine_kind(
             input,
@@ -109,22 +149,24 @@ mod tests {
 
     #[test]
     fn signed_int_test() {
-        fn test_lit_ws(s: &str, res: Numeral) {
+        fn test_lit_ws(s: &str, res: f64) {
             let test_input = Input::new_with_str(s);
             let input_len: u32 = test_input.len().try_into().unwrap();
             assert_eq!(
                 num_lit_ws(test_input),
                 Ok((
                     Input::new("", Position::new(0, input_len), Position::max()),
-                    res
+                    Numeral::Float(FloatNode::new(
+                        res,
+                        Input::new(s, Position::new(0, 0), Position::new(0, input_len))
+                    ))
                 ))
             );
         }
 
-        test_lit_ws("121.1", Numeral::Float(121.1));
-        test_lit_ws("121", Numeral::Int(121));
-        test_lit_ws("121e1", Numeral::Float(121e1));
-        test_lit_ws("121.1e1", Numeral::Float(121.1e1));
+        test_lit_ws("121.1", 121.1);
+        test_lit_ws("121e1", 121e1);
+        test_lit_ws("121.1e1", 121.1e1);
     }
 
     #[test]
@@ -141,6 +183,7 @@ mod tests {
             );
         }
 
+        test_int_ws("121", 121);
         test_int_ws(" + 121", 121i32);
         test_int_ws(" - 121", -121i32);
         test_int_ws(" 121", 121);

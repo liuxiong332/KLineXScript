@@ -141,7 +141,7 @@ mod tests {
 
     #[test]
     fn unary_op_test() {
-        let exp = Box::new(Exp::Num(Numeral::Int(1)));
+        let exp = Box::new(Exp::Num(Numeral::from_i32(1)));
         let exp2 = Box::new(Exp::Bool(true));
 
         let mut context = Context::new(None, ContextType::Normal);
@@ -157,11 +157,11 @@ mod tests {
     }
 
     fn int_exp<'a>(int: i32) -> Exp<'a> {
-        Exp::Num(Numeral::Int(int))
+        Exp::Num(Numeral::from_i32(int))
     }
 
     fn float_exp<'a>(f: f64) -> Exp<'a> {
-        Exp::Num(Numeral::Float(f))
+        Exp::Num(Numeral::from_f64(f))
     }
 
     fn biop_runner<'a, D: PineStaticType + PartialEq + Debug>(

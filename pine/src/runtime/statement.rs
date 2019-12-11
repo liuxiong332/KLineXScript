@@ -450,19 +450,19 @@ mod tests {
         };
         let assign1 = Statement::Assignment(Box::new(Assignment::new(
             vec![VarName("hello")],
-            Exp::Num(Numeral::Int(12)),
+            Exp::Num(Numeral::from_i32(12)),
             false,
             None,
         )));
         let assign2 = Statement::Assignment(Box::new(Assignment::new(
             vec![VarName("hello")],
-            Exp::Num(Numeral::Int(23)),
+            Exp::Num(Numeral::from_i32(23)),
             true,
             None,
         )));
         let assign3 = Statement::Assignment(Box::new(Assignment::new(
             vec![VarName("hello")],
-            Exp::Num(Numeral::Int(23)),
+            Exp::Num(Numeral::from_i32(23)),
             false,
             Some(DataType::Int),
         )));
@@ -562,8 +562,8 @@ mod tests {
 
     #[test]
     fn var_assignment_test() {
-        let assign1 = VarAssignment::new(VarName("hello"), Exp::Num(Numeral::Int(24)));
-        let assign2 = VarAssignment::new(VarName("hello"), Exp::Num(Numeral::Int(36)));
+        let assign1 = VarAssignment::new(VarName("hello"), Exp::Num(Numeral::from_i32(24)));
+        let assign2 = VarAssignment::new(VarName("hello"), Exp::Num(Numeral::from_i32(36)));
         let assign3 = VarAssignment::new(VarName("hello"), Exp::VarName(VarName("newvar")));
 
         let mut context = Context::new(None, ContextType::Normal);
@@ -611,15 +611,15 @@ mod tests {
     fn for_range_test() {
         let assign = Statement::Assignment(Box::new(Assignment::new(
             vec![VarName("a")],
-            Exp::Num(Numeral::Int(1)),
+            Exp::Num(Numeral::from_i32(1)),
             false,
             None,
         )));
-        let block = Block::new(vec![assign], Some(Exp::Num(Numeral::Int(10))));
+        let block = Block::new(vec![assign], Some(Exp::Num(Numeral::from_i32(10))));
         let for_range = ForRange::new_no_ctxid(
             VarName("i"),
-            Exp::Num(Numeral::Int(1)),
-            Exp::Num(Numeral::Int(10)),
+            Exp::Num(Numeral::from_i32(1)),
+            Exp::Num(Numeral::from_i32(10)),
             None,
             block,
         );
@@ -640,11 +640,11 @@ mod tests {
     fn for_range_exp_test() {
         let assign = Statement::Assignment(Box::new(Assignment::new(
             vec![VarName("a")],
-            Exp::Num(Numeral::Int(1)),
+            Exp::Num(Numeral::from_i32(1)),
             false,
             None,
         )));
-        let block = Block::new(vec![assign], Some(Exp::Num(Numeral::Int(10))));
+        let block = Block::new(vec![assign], Some(Exp::Num(Numeral::from_i32(10))));
         let for_range = ForRange::new_no_ctxid(
             VarName("i"),
             Exp::VarName(VarName("start")),
@@ -754,8 +754,8 @@ mod tests {
         let block = Block::new(vec![Statement::Break], Some(Exp::VarName(VarName("i"))));
         let for_range = ForRange::new_no_ctxid(
             VarName("i"),
-            Exp::Num(Numeral::Int(1)),
-            Exp::Num(Numeral::Int(10)),
+            Exp::Num(Numeral::from_i32(1)),
+            Exp::Num(Numeral::from_i32(10)),
             None,
             block,
         );
@@ -778,8 +778,8 @@ mod tests {
         let block = Block::new(vec![Statement::Continue], Some(Exp::VarName(VarName("i"))));
         let for_range = ForRange::new_no_ctxid(
             VarName("i"),
-            Exp::Num(Numeral::Int(1)),
-            Exp::Num(Numeral::Int(10)),
+            Exp::Num(Numeral::from_i32(1)),
+            Exp::Num(Numeral::from_i32(10)),
             None,
             block,
         );

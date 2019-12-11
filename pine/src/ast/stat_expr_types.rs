@@ -1,3 +1,4 @@
+use super::color::ColorNode;
 use super::name::VarName;
 use super::num::Numeral;
 use super::op::{BinaryOp, UnaryOp};
@@ -56,9 +57,9 @@ pub struct Condition<'a> {
 pub enum Exp<'a> {
     Na,
     Bool(bool),
-    Num(Numeral),
+    Num(Numeral<'a>),
     Str(String),
-    Color(&'a str),
+    Color(ColorNode<'a>),
     VarName(VarName<'a>),
     // RetTuple(Box<Vec<VarName<'a>>>),
     Tuple(Box<Vec<Exp<'a>>>),
@@ -92,9 +93,9 @@ pub struct FlatExp<'a>(pub Vec<OpOrExp2<'a>>);
 pub enum Exp2<'a> {
     Na,
     Bool(bool),
-    Num(Numeral),
+    Num(Numeral<'a>),
     Str(String),
-    Color(&'a str),
+    Color(ColorNode<'a>),
     VarName(VarName<'a>),
     // RetTuple(Box<Vec<VarName<'a>>>),
     Tuple(Box<Vec<Exp<'a>>>),

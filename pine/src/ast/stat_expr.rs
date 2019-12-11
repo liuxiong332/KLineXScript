@@ -355,7 +355,7 @@ pub fn block(input: Input) -> PineResult<Block> {
 #[cfg(test)]
 mod tests {
     use super::super::input::Position;
-    use super::super::num::Numeral;
+    use super::super::num::{FloatNode, IntNode, Numeral};
     use super::*;
     use std::fmt::Debug;
 
@@ -595,8 +595,14 @@ mod tests {
             for_range(0),
             ForRange::new_no_ctxid(
                 VarName("a"),
-                Exp::Num(Numeral::Int(1)),
-                Exp::Num(Numeral::Int(2)),
+                Exp::Num(Numeral::Int(IntNode::new(
+                    1,
+                    Input::new_with_start("1", Position::new(0, 8)),
+                ))),
+                Exp::Num(Numeral::Int(IntNode::new(
+                    2,
+                    Input::new_with_start("2", Position::new(0, 13)),
+                ))),
                 None,
                 Block::new(vec![Statement::Break], Some(Exp::Bool(true))),
             ),

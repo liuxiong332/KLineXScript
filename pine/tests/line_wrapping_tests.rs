@@ -93,7 +93,7 @@ fn func_def_test() {
                                 Box::new(Exp::VarName(VarName("s")),),
                                 Box::new(Exp::RefCall(Box::new(RefCall {
                                     name: Exp::VarName(VarName("s")),
-                                    arg: Exp::Num(Numeral::Int(1))
+                                    arg: Exp::Num(Numeral::from_i32(1))
                                 })))
                             ),
                             false,

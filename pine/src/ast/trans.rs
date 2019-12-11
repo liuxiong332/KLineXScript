@@ -257,6 +257,8 @@ impl<'a> From<Exp2<'a>> for Exp<'a> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::input::{Input, Position};
+    use super::super::num::IntNode;
     use super::*;
     use crate::ast::num::Numeral;
 
@@ -284,12 +286,18 @@ mod tests {
             ])
         );
 
-        fn int_oe2(int_lit: i32) -> OpOrExp2<'static> {
-            OpOrExp2::Exp2(Exp2::Num(Numeral::Int(int_lit)))
+        fn int_oe2(int_lit: i32, lit_str: &'static str, pos: Position) -> OpOrExp2<'static> {
+            OpOrExp2::Exp2(Exp2::Num(Numeral::Int(IntNode::new(
+                int_lit,
+                Input::new_with_start(lit_str, pos),
+            ))))
         }
 
-        fn int_exp(int_lit: i32) -> Exp<'static> {
-            Exp::Num(Numeral::Int(int_lit))
+        fn int_exp(int_lit: i32, lit_str: &'static str, pos: Position) -> Exp<'static> {
+            Exp::Num(Numeral::Int(IntNode::new(
+                int_lit,
+                Input::new_with_start(lit_str, pos),
+            )))
         }
 
         fn unary_oe2(unary_op: UnaryOp) -> OpOrExp2<'static> {
@@ -303,34 +311,43 @@ mod tests {
         // 1 + 2 * -2 - -4 / -1;
         assert_eq!(
             Exp::from(FlatExp(vec![
-                int_oe2(1),
+                int_oe2(1, "1", Position::new(0, 0)),
                 binary_oe2(BinaryOp::Plus),
-                int_oe2(2),
+                int_oe2(2, "2", Position::new(0, 4)),
                 binary_oe2(BinaryOp::Mul),
                 unary_oe2(UnaryOp::Minus),
-                int_oe2(2),
+                int_oe2(2, "2", Position::new(0, 8)),
                 binary_oe2(BinaryOp::Minus),
                 unary_oe2(UnaryOp::Minus),
-                int_oe2(4),
+                int_oe2(4, "4", Position::new(0, 13)),
                 binary_oe2(BinaryOp::Div),
                 unary_oe2(UnaryOp::Minus),
-                int_oe2(1),
+                int_oe2(1, "1", Position::new(0, 16)),
             ])),
             Exp::BinaryExp(
                 BinaryOp::Minus,
                 Box::new(Exp::BinaryExp(
                     BinaryOp::Plus,
-                    Box::new(int_exp(1)),
+                    Box::new(int_exp(1, "1", Position::new(0, 0))),
                     Box::new(Exp::BinaryExp(
                         BinaryOp::Mul,
-                        Box::new(int_exp(2)),
-                        Box::new(Exp::UnaryExp(UnaryOp::Minus, Box::new(int_exp(2))))
+                        Box::new(int_exp(2, "2", Position::new(0, 4))),
+                        Box::new(Exp::UnaryExp(
+                            UnaryOp::Minus,
+                            Box::new(int_exp(2, "2", Position::new(0, 8)))
+                        ))
                     ))
                 )),
                 Box::new(Exp::BinaryExp(
                     BinaryOp::Div,
-                    Box::new(Exp::UnaryExp(UnaryOp::Minus, Box::new(int_exp(4)))),
-                    Box::new(Exp::UnaryExp(UnaryOp::Minus, Box::new(int_exp(1)))),
+                    Box::new(Exp::UnaryExp(
+                        UnaryOp::Minus,
+                        Box::new(int_exp(4, "4", Position::new(0, 13)))
+                    )),
+                    Box::new(Exp::UnaryExp(
+                        UnaryOp::Minus,
+                        Box::new(int_exp(1, "1", Position::new(0, 16)))
+                    )),
                 ))
             )
         );

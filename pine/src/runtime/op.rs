@@ -9,7 +9,7 @@ use std::fmt::Debug;
 
 pub fn unary_op_run<'a>(
     op: &UnaryOp,
-    exp: &'a Box<Exp<'a>>,
+    exp: &'a Exp<'a>,
     context: &mut (dyn Ctx<'a>),
 ) -> Result<PineRef<'a>, RuntimeErr> {
     match op {
@@ -67,8 +67,8 @@ where
 
 pub fn binary_op_run<'a, 'b>(
     op: &BinaryOp,
-    exp1: &'a Box<Exp<'a>>,
-    exp2: &'a Box<Exp<'a>>,
+    exp1: &'a Exp<'a>,
+    exp2: &'a Exp<'a>,
     context: &mut (dyn 'b + Ctx<'a>),
 ) -> Result<PineRef<'a>, RuntimeErr> {
     match op {
@@ -134,15 +134,18 @@ pub fn binary_op_run<'a, 'b>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ast::input::StrRange;
     use crate::ast::name::VarName;
     use crate::ast::num::Numeral;
+    use crate::ast::stat_expr_types::BoolNode;
+    use crate::ast::string::StringNode;
     use crate::runtime::context::{Context, ContextType};
     use crate::types::PineStaticType;
 
     #[test]
     fn unary_op_test() {
         let exp = Box::new(Exp::Num(Numeral::from_i32(1)));
-        let exp2 = Box::new(Exp::Bool(true));
+        let exp2 = Box::new(Exp::Bool(BoolNode::new(true, StrRange::new_empty())));
 
         let mut context = Context::new(None, ContextType::Normal);
         assert_eq!(
@@ -190,8 +193,14 @@ mod tests {
         assert_eq!(
             biop_runner(
                 BinaryOp::Plus,
-                Exp::Str(String::from("hello")),
-                Exp::Str(String::from("world"))
+                Exp::Str(StringNode::new(
+                    String::from("hello"),
+                    StrRange::new_empty()
+                )),
+                Exp::Str(StringNode::new(
+                    String::from("world"),
+                    StrRange::new_empty()
+                ))
             ),
             Ok(RefData::new(String::from("helloworld")))
         );
@@ -261,20 +270,21 @@ mod tests {
 
     #[test]
     fn logic_test() {
+        let gen_bool_exp = |val| Exp::Bool(BoolNode::new_no_range(val));
         assert_eq!(
-            biop_runner(BinaryOp::BoolAnd, Exp::Bool(false), Exp::Bool(true)),
+            biop_runner(BinaryOp::BoolAnd, gen_bool_exp(false), gen_bool_exp(true)),
             Ok(RefData::new_box(false))
         );
         assert_eq!(
-            biop_runner(BinaryOp::BoolAnd, Exp::Bool(false), Exp::Bool(false)),
+            biop_runner(BinaryOp::BoolAnd, gen_bool_exp(false), gen_bool_exp(false)),
             Ok(RefData::new_box(false))
         );
         assert_eq!(
-            biop_runner(BinaryOp::BoolOr, Exp::Bool(false), Exp::Bool(true)),
+            biop_runner(BinaryOp::BoolOr, gen_bool_exp(false), gen_bool_exp(true)),
             Ok(RefData::new_box(true))
         );
         assert_eq!(
-            biop_runner(BinaryOp::BoolOr, Exp::Bool(false), Exp::Bool(false)),
+            biop_runner(BinaryOp::BoolOr, gen_bool_exp(false), gen_bool_exp(false)),
             Ok(RefData::new_box(false))
         );
     }
@@ -292,7 +302,7 @@ mod tests {
     }
 
     fn var_exp<'a>(var: &'a str) -> Exp<'a> {
-        Exp::VarName(VarName(var))
+        Exp::VarName(VarName::new_no_input(var))
     }
 
     #[test]

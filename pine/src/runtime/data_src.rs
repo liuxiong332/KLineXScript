@@ -90,6 +90,7 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ast::input::{Position, StrRange};
     use crate::ast::name::VarName;
     use crate::ast::stat_expr_types::{Assignment, Exp, Statement};
 
@@ -100,12 +101,14 @@ mod tests {
     fn datasrc_test() {
         let mut blk = Block::new(
             vec![Statement::Assignment(Box::new(Assignment::new(
-                vec![VarName("hello")],
-                Exp::VarName(VarName("close")),
+                vec![VarName::new_with_start("hello", Position::new(0, 0))],
+                Exp::VarName(VarName::new_with_start("close", Position::new(0, 6))),
                 false,
                 None,
+                StrRange::from_start("hello=close", Position::new(0, 0)),
             )))],
             None,
+            StrRange::from_start("hello=close", Position::new(0, 0)),
         );
         let mut datasrc = DataSrc::new(&mut blk, HashMap::new(), &MyCallback);
 

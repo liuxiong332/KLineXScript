@@ -1,5 +1,6 @@
 use crate::ast::stat_expr_types::{
     Block, Condition, Exp, ForRange, FunctionCall, FunctionDef, IfThenElse, RefCall, Statement,
+    TupleNode,
 };
 
 pub struct CtxIdParser {
@@ -24,8 +25,8 @@ impl CtxIdParser {
         }
     }
 
-    fn parse_tuple<'a>(&mut self, tuple: &mut Vec<Exp<'a>>) {
-        for arg in tuple.iter_mut() {
+    fn parse_tuple<'a>(&mut self, tuple: &mut TupleNode<'a>) {
+        for arg in tuple.exps.iter_mut() {
             self.parse_exp(arg);
         }
     }
@@ -79,10 +80,10 @@ impl CtxIdParser {
             Exp::Condition(condition) => self.parse_condition(condition),
             Exp::Ite(ite) => self.parse_ifthenelse(ite),
             Exp::ForRange(fr) => self.parse_forrange(fr),
-            Exp::UnaryExp(_, exp) => self.parse_exp(exp),
-            Exp::BinaryExp(_, exp1, exp2) => {
-                self.parse_exp(exp1);
-                self.parse_exp(exp2);
+            Exp::UnaryExp(node) => self.parse_exp(&mut node.exp),
+            Exp::BinaryExp(node) => {
+                self.parse_exp(&mut node.exp1);
+                self.parse_exp(&mut node.exp2);
             }
             _ => {}
         }
@@ -119,11 +120,12 @@ impl CtxIdParser {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ast::input::{Position, StrRange};
     use crate::ast::name::VarName;
     use crate::ast::stat_expr_types::{Assignment, DataType, RefCall, TypeCast, VarAssignment};
 
     fn name<'a>(n: &'a str) -> Exp<'a> {
-        Exp::VarName(VarName(n))
+        Exp::VarName(VarName::new_with_start(n, Position::new(0, 0)))
     }
 
     fn func_call<'a>(
@@ -132,7 +134,10 @@ mod tests {
         dict_args: Vec<(VarName<'a>, Exp<'a>)>,
     ) -> Exp<'a> {
         Exp::FuncCall(Box::new(FunctionCall::new_no_ctxid(
-            method, pos_args, dict_args,
+            method,
+            pos_args,
+            dict_args,
+            StrRange::new_empty(),
         )))
     }
 
@@ -142,7 +147,10 @@ mod tests {
         dict_args: Vec<(VarName<'a>, Exp<'a>)>,
     ) -> Statement<'a> {
         Statement::FuncCall(Box::new(FunctionCall::new_no_ctxid(
-            method, pos_args, dict_args,
+            method,
+            pos_args,
+            dict_args,
+            StrRange::new_empty(),
         )))
     }
 
@@ -151,7 +159,11 @@ mod tests {
         let mut call_exp = FunctionCall::new_no_ctxid(
             name("func"),
             vec![func_call(name("arg"), vec![], vec![])],
-            vec![(VarName("arg2"), func_call(name("arg2"), vec![], vec![]))],
+            vec![(
+                VarName::new_no_input("arg2"),
+                func_call(name("arg2"), vec![], vec![]),
+            )],
+            StrRange::new_empty(),
         );
         let mut parser = CtxIdParser::new();
         parser.parse_func_call(&mut call_exp);
@@ -164,6 +176,7 @@ mod tests {
         let mut ref_exp = RefCall {
             name: func_call(name("ref"), vec![], vec![]),
             arg: func_call(name("arg"), vec![], vec![]),
+            range: StrRange::new_empty(),
         };
         let mut parser = CtxIdParser::new();
         parser.parse_ref_call(&mut ref_exp);
@@ -176,6 +189,7 @@ mod tests {
             cond: func_call(name("cond"), vec![], vec![]),
             exp1: func_call(name("exp1"), vec![], vec![]),
             exp2: func_call(name("exp2"), vec![], vec![]),
+            range: StrRange::new_empty(),
         };
         let mut parser = CtxIdParser::new();
         parser.parse_condition(&mut cond);
@@ -187,6 +201,7 @@ mod tests {
         let mut cast = Exp::TypeCast(Box::new(TypeCast {
             data_type: DataType::Bool,
             exp: func_call(name("cond"), vec![], vec![]),
+            range: StrRange::new_empty(),
         }));
         let mut parser = CtxIdParser::new();
         parser.parse_exp(&mut cast);
@@ -196,10 +211,11 @@ mod tests {
     #[test]
     fn assign_test() {
         let mut cast = Statement::Assignment(Box::new(Assignment::new(
-            vec![VarName("n")],
+            vec![VarName::new_no_input("n")],
             func_call(name("func"), vec![], vec![]),
             false,
             None,
+            StrRange::new_empty(),
         )));
         let mut parser = CtxIdParser::new();
         parser.parse_stmt(&mut cast);
@@ -208,8 +224,8 @@ mod tests {
 
     #[test]
     fn var_assign_test() {
-        let mut cast = Statement::VarAssignment(Box::new(VarAssignment::new(
-            VarName("n"),
+        let mut cast = Statement::VarAssignment(Box::new(VarAssignment::new_no_input(
+            VarName::new_no_input("n"),
             func_call(name("func"), vec![], vec![]),
         )));
         let mut parser = CtxIdParser::new();
@@ -221,14 +237,15 @@ mod tests {
     fn ife_test() {
         let mut ite = IfThenElse::new_no_ctxid(
             func_call(name("cond"), vec![], vec![]),
-            Block::new(
+            Block::new_no_input(
                 vec![func_call_stmt(name("t1"), vec![], vec![])],
                 Some(func_call(name("then"), vec![], vec![])),
             ),
-            Some(Block::new(
+            Some(Block::new_no_input(
                 vec![func_call_stmt(name("e1"), vec![], vec![])],
                 Some(func_call(name("else"), vec![], vec![])),
             )),
+            StrRange::new_empty(),
         );
         let mut parser = CtxIdParser::new();
         parser.parse_ifthenelse(&mut ite);
@@ -240,14 +257,15 @@ mod tests {
     #[test]
     fn for_range_test() {
         let mut fr = ForRange::new_no_ctxid(
-            VarName("fr"),
+            VarName::new_no_input("fr"),
             func_call(name("start"), vec![], vec![]),
             func_call(name("end"), vec![], vec![]),
             Some(func_call(name("step"), vec![], vec![])),
-            Block::new(
+            Block::new_no_input(
                 vec![func_call_stmt(name("e1"), vec![], vec![])],
                 Some(func_call(name("else"), vec![], vec![])),
             ),
+            StrRange::new_empty(),
         );
         let mut parser = CtxIdParser::new();
         parser.parse_forrange(&mut fr);
@@ -258,12 +276,13 @@ mod tests {
     #[test]
     fn func_def_test() {
         let mut def = Statement::FuncDef(Box::new(FunctionDef {
-            name: VarName("fr"),
-            params: vec![VarName("arg1")],
-            body: Block::new(
+            name: VarName::new_no_input("fr"),
+            params: vec![VarName::new_no_input("arg1")],
+            body: Block::new_no_input(
                 vec![func_call_stmt(name("e1"), vec![], vec![])],
                 Some(func_call(name("else"), vec![], vec![])),
             ),
+            range: StrRange::new_empty(),
         }));
         let mut parser = CtxIdParser::new();
         parser.parse_stmt(&mut def);

@@ -1,8 +1,9 @@
 use super::color::ColorNode;
-use super::input::{Input, Position};
+use super::input::{Input, Position, StrRange};
 use super::name::VarName;
 use super::num::Numeral;
-use super::op::{BinaryOp, UnaryOp};
+use super::op::{BinaryOp, BinaryOpNode, UnaryOp, UnaryOpNode};
+use super::string::StringNode;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct FunctionCall<'a> {
@@ -10,7 +11,7 @@ pub struct FunctionCall<'a> {
     pub pos_args: Vec<Exp<'a>>,
     pub dict_args: Vec<(VarName<'a>, Exp<'a>)>,
     pub ctxid: i32,
-    pub input: Input<'a>,
+    pub range: StrRange,
 }
 
 impl<'a> FunctionCall<'a> {
@@ -20,14 +21,14 @@ impl<'a> FunctionCall<'a> {
         pos_args: Vec<Exp<'a>>,
         dict_args: Vec<(VarName<'a>, Exp<'a>)>,
         ctxid: i32,
-        input: Input<'a>,
+        range: StrRange,
     ) -> Self {
         FunctionCall {
             method,
             pos_args,
             dict_args,
             ctxid,
-            input,
+            range,
         }
     }
 
@@ -35,13 +36,14 @@ impl<'a> FunctionCall<'a> {
         method: Exp<'a>,
         pos_args: Vec<Exp<'a>>,
         dict_args: Vec<(VarName<'a>, Exp<'a>)>,
+        range: StrRange,
     ) -> Self {
         FunctionCall {
             method,
             pos_args,
             dict_args,
             ctxid: 0,
-            input: Input::new("", Position::new(0, 0), Position::max()),
+            range,
         }
     }
 }
@@ -50,20 +52,20 @@ impl<'a> FunctionCall<'a> {
 pub struct RefCall<'a> {
     pub name: Exp<'a>,
     pub arg: Exp<'a>,
-    pub input: Input<'a>,
+    pub range: StrRange,
 }
 
 impl<'a> RefCall<'a> {
     #[inline]
-    pub fn new(name: Exp<'a>, arg: Exp<'a>, input: Input<'a>) -> RefCall<'a> {
-        RefCall { name, arg, input }
+    pub fn new(name: Exp<'a>, arg: Exp<'a>, range: StrRange) -> RefCall<'a> {
+        RefCall { name, arg, range }
     }
 
     pub fn new_no_input(name: Exp<'a>, arg: Exp<'a>) -> RefCall<'a> {
         RefCall {
             name,
             arg,
-            input: Input::new("", Position::new(0, 0), Position::max()),
+            range: StrRange::new_empty(),
         }
     }
 }
@@ -73,17 +75,17 @@ pub struct Condition<'a> {
     pub cond: Exp<'a>,
     pub exp1: Exp<'a>,
     pub exp2: Exp<'a>,
-    pub input: Input<'a>,
+    pub range: StrRange,
 }
 
 impl<'a> Condition<'a> {
     #[inline]
-    pub fn new(cond: Exp<'a>, exp1: Exp<'a>, exp2: Exp<'a>, input: Input<'a>) -> Condition<'a> {
+    pub fn new(cond: Exp<'a>, exp1: Exp<'a>, exp2: Exp<'a>, range: StrRange) -> Condition<'a> {
         Condition {
             cond,
             exp1,
             exp2,
-            input,
+            range,
         }
     }
 
@@ -93,21 +95,107 @@ impl<'a> Condition<'a> {
             cond,
             exp1,
             exp2,
-            input: Input::new_empty(),
+            range: StrRange::new_empty(),
         }
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct NaNode {
+    pub range: StrRange,
+}
+
+impl NaNode {
+    pub fn new(range: StrRange) -> NaNode {
+        NaNode { range }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct BoolNode {
+    pub value: bool,
+    pub range: StrRange,
+}
+
+impl BoolNode {
+    pub fn new(value: bool, range: StrRange) -> BoolNode {
+        BoolNode { value, range }
+    }
+
+    pub fn new_no_range(value: bool) -> BoolNode {
+        BoolNode {
+            value,
+            range: StrRange::new_empty(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct UnaryExp<'a> {
+    pub op: UnaryOp,
+    pub exp: Exp<'a>,
+    pub range: StrRange,
+}
+
+impl<'a> UnaryExp<'a> {
+    pub fn new(op: UnaryOp, exp: Exp<'a>, range: StrRange) -> UnaryExp<'a> {
+        UnaryExp { op, exp, range }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct BinaryExp<'a> {
+    pub op: BinaryOp,
+    pub exp1: Exp<'a>,
+    pub exp2: Exp<'a>,
+    pub range: StrRange,
+}
+
+impl<'a> BinaryExp<'a> {
+    pub fn new(op: BinaryOp, exp1: Exp<'a>, exp2: Exp<'a>, range: StrRange) -> BinaryExp<'a> {
+        BinaryExp {
+            op,
+            exp1,
+            exp2,
+            range,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TupleNode<'a> {
+    pub exps: Vec<Exp<'a>>,
+    pub range: StrRange,
+}
+
+impl<'a> TupleNode<'a> {
+    pub fn new(exps: Vec<Exp<'a>>, range: StrRange) -> TupleNode<'a> {
+        TupleNode { exps, range }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct LVTupleNode<'a> {
+    pub names: Vec<VarName<'a>>,
+    pub range: StrRange,
+}
+
+impl<'a> LVTupleNode<'a> {
+    pub fn new(names: Vec<VarName<'a>>, range: StrRange) -> LVTupleNode<'a> {
+        LVTupleNode { names, range }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum Exp<'a> {
-    Na,
-    Bool(bool),
-    Num(Numeral<'a>),
-    Str(String),
+    Na(NaNode),
+    Bool(BoolNode),
+    Num(Numeral),
+    Str(StringNode),
     Color(ColorNode<'a>),
     VarName(VarName<'a>),
     // RetTuple(Box<Vec<VarName<'a>>>),
-    Tuple(Box<Vec<Exp<'a>>>),
+    Tuple(Box<TupleNode<'a>>),
     TypeCast(Box<TypeCast<'a>>),
     FuncCall(Box<FunctionCall<'a>>),
     RefCall(Box<RefCall<'a>>),
@@ -115,8 +203,31 @@ pub enum Exp<'a> {
     Condition(Box<Condition<'a>>),
     Ite(Box<IfThenElse<'a>>),
     ForRange(Box<ForRange<'a>>),
-    UnaryExp(UnaryOp, Box<Exp<'a>>),
-    BinaryExp(BinaryOp, Box<Exp<'a>>, Box<Exp<'a>>),
+    UnaryExp(Box<UnaryExp<'a>>),
+    BinaryExp(Box<BinaryExp<'a>>),
+}
+
+impl<'a> Exp<'a> {
+    pub fn range(&self) -> StrRange {
+        match self {
+            Exp::Na(na) => na.range,
+            Exp::Bool(node) => node.range,
+            Exp::Num(node) => node.range(),
+            Exp::Str(node) => node.range,
+            Exp::Color(node) => node.range,
+            Exp::VarName(node) => node.range,
+            Exp::Tuple(node) => node.range,
+            Exp::TypeCast(node) => node.range,
+            Exp::FuncCall(node) => node.range,
+            Exp::RefCall(node) => node.range,
+            Exp::PrefixExp(node) => node.range,
+            Exp::Condition(node) => node.range,
+            Exp::Ite(node) => node.range,
+            Exp::ForRange(node) => node.range,
+            Exp::UnaryExp(node) => node.range,
+            Exp::BinaryExp(node) => node.range,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -125,25 +236,64 @@ pub enum OpOrExp2<'a> {
     Exp2(Exp2<'a>),
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum UnOrBinOp {
-    UnaryOp(UnaryOp),
-    BinaryOp(BinaryOp),
+impl<'a> OpOrExp2<'a> {
+    pub fn range(&self) -> StrRange {
+        match self {
+            OpOrExp2::Op(op) => op.range(),
+            OpOrExp2::Exp2(exp) => exp.range(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct FlatExp<'a>(pub Vec<OpOrExp2<'a>>);
+pub enum UnOrBinOp {
+    UnaryOp(UnaryOpNode),
+    BinaryOp(BinaryOpNode),
+}
+
+impl UnOrBinOp {
+    pub fn range(&self) -> StrRange {
+        match self {
+            UnOrBinOp::UnaryOp(node) => node.range,
+            UnOrBinOp::BinaryOp(node) => node.range,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FlatExp<'a> {
+    pub exps: Vec<OpOrExp2<'a>>,
+    pub range: StrRange,
+}
+
+pub struct UnOpExp2<'a> {
+    pub ops: Vec<UnaryOpNode>,
+    pub exp: Exp2<'a>,
+    pub range: StrRange,
+}
+
+impl<'a> UnOpExp2<'a> {
+    pub fn new(ops: Vec<UnaryOpNode>, exp: Exp2<'a>, range: StrRange) -> UnOpExp2<'a> {
+        UnOpExp2 { ops, exp, range }
+    }
+}
+
+impl<'a> FlatExp<'a> {
+    pub fn new(exps: Vec<OpOrExp2<'a>>, range: StrRange) -> FlatExp<'a> {
+        FlatExp { exps, range }
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Exp2<'a> {
-    Na,
-    Bool(bool),
-    Num(Numeral<'a>),
-    Str(String),
+    Na(NaNode),
+    Bool(BoolNode),
+    Num(Numeral),
+    Str(StringNode),
     Color(ColorNode<'a>),
     VarName(VarName<'a>),
     // RetTuple(Box<Vec<VarName<'a>>>),
-    Tuple(Box<Vec<Exp<'a>>>),
+    Tuple(Box<TupleNode<'a>>),
     TypeCast(Box<TypeCast<'a>>),
     FuncCall(Box<FunctionCall<'a>>),
     RefCall(Box<RefCall<'a>>),
@@ -151,19 +301,38 @@ pub enum Exp2<'a> {
     Exp(Exp<'a>),
 }
 
+impl<'a> Exp2<'a> {
+    pub fn range(&self) -> StrRange {
+        match self {
+            Exp2::Na(na) => na.range,
+            Exp2::Bool(node) => node.range,
+            Exp2::Num(node) => node.range(),
+            Exp2::Str(node) => node.range,
+            Exp2::Color(node) => node.range,
+            Exp2::VarName(node) => node.range,
+            Exp2::Tuple(node) => node.range,
+            Exp2::TypeCast(node) => node.range,
+            Exp2::FuncCall(node) => node.range,
+            Exp2::RefCall(node) => node.range,
+            Exp2::PrefixExp(node) => node.range,
+            Exp2::Exp(node) => node.range(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeCast<'a> {
     pub data_type: DataType,
     pub exp: Exp<'a>,
-    pub input: Input<'a>,
+    pub range: StrRange,
 }
 
 impl<'a> TypeCast<'a> {
-    pub fn new(data_type: DataType, exp: Exp<'a>, input: Input<'a>) -> TypeCast<'a> {
+    pub fn new(data_type: DataType, exp: Exp<'a>, range: StrRange) -> TypeCast<'a> {
         TypeCast {
             data_type,
             exp,
-            input,
+            range,
         }
     }
 
@@ -171,7 +340,7 @@ impl<'a> TypeCast<'a> {
         TypeCast {
             data_type,
             exp,
-            input: Input::new_empty(),
+            range: StrRange::new_empty(),
         }
     }
 }
@@ -179,18 +348,18 @@ impl<'a> TypeCast<'a> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PrefixExp<'a> {
     pub var_chain: Vec<VarName<'a>>,
-    pub input: Input<'a>,
+    pub range: StrRange,
 }
 
 impl<'a> PrefixExp<'a> {
-    pub fn new(var_chain: Vec<VarName<'a>>, input: Input<'a>) -> PrefixExp<'a> {
-        PrefixExp { var_chain, input }
+    pub fn new(var_chain: Vec<VarName<'a>>, range: StrRange) -> PrefixExp<'a> {
+        PrefixExp { var_chain, range }
     }
 
     pub fn new_no_input(var_chain: Vec<VarName<'a>>) -> PrefixExp<'a> {
         PrefixExp {
             var_chain,
-            input: Input::new_empty(),
+            range: StrRange::new_empty(),
         }
     }
 }
@@ -212,7 +381,7 @@ pub struct Assignment<'a> {
     pub val: Exp<'a>,
     pub var_type: Option<DataType>,
     pub var: bool,
-    pub input: Input<'a>,
+    pub range: StrRange,
 }
 
 impl<'a> Assignment<'a> {
@@ -221,14 +390,14 @@ impl<'a> Assignment<'a> {
         val: Exp<'a>,
         var: bool,
         var_type: Option<DataType>,
-        input: Input<'a>,
+        range: StrRange,
     ) -> Assignment<'a> {
         Assignment {
             names,
             val,
             var,
             var_type,
-            input,
+            range,
         }
     }
 
@@ -243,7 +412,7 @@ impl<'a> Assignment<'a> {
             val,
             var,
             var_type,
-            input: Input::new_empty(),
+            range: StrRange::new_empty(),
         }
     }
 }
@@ -252,19 +421,19 @@ impl<'a> Assignment<'a> {
 pub struct VarAssignment<'a> {
     pub name: VarName<'a>,
     pub val: Exp<'a>,
-    pub input: Input<'a>,
+    pub range: StrRange,
 }
 
 impl<'a> VarAssignment<'a> {
-    pub fn new(name: VarName<'a>, val: Exp<'a>, input: Input<'a>) -> VarAssignment<'a> {
-        VarAssignment { name, val, input }
+    pub fn new(name: VarName<'a>, val: Exp<'a>, range: StrRange) -> VarAssignment<'a> {
+        VarAssignment { name, val, range }
     }
 
     pub fn new_no_input(name: VarName<'a>, val: Exp<'a>) -> VarAssignment<'a> {
         VarAssignment {
             name,
             val,
-            input: Input::new_empty(),
+            range: StrRange::new_empty(),
         }
     }
 }
@@ -273,19 +442,15 @@ impl<'a> VarAssignment<'a> {
 pub struct Block<'a> {
     pub stmts: Vec<Statement<'a>>,
     pub ret_stmt: Option<Exp<'a>>,
-    pub input: Input<'a>,
+    pub range: StrRange,
 }
 
 impl<'a> Block<'a> {
-    pub fn new(
-        stmts: Vec<Statement<'a>>,
-        ret_stmt: Option<Exp<'a>>,
-        input: Input<'a>,
-    ) -> Block<'a> {
+    pub fn new(stmts: Vec<Statement<'a>>, ret_stmt: Option<Exp<'a>>, range: StrRange) -> Block<'a> {
         Block {
             stmts,
             ret_stmt,
-            input,
+            range,
         }
     }
 
@@ -293,7 +458,7 @@ impl<'a> Block<'a> {
         Block {
             stmts,
             ret_stmt,
-            input: Input::new_empty(),
+            range: StrRange::new_empty(),
         }
     }
 }
@@ -306,7 +471,7 @@ pub struct IfThenElse<'a> {
     // pub elseifs: Vec<(Exp<'a>, Block<'a>)>,
     pub else_blk: Option<Block<'a>>,
     pub else_ctxid: i32,
-    pub input: Input<'a>,
+    pub range: StrRange,
 }
 
 impl<'a> IfThenElse<'a> {
@@ -316,7 +481,7 @@ impl<'a> IfThenElse<'a> {
         else_blk: Option<Block<'a>>,
         then_ctxid: i32,
         else_ctxid: i32,
-        input: Input<'a>,
+        range: StrRange,
     ) -> Self {
         IfThenElse {
             cond,
@@ -324,18 +489,23 @@ impl<'a> IfThenElse<'a> {
             then_ctxid,
             else_blk,
             else_ctxid,
-            input,
+            range,
         }
     }
 
-    pub fn new_no_ctxid(cond: Exp<'a>, then_blk: Block<'a>, else_blk: Option<Block<'a>>) -> Self {
+    pub fn new_no_ctxid(
+        cond: Exp<'a>,
+        then_blk: Block<'a>,
+        else_blk: Option<Block<'a>>,
+        range: StrRange,
+    ) -> Self {
         IfThenElse {
             cond,
             then_blk,
             else_blk,
             then_ctxid: 0,
             else_ctxid: 1,
-            input: Input::new_empty(),
+            range,
         }
     }
 }
@@ -348,7 +518,7 @@ pub struct ForRange<'a> {
     pub step: Option<Exp<'a>>,
     pub do_blk: Block<'a>,
     pub ctxid: i32,
-    pub input: Input<'a>,
+    pub range: StrRange,
 }
 
 impl<'a> ForRange<'a> {
@@ -359,7 +529,7 @@ impl<'a> ForRange<'a> {
         step: Option<Exp<'a>>,
         do_blk: Block<'a>,
         ctxid: i32,
-        input: Input<'a>,
+        range: StrRange,
     ) -> Self {
         ForRange {
             var,
@@ -368,7 +538,7 @@ impl<'a> ForRange<'a> {
             step,
             do_blk,
             ctxid,
-            input,
+            range,
         }
     }
 
@@ -378,6 +548,7 @@ impl<'a> ForRange<'a> {
         end: Exp<'a>,
         step: Option<Exp<'a>>,
         do_blk: Block<'a>,
+        range: StrRange,
     ) -> Self {
         ForRange {
             var,
@@ -386,7 +557,7 @@ impl<'a> ForRange<'a> {
             step,
             do_blk,
             ctxid: 0,
-            input: Input::new_empty(),
+            range,
         }
     }
 }
@@ -396,18 +567,34 @@ pub struct FunctionDef<'a> {
     pub name: VarName<'a>,
     pub params: Vec<VarName<'a>>,
     pub body: Block<'a>,
-    pub input: Input<'a>,
+    pub range: StrRange,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Statement<'a> {
-    Break,
-    Continue,
-    None,
+    Break(StrRange),
+    Continue(StrRange),
+    None(StrRange),
     Assignment(Box<Assignment<'a>>),
     VarAssignment(Box<VarAssignment<'a>>),
     Ite(Box<IfThenElse<'a>>),
     ForRange(Box<ForRange<'a>>),
     FuncCall(Box<FunctionCall<'a>>),
     FuncDef(Box<FunctionDef<'a>>),
+}
+
+impl<'a> Statement<'a> {
+    pub fn range(&self) -> StrRange {
+        match self {
+            &Statement::Break(range) => range,
+            &Statement::Continue(range) => range,
+            &Statement::None(range) => range,
+            Statement::Assignment(assign) => assign.range,
+            Statement::VarAssignment(assign) => assign.range,
+            Statement::Ite(ite) => ite.range,
+            Statement::ForRange(for_range) => for_range.range,
+            Statement::FuncCall(func_call) => func_call.range,
+            Statement::FuncDef(func_def) => func_def.range,
+        }
+    }
 }

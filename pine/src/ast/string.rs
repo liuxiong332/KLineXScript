@@ -1,5 +1,5 @@
 use super::error::{PineError, PineErrorKind, PineResult};
-use super::input::Input;
+use super::input::{Input, StrRange};
 use nom::{
     branch::alt,
     bytes::complete::{escaped, is_not, tag, take_until},
@@ -9,6 +9,18 @@ use nom::{
 };
 
 const ESCAPE_CODE: &'static str = "\'\"\\\n0123456789abfnrtuvxz";
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StringNode {
+    pub value: String,
+    pub range: StrRange,
+}
+
+impl StringNode {
+    pub fn new(value: String, range: StrRange) -> StringNode {
+        StringNode { value, range }
+    }
+}
 
 enum ControlChar {
     Byte(u8),
@@ -55,7 +67,7 @@ pub fn unescape(buf: &str) -> Result<String, &'static str> {
     }
 }
 
-fn gen_quote_str(quote_char: &'static str) -> impl Fn(Input) -> PineResult<String> {
+fn gen_quote_str(quote_char: &'static str) -> impl Fn(Input) -> PineResult<StringNode> {
     move |input: Input| {
         let ignore_chars = ["\n\\", quote_char].join("");
         let (next_input, out) = delimited(
@@ -64,7 +76,10 @@ fn gen_quote_str(quote_char: &'static str) -> impl Fn(Input) -> PineResult<Strin
             tag(quote_char),
         )(input)?;
         match unescape(out.src) {
-            Ok(res_str) => Ok((next_input, res_str)),
+            Ok(res_str) => Ok((
+                next_input,
+                StringNode::new(res_str, StrRange::from_input(&out)),
+            )),
             Err(err_str) => Err(Err::Error(PineError::from_pine_kind(
                 input,
                 PineErrorKind::InvalidStrLiteral(err_str),
@@ -73,7 +88,7 @@ fn gen_quote_str(quote_char: &'static str) -> impl Fn(Input) -> PineResult<Strin
     }
 }
 
-pub fn string_lit(input: Input) -> PineResult<String> {
+pub fn string_lit(input: Input) -> PineResult<StringNode> {
     alt((gen_quote_str("\""), gen_quote_str("'")))(input)
 }
 
@@ -101,7 +116,10 @@ mod tests {
             string_lit(test_input),
             Ok((
                 Input::new("ding", Position::new(0, input_len - 4), Position::max()),
-                String::from("hello ' world")
+                StringNode::new(
+                    String::from("hello ' world"),
+                    StrRange::new(Position::new(0, 0), Position::new(0, 16))
+                )
             ))
         );
 
@@ -111,7 +129,10 @@ mod tests {
             string_lit(test_input),
             Ok((
                 Input::new("ding", Position::new(0, input_len - 4), Position::max()),
-                String::from("hello ' world")
+                StringNode::new(
+                    String::from("hello ' world"),
+                    StrRange::new(Position::new(0, 0), Position::new(0, 18))
+                )
             ))
         );
     }

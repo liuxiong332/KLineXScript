@@ -34,10 +34,37 @@ impl Position {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct StrRange {
-    start: Position,
-    end: Position,
+    pub start: Position,
+    pub end: Position,
+}
+
+impl StrRange {
+    pub fn new(start: Position, end: Position) -> StrRange {
+        StrRange { start, end }
+    }
+
+    pub fn new_empty() -> StrRange {
+        StrRange::new(Position::new(0, 0), Position::max())
+    }
+
+    pub fn from_input(input: &Input) -> StrRange {
+        StrRange {
+            start: input.start,
+            end: input.end,
+        }
+    }
+
+    pub fn from_start<'a>(src: &'a str, start: Position) -> StrRange {
+        let (line_count, end_col) = Input::get_line_col(src);
+        let end = if line_count == 1 {
+            Position::new(start.line, end_col + start.character)
+        } else {
+            Position::new(start.line + line_count - 1, end_col)
+        };
+        StrRange::new(start, end)
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]

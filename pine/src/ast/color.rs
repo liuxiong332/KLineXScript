@@ -11,19 +11,19 @@ use nom::{
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ColorNode<'a> {
     pub value: &'a str,
-    pub input: Input<'a>,
+    pub range: StrRange,
 }
 
 impl<'a> ColorNode<'a> {
     #[inline]
-    pub fn new(value: &'a str, input: Input<'a>) -> ColorNode<'a> {
-        ColorNode { value, input }
+    pub fn new(value: &'a str, range: StrRange) -> ColorNode<'a> {
+        ColorNode { value, range }
     }
 
     pub fn from_str(value: &'a str) -> ColorNode<'a> {
         ColorNode {
             value,
-            input: Input::new_with_start(value, Position::new(0, 0)),
+            range: StrRange::from_start(value, Position::new(0, 0)),
         }
     }
 }
@@ -37,7 +37,10 @@ pub fn color_lit(input: Input) -> PineResult<ColorNode> {
     let (next_input, out) = recognize(tuple((tag("#"), take_while(is_hex_digit))))(input)?;
 
     match out.len() {
-        7 | 9 => Ok((next_input, ColorNode::new(out.src, out))),
+        7 | 9 => Ok((
+            next_input,
+            ColorNode::new(out.src, StrRange::from_input(&out)),
+        )),
         _ => Err(Err::Error(PineError::from_pine_kind(
             input,
             PineErrorKind::InvalidColorLiteral,
@@ -58,7 +61,7 @@ mod tests {
                 Input::new(" d", Position::new(0, 8), Position::max()),
                 ColorNode::new(
                     "#123456",
-                    Input::new_with_start("#123456", Position::new(0, 1))
+                    StrRange::from_start("#123456", Position::new(0, 1))
                 )
             ))
         );

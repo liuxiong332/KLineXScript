@@ -16,9 +16,9 @@ use std::fmt::Debug;
 impl<'a> StmtRunner<'a> for Statement<'a> {
     fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
         match *self {
-            Statement::None => Ok(()),
-            Statement::Break => Err(RuntimeErr::Break),
-            Statement::Continue => Err(RuntimeErr::Continue),
+            Statement::None(_) => Ok(()),
+            Statement::Break(_) => Err(RuntimeErr::Break),
+            Statement::Continue(_) => Err(RuntimeErr::Continue),
             Statement::Assignment(ref assign) => assign.st_run(context),
             Statement::VarAssignment(ref var_assign) => var_assign.st_run(context),
             Statement::Ite(ref ite) => StmtRunner::st_run(ite.as_ref(), context),
@@ -129,7 +129,7 @@ impl<'a> RunnerForName<'a> for Assignment<'a> {
         vn: &VarName<'a>,
         val: PineRef<'a>,
     ) -> Result<(), RuntimeErr> {
-        let name = vn.0;
+        let name = vn.value;
         if context.contains_declare_scope(name) {
             return Err(RuntimeErr::NameDeclared);
         }
@@ -183,7 +183,7 @@ impl<'a> StmtRunner<'a> for Assignment<'a> {
 
 impl<'a> StmtRunner<'a> for VarAssignment<'a> {
     fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
-        let name = self.name.0;
+        let name = self.name.value;
         if !context.contains_declare(name) {
             return Err(RuntimeErr::NameNotDeclard);
         }
@@ -233,7 +233,7 @@ impl<'a> StmtRunner<'a> for IfThenElse<'a> {
 
 impl<'a> Runner<'a> for ForRange<'a> {
     fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
-        let iter_name = self.var.0;
+        let iter_name = self.var.value;
         let start: i32;
         match *Int::implicity_from(self.start.rv_run(context)?)? {
             Some(val) => start = val,
@@ -319,7 +319,7 @@ fn extract_args<'a>(
     }
     let mut ret_dict = vec![];
     for (n, exp) in exp.dict_args.iter() {
-        ret_dict.push((n.0, exp.rv_run(context)?));
+        ret_dict.push((n.value, exp.rv_run(context)?));
     }
     Ok((ret_pos, ret_dict))
 }
@@ -416,7 +416,7 @@ impl<'a> StmtRunner<'a> for FunctionCall<'a> {
 impl<'a> StmtRunner<'a> for FunctionDef<'a> {
     fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
         let func = Function::new(self);
-        context.create_var(self.name.0, PineRef::new_rc(func));
+        context.create_var(self.name.value, PineRef::new_rc(func));
         Ok(())
     }
 }
@@ -437,8 +437,10 @@ impl<'a> Runner<'a> for Block<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ast::input::StrRange;
     use crate::ast::name::VarName;
     use crate::ast::num::Numeral;
+    use crate::ast::stat_expr_types::{BoolNode, TupleNode};
     use crate::runtime::exp::Exp;
 
     #[test]
@@ -448,20 +450,20 @@ mod tests {
             assert_eq!(val, Ok(RefData::new_box(Some(int_val))));
             context.update_var("hello", val.unwrap().into_pf());
         };
-        let assign1 = Statement::Assignment(Box::new(Assignment::new(
-            vec![VarName("hello")],
+        let assign1 = Statement::Assignment(Box::new(Assignment::new_no_input(
+            vec![VarName::new_no_input("hello")],
             Exp::Num(Numeral::from_i32(12)),
             false,
             None,
         )));
-        let assign2 = Statement::Assignment(Box::new(Assignment::new(
-            vec![VarName("hello")],
+        let assign2 = Statement::Assignment(Box::new(Assignment::new_no_input(
+            vec![VarName::new_no_input("hello")],
             Exp::Num(Numeral::from_i32(23)),
             true,
             None,
         )));
-        let assign3 = Statement::Assignment(Box::new(Assignment::new(
-            vec![VarName("hello")],
+        let assign3 = Statement::Assignment(Box::new(Assignment::new_no_input(
+            vec![VarName::new_no_input("hello")],
             Exp::Num(Numeral::from_i32(23)),
             false,
             Some(DataType::Int),
@@ -483,9 +485,9 @@ mod tests {
 
     #[test]
     fn rv_assignment_test() {
-        let assign = Statement::Assignment(Box::new(Assignment::new(
-            vec![VarName("myvar")],
-            Exp::VarName(VarName("newvar")),
+        let assign = Statement::Assignment(Box::new(Assignment::new_no_input(
+            vec![VarName::new_no_input("myvar")],
+            Exp::VarName(VarName::new_no_input("newvar")),
             false,
             None,
         )));
@@ -500,12 +502,15 @@ mod tests {
 
     #[test]
     fn tuple_assignment_test() {
-        let assign = Statement::Assignment(Box::new(Assignment::new(
-            vec![VarName("var1"), VarName("var2")],
-            Exp::Tuple(Box::new(vec![
-                Exp::VarName(VarName("nv1")),
-                Exp::VarName(VarName("nv2")),
-            ])),
+        let assign = Statement::Assignment(Box::new(Assignment::new_no_input(
+            vec![VarName::new_no_input("var1"), VarName::new_no_input("var2")],
+            Exp::Tuple(Box::new(TupleNode::new(
+                vec![
+                    Exp::VarName(VarName::new_no_input("nv1")),
+                    Exp::VarName(VarName::new_no_input("nv2")),
+                ],
+                StrRange::new_empty(),
+            ))),
             false,
             None,
         )));
@@ -535,9 +540,9 @@ mod tests {
 
     #[test]
     fn series_assignment_test() {
-        let assign = Statement::Assignment(Box::new(Assignment::new(
-            vec![VarName("myvar")],
-            Exp::VarName(VarName("newvar")),
+        let assign = Statement::Assignment(Box::new(Assignment::new_no_input(
+            vec![VarName::new_no_input("myvar")],
+            Exp::VarName(VarName::new_no_input("newvar")),
             false,
             None,
         )));
@@ -562,9 +567,18 @@ mod tests {
 
     #[test]
     fn var_assignment_test() {
-        let assign1 = VarAssignment::new(VarName("hello"), Exp::Num(Numeral::from_i32(24)));
-        let assign2 = VarAssignment::new(VarName("hello"), Exp::Num(Numeral::from_i32(36)));
-        let assign3 = VarAssignment::new(VarName("hello"), Exp::VarName(VarName("newvar")));
+        let assign1 = VarAssignment::new_no_input(
+            VarName::new_no_input("hello"),
+            Exp::Num(Numeral::from_i32(24)),
+        );
+        let assign2 = VarAssignment::new_no_input(
+            VarName::new_no_input("hello"),
+            Exp::Num(Numeral::from_i32(36)),
+        );
+        let assign3 = VarAssignment::new_no_input(
+            VarName::new_no_input("hello"),
+            Exp::VarName(VarName::new_no_input("newvar")),
+        );
 
         let mut context = Context::new(None, ContextType::Normal);
         context.create_var("hello", PineRef::new_box(Some(12)));
@@ -590,9 +604,13 @@ mod tests {
     #[test]
     fn if_then_else_test() {
         let ite = IfThenElse::new_no_ctxid(
-            Exp::VarName(VarName("cond")),
-            Block::new(vec![], Some(Exp::VarName(VarName("then")))),
-            Some(Block::new(vec![], Some(Exp::VarName(VarName("else"))))),
+            Exp::VarName(VarName::new_no_input("cond")),
+            Block::new_no_input(vec![], Some(Exp::VarName(VarName::new_no_input("then")))),
+            Some(Block::new_no_input(
+                vec![],
+                Some(Exp::VarName(VarName::new_no_input("else"))),
+            )),
+            StrRange::new_empty(),
         );
         let mut context = Context::new(None, ContextType::Normal);
         context.create_var("cond", PineRef::new_box(true));
@@ -609,19 +627,20 @@ mod tests {
 
     #[test]
     fn for_range_test() {
-        let assign = Statement::Assignment(Box::new(Assignment::new(
-            vec![VarName("a")],
+        let assign = Statement::Assignment(Box::new(Assignment::new_no_input(
+            vec![VarName::new_no_input("a")],
             Exp::Num(Numeral::from_i32(1)),
             false,
             None,
         )));
-        let block = Block::new(vec![assign], Some(Exp::Num(Numeral::from_i32(10))));
+        let block = Block::new_no_input(vec![assign], Some(Exp::Num(Numeral::from_i32(10))));
         let for_range = ForRange::new_no_ctxid(
-            VarName("i"),
+            VarName::new_no_input("i"),
             Exp::Num(Numeral::from_i32(1)),
             Exp::Num(Numeral::from_i32(10)),
             None,
             block,
+            StrRange::new_empty(),
         );
 
         let mut context = Context::new(None, ContextType::Normal);
@@ -638,19 +657,20 @@ mod tests {
 
     #[test]
     fn for_range_exp_test() {
-        let assign = Statement::Assignment(Box::new(Assignment::new(
-            vec![VarName("a")],
+        let assign = Statement::Assignment(Box::new(Assignment::new_no_input(
+            vec![VarName::new_no_input("a")],
             Exp::Num(Numeral::from_i32(1)),
             false,
             None,
         )));
-        let block = Block::new(vec![assign], Some(Exp::Num(Numeral::from_i32(10))));
+        let block = Block::new_no_input(vec![assign], Some(Exp::Num(Numeral::from_i32(10))));
         let for_range = ForRange::new_no_ctxid(
-            VarName("i"),
-            Exp::VarName(VarName("start")),
-            Exp::VarName(VarName("end")),
-            Some(Exp::VarName(VarName("step"))),
+            VarName::new_no_input("i"),
+            Exp::VarName(VarName::new_no_input("start")),
+            Exp::VarName(VarName::new_no_input("end")),
+            Some(Exp::VarName(VarName::new_no_input("step"))),
             block,
+            StrRange::new_empty(),
         );
 
         let mut context = Context::new(None, ContextType::Normal);
@@ -673,9 +693,10 @@ mod tests {
     fn func_call_exp_test() {
         use std::collections::HashMap;
         let exp = FunctionCall::new_no_ctxid(
-            Exp::VarName(VarName("name")),
-            vec![Exp::Bool(true)],
+            Exp::VarName(VarName::new_no_input("name")),
+            vec![Exp::Bool(BoolNode::new_no_range(true))],
             vec![],
+            StrRange::new_empty(),
         );
         let mut context = Context::new(None, ContextType::Normal);
 
@@ -703,22 +724,26 @@ mod tests {
         use crate::ast::stat_expr_types::Exp;
 
         let exp = FunctionCall::new_no_ctxid(
-            Exp::VarName(VarName("name")),
-            vec![Exp::Bool(true)],
+            Exp::VarName(VarName::new_no_input("name")),
+            vec![Exp::Bool(BoolNode::new_no_range(true))],
             vec![],
+            StrRange::new_empty(),
         );
         let series_exp = FunctionCall::new_no_ctxid(
-            Exp::VarName(VarName("name")),
-            vec![Exp::VarName(VarName("series"))],
+            Exp::VarName(VarName::new_no_input("name")),
+            vec![Exp::VarName(VarName::new_no_input("series"))],
             vec![],
+            StrRange::new_empty(),
         );
         let def_exp = FunctionDef {
-            name: VarName("name"),
-            params: vec![VarName("arg")],
+            name: VarName::new_no_input("name"),
+            params: vec![VarName::new_no_input("arg")],
             body: Block {
                 stmts: vec![],
-                ret_stmt: Some(Exp::VarName(VarName("arg"))),
+                ret_stmt: Some(Exp::VarName(VarName::new_no_input("arg"))),
+                range: StrRange::new_empty(),
             },
+            range: StrRange::new_empty(),
         };
         let mut context = Context::new(None, ContextType::Normal);
         context.create_var("name", PineRef::new_rc(Function::new(&def_exp)));
@@ -751,13 +776,17 @@ mod tests {
 
     #[test]
     fn for_range_break_test() {
-        let block = Block::new(vec![Statement::Break], Some(Exp::VarName(VarName("i"))));
+        let block = Block::new_no_input(
+            vec![Statement::Break(StrRange::new_empty())],
+            Some(Exp::VarName(VarName::new_no_input("i"))),
+        );
         let for_range = ForRange::new_no_ctxid(
-            VarName("i"),
+            VarName::new_no_input("i"),
             Exp::Num(Numeral::from_i32(1)),
             Exp::Num(Numeral::from_i32(10)),
             None,
             block,
+            StrRange::new_empty(),
         );
 
         let mut context = Context::new(None, ContextType::Normal);
@@ -775,13 +804,17 @@ mod tests {
 
     #[test]
     fn for_range_continue_test() {
-        let block = Block::new(vec![Statement::Continue], Some(Exp::VarName(VarName("i"))));
+        let block = Block::new_no_input(
+            vec![Statement::Continue(StrRange::new_empty())],
+            Some(Exp::VarName(VarName::new_no_input("i"))),
+        );
         let for_range = ForRange::new_no_ctxid(
-            VarName("i"),
+            VarName::new_no_input("i"),
             Exp::Num(Numeral::from_i32(1)),
             Exp::Num(Numeral::from_i32(10)),
             None,
             block,
+            StrRange::new_empty(),
         );
 
         let mut context = Context::new(None, ContextType::Normal);

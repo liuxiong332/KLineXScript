@@ -6,7 +6,7 @@ use nom::{
 };
 
 use super::error::{PineError, PineErrorKind, PineResult};
-use super::input::Input;
+use super::input::{Input, StrRange};
 use super::name::{varname_ws, VarName};
 use super::stat_expr::{callable_expr, exp};
 use super::stat_expr_types::{Exp, FunctionCall};
@@ -14,8 +14,15 @@ use super::utils::eat_sep;
 
 #[derive(Debug, PartialEq)]
 struct FuncCallArg<'a> {
-    name: Option<VarName<'a>>,
-    arg: Exp<'a>,
+    pub name: Option<VarName<'a>>,
+    pub arg: Exp<'a>,
+    pub range: StrRange,
+}
+
+impl<'a> FuncCallArg<'a> {
+    pub fn new(name: Option<VarName<'a>>, arg: Exp<'a>, range: StrRange) -> FuncCallArg<'a> {
+        FuncCallArg { name, arg, range }
+    }
 }
 
 fn func_call_arg(input: Input) -> PineResult<FuncCallArg> {
@@ -23,12 +30,17 @@ fn func_call_arg(input: Input) -> PineResult<FuncCallArg> {
         FuncCallArg {
             name: Some(s.0),
             arg: s.2,
+            range: StrRange::new(s.0.range.start, s.2.range().end),
         }
     })(input)
     {
         Ok((input, result))
     } else {
-        let result = map(exp, |s| FuncCallArg { name: None, arg: s })(input)?;
+        let result = map(exp, |s| FuncCallArg {
+            name: None,
+            arg: s,
+            range: s.range(),
+        })(input)?;
         Ok(result)
     }
 }
@@ -74,13 +86,18 @@ fn func_call_args(input: Input) -> PineResult<(Vec<Exp>, Vec<(VarName, Exp)>)> {
 }
 
 pub fn func_call(input: Input) -> PineResult<FunctionCall> {
-    let (input, (method, (pos_args, dict_args))) = tuple((
+    let (input, (method, (_, (pos_args, dict_args), paren_r))) = tuple((
         callable_expr,
-        delimited(eat_sep(tag("(")), func_call_args, eat_sep(tag(")"))),
+        tuple((eat_sep(tag("(")), func_call_args, eat_sep(tag(")")))),
     ))(input)?;
     Ok((
         input,
-        FunctionCall::new_no_ctxid(method, pos_args, dict_args),
+        FunctionCall::new_no_ctxid(
+            method,
+            pos_args,
+            dict_args,
+            StrRange::new(method.range().start, paren_r.end),
+        ),
     ))
 }
 
@@ -91,6 +108,7 @@ pub fn func_call_ws(input: Input) -> PineResult<FunctionCall> {
 #[cfg(test)]
 mod tests {
     use super::super::input::Position;
+    use super::super::stat_expr_types::BoolNode;
     use super::*;
     use crate::ast::stat_expr_types::PrefixExp;
     use std::convert::TryInto;
@@ -118,24 +136,55 @@ mod tests {
             "a = true",
             func_call_arg,
             FuncCallArg {
-                name: Some(VarName("a")),
-                arg: Exp::Bool(true),
+                name: Some(VarName::new_no_input("a")),
+                arg: Exp::Bool(BoolNode::new(
+                    true,
+                    StrRange::from_start("true", Position::new(0, 4)),
+                )),
+                range: StrRange::new(Position::new(0, 0), Position::new(0, 4)),
             },
         );
         check_res(
             "funa(arg1, arg2, a = true)",
             func_call_ws,
             FunctionCall::new_no_ctxid(
-                Exp::VarName(VarName("funa")),
-                vec![Exp::VarName(VarName("arg1")), Exp::VarName(VarName("arg2"))],
-                vec![(VarName("a"), Exp::Bool(true))],
+                Exp::VarName(VarName::new(
+                    "funa",
+                    StrRange::from_start("funa", Position::new(0, 0)),
+                )),
+                vec![
+                    Exp::VarName(VarName::new(
+                        "arg1",
+                        StrRange::from_start("arg1", Position::new(0, 5)),
+                    )),
+                    Exp::VarName(VarName::new(
+                        "arg2",
+                        StrRange::from_start("arg2", Position::new(0, 11)),
+                    )),
+                ],
+                vec![(
+                    VarName::new("a", StrRange::from_start("a", Position::new(0, 17))),
+                    Exp::Bool(BoolNode::new(
+                        true,
+                        StrRange::from_start("true", Position::new(0, 21)),
+                    )),
+                )],
+                StrRange::from_start("funa(arg1, arg2, a = true)", Position::new(0, 0)),
             ),
         );
 
         check_res(
             "funa()",
             func_call_ws,
-            FunctionCall::new_no_ctxid(Exp::VarName(VarName("funa")), vec![], vec![]),
+            FunctionCall::new_no_ctxid(
+                Exp::VarName(VarName::new(
+                    "funa",
+                    StrRange::from_start("funa", Position::new(0, 0)),
+                )),
+                vec![],
+                vec![],
+                StrRange::from_start("funa()", Position::new(0, 0)),
+            ),
         );
 
         check_res(
@@ -143,10 +192,15 @@ mod tests {
             func_call_ws,
             FunctionCall::new_no_ctxid(
                 Exp::PrefixExp(Box::new(PrefixExp {
-                    var_chain: vec![VarName("funa"), VarName("funb")],
+                    var_chain: vec![
+                        VarName::new("funa", StrRange::from_start("funa", Position::new(0, 0))),
+                        VarName::new("funb", StrRange::from_start("funb", Position::new(0, 0))),
+                    ],
+                    range: StrRange::from_start("funa.funb", Position::new(0, 0)),
                 })),
                 vec![],
                 vec![],
+                StrRange::from_start("funa.funb()", Position::new(0, 0)),
             ),
         );
     }
@@ -157,13 +211,21 @@ mod tests {
             "funa(funb())",
             func_call_ws,
             FunctionCall::new_no_ctxid(
-                Exp::VarName(VarName("funa")),
+                Exp::VarName(VarName::new(
+                    "funa",
+                    StrRange::from_start("funa", Position::new(0, 0)),
+                )),
                 vec![Exp::FuncCall(Box::new(FunctionCall::new_no_ctxid(
-                    Exp::VarName(VarName("funb")),
+                    Exp::VarName(VarName::new(
+                        "funb",
+                        StrRange::from_start("funb", Position::new(0, 5)),
+                    )),
                     vec![],
                     vec![],
+                    StrRange::from_start("funb()", Position::new(0, 5)),
                 )))],
                 vec![],
+                StrRange::from_start("funa(funb())", Position::new(0, 0)),
             ),
         );
     }

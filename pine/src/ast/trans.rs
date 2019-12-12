@@ -1,5 +1,8 @@
-use super::op::{BinaryOp, UnaryOp};
-use super::stat_expr_types::{Exp, Exp2, FlatExp, OpOrExp2, UnOrBinOp};
+use super::input::StrRange;
+use super::op::{BinaryOp, BinaryOpNode, UnaryOp};
+use super::stat_expr_types::{
+    BinaryExp, Exp, Exp2, FlatExp, OpOrExp2, UnOpExp2, UnOrBinOp, UnaryExp,
+};
 // pine language precedence table(The belower, the higher):
 //   conditional ?:
 //   or
@@ -41,19 +44,20 @@ lazy_static! {
     };
 }
 
-fn tuple_to_flatvec<'a>((unops, e): (Vec<UnaryOp>, Exp2<'a>)) -> Vec<OpOrExp2<'a>> {
-    let mut v: Vec<OpOrExp2<'a>> = unops
+fn tuple_to_flatvec<'a>(unexp: UnOpExp2<'a>) -> Vec<OpOrExp2<'a>> {
+    let mut v: Vec<OpOrExp2<'a>> = unexp
+        .ops
         .into_iter()
         .map(UnOrBinOp::UnaryOp)
         .map(OpOrExp2::Op)
         .collect();
-    v.push(OpOrExp2::Exp2(e));
+    v.push(OpOrExp2::Exp2(unexp.exp));
     v
 }
 
 pub fn flatexp_from_components<'a>(
-    head: (Vec<UnaryOp>, Exp2<'a>),
-    binop_chain: Vec<(BinaryOp, (Vec<UnaryOp>, Exp2<'a>))>,
+    head: UnOpExp2<'a>,
+    binop_chain: Vec<(BinaryOpNode, UnOpExp2<'a>)>,
 ) -> FlatExp<'a> {
     let acc = tuple_to_flatvec(head);
     let res = binop_chain.into_iter().fold(acc, |mut a, (binop, t)| {
@@ -62,7 +66,10 @@ pub fn flatexp_from_components<'a>(
         a
     });
 
-    FlatExp(res)
+    FlatExp::new(
+        res,
+        StrRange::new(res[0].range().start, res.last().unwrap().range().end),
+    )
 }
 
 // Convenience type for implementing the below conversion function
@@ -104,7 +111,12 @@ impl<'a> From<FlatExp<'a>> for Exp<'a> {
         fn merge_nodes_binop<'a>(a: OpOrExp<'a>, o: OpOrExp<'a>, b: OpOrExp<'a>) -> OpOrExp<'a> {
             match (a, o, b) {
                 (OpOrExp::Exp(a), OpOrExp::Op(UnOrBinOp::BinaryOp(o)), OpOrExp::Exp(b)) => {
-                    let merged_exp = Exp::BinaryExp(o, Box::new(a), Box::new(b));
+                    let merged_exp = Exp::BinaryExp(Box::new(BinaryExp::new(
+                        o.op,
+                        a,
+                        b,
+                        StrRange::new(o.range.start, b.range().end),
+                    )));
                     OpOrExp::Exp(merged_exp)
                 }
                 _ => panic!("unexpected input variants in merge_nodes_binop"),
@@ -115,7 +127,11 @@ impl<'a> From<FlatExp<'a>> for Exp<'a> {
         fn merge_nodes_unop<'a>(o: OpOrExp, a: OpOrExp<'a>) -> OpOrExp<'a> {
             match (o, a) {
                 (OpOrExp::Op(UnOrBinOp::UnaryOp(o)), OpOrExp::Exp(a)) => {
-                    let merged_exp = Exp::UnaryExp(o, Box::new(a));
+                    let merged_exp = Exp::UnaryExp(Box::new(UnaryExp::new(
+                        o.op,
+                        a,
+                        StrRange::new(o.range.start, a.range().end),
+                    )));
                     OpOrExp::Exp(merged_exp)
                 }
                 _ => panic!("unexpected input variants in merge_nodes_unop"),
@@ -134,7 +150,7 @@ impl<'a> From<FlatExp<'a>> for Exp<'a> {
                     match oe {
                         &OpOrExp::Op(UnOrBinOp::BinaryOp(ref o)) => {
                             // Found something to join
-                            if binops.binary_search(o).is_ok() {
+                            if binops.binary_search(&o.op).is_ok() {
                                 assert!(i > 0);
                                 assert!(explist[i - 1].is_exp());
                                 assert!(i.checked_add(1).is_some());
@@ -186,7 +202,7 @@ impl<'a> From<FlatExp<'a>> for Exp<'a> {
                     match oe {
                         &OpOrExp::Op(UnOrBinOp::UnaryOp(ref o)) => {
                             // Found something to join
-                            if unops.binary_search(o).is_ok() {
+                            if unops.binary_search(&o.op).is_ok() {
                                 assert!(i.checked_add(1).is_some());
                                 let next = explist.get(i + 1).unwrap();
                                 assert!(next.is_exp());
@@ -212,13 +228,14 @@ impl<'a> From<FlatExp<'a>> for Exp<'a> {
             }
         }
 
-        let mut explist: Vec<OpOrExp> =
-            fe.0.into_iter()
-                .map(|oe| match oe {
-                    OpOrExp2::Op(o) => OpOrExp::Op(o),
-                    OpOrExp2::Exp2(e) => OpOrExp::Exp(Exp::from(e)),
-                })
-                .collect();
+        let mut explist: Vec<OpOrExp> = fe
+            .exps
+            .into_iter()
+            .map(|oe| match oe {
+                OpOrExp2::Op(o) => OpOrExp::Op(o),
+                OpOrExp2::Exp2(e) => OpOrExp::Exp(Exp::from(e)),
+            })
+            .collect();
 
         // The unary operation is the highest preceded.
         merge_all_unops(&mut explist, &*UNOPS);
@@ -238,7 +255,7 @@ impl<'a> From<FlatExp<'a>> for Exp<'a> {
 impl<'a> From<Exp2<'a>> for Exp<'a> {
     fn from(e: Exp2<'a>) -> Exp<'a> {
         match e {
-            Exp2::Na => Exp::Na,
+            Exp2::Na(node) => Exp::Na(node),
             Exp2::Bool(b) => Exp::Bool(b),
             Exp2::Num(n) => Exp::Num(n),
             Exp2::Str(s) => Exp::Str(s),
@@ -259,97 +276,146 @@ impl<'a> From<Exp2<'a>> for Exp<'a> {
 mod tests {
     use super::super::input::{Input, Position};
     use super::super::num::IntNode;
+    use super::super::op::*;
+    use super::super::stat_expr_types::*;
     use super::*;
     use crate::ast::num::Numeral;
 
     #[test]
     fn flatexp_from_components_test() {
+        let gen_unop_node = || {
+            UnaryOpNode::new(
+                UnaryOp::Plus,
+                StrRange::from_start("+", Position::new(0, 0)),
+            )
+        };
+
+        let gen_biop_node =
+            || BinaryOpNode::new(BinaryOp::Eq, StrRange::from_start("+", Position::new(0, 0)));
+
+        let gen_bool_node =
+            || BoolNode::new(true, StrRange::from_start("true", Position::new(0, 1)));
+
         assert_eq!(
-            tuple_to_flatvec((vec![UnaryOp::Plus], Exp2::Bool(true))),
+            tuple_to_flatvec(UnOpExp2::new(
+                vec![gen_unop_node()],
+                Exp2::Bool(gen_bool_node()),
+                StrRange::from_start("+true", Position::new(0, 0))
+            )),
             vec![
-                OpOrExp2::Op(UnOrBinOp::UnaryOp(UnaryOp::Plus)),
-                OpOrExp2::Exp2(Exp2::Bool(true))
+                OpOrExp2::Op(UnOrBinOp::UnaryOp(gen_unop_node())),
+                OpOrExp2::Exp2(Exp2::Bool(gen_bool_node()))
             ]
         );
 
         assert_eq!(
             flatexp_from_components(
-                (vec![UnaryOp::Plus], Exp2::Bool(true)),
-                vec![(BinaryOp::Eq, (vec![UnaryOp::Minus], Exp2::Bool(false)))]
+                UnOpExp2::new(
+                    vec![gen_unop_node()],
+                    Exp2::Bool(gen_bool_node()),
+                    StrRange::from_start("+true", Position::new(0, 0))
+                ),
+                vec![(
+                    gen_biop_node(),
+                    UnOpExp2::new(
+                        vec![gen_unop_node()],
+                        Exp2::Bool(gen_bool_node()),
+                        StrRange::from_start("+true=+true", Position::new(0, 0))
+                    )
+                )],
             ),
-            FlatExp(vec![
-                OpOrExp2::Op(UnOrBinOp::UnaryOp(UnaryOp::Plus)),
-                OpOrExp2::Exp2(Exp2::Bool(true)),
-                OpOrExp2::Op(UnOrBinOp::BinaryOp(BinaryOp::Eq)),
-                OpOrExp2::Op(UnOrBinOp::UnaryOp(UnaryOp::Minus)),
-                OpOrExp2::Exp2(Exp2::Bool(false)),
-            ])
+            FlatExp::new(
+                vec![
+                    OpOrExp2::Op(UnOrBinOp::UnaryOp(gen_unop_node())),
+                    OpOrExp2::Exp2(Exp2::Bool(gen_bool_node())),
+                    OpOrExp2::Op(UnOrBinOp::BinaryOp(gen_biop_node())),
+                    OpOrExp2::Op(UnOrBinOp::UnaryOp(gen_unop_node())),
+                    OpOrExp2::Exp2(Exp2::Bool(gen_bool_node())),
+                ],
+                StrRange::from_start("+true=+true", Position::new(0, 0))
+            )
         );
 
         fn int_oe2(int_lit: i32, lit_str: &'static str, pos: Position) -> OpOrExp2<'static> {
             OpOrExp2::Exp2(Exp2::Num(Numeral::Int(IntNode::new(
                 int_lit,
-                Input::new_with_start(lit_str, pos),
+                StrRange::from_start(lit_str, pos),
             ))))
         }
 
         fn int_exp(int_lit: i32, lit_str: &'static str, pos: Position) -> Exp<'static> {
             Exp::Num(Numeral::Int(IntNode::new(
                 int_lit,
-                Input::new_with_start(lit_str, pos),
+                StrRange::from_start(lit_str, pos),
             )))
         }
 
         fn unary_oe2(unary_op: UnaryOp) -> OpOrExp2<'static> {
-            OpOrExp2::Op(UnOrBinOp::UnaryOp(unary_op))
+            OpOrExp2::Op(UnOrBinOp::UnaryOp(UnaryOpNode::new(
+                unary_op,
+                StrRange::new_empty(),
+            )))
         }
 
         fn binary_oe2(binary_op: BinaryOp) -> OpOrExp2<'static> {
-            OpOrExp2::Op(UnOrBinOp::BinaryOp(binary_op))
+            OpOrExp2::Op(UnOrBinOp::BinaryOp(BinaryOpNode::new(
+                binary_op,
+                StrRange::new_empty(),
+            )))
         }
 
         // 1 + 2 * -2 - -4 / -1;
         assert_eq!(
-            Exp::from(FlatExp(vec![
-                int_oe2(1, "1", Position::new(0, 0)),
-                binary_oe2(BinaryOp::Plus),
-                int_oe2(2, "2", Position::new(0, 4)),
-                binary_oe2(BinaryOp::Mul),
-                unary_oe2(UnaryOp::Minus),
-                int_oe2(2, "2", Position::new(0, 8)),
-                binary_oe2(BinaryOp::Minus),
-                unary_oe2(UnaryOp::Minus),
-                int_oe2(4, "4", Position::new(0, 13)),
-                binary_oe2(BinaryOp::Div),
-                unary_oe2(UnaryOp::Minus),
-                int_oe2(1, "1", Position::new(0, 16)),
-            ])),
-            Exp::BinaryExp(
+            Exp::from(FlatExp::new(
+                vec![
+                    int_oe2(1, "1", Position::new(0, 0)),
+                    binary_oe2(BinaryOp::Plus),
+                    int_oe2(2, "2", Position::new(0, 2)),
+                    binary_oe2(BinaryOp::Mul),
+                    unary_oe2(UnaryOp::Minus),
+                    int_oe2(2, "2", Position::new(0, 5)),
+                    binary_oe2(BinaryOp::Minus),
+                    unary_oe2(UnaryOp::Minus),
+                    int_oe2(4, "4", Position::new(0, 8)),
+                    binary_oe2(BinaryOp::Div),
+                    unary_oe2(UnaryOp::Minus),
+                    int_oe2(1, "1", Position::new(0, 11)),
+                ],
+                StrRange::from_start("1+2*-2--4/-1", Position::new(0, 0))
+            )),
+            Exp::BinaryExp(Box::new(BinaryExp::new(
                 BinaryOp::Minus,
-                Box::new(Exp::BinaryExp(
+                Exp::BinaryExp(Box::new(BinaryExp::new(
                     BinaryOp::Plus,
-                    Box::new(int_exp(1, "1", Position::new(0, 0))),
-                    Box::new(Exp::BinaryExp(
+                    int_exp(1, "1", Position::new(0, 0)),
+                    Exp::BinaryExp(Box::new(BinaryExp::new(
                         BinaryOp::Mul,
-                        Box::new(int_exp(2, "2", Position::new(0, 4))),
-                        Box::new(Exp::UnaryExp(
+                        int_exp(2, "2", Position::new(0, 2)),
+                        Exp::UnaryExp(Box::new(UnaryExp::new(
                             UnaryOp::Minus,
-                            Box::new(int_exp(2, "2", Position::new(0, 8)))
-                        ))
-                    ))
-                )),
-                Box::new(Exp::BinaryExp(
+                            int_exp(2, "2", Position::new(0, 5)),
+                            StrRange::from_start("-2", Position::new(0, 4))
+                        ))),
+                        StrRange::from_start("2*-2", Position::new(0, 2))
+                    ))),
+                    StrRange::from_start("1+2*-2", Position::new(0, 0))
+                ))),
+                Exp::BinaryExp(Box::new(BinaryExp::new(
                     BinaryOp::Div,
-                    Box::new(Exp::UnaryExp(
+                    Exp::UnaryExp(Box::new(UnaryExp::new(
                         UnaryOp::Minus,
-                        Box::new(int_exp(4, "4", Position::new(0, 13)))
-                    )),
-                    Box::new(Exp::UnaryExp(
+                        int_exp(4, "4", Position::new(0, 8)),
+                        StrRange::from_start("-4", Position::new(0, 7))
+                    ))),
+                    Exp::UnaryExp(Box::new(UnaryExp::new(
                         UnaryOp::Minus,
-                        Box::new(int_exp(1, "1", Position::new(0, 16)))
-                    )),
-                ))
-            )
+                        int_exp(1, "1", Position::new(0, 11)),
+                        StrRange::from_start("-1", Position::new(0, 10))
+                    ))),
+                    StrRange::from_start("-4/-1", Position::new(0, 7))
+                ))),
+                StrRange::from_start("1+2*-2--4/-1", Position::new(0, 0))
+            ))),
         );
     }
 }

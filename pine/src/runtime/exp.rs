@@ -14,16 +14,16 @@ use std::fmt::Debug;
 impl<'a> Runner<'a> for Exp<'a> {
     fn run(&'a self, _context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
         match *self {
-            Exp::Na => Ok(PineRef::new_box(NA)),
-            Exp::Bool(b) => Ok(PineRef::new_box(b)),
+            Exp::Na(_) => Ok(PineRef::new_box(NA)),
+            Exp::Bool(b) => Ok(PineRef::new_box(b.value)),
             Exp::Num(Numeral::Float(f)) => Ok(PineRef::new_box(Some(f.value))),
             Exp::Num(Numeral::Int(n)) => Ok(PineRef::new_box(Some(n.value))),
-            Exp::Str(ref s) => Ok(PineRef::new_rc(String::from(s))),
+            Exp::Str(ref s) => Ok(PineRef::new_rc(String::from(s.value.clone()))),
             Exp::Color(s) => Ok(PineRef::new_box(Color(s.value))),
-            Exp::VarName(VarName(s)) => Ok(PineRef::new_box(PineVar(s))),
+            Exp::VarName(s) => Ok(PineRef::new_box(PineVar(s.value))),
             Exp::Tuple(ref tuple) => {
                 let mut col: Vec<PineRef<'a>> = vec![];
-                for exp in tuple.iter() {
+                for exp in tuple.exps.iter() {
                     col.push(exp.run(_context)?)
                 }
                 Ok(PineRef::new_box(Tuple(col)))
@@ -35,8 +35,8 @@ impl<'a> Runner<'a> for Exp<'a> {
             Exp::Condition(ref cond) => cond.run(_context),
             Exp::Ite(ref ite) => ite.run(_context),
             Exp::ForRange(ref for_range) => for_range.run(_context),
-            Exp::UnaryExp(ref op, ref exp) => unary_op_run(op, exp, _context),
-            Exp::BinaryExp(ref op, ref exp1, ref exp2) => binary_op_run(op, exp1, exp2, _context),
+            Exp::UnaryExp(ref node) => unary_op_run(&node.op, &node.exp, _context),
+            Exp::BinaryExp(ref node) => binary_op_run(&node.op, &node.exp1, &node.exp2, _context),
         }
     }
 }
@@ -44,17 +44,17 @@ impl<'a> Runner<'a> for Exp<'a> {
 impl<'a> RVRunner<'a> for Exp<'a> {
     fn rv_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
         match *self {
-            Exp::VarName(VarName(name)) => match context.move_var(name) {
+            Exp::VarName(name) => match context.move_var(name.value) {
                 None => Err(RuntimeErr::VarNotFound),
                 Some(s) => {
                     let ret = s.copy();
-                    context.update_var(name, s);
+                    context.update_var(name.value, s);
                     Ok(ret)
                 }
             },
             Exp::Tuple(ref tuple) => {
                 let mut col: Vec<PineRef<'a>> = vec![];
-                for exp in tuple.iter() {
+                for exp in tuple.exps.iter() {
                     col.push(exp.rv_run(context)?)
                 }
                 Ok(PineRef::new_box(Tuple(col)))
@@ -106,7 +106,7 @@ impl<'a> Runner<'a> for TypeCast<'a> {
 
 impl<'a> Runner<'a> for PrefixExp<'a> {
     fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
-        let varname = self.var_chain[0].0;
+        let varname = self.var_chain[0].value;
         let var = context.move_var(varname);
         if var.is_none() {
             return Err(RuntimeErr::NotSupportOperator);
@@ -119,12 +119,12 @@ impl<'a> Runner<'a> for PrefixExp<'a> {
             )));
         }
         let object = downcast_pf::<Object>(var_unwrap)?;
-        let mut subobj = object.get(self.var_chain[1].0)?;
+        let mut subobj = object.get(self.var_chain[1].value)?;
         for name in self.var_chain[2..].iter() {
             match subobj.get_type() {
                 (FirstType::Object, SecondType::Simple) => {
                     let obj = downcast_pf::<Object>(subobj).unwrap();
-                    subobj = obj.get(name.0)?;
+                    subobj = obj.get(name.value)?;
                 }
                 _ => return Err(RuntimeErr::NotSupportOperator),
             }
@@ -199,7 +199,10 @@ impl<'a> Runner<'a> for RefCall<'a> {
 mod tests {
     use super::*;
     use crate::ast::color::ColorNode;
+    use crate::ast::input::StrRange;
     use crate::ast::num::Numeral;
+    use crate::ast::stat_expr_types::{BoolNode, NaNode, TupleNode};
+    use crate::ast::string::StringNode;
     use crate::runtime::context::{Context, ContextType};
     use crate::types::PineClass;
     use std::fmt::Debug;
@@ -225,9 +228,11 @@ mod tests {
             }
         }
 
-        let exp = PrefixExp {
-            var_chain: vec![VarName("obja"), VarName("object"), VarName("int")],
-        };
+        let exp = PrefixExp::new_no_input(vec![
+            VarName::new_no_input("obja"),
+            VarName::new_no_input("object"),
+            VarName::new_no_input("int"),
+        ]);
 
         let mut context = Context::new(None, ContextType::Normal);
         context.create_var("obja", PineRef::new_rc(Object::new(Box::new(A))));
@@ -241,11 +246,11 @@ mod tests {
 
     #[test]
     fn condition_test() {
-        let cond_exp = Condition {
-            cond: Exp::Bool(true),
-            exp1: Exp::Num(Numeral::from_i32(1)),
-            exp2: Exp::Num(Numeral::from_i32(2)),
-        };
+        let cond_exp = Condition::new_no_input(
+            Exp::Bool(BoolNode::new(true, StrRange::new_empty())),
+            Exp::Num(Numeral::from_i32(1)),
+            Exp::Num(Numeral::from_i32(2)),
+        );
         let mut context = Context::new(None, ContextType::Normal);
         assert_eq!(
             downcast_pf::<Int>(cond_exp.run(&mut context).unwrap()),
@@ -255,11 +260,11 @@ mod tests {
 
     #[test]
     fn condition2_test() {
-        let cond_exp = Condition {
-            cond: Exp::VarName(VarName("cond")),
-            exp1: Exp::VarName(VarName("exp1")),
-            exp2: Exp::VarName(VarName("exp2")),
-        };
+        let cond_exp = Condition::new_no_input(
+            Exp::VarName(VarName::new_no_input("cond")),
+            Exp::VarName(VarName::new_no_input("exp1")),
+            Exp::VarName(VarName::new_no_input("exp2")),
+        );
         let mut context = Context::new(None, ContextType::Normal);
         context.create_var("cond", PineRef::new_box(true));
         context.create_var("exp1", PineRef::new_box(Some(1)));
@@ -273,10 +278,10 @@ mod tests {
 
     #[test]
     fn ref_call_test() {
-        let exp = RefCall {
-            name: Exp::VarName(VarName("hello")),
-            arg: Exp::Num(Numeral::from_i32(1)),
-        };
+        let exp = RefCall::new_no_input(
+            Exp::VarName(VarName::new_no_input("hello")),
+            Exp::Num(Numeral::from_i32(1)),
+        );
 
         let mut context = Context::new(None, ContextType::Normal);
         let mut series: Series<Int> = Series::from(Some(1));
@@ -292,7 +297,7 @@ mod tests {
 
     #[test]
     fn var_rv_test() {
-        let exp = Exp::VarName(VarName("hello"));
+        let exp = Exp::VarName(VarName::new_no_input("hello"));
         let mut context = Context::new(None, ContextType::Normal);
         context.create_var("hello", PineRef::new_box(Some(1)));
 
@@ -315,18 +320,27 @@ mod tests {
 
     #[test]
     fn simple_exp_test() {
-        simple_exp::<NA>(Exp::Na, NA);
-        simple_exp::<Bool>(Exp::Bool(false), false);
+        simple_exp::<NA>(Exp::Na(NaNode::new(StrRange::new_empty())), NA);
+        simple_exp::<Bool>(
+            Exp::Bool(BoolNode::new(false, StrRange::new_empty())),
+            false,
+        );
         simple_exp(Exp::Num(Numeral::from_f64(0f64)), Some(0f64));
         simple_exp(Exp::Num(Numeral::from_i32(1)), Some(1));
-        simple_exp(Exp::Str(String::from("hello")), String::from("hello"));
-        simple_exp(Exp::Color(ColorNode::from_str("#12")), Color("#12"));
-        simple_exp(Exp::VarName(VarName("name")), PineVar("name"));
         simple_exp(
-            Exp::TypeCast(Box::new(TypeCast {
-                data_type: DataType::Int,
-                exp: Exp::Num(Numeral::from_f64(1.2)),
-            })),
+            Exp::Str(StringNode::new(
+                String::from("hello"),
+                StrRange::new_empty(),
+            )),
+            String::from("hello"),
+        );
+        simple_exp(Exp::Color(ColorNode::from_str("#12")), Color("#12"));
+        simple_exp(Exp::VarName(VarName::new_no_input("name")), PineVar("name"));
+        simple_exp(
+            Exp::TypeCast(Box::new(TypeCast::new_no_input(
+                DataType::Int,
+                Exp::Num(Numeral::from_f64(1.2)),
+            ))),
             Some(1),
         );
     }
@@ -346,18 +360,27 @@ mod tests {
 
     #[test]
     fn simple_rv_exp_test() {
-        simple_rv_exp::<NA>(Exp::Na, NA);
-        simple_rv_exp::<Bool>(Exp::Bool(false), false);
+        simple_rv_exp::<NA>(Exp::Na(NaNode::new(StrRange::new_empty())), NA);
+        simple_rv_exp::<Bool>(
+            Exp::Bool(BoolNode::new(false, StrRange::new_empty())),
+            false,
+        );
         simple_rv_exp(Exp::Num(Numeral::from_f64(0f64)), Some(0f64));
         simple_rv_exp(Exp::Num(Numeral::from_i32(1)), Some(1));
-        simple_rv_exp(Exp::Str(String::from("hello")), String::from("hello"));
-        simple_rv_exp(Exp::Color(ColorNode::from_str("#12")), Color("#12"));
-        simple_rv_exp(Exp::VarName(VarName("name")), Some(1));
         simple_rv_exp(
-            Exp::TypeCast(Box::new(TypeCast {
-                data_type: DataType::Float,
-                exp: Exp::VarName(VarName("name")),
-            })),
+            Exp::Str(StringNode::new(
+                String::from("hello"),
+                StrRange::new_empty(),
+            )),
+            String::from("hello"),
+        );
+        simple_rv_exp(Exp::Color(ColorNode::from_str("#12")), Color("#12"));
+        simple_rv_exp(Exp::VarName(VarName::new_no_input("name")), Some(1));
+        simple_rv_exp(
+            Exp::TypeCast(Box::new(TypeCast::new_no_input(
+                DataType::Float,
+                Exp::VarName(VarName::new_no_input("name")),
+            ))),
             Some(1f64),
         );
     }
@@ -365,54 +388,57 @@ mod tests {
     #[test]
     fn type_cast_test() {
         simple_exp(
-            Exp::TypeCast(Box::new(TypeCast {
-                data_type: DataType::Int,
-                exp: Exp::Num(Numeral::from_f64(1.2)),
-            })),
+            Exp::TypeCast(Box::new(TypeCast::new_no_input(
+                DataType::Int,
+                Exp::Num(Numeral::from_f64(1.2)),
+            ))),
             Some(1),
         );
         simple_rv_exp(
-            Exp::TypeCast(Box::new(TypeCast {
-                data_type: DataType::Int,
-                exp: Exp::VarName(VarName("series")),
-            })),
+            Exp::TypeCast(Box::new(TypeCast::new_no_input(
+                DataType::Int,
+                Exp::VarName(VarName::new_no_input("series")),
+            ))),
             Series::from(Some(1)),
         );
 
         simple_exp(
-            Exp::TypeCast(Box::new(TypeCast {
-                data_type: DataType::Float,
-                exp: Exp::Num(Numeral::from_f64(1.2)),
-            })),
+            Exp::TypeCast(Box::new(TypeCast::new_no_input(
+                DataType::Float,
+                Exp::Num(Numeral::from_f64(1.2)),
+            ))),
             Some(1.2),
         );
         simple_rv_exp(
-            Exp::TypeCast(Box::new(TypeCast {
-                data_type: DataType::Float,
-                exp: Exp::VarName(VarName("series")),
-            })),
+            Exp::TypeCast(Box::new(TypeCast::new_no_input(
+                DataType::Float,
+                Exp::VarName(VarName::new_no_input("series")),
+            ))),
             Series::from(Some(1.0)),
         );
 
         simple_exp(
-            Exp::TypeCast(Box::new(TypeCast {
-                data_type: DataType::Bool,
-                exp: Exp::Num(Numeral::from_f64(1.2)),
-            })),
+            Exp::TypeCast(Box::new(TypeCast::new_no_input(
+                DataType::Bool,
+                Exp::Num(Numeral::from_f64(1.2)),
+            ))),
             true,
         );
         simple_rv_exp(
-            Exp::TypeCast(Box::new(TypeCast {
-                data_type: DataType::Bool,
-                exp: Exp::VarName(VarName("series")),
-            })),
+            Exp::TypeCast(Box::new(TypeCast::new_no_input(
+                DataType::Bool,
+                Exp::VarName(VarName::new_no_input("series")),
+            ))),
             Series::from(true),
         );
     }
 
     #[test]
     fn tuple_exp_test() {
-        let exp = Exp::Tuple(Box::new(vec![Exp::VarName(VarName("name"))]));
+        let exp = Exp::Tuple(Box::new(TupleNode::new(
+            vec![Exp::VarName(VarName::new_no_input("name"))],
+            StrRange::new_empty(),
+        )));
         let mut context = Context::new(None, ContextType::Normal);
 
         let tuple_res = downcast_pf::<Tuple>(exp.run(&mut context).unwrap()).unwrap();
@@ -427,7 +453,10 @@ mod tests {
 
     #[test]
     fn rv_tuple_exp_test() {
-        let exp = Exp::Tuple(Box::new(vec![Exp::VarName(VarName("name"))]));
+        let exp = Exp::Tuple(Box::new(TupleNode::new(
+            vec![Exp::VarName(VarName::new_no_input("name"))],
+            StrRange::new_empty(),
+        )));
         let mut context = Context::new(None, ContextType::Normal);
         context.create_var("name", PineRef::new_box(Some(1)));
 

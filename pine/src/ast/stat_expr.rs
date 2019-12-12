@@ -1,15 +1,7 @@
-use nom::{
-    branch::alt,
-    bytes::complete::tag,
-    combinator::{map, opt, value},
-    multi::{many0, separated_list},
-    sequence::{delimited, preceded, terminated, tuple},
-};
-
 use super::color::color_lit;
-use super::error::PineResult;
+use super::error::{PineError, PineErrorKind, PineResult};
 use super::func_call::{func_call, func_call_ws};
-use super::input::Input;
+use super::input::{Input, StrRange};
 use super::name::{varname, varname_ws, VarName};
 use super::num::{int_lit_ws, num_lit_ws};
 use super::op::*;
@@ -17,13 +9,27 @@ use super::stat_expr_types::*;
 use super::string::string_lit;
 use super::trans::flatexp_from_components;
 use super::utils::{eat_sep, eat_statement, statement_end, statement_indent};
+use nom::{
+    branch::alt,
+    bytes::complete::tag,
+    combinator::{map, opt, value},
+    multi::{many0, separated_list},
+    sequence::{delimited, preceded, terminated, tuple},
+    Err,
+};
 
 // exp2 contain the expressions that can apply the binary operators(+,-,*,/) and unary operators(+,-)
 pub fn exp2(input: Input) -> PineResult<Exp2> {
     alt((
-        value(Exp2::Na, eat_sep(tag("na"))),
-        value(Exp2::Bool(true), eat_sep(tag("true"))),
-        value(Exp2::Bool(false), eat_sep(tag("false"))),
+        map(eat_sep(tag("na")), |s| {
+            Exp2::Na(NaNode::new(StrRange::from_input(&s)))
+        }),
+        map(eat_sep(tag("true")), |s| {
+            Exp2::Bool(BoolNode::new(true, StrRange::from_input(&s)))
+        }),
+        map(eat_sep(tag("false")), |s| {
+            Exp2::Bool(BoolNode::new(false, StrRange::from_input(&s)))
+        }),
         map(num_lit_ws, Exp2::Num),
         map(string_lit, Exp2::Str),
         map(color_lit, Exp2::Color),
@@ -38,8 +44,14 @@ pub fn exp2(input: Input) -> PineResult<Exp2> {
     ))(input)
 }
 
-pub fn unopexp2(input: Input) -> PineResult<(Vec<UnaryOp>, Exp2)> {
-    tuple((many0(unary_op), exp2))(input)
+pub fn unopexp2(input: Input) -> PineResult<UnOpExp2> {
+    let (input, (ops, exp)) = tuple((many0(unary_op), exp2))(input)?;
+    let range = if ops.is_empty() {
+        exp.range()
+    } else {
+        StrRange::new(ops[0].range.start, exp.range().end)
+    };
+    Ok((input, UnOpExp2::new(ops, exp, range)))
 }
 
 pub fn flatexp(input: Input) -> PineResult<FlatExp> {
@@ -56,27 +68,49 @@ pub fn exp(input: Input) -> PineResult<Exp> {
 }
 
 // The left return tuple of expression `[a, b] = [1, 2]` that contain variable name between square brackets
-fn rettupledef(input: Input) -> PineResult<Vec<VarName>> {
-    eat_sep(delimited(
+fn rettupledef(input: Input) -> PineResult<LVTupleNode> {
+    let (input, (paren_l, names, paren_r)) = eat_sep(tuple((
         eat_sep(tag("[")),
         separated_list(eat_sep(tag(",")), varname_ws),
         eat_sep(tag("]")),
-    ))(input)
+    )))(input)?;
+    if names.is_empty() {
+        Err(Err::Error(PineError::from_pine_kind(
+            input,
+            PineErrorKind::LVTupleNoNames,
+        )))
+    } else {
+        Ok((
+            input,
+            LVTupleNode::new(names, StrRange::new(paren_l.start, paren_r.end)),
+        ))
+    }
 }
 
 // The right tuple of expression `[a, b] = [1, 2]` that contain expressions splited by dot between square brackets
-fn tupledef(input: Input) -> PineResult<Vec<Exp>> {
-    eat_sep(delimited(
+fn tupledef(input: Input) -> PineResult<TupleNode> {
+    let (input, (paren_l, items, paren_r)) = eat_sep(tuple((
         eat_sep(tag("[")),
         separated_list(eat_sep(tag(",")), exp),
         eat_sep(tag("]")),
-    ))(input)
+    )))(input)?;
+    Ok((
+        input,
+        TupleNode::new(items, StrRange::new(paren_l.start, paren_r.end)),
+    ))
 }
 
 fn type_cast(input: Input) -> PineResult<TypeCast> {
-    let (input, (data_type, _, e, _)) =
+    let (input, (data_type, _, e, end_tag)) =
         tuple((eat_sep(datatype), eat_sep(tag("(")), exp, eat_sep(tag(")"))))(input)?;
-    Ok((input, TypeCast { data_type, exp: e }))
+    Ok((
+        input,
+        TypeCast::new(
+            data_type.value,
+            e,
+            StrRange::new(data_type.range.start, end_tag.end),
+        ),
+    ))
 }
 
 pub fn callable_expr(input: Input) -> PineResult<Exp> {
@@ -88,11 +122,14 @@ pub fn callable_expr(input: Input) -> PineResult<Exp> {
 }
 
 fn ref_call(input: Input) -> PineResult<RefCall> {
-    let (input, (name, arg)) = tuple((
+    let (input, (name, (paren_l, arg, paren_r))) = tuple((
         eat_sep(callable_expr),
-        delimited(eat_sep(tag("[")), exp, eat_sep(tag("]"))),
+        tuple((eat_sep(tag("[")), exp, eat_sep(tag("]")))),
     ))(input)?;
-    Ok((input, RefCall { name, arg }))
+    Ok((
+        input,
+        RefCall::new(name, arg, StrRange::new(name.range().start, paren_r.end)),
+    ))
 }
 
 fn bracket_expr(input: Input) -> PineResult<Exp> {
@@ -107,19 +144,35 @@ fn condition(input: Input) -> PineResult<Condition> {
         eat_sep(tag(":")),
         exp,
     ))(input)?;
-    Ok((input, Condition { cond, exp1, exp2 }))
+    Ok((
+        input,
+        Condition::new(
+            cond,
+            exp1,
+            exp2,
+            StrRange::new(cond.range().start, exp2.range().end),
+        ),
+    ))
 }
 
 fn prefix_exp(input: Input) -> PineResult<PrefixExp> {
     let (input, (prefix, _, names)) =
         tuple((varname, tag("."), separated_list(tag("."), varname)))(input)?;
 
-    Ok((
-        input,
-        PrefixExp {
-            var_chain: [vec![prefix], names].concat(),
-        },
-    ))
+    if names.len() == 0 {
+        Err(Err::Error(PineError::from_pine_kind(
+            input,
+            PineErrorKind::PrefixNoNamesAfterDot,
+        )))
+    } else {
+        Ok((
+            input,
+            PrefixExp::new(
+                [vec![prefix], names].concat(),
+                StrRange::new(prefix.range.start, names.last().unwrap().range.end),
+            ),
+        ))
+    }
 }
 
 fn prefix_exp_ws(input: Input) -> PineResult<PrefixExp> {
@@ -128,7 +181,7 @@ fn prefix_exp_ws(input: Input) -> PineResult<PrefixExp> {
 
 fn if_then_else<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResult<IfThenElse> {
     move |input: Input<'a>| {
-        let (input, (_, cond, _, then_block, else_block)) = tuple((
+        let (input, (if_tag, cond, _, then_block, else_block)) = tuple((
             tag("if"),
             exp,
             statement_end,
@@ -142,10 +195,23 @@ fn if_then_else<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResult<IfThenEls
         if let Some((_, _, else_block)) = else_block {
             Ok((
                 input,
-                IfThenElse::new_no_ctxid(cond, then_block, Some(else_block)),
+                IfThenElse::new_no_ctxid(
+                    cond,
+                    then_block,
+                    Some(else_block),
+                    StrRange::new(if_tag.start, else_block.range.end),
+                ),
             ))
         } else {
-            Ok((input, IfThenElse::new_no_ctxid(cond, then_block, None)))
+            Ok((
+                input,
+                IfThenElse::new_no_ctxid(
+                    cond,
+                    then_block,
+                    None,
+                    StrRange::new(if_tag.start, then_block.range.end),
+                ),
+            ))
         }
     }
 }
@@ -156,7 +222,7 @@ fn if_then_else_with_indent<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResu
 
 fn for_range<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResult<ForRange> {
     move |input: Input<'a>| {
-        let (input, (_, var, _, start, _, end, by, _, do_blk)) = tuple((
+        let (input, (for_tag, var, _, start, _, end, by, _, do_blk)) = tuple((
             tag("for"),
             varname_ws,
             eat_sep(tag("=")),
@@ -170,10 +236,27 @@ fn for_range<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResult<ForRange> {
         if let Some((_, step)) = by {
             Ok((
                 input,
-                ForRange::new_no_ctxid(var, start, end, Some(step), do_blk),
+                ForRange::new_no_ctxid(
+                    var,
+                    start,
+                    end,
+                    Some(step),
+                    do_blk,
+                    StrRange::new(for_tag.start, do_blk.range.end),
+                ),
             ))
         } else {
-            Ok((input, ForRange::new_no_ctxid(var, start, end, None, do_blk)))
+            Ok((
+                input,
+                ForRange::new_no_ctxid(
+                    var,
+                    start,
+                    end,
+                    None,
+                    do_blk,
+                    StrRange::new(for_tag.start, do_blk.range.end),
+                ),
+            ))
         }
     }
 }
@@ -196,14 +279,35 @@ fn function_def_with_indent<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResu
                 map(terminated(exp, statement_end), |s| Block {
                     stmts: vec![],
                     ret_stmt: Some(s),
+                    range: s.range(),
                 }),
             )),
         ))(input)?;
-        Ok((input, FunctionDef { name, params, body }))
+        Ok((
+            input,
+            FunctionDef {
+                name,
+                params,
+                body,
+                range: StrRange::new(name.range.start, body.range.end),
+            },
+        ))
     }
 }
 
-fn datatype(input: Input) -> PineResult<DataType> {
+#[derive(Clone, Debug, PartialEq)]
+struct DataTypeNode {
+    pub value: DataType,
+    pub range: StrRange,
+}
+
+impl DataTypeNode {
+    pub fn new(value: DataType, range: StrRange) -> DataTypeNode {
+        DataTypeNode { value, range }
+    }
+}
+
+fn datatype(input: Input) -> PineResult<DataTypeNode> {
     let (input, label) = alt((
         tag("float"),
         tag("int"),
@@ -223,7 +327,10 @@ fn datatype(input: Input) -> PineResult<DataType> {
         "label" => DataType::Label,
         _ => unreachable!(),
     };
-    Ok((input, data_type))
+    Ok((
+        input,
+        DataTypeNode::new(data_type, StrRange::from_input(&label)),
+    ))
 }
 
 pub fn exp_with_indent<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResult<Exp> {
@@ -236,8 +343,11 @@ pub fn exp_with_indent<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResult<Ex
     }
 }
 
-fn assign_lv_names<'a>(input: Input<'a>) -> PineResult<Vec<VarName<'a>>> {
-    alt((map(varname_ws, |name| vec![name]), rettupledef))(input)
+fn assign_lv_names<'a>(input: Input<'a>) -> PineResult<LVTupleNode> {
+    alt((
+        map(varname_ws, |name| LVTupleNode::new(vec![name], name.range)),
+        rettupledef,
+    ))(input)
 }
 
 fn assign_with_indent<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResult<Assignment> {
@@ -252,19 +362,51 @@ fn assign_with_indent<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResult<Ass
                     eat_sep(tag("=")),
                     exp_parser(),
                 )),
-                |s| Assignment::new(s.2, s.4, true, Some(s.1)),
+                |s| {
+                    Assignment::new(
+                        s.2.names,
+                        s.4,
+                        true,
+                        Some(s.1.value),
+                        StrRange::new(s.1.range.start, s.4.range().end),
+                    )
+                },
             ),
             map(
                 tuple((tag("var"), assign_lv_names, eat_sep(tag("=")), exp_parser())),
-                |s| Assignment::new(s.1, s.3, true, None),
+                |s| {
+                    Assignment::new(
+                        s.1.names,
+                        s.3,
+                        true,
+                        None,
+                        StrRange::new(s.0.start, s.3.range().end),
+                    )
+                },
             ),
             map(
                 tuple((datatype, assign_lv_names, eat_sep(tag("=")), exp_parser())),
-                |s| Assignment::new(s.1, s.3, false, Some(s.0)),
+                |s| {
+                    Assignment::new(
+                        s.1.names,
+                        s.3,
+                        false,
+                        Some(s.0.value),
+                        StrRange::new(s.0.range.start, s.3.range().end),
+                    )
+                },
             ),
             map(
                 tuple((assign_lv_names, eat_sep(tag("=")), exp_parser())),
-                |s| Assignment::new(s.0, s.2, false, None),
+                |s| {
+                    Assignment::new(
+                        s.0.names,
+                        s.2,
+                        false,
+                        None,
+                        StrRange::new(s.0.range.start, s.2.range().end),
+                    )
+                },
             ),
         ))(input)
     }
@@ -274,7 +416,7 @@ fn var_assign_with_indent<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResult
     move |input: Input<'a>| {
         map(
             tuple((varname, eat_sep(tag(":=")), exp_with_indent(indent))),
-            |s| VarAssignment::new(s.0, s.2),
+            |s| VarAssignment::new(s.0, s.2, StrRange::new(s.0.range.start, s.2.range().end)),
         )(input)
     }
 }
@@ -295,7 +437,12 @@ fn block_with_indent<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResult<Bloc
         }
         if cur_input.len() > 0 {
             if let Ok((next_input, ret_stmt)) = eat_statement(gen_indent, exp)(cur_input) {
-                return Ok((next_input, Block::new(stmts, Some(ret_stmt))));
+                let range = if stmts.is_empty() {
+                    ret_stmt.range()
+                } else {
+                    StrRange::new(stmts[0].range().start, ret_stmt.range().end)
+                };
+                return Ok((next_input, Block::new(stmts, Some(ret_stmt), range)));
             }
         }
         // let block = match stmts.last() {
@@ -308,26 +455,41 @@ fn block_with_indent<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResult<Bloc
         //     }
         //     _ => Block::new(stmts, None),
         // };
-        Ok((cur_input, Block::new(stmts, None)))
+        if stmts.is_empty() {
+            Err(Err::Error(PineError::from_pine_kind(
+                input,
+                PineErrorKind::BlockNoStmts,
+            )))
+        } else {
+            Ok((
+                cur_input,
+                Block::new(
+                    stmts,
+                    None,
+                    StrRange::new(stmts[0].range().start, stmts.last().unwrap().range().end),
+                ),
+            ))
+        }
     }
 }
 
-fn statement_with_indent<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResult<Statement> {
-    let gen_indent = statement_indent(indent);
-    move |input: Input<'a>| {
+fn statement_with_indent<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResult<'a, Statement<'a>> {
+    move |input: Input<'a>| -> PineResult<'a, Statement<'a>> {
+        let gen_indent = statement_indent(indent);
         alt((
-            value(Statement::Break, eat_statement(&gen_indent, tag("break"))),
-            value(
-                Statement::Continue,
-                eat_statement(&gen_indent, tag("continue")),
-            ),
+            map(eat_statement(&gen_indent, tag("break")), |s| {
+                Statement::Break(StrRange::from_input(&s))
+            }),
+            map(eat_statement(&gen_indent, tag("continue")), |s| {
+                Statement::Continue(StrRange::from_input(&s))
+            }),
             map(if_then_else_with_indent(indent), |s| {
                 Statement::Ite(Box::new(s))
             }),
             map(for_range_with_indent(indent), |s| {
                 Statement::ForRange(Box::new(s))
             }),
-            value(Statement::None, statement_end),
+            map(statement_end, |s| Statement::None(StrRange::from_input(&s))),
             map(function_def_with_indent(indent), |s| {
                 Statement::FuncDef(Box::new(s))
             }),
@@ -389,19 +551,38 @@ mod tests {
         check_res(
             " [hello, good]",
             rettupledef,
-            vec![VarName("hello"), VarName("good")],
+            LVTupleNode::new(
+                vec![
+                    VarName::new_with_start("hello", Position::new(0, 2)),
+                    VarName::new_with_start("good", Position::new(0, 10)),
+                ],
+                StrRange::from_start(" [hello, good]", Position::new(0, 0)),
+            ),
         );
         check_res_input(
             " [hello, good,  my]hello",
             rettupledef,
-            vec![VarName("hello"), VarName("good"), VarName("my")],
+            LVTupleNode::new(
+                vec![
+                    VarName::new_with_start("hello", Position::new(0, 2)),
+                    VarName::new_with_start("good", Position::new(0, 10)),
+                    VarName::new_with_start("my", Position::new(0, 17)),
+                ],
+                StrRange::from_start(" [hello, good,  my]", Position::new(0, 0)),
+            ),
             "hello",
         );
 
         check_res(
             " [ hello  , good ]",
             rettupledef,
-            vec![VarName("hello"), VarName("good")],
+            LVTupleNode::new(
+                vec![
+                    VarName::new_with_start("hello", Position::new(0, 3)),
+                    VarName::new_with_start("good", Position::new(0, 12)),
+                ],
+                StrRange::from_start(" [ hello  , good ]", Position::new(0, 0)),
+            ),
         );
     }
 
@@ -410,7 +591,16 @@ mod tests {
         check_res(
             " [ hello , true ]",
             tupledef,
-            vec![Exp::VarName(VarName("hello")), Exp::Bool(true)],
+            TupleNode::new(
+                vec![
+                    Exp::VarName(VarName::new_with_start("hello", Position::new(0, 3))),
+                    Exp::Bool(BoolNode::new(
+                        true,
+                        StrRange::from_start("true", Position::new(0, 11)),
+                    )),
+                ],
+                StrRange::from_start(" [ hello , true ]", Position::new(0, 0)),
+            ),
         );
     }
 
@@ -419,10 +609,14 @@ mod tests {
         check_res(
             "hello[true]",
             ref_call,
-            RefCall {
-                name: Exp::VarName(VarName("hello")),
-                arg: Exp::Bool(true),
-            },
+            RefCall::new(
+                Exp::VarName(VarName::new_with_start("hello", Position::new(0, 0))),
+                Exp::Bool(BoolNode::new(
+                    true,
+                    StrRange::from_start("true", Position::new(0, 5)),
+                )),
+                StrRange::from_start("hello[true]", Position::new(0, 0)),
+            ),
         );
     }
 
@@ -431,11 +625,12 @@ mod tests {
         check_res(
             "a ? b : c",
             condition,
-            Condition {
-                cond: Exp::VarName(VarName("a")),
-                exp1: Exp::VarName(VarName("b")),
-                exp2: Exp::VarName(VarName("c")),
-            },
+            Condition::new(
+                Exp::VarName(VarName::new_with_start("a", Position::new(0, 0))),
+                Exp::VarName(VarName::new_with_start("b", Position::new(0, 4))),
+                Exp::VarName(VarName::new_with_start("c", Position::new(0, 8))),
+                StrRange::from_start("a ? b : c", Position::new(0, 0)),
+            ),
         );
     }
 
@@ -445,61 +640,78 @@ mod tests {
             "m = a ? b : c \n",
             statement_with_indent(0),
             Statement::Assignment(Box::new(Assignment::new(
-                vec![VarName("m")],
+                vec![VarName::new_with_start("m", Position::new(0, 0))],
                 Exp::Condition(Box::new(Condition {
-                    cond: Exp::VarName(VarName("a")),
-                    exp1: Exp::VarName(VarName("b")),
-                    exp2: Exp::VarName(VarName("c")),
+                    cond: Exp::VarName(VarName::new_with_start("a", Position::new(0, 4))),
+                    exp1: Exp::VarName(VarName::new_with_start("b", Position::new(0, 8))),
+                    exp2: Exp::VarName(VarName::new_with_start("c", Position::new(0, 12))),
+                    range: StrRange::from_start("a ? b : c", Position::new(0, 4)),
                 })),
                 false,
                 None,
+                StrRange::from_start("m = a ? b : c", Position::new(0, 0)),
             ))),
         );
         check_res(
             "m = na \n",
             statement_with_indent(0),
             Statement::Assignment(Box::new(Assignment::new(
-                vec![VarName("m")],
-                Exp::Na,
+                vec![VarName::new_with_start("m", Position::new(0, 0))],
+                Exp::Na(NaNode::new(StrRange::from_start("na", Position::new(0, 4)))),
                 false,
                 None,
+                StrRange::from_start("m = na", Position::new(0, 0)),
             ))),
         );
     }
 
     #[test]
     fn statement_test() {
-        check_res("    break \n", statement_with_indent(1), Statement::Break);
+        check_res(
+            "    break \n",
+            statement_with_indent(1),
+            Statement::Break(StrRange::from_start("break", Position::new(0, 4))),
+        );
 
         check_res(
             "a = b \n",
             statement_with_indent(0),
             Statement::Assignment(Box::new(Assignment::new(
-                vec![VarName("a")],
-                Exp::VarName(VarName("b")),
+                vec![VarName::new_with_start("a", Position::new(0, 0))],
+                Exp::VarName(VarName::new_with_start("b", Position::new(0, 4))),
                 false,
                 None,
+                StrRange::from_start("a = b", Position::new(0, 0)),
             ))),
         );
         check_res(
             "    a(arg1) \n",
             statement_with_indent(1),
             Statement::FuncCall(Box::new(FunctionCall::new_no_ctxid(
-                Exp::VarName(VarName("a")),
-                vec![Exp::VarName(VarName("arg1"))],
+                Exp::VarName(VarName::new_with_start("a", Position::new(0, 4))),
+                vec![Exp::VarName(VarName::new_with_start(
+                    "arg1",
+                    Position::new(0, 6),
+                ))],
                 vec![],
+                StrRange::from_start("a(arg1)", Position::new(0, 4)),
             ))),
         );
         check_res(
             "    a(arg1) => b \n",
             statement_with_indent(1),
             Statement::FuncDef(Box::new(FunctionDef {
-                name: VarName("a"),
-                params: vec![VarName("arg1")],
+                name: VarName::new_with_start("a", Position::new(0, 4)),
+                params: vec![VarName::new_with_start("arg1", Position::new(0, 6))],
                 body: Block {
                     stmts: vec![],
-                    ret_stmt: Some(Exp::VarName(VarName("b"))),
+                    ret_stmt: Some(Exp::VarName(VarName::new_with_start(
+                        "b",
+                        Position::new(0, 15),
+                    ))),
+                    range: StrRange::from_start("a(arg1) => b", Position::new(0, 4)),
                 },
+                range: StrRange::from_start("a(arg1) => b", Position::new(0, 4)),
             })),
         );
 
@@ -507,19 +719,27 @@ mod tests {
             "    a(arg1) => \n        b \n",
             statement_with_indent(1),
             Statement::FuncDef(Box::new(FunctionDef {
-                name: VarName("a"),
-                params: vec![VarName("arg1")],
+                name: VarName::new_with_start("a", Position::new(0, 4)),
+                params: vec![VarName::new_with_start("arg1", Position::new(0, 6))],
                 body: Block {
                     stmts: vec![],
-                    ret_stmt: Some(Exp::VarName(VarName("b"))),
+                    ret_stmt: Some(Exp::VarName(VarName::new_with_start(
+                        "b",
+                        Position::new(1, 8),
+                    ))),
+                    range: StrRange::from_start("b", Position::new(1, 8)),
                 },
+                range: StrRange::from_start("a(arg1) => \n        b", Position::new(0, 4)),
             })),
         );
 
         check_res_input(
             "    //helo world \na = close",
             statement_with_indent(1),
-            Statement::None,
+            Statement::None(StrRange::from_start(
+                "    //helo world \n",
+                Position::new(0, 0),
+            )),
             "a = close",
         );
     }
@@ -530,18 +750,20 @@ mod tests {
             "a = close // This is also a comment\n",
             statement_with_indent(0),
             Statement::Assignment(Box::new(Assignment::new(
-                vec![VarName("a")],
-                Exp::VarName(VarName("close")),
+                vec![VarName::new_with_start("a", Position::new(0, 0))],
+                Exp::VarName(VarName::new_with_start("close", Position::new(0, 4))),
                 false,
                 None,
+                StrRange::from_start("a = close", Position::new(0, 0)),
             ))),
         );
         check_res(
             "a := close\n",
             statement_with_indent(0),
             Statement::VarAssignment(Box::new(VarAssignment::new(
-                VarName("a"),
-                Exp::VarName(VarName("close")),
+                VarName::new_with_start("a", Position::new(0, 0)),
+                Exp::VarName(VarName::new_with_start("close", Position::new(0, 5))),
+                StrRange::from_start("a := close", Position::new(0, 0)),
             ))),
         );
     }
@@ -552,12 +774,18 @@ mod tests {
             "m = a.b.c \n",
             statement_with_indent(0),
             Statement::Assignment(Box::new(Assignment::new(
-                vec![VarName("m")],
+                vec![VarName::new_with_start("m", Position::new(0, 0))],
                 Exp::PrefixExp(Box::new(PrefixExp {
-                    var_chain: vec![VarName("a"), VarName("b"), VarName("c")],
+                    var_chain: vec![
+                        VarName::new_with_start("a", Position::new(0, 4)),
+                        VarName::new_with_start("b", Position::new(0, 6)),
+                        VarName::new_with_start("c", Position::new(0, 8)),
+                    ],
+                    range: StrRange::from_start("a.b.c", Position::new(0, 4)),
                 })),
                 false,
                 None,
+                StrRange::from_start("m = a.b.c", Position::new(0, 0)),
             ))),
         )
     }
@@ -568,8 +796,15 @@ mod tests {
             "    break \n    continue \n    true \nhello",
             block_with_indent(1),
             Block::new(
-                vec![Statement::Break, Statement::Continue],
-                Some(Exp::Bool(true)),
+                vec![
+                    Statement::Break(StrRange::from_start("break", Position::new(0, 4))),
+                    Statement::Continue(StrRange::from_start("continue", Position::new(1, 4))),
+                ],
+                Some(Exp::Bool(BoolNode::new(
+                    true,
+                    StrRange::from_start("true", Position::new(2, 4)),
+                ))),
+                StrRange::new(Position::new(0, 4), Position::new(2, 8)),
             ),
             "hello",
         );
@@ -581,9 +816,23 @@ mod tests {
             "if true \n    break\n    true  \n",
             if_then_else(0),
             IfThenElse::new_no_ctxid(
-                Exp::Bool(true),
-                Block::new(vec![Statement::Break], Some(Exp::Bool(true))),
+                Exp::Bool(BoolNode::new(
+                    true,
+                    StrRange::from_start("true", Position::new(0, 3)),
+                )),
+                Block::new(
+                    vec![Statement::Break(StrRange::from_start(
+                        "break",
+                        Position::new(1, 4),
+                    ))],
+                    Some(Exp::Bool(BoolNode::new(
+                        true,
+                        StrRange::from_start("true", Position::new(2, 4)),
+                    ))),
+                    StrRange::new(Position::new(1, 4), Position::new(2, 8)),
+                ),
                 None,
+                StrRange::new(Position::new(0, 0), Position::new(2, 8)),
             ),
         );
     }
@@ -594,17 +843,28 @@ mod tests {
             "for a = 1 to 2 \n    break\n    true  \n",
             for_range(0),
             ForRange::new_no_ctxid(
-                VarName("a"),
+                VarName::new_with_start("a", Position::new(0, 4)),
                 Exp::Num(Numeral::Int(IntNode::new(
                     1,
-                    Input::new_with_start("1", Position::new(0, 8)),
+                    StrRange::from_start("1", Position::new(0, 8)),
                 ))),
                 Exp::Num(Numeral::Int(IntNode::new(
                     2,
-                    Input::new_with_start("2", Position::new(0, 13)),
+                    StrRange::from_start("2", Position::new(0, 13)),
                 ))),
                 None,
-                Block::new(vec![Statement::Break], Some(Exp::Bool(true))),
+                Block::new(
+                    vec![Statement::Break(StrRange::from_start(
+                        "break",
+                        Position::new(1, 4),
+                    ))],
+                    Some(Exp::Bool(BoolNode::new(
+                        true,
+                        StrRange::from_start("true", Position::new(2, 4)),
+                    ))),
+                    StrRange::new(Position::new(1, 4), Position::new(2, 8)),
+                ),
+                StrRange::new(Position::new(0, 0), Position::new(2, 8)),
             ),
         );
     }

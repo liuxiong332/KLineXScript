@@ -1,4 +1,4 @@
-use super::input::{Input, Position};
+use super::input::{Input, Position, StrRange};
 use nom::{
     branch::alt,
     bytes::complete::tag,
@@ -14,48 +14,55 @@ use super::error::{PineError, PineErrorKind, PineResult};
 use super::utils::skip_ws;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct IntNode<'a> {
+pub struct IntNode {
     pub value: i32,
-    pub input: Input<'a>,
+    pub range: StrRange,
 }
 
-impl<'a> IntNode<'a> {
-    pub fn new(value: i32, input: Input<'a>) -> IntNode<'a> {
-        IntNode { value, input }
+impl IntNode {
+    pub fn new(value: i32, range: StrRange) -> IntNode {
+        IntNode { value, range }
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct FloatNode<'a> {
+pub struct FloatNode {
     pub value: f64,
-    pub input: Input<'a>,
+    pub range: StrRange,
 }
 
-impl<'a> FloatNode<'a> {
-    pub fn new(value: f64, input: Input<'a>) -> FloatNode<'a> {
-        FloatNode { value, input }
+impl FloatNode {
+    pub fn new(value: f64, range: StrRange) -> FloatNode {
+        FloatNode { value, range }
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Numeral<'a> {
-    Float(FloatNode<'a>),
-    Int(IntNode<'a>),
+pub enum Numeral {
+    Float(FloatNode),
+    Int(IntNode),
 }
 
-impl<'a> Numeral<'a> {
-    pub fn from_i32(val: i32) -> Numeral<'a> {
+impl Numeral {
+    pub fn from_i32(val: i32) -> Numeral {
         Numeral::Int(IntNode::new(
             val,
-            Input::new("", Position::new(0, 0), Position::max()),
+            StrRange::new(Position::new(0, 0), Position::max()),
         ))
     }
 
-    pub fn from_f64(val: f64) -> Numeral<'a> {
+    pub fn from_f64(val: f64) -> Numeral {
         Numeral::Float(FloatNode::new(
             val,
-            Input::new("", Position::new(0, 0), Position::max()),
+            StrRange::new(Position::new(0, 0), Position::max()),
         ))
+    }
+
+    pub fn range(&self) -> StrRange {
+        match self {
+            Numeral::Float(node) => node.range,
+            Numeral::Int(node) => node.range,
+        }
     }
 }
 
@@ -124,9 +131,15 @@ pub fn num_lit(input: Input) -> PineResult<Numeral> {
         opt(float_mag),
     )))(input)?;
     if let Ok(n) = i32::from_str_radix(out.src, 10) {
-        Ok((input, Numeral::Int(IntNode::new(n, out))))
+        Ok((
+            input,
+            Numeral::Int(IntNode::new(n, StrRange::from_input(&out))),
+        ))
     } else if let Ok(f) = f64::from_str(out.src) {
-        Ok((input, Numeral::Float(FloatNode::new(f, out))))
+        Ok((
+            input,
+            Numeral::Float(FloatNode::new(f, StrRange::from_input(&out))),
+        ))
     } else {
         Err(Err::Error(PineError::from_pine_kind(
             input,
@@ -158,7 +171,7 @@ mod tests {
                     Input::new("", Position::new(0, input_len), Position::max()),
                     Numeral::Float(FloatNode::new(
                         res,
-                        Input::new(s, Position::new(0, 0), Position::new(0, input_len))
+                        StrRange::new(Position::new(0, 0), Position::new(0, input_len))
                     ))
                 ))
             );

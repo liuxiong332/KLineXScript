@@ -52,11 +52,11 @@ impl<'a> Function<'a> {
 
         let mut all_args: HashMap<&'a str, PineRef<'a>> = HashMap::new();
         for (i, val) in pos_args.into_iter().enumerate() {
-            let name = self.def.params[i].0;
+            let name = self.def.params[i].value;
             all_args.insert(name, val);
         }
         for (name, val) in dict_args.into_iter() {
-            match self.def.params.iter().any(|&v| name == v.0) {
+            match self.def.params.iter().any(|&v| name == v.value) {
                 false => return Err(RuntimeErr::NotValidParam),
                 true => {
                     all_args.insert(name, val);
@@ -75,6 +75,7 @@ impl<'a> Function<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ast::input::StrRange;
     use crate::ast::name::VarName;
     use crate::ast::stat_expr_types::{Block, Exp};
     use crate::runtime::context::{Context, ContextType};
@@ -83,9 +84,10 @@ mod tests {
     #[test]
     fn func_test() {
         let func_def = FunctionDef {
-            name: VarName("hello"),
-            params: vec![VarName("arg1")],
-            body: Block::new(vec![], Some(Exp::VarName(VarName("arg1")))),
+            name: VarName::new_no_input("hello"),
+            params: vec![VarName::new_no_input("arg1")],
+            body: Block::new_no_input(vec![], Some(Exp::VarName(VarName::new_no_input("arg1")))),
+            range: StrRange::new_empty(),
         };
         let func = Function::new(&func_def);
         let mut ctx = Context::new(None, ContextType::FuncDefBlock);

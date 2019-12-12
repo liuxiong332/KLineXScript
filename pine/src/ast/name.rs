@@ -1,5 +1,5 @@
 use super::error::{PineError, PineErrorKind, PineResult};
-use super::input::Input;
+use super::input::{Input, Position, StrRange};
 use super::utils::skip_ws;
 use nom::{
     branch::alt,
@@ -12,18 +12,25 @@ use nom::{
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct VarName<'a> {
     pub value: &'a str,
-    pub input: Input<'a>,
+    pub range: StrRange,
 }
 
 impl<'a> VarName<'a> {
-    pub fn new(value: &'a str, input: Input<'a>) -> VarName<'a> {
-        VarName { value, input }
+    pub fn new(value: &'a str, range: StrRange) -> VarName<'a> {
+        VarName { value, range }
     }
 
     pub fn new_no_input(value: &'a str) -> VarName<'a> {
         VarName {
             value,
-            input: Input::new_empty(),
+            range: StrRange::new_empty(),
+        }
+    }
+
+    pub fn new_with_start(value: &'a str, start: Position) -> VarName<'a> {
+        VarName {
+            value,
+            range: StrRange::from_start(value, start),
         }
     }
 }
@@ -77,7 +84,7 @@ pub fn varname(input: Input) -> PineResult<VarName> {
             )));
         }
     }
-    Ok((input, VarName::new(name.src, name)))
+    Ok((input, VarName::new(name.src, StrRange::from_input(&name))))
 }
 
 pub fn varname_ws(input: Input) -> PineResult<VarName> {
@@ -124,7 +131,7 @@ mod tests {
                 varname_ws(test_input),
                 Ok((
                     Input::new("", Position::new(0, input_len), Position::max()),
-                    VarName::new(res, Input::new_with_start(res, Position::new(0, col)))
+                    VarName::new(res, StrRange::from_start(res, Position::new(0, col)))
                 ))
             );
         }

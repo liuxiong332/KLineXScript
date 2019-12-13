@@ -1,5 +1,6 @@
 extern crate pine;
 // use pine::error::PineError;
+use pine::ast::input::*;
 use pine::ast::name::*;
 use pine::ast::num::*;
 use pine::ast::op::*;
@@ -10,34 +11,53 @@ pub use utils::*;
 
 #[test]
 fn expr_test() {
-    let add_expr = Block::new(
-        vec![Statement::Assignment(Box::new(Assignment::new(
-            vec![VarName("a")],
-            Exp::BinaryExp(
-                BinaryOp::Plus,
-                Box::new(Exp::BinaryExp(
+    let add_expr = |range, open, high, low, close| {
+        Block::new(
+            vec![Statement::Assignment(Box::new(Assignment::new(
+                vec![VarName::new_with_start("a", Position::new(0, 0))],
+                Exp::BinaryExp(Box::new(BinaryExp::new(
                     BinaryOp::Plus,
-                    Box::new(Exp::BinaryExp(
+                    Exp::BinaryExp(Box::new(BinaryExp::new(
                         BinaryOp::Plus,
-                        Box::new(Exp::VarName(VarName("open"))),
-                        Box::new(Exp::VarName(VarName("high"))),
-                    )),
-                    Box::new(Exp::VarName(VarName("low"))),
-                )),
-                Box::new(Exp::VarName(VarName("close"))),
-            ),
-            false,
+                        Exp::BinaryExp(Box::new(BinaryExp::new(
+                            BinaryOp::Plus,
+                            Exp::VarName(open),
+                            Exp::VarName(high),
+                            StrRange::new(open.range.start, high.range.end),
+                        ))),
+                        Exp::VarName(low),
+                        StrRange::new(open.range.start, low.range.end),
+                    ))),
+                    Exp::VarName(close),
+                    StrRange::new(open.range.start, close.range.end),
+                ))),
+                false,
+                None,
+                range,
+            )))],
             None,
-        )))],
-        None,
-    );
+            range,
+        )
+    };
     assert_eq!(
         pine::parse_all("a = open + high + low + close\n"),
-        Ok(add_expr.clone())
+        Ok(add_expr(
+            StrRange::new(Position::new(0, 0), Position::new(0, 29)),
+            VarName::new_with_start("open", Position::new(0, 4)),
+            VarName::new_with_start("high", Position::new(0, 11)),
+            VarName::new_with_start("low", Position::new(0, 18)),
+            VarName::new_with_start("close", Position::new(0, 24)),
+        ))
     );
     assert_eq!(
         pine::parse_all("a = open + \n high + \n low + \n  close\n"),
-        Ok(add_expr.clone())
+        Ok(add_expr(
+            StrRange::new(Position::new(0, 0), Position::new(3, 7)),
+            VarName::new_with_start("open", Position::new(0, 4)),
+            VarName::new_with_start("high", Position::new(1, 1)),
+            VarName::new_with_start("low", Position::new(2, 1)),
+            VarName::new_with_start("close", Position::new(3, 2)),
+        ))
     );
 }
 
@@ -53,19 +73,47 @@ fn func_call_test() {
         pine::parse_all(FUNC_CALL_STAT),
         Ok(Block::new(
             vec![gen_func_call_stmt(
-                "plot",
+                VarName::new_with_start("plot", Position::new(0, 0)),
                 vec![gen_func_call(
-                    "correlation",
-                    vec![gen_name("src"), gen_name("ovr"), gen_name("length")],
-                    vec![]
+                    VarName::new_with_start("correlation", Position::new(0, 5)),
+                    vec![
+                        gen_name(VarName::new_with_start("src", Position::new(0, 17))),
+                        gen_name(VarName::new_with_start("ovr", Position::new(0, 22))),
+                        gen_name(VarName::new_with_start("length", Position::new(0, 27)))
+                    ],
+                    vec![],
+                    StrRange::new(Position::new(0, 5), Position::new(0, 34))
                 )],
                 vec![
-                    (VarName("color"), gen_prefix(vec!["color", "purple"]),),
-                    (VarName("style"), gen_prefix(vec!["plot", "style_area"]),),
-                    (VarName("transp"), gen_int(40))
-                ]
+                    (
+                        VarName::new_with_start("color", Position::new(1, 0)),
+                        gen_prefix(
+                            vec![
+                                VarName::new_with_start("color", Position::new(1, 6)),
+                                VarName::new_with_start("purple", Position::new(1, 12))
+                            ],
+                            StrRange::from_start("color.purple", Position::new(1, 6))
+                        ),
+                    ),
+                    (
+                        VarName::new_with_start("style", Position::new(2, 0)),
+                        gen_prefix(
+                            vec![
+                                VarName::new_with_start("plot", Position::new(2, 6)),
+                                VarName::new_with_start("style_area", Position::new(2, 11))
+                            ],
+                            StrRange::from_start("plot.style_area", Position::new(2, 6))
+                        ),
+                    ),
+                    (
+                        VarName::new_with_start("transp", Position::new(3, 0)),
+                        gen_int(40, StrRange::from_start("40", Position::new(3, 7)))
+                    )
+                ],
+                StrRange::new(Position::new(0, 0), Position::new(3, 10))
             ),],
-            None
+            None,
+            StrRange::new(Position::new(0, 0), Position::new(3, 10))
         ))
     );
 }
@@ -81,29 +129,41 @@ fn func_def_test() {
         pine::parse_all(FUNC_DEF),
         Ok(Block::new(
             vec![
-                Statement::None,
+                Statement::None(StrRange::from_start("\n", Position::new(0, 0))),
                 Statement::FuncDef(Box::new(FunctionDef {
-                    name: VarName("updown"),
-                    params: vec![VarName("s")],
+                    name: VarName::new_with_start("updown", Position::new(1, 0)),
+                    params: vec![VarName::new_with_start("s", Position::new(1, 7))],
                     body: Block::new(
                         vec![Statement::Assignment(Box::new(Assignment::new(
-                            vec![VarName("isEqual")],
-                            Exp::BinaryExp(
+                            vec![VarName::new_with_start("isEqual", Position::new(2, 4))],
+                            Exp::BinaryExp(Box::new(BinaryExp::new(
                                 BinaryOp::Eq,
-                                Box::new(Exp::VarName(VarName("s")),),
-                                Box::new(Exp::RefCall(Box::new(RefCall {
-                                    name: Exp::VarName(VarName("s")),
-                                    arg: Exp::Num(Numeral::from_i32(1))
-                                })))
-                            ),
+                                Exp::VarName(VarName::new_with_start("s", Position::new(2, 14))),
+                                Exp::RefCall(Box::new(RefCall {
+                                    name: Exp::VarName(VarName::new_with_start(
+                                        "s",
+                                        Position::new(2, 19)
+                                    )),
+                                    arg: Exp::Num(Numeral::Int(IntNode::new(
+                                        1,
+                                        StrRange::from_start("1", Position::new(2, 21))
+                                    ))),
+                                    range: StrRange::from_start("s[1]", Position::new(2, 19))
+                                })),
+                                StrRange::from_start("s == s[1]", Position::new(2, 14))
+                            ))),
                             false,
-                            None
+                            None,
+                            StrRange::new(Position::new(2, 4), Position::new(2, 23))
                         )))],
-                        None
-                    )
+                        None,
+                        StrRange::new(Position::new(2, 4), Position::new(2, 23))
+                    ),
+                    range: StrRange::new(Position::new(1, 0), Position::new(2, 23))
                 }))
             ],
-            None
+            None,
+            StrRange::new(Position::new(0, 0), Position::new(2, 23))
         ))
     );
 }
@@ -125,21 +185,47 @@ updown(s) =>
 
 #[test]
 fn cond_expr_test() {
-    let gen_nz_call = || gen_func_call("nz", vec![gen_ref_call("ud", gen_int(1))], vec![]);
+    let gen_nz_call = |pos| {
+        gen_func_call(
+            VarName::new_with_start("nz", pos),
+            vec![gen_ref_call(
+                VarName::new_with_start("ud", pos.translate(0, 3)),
+                gen_int(1, StrRange::from_start("1", pos.translate(0, 6))),
+                StrRange::from_start("ud[1]", pos.translate(0, 3)),
+            )],
+            vec![],
+            StrRange::from_start("nz(ud[1])", pos),
+        )
+    };
 
     assert_eq!(
         pine::parse_all("m = nz(ud[1])\n"),
-        Ok(Block::new(vec![gen_assign("m", gen_nz_call())], None))
+        Ok(Block::new(
+            vec![gen_assign(
+                VarName::new_with_start("m", Position::new(0, 0)),
+                gen_nz_call(Position::new(0, 4)),
+                StrRange::from_start("m = nz(ud[1])", Position::new(0, 0))
+            )],
+            None,
+            StrRange::from_start("m = nz(ud[1])", Position::new(0, 0))
+        ))
     );
 
     assert_eq!(
         pine::parse_all("m = (nz(ud[1]) >= 0)\n"),
         Ok(Block::new(
             vec![gen_assign(
-                "m",
-                gen_binop(BinaryOp::Geq, gen_nz_call(), gen_int(0))
+                VarName::new_with_start("m", Position::new(0, 0)),
+                gen_binop(
+                    BinaryOp::Geq,
+                    gen_nz_call(Position::new(0, 5)),
+                    gen_int(0, StrRange::from_start("0", Position::new(0, 18))),
+                    StrRange::from_start("nz(ud[1]) >= 0", Position::new(0, 5))
+                ),
+                StrRange::from_start("m = (nz(ud[1]) >= 0", Position::new(0, 0))
             )],
-            None
+            None,
+            StrRange::from_start("m = (nz(ud[1]) >= 0", Position::new(0, 0))
         ))
     );
 
@@ -147,57 +233,148 @@ fn cond_expr_test() {
         pine::parse_all("m = (1 >= 0 ? 1 : 2)\n"),
         Ok(Block::new(
             vec![gen_assign(
-                "m",
+                VarName::new_with_start("m", Position::new(0, 0)),
                 gen_condition(
-                    gen_binop(BinaryOp::Geq, gen_int(1), gen_int(0)),
-                    gen_int(1),
-                    gen_int(2)
-                )
+                    gen_binop(
+                        BinaryOp::Geq,
+                        gen_int(1, StrRange::from_start("1", Position::new(0, 5))),
+                        gen_int(0, StrRange::from_start("0", Position::new(0, 10))),
+                        StrRange::from_start("1 >= 0", Position::new(0, 5))
+                    ),
+                    gen_int(1, StrRange::from_start("1", Position::new(0, 14))),
+                    gen_int(2, StrRange::from_start("2", Position::new(0, 18))),
+                    StrRange::from_start("1 >= 0 ? 1 : 2", Position::new(0, 5))
+                ),
+                StrRange::from_start("m = (1 >= 0 ? 1 : 2", Position::new(0, 0))
             )],
-            None
+            None,
+            StrRange::from_start("m = (1 >= 0 ? 1 : 2", Position::new(0, 0))
         ))
     );
+
     assert_eq!(
         pine::parse_all(FUNC_DEF2),
         Ok(Block::new(
             vec![gen_func_def(
-                "updown",
-                vec!["s"],
+                VarName::new_with_start("updown", Position::new(0, 0)),
+                vec![VarName::new_with_start("s", Position::new(0, 7))],
                 Block::new(
                     vec![
                         gen_assign(
-                            "isEqual",
-                            gen_binop(BinaryOp::Eq, gen_name("s"), gen_ref_call("s", gen_int(1)))
+                            VarName::new_with_start("isEqual", Position::new(1, 4)),
+                            gen_binop(
+                                BinaryOp::Eq,
+                                gen_name(VarName::new_with_start("s", Position::new(1, 14))),
+                                gen_ref_call(
+                                    VarName::new_with_start("s", Position::new(1, 19)),
+                                    gen_int(1, StrRange::from_start("1", Position::new(1, 21))),
+                                    StrRange::from_start("s[1]", Position::new(1, 19))
+                                ),
+                                StrRange::from_start("s == s[1]", Position::new(1, 14))
+                            ),
+                            StrRange::from_start("isEqual = s == s[1]", Position::new(1, 4))
                         ),
                         gen_assign(
-                            "isGrowing",
-                            gen_binop(BinaryOp::Gt, gen_name("s"), gen_ref_call("s", gen_int(1)))
+                            VarName::new_with_start("isGrowing", Position::new(2, 4)),
+                            gen_binop(
+                                BinaryOp::Gt,
+                                gen_name(VarName::new_with_start("s", Position::new(2, 16))),
+                                gen_ref_call(
+                                    VarName::new_with_start("s", Position::new(2, 20)),
+                                    gen_int(1, StrRange::from_start("1", Position::new(2, 22))),
+                                    StrRange::from_start("s[1]", Position::new(2, 20))
+                                ),
+                                StrRange::from_start("s > s[1]", Position::new(2, 16))
+                            ),
+                            StrRange::from_start("isGrowing = s > s[1]", Position::new(2, 4))
                         ),
                         gen_assign(
-                            "ud",
+                            VarName::new_with_start("ud", Position::new(3, 4)),
                             gen_condition(
-                                gen_name("isEqual"),
-                                gen_int(0),
+                                gen_name(VarName::new_with_start("isEqual", Position::new(3, 9))),
+                                gen_int(0, StrRange::from_start("0", Position::new(4, 11))),
                                 gen_condition(
-                                    gen_name("isGrowing"),
+                                    gen_name(VarName::new_with_start(
+                                        "isGrowing",
+                                        Position::new(5, 11)
+                                    )),
                                     gen_condition(
-                                        gen_binop(BinaryOp::Leq, gen_nz_call(), gen_int(0)),
-                                        gen_int(1),
-                                        gen_binop(BinaryOp::Plus, gen_nz_call(), gen_int(1))
+                                        gen_binop(
+                                            BinaryOp::Leq,
+                                            gen_nz_call(Position::new(6, 16)),
+                                            gen_int(
+                                                0,
+                                                StrRange::from_start("0", Position::new(6, 29))
+                                            ),
+                                            StrRange::from_start(
+                                                "nz(ud[1]) <= 0",
+                                                Position::new(6, 16)
+                                            )
+                                        ),
+                                        gen_int(1, StrRange::from_start("1", Position::new(7, 21))),
+                                        gen_binop(
+                                            BinaryOp::Plus,
+                                            gen_nz_call(Position::new(8, 19)),
+                                            gen_int(
+                                                1,
+                                                StrRange::from_start("1", Position::new(8, 29))
+                                            ),
+                                            StrRange::from_start(
+                                                "nz(ud[1])+1",
+                                                Position::new(8, 19)
+                                            )
+                                        ),
+                                        StrRange::new(Position::new(6, 16), Position::new(8, 30))
                                     ),
                                     gen_condition(
-                                        gen_binop(BinaryOp::Geq, gen_nz_call(), gen_int(0)),
-                                        gen_unop(UnaryOp::Minus, gen_int(1)),
-                                        gen_binop(BinaryOp::Minus, gen_nz_call(), gen_int(1))
-                                    )
-                                )
-                            )
+                                        gen_binop(
+                                            BinaryOp::Geq,
+                                            gen_nz_call(Position::new(9, 16)),
+                                            gen_int(
+                                                0,
+                                                StrRange::from_start("0", Position::new(9, 29))
+                                            ),
+                                            StrRange::from_start(
+                                                "nz(ud[1]) >= 0",
+                                                Position::new(9, 16)
+                                            )
+                                        ),
+                                        gen_unop(
+                                            UnaryOp::Minus,
+                                            gen_int(
+                                                1,
+                                                StrRange::from_start("1", Position::new(10, 20))
+                                            ),
+                                            StrRange::from_start("-1", Position::new(10, 19))
+                                        ),
+                                        gen_binop(
+                                            BinaryOp::Minus,
+                                            gen_nz_call(Position::new(11, 19)),
+                                            gen_int(
+                                                1,
+                                                StrRange::from_start("1", Position::new(11, 29))
+                                            ),
+                                            StrRange::from_start(
+                                                "nz(ud[1])-1",
+                                                Position::new(11, 19)
+                                            )
+                                        ),
+                                        StrRange::new(Position::new(9, 16), Position::new(11, 30))
+                                    ),
+                                    StrRange::new(Position::new(5, 11), Position::new(11, 30))
+                                ),
+                                StrRange::new(Position::new(3, 9), Position::new(11, 30))
+                            ),
+                            StrRange::new(Position::new(3, 4), Position::new(11, 30))
                         ),
                     ],
-                    None
-                )
+                    None,
+                    StrRange::new(Position::new(1, 4), Position::new(11, 30))
+                ),
+                StrRange::new(Position::new(0, 0), Position::new(11, 30))
             )],
-            None
+            None,
+            StrRange::new(Position::new(0, 0), Position::new(11, 30))
         ))
     );
 }
@@ -215,17 +392,39 @@ fn expr_comment_test() {
         Ok(Block::new(
             vec![
                 gen_assign(
-                    "c",
+                    VarName::new_with_start("c", Position::new(0, 0)),
                     gen_condition(
-                        gen_binop(BinaryOp::Gt, gen_name("open"), gen_name("close")),
-                        gen_prefix(vec!["color", "red"]),
+                        gen_binop(
+                            BinaryOp::Gt,
+                            gen_name(VarName::new_with_start("open", Position::new(0, 4))),
+                            gen_name(VarName::new_with_start("close", Position::new(0, 11))),
+                            StrRange::from_start("open > close", Position::new(0, 4))
+                        ),
+                        gen_prefix(
+                            vec![
+                                VarName::new_with_start("color", Position::new(0, 19)),
+                                VarName::new_with_start("red", Position::new(0, 25))
+                            ],
+                            StrRange::from_start("color.red", Position::new(0, 19))
+                        ),
                         gen_condition(
                             gen_binop(
                                 BinaryOp::Gt,
-                                gen_name("high"),
-                                gen_ref_call("high", gen_int(1))
+                                gen_name(VarName::new_with_start("high", Position::new(1, 0))),
+                                gen_ref_call(
+                                    VarName::new_with_start("high", Position::new(1, 7)),
+                                    gen_int(1, StrRange::from_start("1", Position::new(1, 12))),
+                                    StrRange::from_start("high[1]", Position::new(1, 7))
+                                ),
+                                StrRange::from_start("high > high[1]", Position::new(1, 0))
                             ),
-                            gen_prefix(vec!["color", "lime"]),
+                            gen_prefix(
+                                vec![
+                                    VarName::new_with_start("color", Position::new(1, 17)),
+                                    VarName::new_with_start("lime", Position::new(1, 23))
+                                ],
+                                StrRange::from_start("color.lime", Position::new(1, 17))
+                            ),
                             gen_condition(
                                 gen_binop(
                                     BinaryOp::Lt,
@@ -234,13 +433,22 @@ fn expr_comment_test() {
                                 ),
                                 gen_prefix(vec!["color", "blue"]),
                                 gen_prefix(vec!["color", "black"])
-                            )
-                        )
-                    )
+                            ),
+                            StrRange::new(Position::new(1, 0), Position::new(2, 39))
+                        ),
+                        StrRange::new(Position::new(0, 3), Position::new(2, 39))
+                    ),
+                    StrRange::new(Position::new(0, 0), Position::new(2, 39))
                 ),
-                gen_func_call_stmt("bgcolor", vec![gen_name("c")], vec![])
+                gen_func_call_stmt(
+                    VarName::new_with_start("bgcolor", Position::new(3, 0)),
+                    vec![gen_name(VarName::new_with_start("c", Position::new(3, 8)))],
+                    vec![],
+                    StrRange::from_start("bgcolor(c)", Position::new(3, 0))
+                )
             ],
-            None
+            None,
+            StrRange::new(Position::new(0, 0), Position::new(3, 10))
         ))
     );
 }

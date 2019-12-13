@@ -118,7 +118,7 @@ mod tests {
                 Input::new("ding", Position::new(0, input_len - 4), Position::max()),
                 StringNode::new(
                     String::from("hello ' world"),
-                    StrRange::new(Position::new(0, 0), Position::new(0, 16))
+                    StrRange::new(Position::new(0, 1), Position::new(0, 15))
                 )
             ))
         );
@@ -131,7 +131,7 @@ mod tests {
                 Input::new("ding", Position::new(0, input_len - 4), Position::max()),
                 StringNode::new(
                     String::from("hello ' world"),
-                    StrRange::new(Position::new(0, 0), Position::new(0, 18))
+                    StrRange::new(Position::new(0, 1), Position::new(0, 14))
                 )
             ))
         );

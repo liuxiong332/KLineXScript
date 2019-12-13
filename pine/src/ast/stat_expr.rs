@@ -102,7 +102,7 @@ fn tupledef(input: Input) -> PineResult<TupleNode> {
 
 fn type_cast(input: Input) -> PineResult<TypeCast> {
     let (input, (data_type, _, e, end_tag)) =
-        tuple((eat_sep(datatype), eat_sep(tag("(")), exp, eat_sep(tag(")"))))(input)?;
+        eat_sep(tuple((datatype, eat_sep(tag("(")), exp, eat_sep(tag(")")))))(input)?;
     Ok((
         input,
         TypeCast::new(
@@ -122,14 +122,13 @@ pub fn callable_expr(input: Input) -> PineResult<Exp> {
 }
 
 fn ref_call(input: Input) -> PineResult<RefCall> {
-    let (input, (name, (paren_l, arg, paren_r))) = tuple((
+    let (input, (name, (_, arg, paren_r))) = tuple((
         eat_sep(callable_expr),
         tuple((eat_sep(tag("[")), exp, eat_sep(tag("]")))),
     ))(input)?;
-    Ok((
-        input,
-        RefCall::new(name, arg, StrRange::new(name.range().start, paren_r.end)),
-    ))
+
+    let range = StrRange::new(name.range().start, paren_r.end);
+    Ok((input, RefCall::new(name, arg, range)))
 }
 
 fn bracket_expr(input: Input) -> PineResult<Exp> {
@@ -144,15 +143,9 @@ fn condition(input: Input) -> PineResult<Condition> {
         eat_sep(tag(":")),
         exp,
     ))(input)?;
-    Ok((
-        input,
-        Condition::new(
-            cond,
-            exp1,
-            exp2,
-            StrRange::new(cond.range().start, exp2.range().end),
-        ),
-    ))
+
+    let range = StrRange::new(cond.range().start, exp2.range().end);
+    Ok((input, Condition::new(cond, exp1, exp2, range)))
 }
 
 fn prefix_exp(input: Input) -> PineResult<PrefixExp> {
@@ -165,13 +158,8 @@ fn prefix_exp(input: Input) -> PineResult<PrefixExp> {
             PineErrorKind::PrefixNoNamesAfterDot,
         )))
     } else {
-        Ok((
-            input,
-            PrefixExp::new(
-                [vec![prefix], names].concat(),
-                StrRange::new(prefix.range.start, names.last().unwrap().range.end),
-            ),
-        ))
+        let range = StrRange::new(prefix.range.start, names.last().unwrap().range.end);
+        Ok((input, PrefixExp::new([vec![prefix], names].concat(), range)))
     }
 }
 
@@ -193,24 +181,16 @@ fn if_then_else<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResult<IfThenEls
             ))),
         ))(input)?;
         if let Some((_, _, else_block)) = else_block {
+            let range = StrRange::new(if_tag.start, else_block.range.end);
             Ok((
                 input,
-                IfThenElse::new_no_ctxid(
-                    cond,
-                    then_block,
-                    Some(else_block),
-                    StrRange::new(if_tag.start, else_block.range.end),
-                ),
+                IfThenElse::new_no_ctxid(cond, then_block, Some(else_block), range),
             ))
         } else {
+            let range = StrRange::new(if_tag.start, then_block.range.end);
             Ok((
                 input,
-                IfThenElse::new_no_ctxid(
-                    cond,
-                    then_block,
-                    None,
-                    StrRange::new(if_tag.start, then_block.range.end),
-                ),
+                IfThenElse::new_no_ctxid(cond, then_block, None, range),
             ))
         }
     }
@@ -233,29 +213,17 @@ fn for_range<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResult<ForRange> {
             statement_end,
             block_with_indent(indent + 1),
         ))(input)?;
+
+        let range = StrRange::new(for_tag.start, do_blk.range.end);
         if let Some((_, step)) = by {
             Ok((
                 input,
-                ForRange::new_no_ctxid(
-                    var,
-                    start,
-                    end,
-                    Some(step),
-                    do_blk,
-                    StrRange::new(for_tag.start, do_blk.range.end),
-                ),
+                ForRange::new_no_ctxid(var, start, end, Some(step), do_blk, range),
             ))
         } else {
             Ok((
                 input,
-                ForRange::new_no_ctxid(
-                    var,
-                    start,
-                    end,
-                    None,
-                    do_blk,
-                    StrRange::new(for_tag.start, do_blk.range.end),
-                ),
+                ForRange::new_no_ctxid(var, start, end, None, do_blk, range),
             ))
         }
     }
@@ -278,18 +246,20 @@ fn function_def_with_indent<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResu
                 preceded(statement_end, block_with_indent(indent + 1)),
                 map(terminated(exp, statement_end), |s| Block {
                     stmts: vec![],
-                    ret_stmt: Some(s),
                     range: s.range(),
+                    ret_stmt: Some(s),
                 }),
             )),
         ))(input)?;
+
+        let range = StrRange::new(name.range.start, body.range.end);
         Ok((
             input,
             FunctionDef {
                 name,
                 params,
                 body,
-                range: StrRange::new(name.range.start, body.range.end),
+                range,
             },
         ))
     }
@@ -363,49 +333,29 @@ fn assign_with_indent<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResult<Ass
                     exp_parser(),
                 )),
                 |s| {
-                    Assignment::new(
-                        s.2.names,
-                        s.4,
-                        true,
-                        Some(s.1.value),
-                        StrRange::new(s.1.range.start, s.4.range().end),
-                    )
+                    let range = StrRange::new(s.0.start, s.4.range().end);
+                    Assignment::new(s.2.names, s.4, true, Some(s.1.value), range)
                 },
             ),
             map(
                 tuple((tag("var"), assign_lv_names, eat_sep(tag("=")), exp_parser())),
                 |s| {
-                    Assignment::new(
-                        s.1.names,
-                        s.3,
-                        true,
-                        None,
-                        StrRange::new(s.0.start, s.3.range().end),
-                    )
+                    let range = StrRange::new(s.0.start, s.3.range().end);
+                    Assignment::new(s.1.names, s.3, true, None, range)
                 },
             ),
             map(
                 tuple((datatype, assign_lv_names, eat_sep(tag("=")), exp_parser())),
                 |s| {
-                    Assignment::new(
-                        s.1.names,
-                        s.3,
-                        false,
-                        Some(s.0.value),
-                        StrRange::new(s.0.range.start, s.3.range().end),
-                    )
+                    let range = StrRange::new(s.0.range.start, s.3.range().end);
+                    Assignment::new(s.1.names, s.3, false, Some(s.0.value), range)
                 },
             ),
             map(
                 tuple((assign_lv_names, eat_sep(tag("=")), exp_parser())),
                 |s| {
-                    Assignment::new(
-                        s.0.names,
-                        s.2,
-                        false,
-                        None,
-                        StrRange::new(s.0.range.start, s.2.range().end),
-                    )
+                    let range = StrRange::new(s.0.range.start, s.2.range().end);
+                    Assignment::new(s.0.names, s.2, false, None, range)
                 },
             ),
         ))(input)
@@ -416,7 +366,10 @@ fn var_assign_with_indent<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResult
     move |input: Input<'a>| {
         map(
             tuple((varname, eat_sep(tag(":=")), exp_with_indent(indent))),
-            |s| VarAssignment::new(s.0, s.2, StrRange::new(s.0.range.start, s.2.range().end)),
+            |s| {
+                let range = StrRange::new(s.0.range.start, s.2.range().end);
+                VarAssignment::new(s.0, s.2, range)
+            },
         )(input)
     }
 }
@@ -461,21 +414,15 @@ fn block_with_indent<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResult<Bloc
                 PineErrorKind::BlockNoStmts,
             )))
         } else {
-            Ok((
-                cur_input,
-                Block::new(
-                    stmts,
-                    None,
-                    StrRange::new(stmts[0].range().start, stmts.last().unwrap().range().end),
-                ),
-            ))
+            let range = StrRange::new(stmts[0].range().start, stmts.last().unwrap().range().end);
+            Ok((cur_input, Block::new(stmts, None, range)))
         }
     }
 }
 
 fn statement_with_indent<'a>(indent: usize) -> impl Fn(Input<'a>) -> PineResult<'a, Statement<'a>> {
+    let gen_indent = statement_indent(indent);
     move |input: Input<'a>| -> PineResult<'a, Statement<'a>> {
-        let gen_indent = statement_indent(indent);
         alt((
             map(eat_statement(&gen_indent, tag("break")), |s| {
                 Statement::Break(StrRange::from_input(&s))
@@ -554,9 +501,9 @@ mod tests {
             LVTupleNode::new(
                 vec![
                     VarName::new_with_start("hello", Position::new(0, 2)),
-                    VarName::new_with_start("good", Position::new(0, 10)),
+                    VarName::new_with_start("good", Position::new(0, 9)),
                 ],
-                StrRange::from_start(" [hello, good]", Position::new(0, 0)),
+                StrRange::from_start("[hello, good]", Position::new(0, 1)),
             ),
         );
         check_res_input(
@@ -565,10 +512,10 @@ mod tests {
             LVTupleNode::new(
                 vec![
                     VarName::new_with_start("hello", Position::new(0, 2)),
-                    VarName::new_with_start("good", Position::new(0, 10)),
-                    VarName::new_with_start("my", Position::new(0, 17)),
+                    VarName::new_with_start("good", Position::new(0, 9)),
+                    VarName::new_with_start("my", Position::new(0, 16)),
                 ],
-                StrRange::from_start(" [hello, good,  my]", Position::new(0, 0)),
+                StrRange::from_start("[hello, good,  my]", Position::new(0, 1)),
             ),
             "hello",
         );
@@ -581,7 +528,7 @@ mod tests {
                     VarName::new_with_start("hello", Position::new(0, 3)),
                     VarName::new_with_start("good", Position::new(0, 12)),
                 ],
-                StrRange::from_start(" [ hello  , good ]", Position::new(0, 0)),
+                StrRange::from_start("[ hello  , good ]", Position::new(0, 1)),
             ),
         );
     }
@@ -599,7 +546,7 @@ mod tests {
                         StrRange::from_start("true", Position::new(0, 11)),
                     )),
                 ],
-                StrRange::from_start(" [ hello , true ]", Position::new(0, 0)),
+                StrRange::from_start("[ hello , true ]", Position::new(0, 1)),
             ),
         );
     }
@@ -613,7 +560,7 @@ mod tests {
                 Exp::VarName(VarName::new_with_start("hello", Position::new(0, 0))),
                 Exp::Bool(BoolNode::new(
                     true,
-                    StrRange::from_start("true", Position::new(0, 5)),
+                    StrRange::from_start("true", Position::new(0, 6)),
                 )),
                 StrRange::from_start("hello[true]", Position::new(0, 0)),
             ),
@@ -709,7 +656,7 @@ mod tests {
                         "b",
                         Position::new(0, 15),
                     ))),
-                    range: StrRange::from_start("a(arg1) => b", Position::new(0, 4)),
+                    range: StrRange::from_start("b", Position::new(0, 15)),
                 },
                 range: StrRange::from_start("a(arg1) => b", Position::new(0, 4)),
             })),

@@ -13,7 +13,7 @@ use std::fmt::Debug;
 
 impl<'a> Runner<'a> for Exp<'a> {
     fn run(&'a self, _context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
-        match *self {
+        match self {
             Exp::Na(_) => Ok(PineRef::new_box(NA)),
             Exp::Bool(b) => Ok(PineRef::new_box(b.value)),
             Exp::Num(Numeral::Float(f)) => Ok(PineRef::new_box(Some(f.value))),

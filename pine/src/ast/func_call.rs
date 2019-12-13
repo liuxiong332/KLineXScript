@@ -29,8 +29,8 @@ fn func_call_arg(input: Input) -> PineResult<FuncCallArg> {
     if let Ok((input, result)) = map(tuple((varname_ws, eat_sep(tag("=")), exp)), |s| {
         FuncCallArg {
             name: Some(s.0),
-            arg: s.2,
             range: StrRange::new(s.0.range.start, s.2.range().end),
+            arg: s.2,
         }
     })(input)
     {
@@ -38,8 +38,8 @@ fn func_call_arg(input: Input) -> PineResult<FuncCallArg> {
     } else {
         let result = map(exp, |s| FuncCallArg {
             name: None,
-            arg: s,
             range: s.range(),
+            arg: s,
         })(input)?;
         Ok(result)
     }
@@ -90,13 +90,14 @@ pub fn func_call(input: Input) -> PineResult<FunctionCall> {
         callable_expr,
         tuple((eat_sep(tag("(")), func_call_args, eat_sep(tag(")")))),
     ))(input)?;
+    let start = method.range().start;
     Ok((
         input,
         FunctionCall::new_no_ctxid(
             method,
             pos_args,
             dict_args,
-            StrRange::new(method.range().start, paren_r.end),
+            StrRange::new(start, paren_r.end),
         ),
     ))
 }
@@ -136,12 +137,12 @@ mod tests {
             "a = true",
             func_call_arg,
             FuncCallArg {
-                name: Some(VarName::new_no_input("a")),
+                name: Some(VarName::new_with_start("a", Position::new(0, 0))),
                 arg: Exp::Bool(BoolNode::new(
                     true,
                     StrRange::from_start("true", Position::new(0, 4)),
                 )),
-                range: StrRange::new(Position::new(0, 0), Position::new(0, 4)),
+                range: StrRange::new(Position::new(0, 0), Position::new(0, 8)),
             },
         );
         check_res(
@@ -194,7 +195,7 @@ mod tests {
                 Exp::PrefixExp(Box::new(PrefixExp {
                     var_chain: vec![
                         VarName::new("funa", StrRange::from_start("funa", Position::new(0, 0))),
-                        VarName::new("funb", StrRange::from_start("funb", Position::new(0, 0))),
+                        VarName::new("funb", StrRange::from_start("funb", Position::new(0, 5))),
                     ],
                     range: StrRange::from_start("funa.funb", Position::new(0, 0)),
                 })),

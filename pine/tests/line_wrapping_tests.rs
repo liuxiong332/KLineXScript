@@ -428,15 +428,36 @@ fn expr_comment_test() {
                             gen_condition(
                                 gen_binop(
                                     BinaryOp::Lt,
-                                    gen_name("low"),
-                                    gen_ref_call("low", gen_int(1))
+                                    gen_name(VarName::new_with_start("low", Position::new(2, 0))),
+                                    gen_ref_call(
+                                        VarName::new_with_start("low", Position::new(2, 6)),
+                                        gen_int(1, StrRange::from_start("1", Position::new(2, 10))),
+                                        StrRange::from_start("low[1]", Position::new(2, 6))
+                                    ),
+                                    StrRange::from_start("low < low[1]", Position::new(2, 0))
                                 ),
-                                gen_prefix(vec!["color", "blue"]),
-                                gen_prefix(vec!["color", "black"])
+                                gen_prefix(
+                                    vec![
+                                        VarName::new_with_start("color", Position::new(2, 15)),
+                                        VarName::new_with_start("blue", Position::new(2, 21))
+                                    ],
+                                    StrRange::from_start("color.blue", Position::new(2, 15))
+                                ),
+                                gen_prefix(
+                                    vec![
+                                        VarName::new_with_start("color", Position::new(2, 28)),
+                                        VarName::new_with_start("black", Position::new(2, 34))
+                                    ],
+                                    StrRange::from_start("color.black", Position::new(2, 28))
+                                ),
+                                StrRange::from_start(
+                                    "low < low[1] ? color.blue : color.black",
+                                    Position::new(2, 0)
+                                )
                             ),
                             StrRange::new(Position::new(1, 0), Position::new(2, 39))
                         ),
-                        StrRange::new(Position::new(0, 3), Position::new(2, 39))
+                        StrRange::new(Position::new(0, 4), Position::new(2, 39))
                     ),
                     StrRange::new(Position::new(0, 0), Position::new(2, 39))
                 ),

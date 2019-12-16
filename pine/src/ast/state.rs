@@ -1,17 +1,28 @@
 use super::error::PineErrorKind;
+use super::input::StrRange;
+// use std::marker::PhantomData;
+use std::cell::RefCell;
 
-#[derive(Debug, PartialEq)]
-pub struct PineInputError<'a> {
-    input: Input<'a>,
+#[derive(Debug, PartialEq, Clone)]
+pub struct PineInputError {
     code: PineErrorKind,
+    range: StrRange,
 }
 
-pub struct AstState<'a> {
-    pub errors: Vec<PineInputError<'a>>,
+pub struct AstState {
+    errors: RefCell<Vec<PineInputError>>,
+    // phantom: PhantomData<&'a str>,
 }
 
-impl<'a> AstState<'a> {
-    pub fn new() -> AstState<'a> {
-        AstState { errors: vec![] }
+impl AstState {
+    pub fn new() -> AstState {
+        AstState {
+            errors: RefCell::new(vec![]),
+            // phantom: PhantomData,
+        }
+    }
+
+    pub fn catch(&self, err: PineInputError) {
+        self.errors.borrow_mut().push(err);
     }
 }

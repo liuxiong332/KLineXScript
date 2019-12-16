@@ -14,10 +14,11 @@ use ast::error::{PineError, PineErrorKind};
 use ast::input::{Input, Position};
 use ast::stat_expr::block;
 use ast::stat_expr_types::Block;
+use ast::state::AstState;
 
 pub fn parse_all(in_str: &str) -> Result<Block, PineError<Input>> {
     let input = Input::new(in_str, Position::new(0, 0), Position::max());
-    match block(input.clone()) {
+    match block(input.clone(), &AstState::new()) {
         Ok((input, parsed)) => {
             if input.len() != 0 {
                 Err(PineError::from_pine_kind(

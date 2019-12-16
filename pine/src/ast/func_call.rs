@@ -10,6 +10,7 @@ use super::input::{Input, StrRange};
 use super::name::{varname_ws, VarName};
 use super::stat_expr::{callable_expr, exp};
 use super::stat_expr_types::{Exp, FunctionCall};
+use super::state::AstState;
 use super::utils::eat_sep;
 
 #[derive(Debug, PartialEq)]
@@ -25,28 +26,35 @@ impl<'a> FuncCallArg<'a> {
     }
 }
 
-fn func_call_arg(input: Input) -> PineResult<FuncCallArg> {
-    if let Ok((input, result)) = map(tuple((varname_ws, eat_sep(tag("=")), exp)), |s| {
-        FuncCallArg {
+fn func_call_arg<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, FuncCallArg<'a>> {
+    if let Ok((input, result)) = map(
+        tuple((varname_ws, eat_sep(tag("=")), |s| exp(s, state))),
+        |s| FuncCallArg {
             name: Some(s.0),
             range: StrRange::new(s.0.range.start, s.2.range().end),
             arg: s.2,
-        }
-    })(input)
+        },
+    )(input)
     {
         Ok((input, result))
     } else {
-        let result = map(exp, |s| FuncCallArg {
-            name: None,
-            range: s.range(),
-            arg: s,
-        })(input)?;
+        let result = map(
+            |s| exp(s, state),
+            |s| FuncCallArg {
+                name: None,
+                range: s.range(),
+                arg: s,
+            },
+        )(input)?;
         Ok(result)
     }
 }
 
-fn func_call_args(input: Input) -> PineResult<(Vec<Exp>, Vec<(VarName, Exp)>)> {
-    let (input, arg1) = opt(func_call_arg)(input)?;
+fn func_call_args<'a>(
+    input: Input<'a>,
+    state: &AstState,
+) -> PineResult<'a, (Vec<Exp<'a>>, Vec<(VarName<'a>, Exp<'a>)>)> {
+    let (input, arg1) = opt(|s| func_call_arg(s, state))(input)?;
     if arg1.is_none() {
         return Ok((input, (vec![], vec![])));
     }
@@ -62,7 +70,9 @@ fn func_call_args(input: Input) -> PineResult<(Vec<Exp>, Vec<(VarName, Exp)>)> {
 
     let mut cur_input = input;
 
-    while let Ok((next_input, arg)) = preceded(eat_sep(tag(",")), func_call_arg)(cur_input) {
+    while let Ok((next_input, arg)) =
+        preceded(eat_sep(tag(",")), |s| func_call_arg(s, state))(cur_input)
+    {
         match arg.name {
             Some(name) => {
                 is_dict_args = true;
@@ -85,10 +95,14 @@ fn func_call_args(input: Input) -> PineResult<(Vec<Exp>, Vec<(VarName, Exp)>)> {
     Ok((cur_input, (pos_args, dict_args)))
 }
 
-pub fn func_call(input: Input) -> PineResult<FunctionCall> {
+pub fn func_call<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, FunctionCall<'a>> {
     let (input, (method, (_, (pos_args, dict_args), paren_r))) = tuple((
-        callable_expr,
-        tuple((eat_sep(tag("(")), func_call_args, eat_sep(tag(")")))),
+        |s| callable_expr(s, state),
+        tuple((
+            eat_sep(tag("(")),
+            |s| func_call_args(s, state),
+            eat_sep(tag(")")),
+        )),
     ))(input)?;
     let start = method.range().start;
     Ok((
@@ -102,8 +116,8 @@ pub fn func_call(input: Input) -> PineResult<FunctionCall> {
     ))
 }
 
-pub fn func_call_ws(input: Input) -> PineResult<FunctionCall> {
-    eat_sep(func_call)(input)
+pub fn func_call_ws<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, FunctionCall<'a>> {
+    eat_sep(|s| func_call(s, state))(input)
 }
 
 #[cfg(test)]
@@ -117,13 +131,13 @@ mod tests {
 
     fn check_res<'a, F, O>(s: &'a str, handler: F, res: O)
     where
-        F: Fn(Input<'a>) -> PineResult<O>,
+        F: Fn(Input<'a>, &AstState) -> PineResult<'a, O>,
         O: Debug + PartialEq,
     {
         let test_input = Input::new_with_str(s);
         let input_len: u32 = test_input.len().try_into().unwrap();
         assert_eq!(
-            handler(test_input),
+            handler(test_input, &AstState::new()),
             Ok((
                 Input::new("", Position::new(0, input_len), Position::max()),
                 res

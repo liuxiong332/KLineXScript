@@ -16,10 +16,14 @@ pub enum PineErrorKind {
     InvalidFuncCallArgs(&'static str),
     IncorrectIndent,
     CannotInferType,
-    NotEndOfInput,         // expect end of input, but not
+    NotEndOfInput,                                    // expect end of input, but not
     PrefixNoNamesAfterDot, // Prefix expressions don't contain names after dot
     LVTupleNoNames,        // left value tuple don't contain names
     BlockNoStmts,          // Block don't contain statements.
+    VarNotDeclare,         // The variable not declare before used
+    InvalidTypeCast { origin: String, cast: String }, // This type cast is not valid
+    VarNotCallable,
+    FuncCallSignatureNotMatch,
 }
 
 #[derive(Debug, PartialEq)]

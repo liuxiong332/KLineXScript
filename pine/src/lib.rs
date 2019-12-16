@@ -8,6 +8,7 @@ extern crate lazy_static;
 pub mod ast;
 pub mod libs;
 pub mod runtime;
+pub mod syntax;
 pub mod types;
 
 use ast::error::{PineError, PineErrorKind};

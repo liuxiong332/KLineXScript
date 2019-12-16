@@ -371,8 +371,6 @@ pub enum DataType {
     Bool,
     Color,
     String,
-    Line,
-    Label,
 }
 
 #[derive(Clone, Debug, PartialEq)]

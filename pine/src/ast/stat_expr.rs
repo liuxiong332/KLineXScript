@@ -310,8 +310,8 @@ fn datatype<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, DataTypeNo
         tag("bool"),
         tag("color"),
         tag("string"),
-        tag("line"),
-        tag("label"),
+        // tag("line"),
+        // tag("label"),
     ))(input)?;
     let data_type = match label.src {
         "float" => DataType::Float,
@@ -319,8 +319,8 @@ fn datatype<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, DataTypeNo
         "bool" => DataType::Bool,
         "color" => DataType::Color,
         "string" => DataType::String,
-        "line" => DataType::Line,
-        "label" => DataType::Label,
+        // "line" => DataType::Line,
+        // "label" => DataType::Label,
         _ => unreachable!(),
     };
     Ok((

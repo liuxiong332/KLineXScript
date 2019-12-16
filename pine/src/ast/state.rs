@@ -9,6 +9,12 @@ pub struct PineInputError {
     range: StrRange,
 }
 
+impl PineInputError {
+    pub fn new(code: PineErrorKind, range: StrRange) -> PineInputError {
+        PineInputError { code, range }
+    }
+}
+
 pub struct AstState {
     errors: RefCell<Vec<PineInputError>>,
     // phantom: PhantomData<&'a str>,

@@ -181,19 +181,23 @@ fn prefix_exp_ws<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Prefi
     eat_sep(|s| prefix_exp(s, state))(input)
 }
 
-fn if_then_else<'a>(
+fn if_then_else<'a, F>(
     indent: usize,
-) -> impl Fn(Input<'a>, &AstState) -> PineResult<'a, IfThenElse<'a>> {
+    block_parser: impl Fn(usize) -> F,
+) -> impl Fn(Input<'a>, &AstState) -> PineResult<'a, IfThenElse<'a>>
+where
+    F: Fn(Input<'a>, &AstState) -> PineResult<'a, Block<'a>>,
+{
     move |input: Input<'a>, state: &AstState| {
         let (input, (if_tag, cond, _, then_block, else_block)) = tuple((
             tag("if"),
             |s| exp(s, state),
             statement_end,
-            |s| block_with_indent(indent + 1)(s, state),
+            |s| block_parser(indent + 1)(s, state),
             opt(tuple((
                 preceded(statement_indent(indent), tag("else")),
                 statement_end,
-                |s| block_with_indent(indent + 1)(s, state),
+                |s| block_parser(indent + 1)(s, state),
             ))),
         ))(input)?;
         if let Some((_, _, else_block)) = else_block {
@@ -212,15 +216,31 @@ fn if_then_else<'a>(
     }
 }
 
+fn if_then_else_exp<'a>(
+    indent: usize,
+) -> impl Fn(Input<'a>, &AstState) -> PineResult<'a, IfThenElse<'a>> {
+    move |input: Input<'a>, state: &AstState| {
+        if_then_else(indent, block_ret_with_indent)(input, state)
+    }
+}
+
 fn if_then_else_with_indent<'a>(
     indent: usize,
 ) -> impl Fn(Input<'a>, &AstState) -> PineResult<'a, IfThenElse<'a>> {
     move |input: Input<'a>, state| {
-        preceded(statement_indent(indent), |s| if_then_else(indent)(s, state))(input)
+        preceded(statement_indent(indent), |s| {
+            if_then_else(indent, block_with_indent)(s, state)
+        })(input)
     }
 }
 
-fn for_range<'a>(indent: usize) -> impl Fn(Input<'a>, &AstState) -> PineResult<'a, ForRange<'a>> {
+fn for_range<'a, F>(
+    indent: usize,
+    block_parser: impl Fn(usize) -> F,
+) -> impl Fn(Input<'a>, &AstState) -> PineResult<'a, ForRange<'a>>
+where
+    F: Fn(Input<'a>, &AstState) -> PineResult<'a, Block<'a>>,
+{
     move |input: Input<'a>, state| {
         let (input, (for_tag, var, _, start, _, end, by, _, do_blk)) = tuple((
             tag("for"),
@@ -231,7 +251,7 @@ fn for_range<'a>(indent: usize) -> impl Fn(Input<'a>, &AstState) -> PineResult<'
             |s| exp(s, state), // int_lit_ws,
             opt(tuple((eat_sep(tag("by")), |s| exp(s, state)))),
             statement_end,
-            |s| block_with_indent(indent + 1)(s, state),
+            |s| block_parser(indent + 1)(s, state),
         ))(input)?;
 
         let range = StrRange::new(for_tag.start, do_blk.range.end);
@@ -249,11 +269,19 @@ fn for_range<'a>(indent: usize) -> impl Fn(Input<'a>, &AstState) -> PineResult<'
     }
 }
 
+fn for_range_exp<'a>(
+    indent: usize,
+) -> impl Fn(Input<'a>, &AstState) -> PineResult<'a, ForRange<'a>> {
+    move |input: Input<'a>, state| for_range(indent, block_ret_with_indent)(input, state)
+}
+
 fn for_range_with_indent<'a>(
     indent: usize,
 ) -> impl Fn(Input<'a>, &AstState) -> PineResult<'a, ForRange<'a>> {
     move |input: Input<'a>, state| {
-        preceded(statement_indent(indent), |s| for_range(indent)(s, state))(input)
+        preceded(statement_indent(indent), |s| {
+            for_range(indent, block_with_indent)(s, state)
+        })(input)
     }
 }
 
@@ -269,7 +297,9 @@ fn function_def_with_indent<'a>(
             eat_sep(tag(")")),
             eat_sep(tag("=>")),
             alt((
-                preceded(statement_end, |s| block_with_indent(indent + 1)(s, state)),
+                preceded(statement_end, |s| {
+                    block_ret_with_indent(indent + 1)(s, state)
+                }),
                 map(terminated(|s| exp(s, state), statement_end), |s| Block {
                     stmts: vec![],
                     range: s.range(),
@@ -335,10 +365,10 @@ pub fn exp_with_indent<'a>(
     move |input: Input<'a>, state| {
         alt((
             terminated(|s| exp(s, state), statement_end),
-            map(eat_sep(|s| if_then_else(indent)(s, state)), |s| {
+            map(eat_sep(|s| if_then_else_exp(indent)(s, state)), |s| {
                 Exp::Ite(Box::new(s))
             }),
-            map(eat_sep(|s| for_range(indent)(s, state)), |s| {
+            map(eat_sep(|s| for_range_exp(indent)(s, state)), |s| {
                 Exp::ForRange(Box::new(s))
             }),
         ))(input)
@@ -453,16 +483,6 @@ fn block_with_indent<'a>(
                 return Ok((next_input, Block::new(stmts, Some(ret_stmt), range)));
             }
         }
-        // let block = match stmts.last() {
-        //     Some(&Statement::Ite(_)) | Some(&Statement::ForRange(_)) => {
-        //         match stmts.pop().unwrap() {
-        //             Statement::Ite(s) => Block::new(stmts, Some(Exp::Ite(s))),
-        //             Statement::ForRange(s) => Block::new(stmts, Some(Exp::ForRange(s))),
-        //             _ => unreachable!(),
-        //         }
-        //     }
-        //     _ => Block::new(stmts, None),
-        // };
         if stmts.is_empty() {
             Err(Err::Error(PineError::from_pine_kind(
                 input,
@@ -472,6 +492,40 @@ fn block_with_indent<'a>(
             let range = StrRange::new(stmts[0].range().start, stmts.last().unwrap().range().end);
             Ok((cur_input, Block::new(stmts, None, range)))
         }
+    }
+}
+
+fn transfer_block_ret<'a>(mut blk: Block<'a>) -> Block<'a> {
+    if blk.ret_stmt.is_some() {
+        return blk;
+    }
+    match blk.stmts.last() {
+        Some(&Statement::Ite(_)) | Some(&Statement::ForRange(_)) => {
+            match blk.stmts.pop().unwrap() {
+                Statement::Ite(mut s) => {
+                    s.then_blk = transfer_block_ret(s.then_blk);
+                    if let Some(else_blk) = s.else_blk {
+                        s.else_blk = Some(transfer_block_ret(else_blk));
+                    }
+                    Block::new(blk.stmts, Some(Exp::Ite(s)), blk.range)
+                }
+                Statement::ForRange(mut s) => {
+                    s.do_blk = transfer_block_ret(s.do_blk);
+                    Block::new(blk.stmts, Some(Exp::ForRange(s)), blk.range)
+                }
+                _ => unreachable!(),
+            }
+        }
+        _ => blk,
+    }
+}
+
+fn block_ret_with_indent<'a>(
+    indent: usize,
+) -> impl Fn(Input<'a>, &AstState) -> PineResult<'a, Block<'a>> {
+    move |input: Input<'a>, state| {
+        let (input, blk) = block_with_indent(indent)(input, state)?;
+        Ok((input, transfer_block_ret(blk)))
     }
 }
 
@@ -827,7 +881,7 @@ mod tests {
     fn if_then_else_test() {
         check_res(
             "if true \n    break\n    true  \n",
-            if_then_else(0),
+            if_then_else_exp(0),
             IfThenElse::new_no_ctxid(
                 Exp::Bool(BoolNode::new(
                     true,
@@ -854,7 +908,7 @@ mod tests {
     fn for_range_test() {
         check_res(
             "for a = 1 to 2 \n    break\n    true  \n",
-            for_range(0),
+            for_range_exp(0),
             ForRange::new_no_ctxid(
                 VarName::new_with_start("a", Position::new(0, 4)),
                 Exp::Num(Numeral::Int(IntNode::new(
@@ -878,6 +932,128 @@ mod tests {
                     StrRange::new(Position::new(1, 4), Position::new(2, 8)),
                 ),
                 StrRange::new(Position::new(0, 0), Position::new(2, 8)),
+            ),
+        );
+    }
+
+    #[test]
+    fn func_def_test() {
+        check_res(
+            "a(arg1) => \n    if b\n        c \n",
+            function_def_with_indent(0),
+            FunctionDef {
+                name: VarName::new_with_start("a", Position::new(0, 0)),
+                params: vec![VarName::new_with_start("arg1", Position::new(0, 2))],
+                body: Block {
+                    stmts: vec![],
+                    ret_stmt: Some(Exp::Ite(Box::new(IfThenElse::new_no_ctxid(
+                        Exp::VarName(VarName::new_with_start("b", Position::new(1, 7))),
+                        Block::new(
+                            vec![],
+                            Some(Exp::VarName(VarName::new_with_start(
+                                "c",
+                                Position::new(2, 8),
+                            ))),
+                            StrRange::from_start("c", Position::new(2, 8)),
+                        ),
+                        None,
+                        StrRange::new(Position::new(1, 4), Position::new(2, 9)),
+                    )))),
+                    range: StrRange::new(Position::new(1, 4), Position::new(2, 9)),
+                },
+                range: StrRange::new(Position::new(0, 0), Position::new(2, 9)),
+            },
+        );
+    }
+
+    #[test]
+    fn if_then_else_exp_test() {
+        check_res(
+            "if a \n    if b \n        c\n    else\n        d",
+            if_then_else_exp(0),
+            IfThenElse::new_no_ctxid(
+                Exp::VarName(VarName::new_with_start("a", Position::new(0, 3))),
+                Block {
+                    stmts: vec![],
+                    ret_stmt: Some(Exp::Ite(Box::new(IfThenElse::new_no_ctxid(
+                        Exp::VarName(VarName::new_with_start("b", Position::new(1, 7))),
+                        Block::new(
+                            vec![],
+                            Some(Exp::VarName(VarName::new_with_start(
+                                "c",
+                                Position::new(2, 8),
+                            ))),
+                            StrRange::from_start("c", Position::new(2, 8)),
+                        ),
+                        Some(Block::new(
+                            vec![],
+                            Some(Exp::VarName(VarName::new_with_start(
+                                "d",
+                                Position::new(4, 8),
+                            ))),
+                            StrRange::from_start("d", Position::new(4, 8)),
+                        )),
+                        StrRange::new(Position::new(1, 4), Position::new(4, 9)),
+                    )))),
+                    range: StrRange::new(Position::new(1, 4), Position::new(4, 9)),
+                },
+                None,
+                StrRange::new(Position::new(0, 0), Position::new(4, 9)),
+            ),
+        );
+    }
+
+    #[test]
+    fn for_range_exp_test() {
+        let int_exp = |i, s, e| {
+            Exp::Num(Numeral::Int(IntNode::new(
+                i,
+                StrRange::from_start("1", Position::new(s, e)),
+            )))
+        };
+
+        check_res(
+            "for i = 1 to 2\n    for i = 1 to 2\n        for i = 1 to 2\n            i",
+            for_range_exp(0),
+            ForRange::new_no_ctxid(
+                VarName::new_with_start("i", Position::new(0, 4)),
+                int_exp(1, 0, 8),
+                int_exp(2, 0, 13),
+                None,
+                Block {
+                    stmts: vec![],
+                    ret_stmt: Some(Exp::ForRange(Box::new(ForRange::new_no_ctxid(
+                        VarName::new_with_start("i", Position::new(1, 8)),
+                        int_exp(1, 1, 12),
+                        int_exp(2, 1, 17),
+                        None,
+                        Block::new(
+                            vec![],
+                            Some(Exp::ForRange(Box::new(ForRange::new_no_ctxid(
+                                VarName::new_with_start("i", Position::new(2, 12)),
+                                int_exp(1, 2, 16),
+                                int_exp(2, 2, 21),
+                                None,
+                                Block::new(
+                                    vec![],
+                                    Some(Exp::VarName(VarName::new_with_start(
+                                        "i",
+                                        Position::new(3, 12),
+                                    ))),
+                                    StrRange::from_start("i", Position::new(3, 12)),
+                                ),
+                                StrRange::from_start(
+                                    "for i = 1 to 2\n            i",
+                                    Position::new(2, 8),
+                                ),
+                            )))),
+                            StrRange::new(Position::new(2, 8), Position::new(3, 13)),
+                        ),
+                        StrRange::new(Position::new(1, 4), Position::new(3, 13)),
+                    )))),
+                    range: StrRange::new(Position::new(1, 4), Position::new(3, 13)),
+                },
+                StrRange::new(Position::new(0, 0), Position::new(3, 13)),
             ),
         );
     }

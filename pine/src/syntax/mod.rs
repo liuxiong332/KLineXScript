@@ -10,8 +10,10 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 mod convert;
+mod type_cast;
 
 use convert::implicity_convert;
+use type_cast::parse_type_cast;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct FunctionType<'a> {
@@ -276,23 +278,55 @@ impl<'a> SyntaxParser<'a> {
     }
 
     fn parse_ref_call(&mut self, ref_call: &mut RefCall<'a>) -> ParseResult<'a> {
-        // let name_res = self.parse_exp(&mut ref_call.name)?;
+        let name_res = self.parse_exp(&mut ref_call.name)?;
 
-        // self.parse_exp(&mut ref_call.arg);
-        Err(PineInputError::new(
-            PineErrorKind::VarNotCallable,
-            ref_call.range,
-        ))
+        if let SyntaxType::Series(_) = name_res.syntax_type {
+            let arg_res = self.parse_exp(&mut ref_call.arg)?;
+            match arg_res.syntax_type {
+                SyntaxType::Simple(SimpleSyntaxType::Int)
+                | SyntaxType::Series(SimpleSyntaxType::Int) => {
+                    Ok(ParseValue::new_with_type(name_res.syntax_type))
+                }
+                _ => {
+                    self.catch(PineInputError::new(
+                        PineErrorKind::RefIndexNotInt,
+                        ref_call.range,
+                    ));
+                    Ok(ParseValue::new_with_type(name_res.syntax_type))
+                }
+            }
+        } else {
+            Err(PineInputError::new(
+                PineErrorKind::VarNotSeriesInRef,
+                ref_call.range,
+            ))
+        }
     }
 
     fn parse_condition(&mut self, condition: &mut Condition<'a>) -> ParseResult<'a> {
-        // self.parse_exp(&mut condition.cond);
-        // self.parse_exp(&mut condition.exp1);
-        // self.parse_exp(&mut condition.exp2);
-        Err(PineInputError::new(
-            PineErrorKind::VarNotCallable,
-            condition.range,
-        ))
+        let cond_res = self.parse_exp(&mut condition.cond)?;
+        if implicity_convert(
+            &cond_res.syntax_type,
+            &SyntaxType::Series(SimpleSyntaxType::Bool),
+        ) {
+            let exp1_res = self.parse_exp(&mut condition.exp1)?;
+            let exp2_res = self.parse_exp(&mut condition.exp2)?;
+            if implicity_convert(&exp1_res.syntax_type, &exp2_res.syntax_type) {
+                Ok(ParseValue::new_with_type(exp2_res.syntax_type))
+            } else if implicity_convert(&exp2_res.syntax_type, &exp1_res.syntax_type) {
+                Ok(ParseValue::new_with_type(exp1_res.syntax_type))
+            } else {
+                Err(PineInputError::new(
+                    PineErrorKind::CondExpTypesNotSame,
+                    condition.range,
+                ))
+            }
+        } else {
+            Err(PineInputError::new(
+                PineErrorKind::VarNotCallable,
+                condition.range,
+            ))
+        }
     }
 
     fn parse_ifthenelse(&mut self, ite: &mut IfThenElse<'a>) -> ParseResult<'a> {
@@ -336,105 +370,8 @@ impl<'a> SyntaxParser<'a> {
     }
 
     fn parse_type_cast(&mut self, type_cast: &mut TypeCast<'a>) -> ParseResult<'a> {
-        let mut is_cast_err = false;
         let origin_type = self.parse_exp(&mut type_cast.exp)?.syntax_type;
-        let result = match type_cast.data_type {
-            DataType::Bool => match origin_type {
-                SyntaxType::Series(SimpleSyntaxType::Int)
-                | SyntaxType::Series(SimpleSyntaxType::Float)
-                | SyntaxType::Series(SimpleSyntaxType::Bool)
-                | SyntaxType::Series(SimpleSyntaxType::Na) => {
-                    SyntaxType::Series(SimpleSyntaxType::Bool)
-                }
-                SyntaxType::Series(_) => {
-                    is_cast_err = true;
-                    SyntaxType::Series(SimpleSyntaxType::Bool)
-                }
-                SyntaxType::Simple(SimpleSyntaxType::Int)
-                | SyntaxType::Simple(SimpleSyntaxType::Float)
-                | SyntaxType::Simple(SimpleSyntaxType::Bool)
-                | SyntaxType::Simple(SimpleSyntaxType::Na) => {
-                    SyntaxType::Simple(SimpleSyntaxType::Bool)
-                }
-                _ => {
-                    is_cast_err = true;
-                    SyntaxType::Simple(SimpleSyntaxType::Bool)
-                }
-            },
-            DataType::Int => match origin_type {
-                SyntaxType::Series(SimpleSyntaxType::Int)
-                | SyntaxType::Series(SimpleSyntaxType::Float)
-                | SyntaxType::Series(SimpleSyntaxType::Na) => {
-                    SyntaxType::Series(SimpleSyntaxType::Int)
-                }
-                SyntaxType::Series(_) => {
-                    is_cast_err = true;
-                    SyntaxType::Series(SimpleSyntaxType::Int)
-                }
-                SyntaxType::Simple(SimpleSyntaxType::Int)
-                | SyntaxType::Simple(SimpleSyntaxType::Float)
-                | SyntaxType::Simple(SimpleSyntaxType::Na) => {
-                    SyntaxType::Simple(SimpleSyntaxType::Int)
-                }
-                _ => {
-                    is_cast_err = true;
-                    SyntaxType::Simple(SimpleSyntaxType::Int)
-                }
-            },
-            DataType::Float => match origin_type {
-                SyntaxType::Series(SimpleSyntaxType::Int)
-                | SyntaxType::Series(SimpleSyntaxType::Float)
-                | SyntaxType::Series(SimpleSyntaxType::Na) => {
-                    SyntaxType::Series(SimpleSyntaxType::Float)
-                }
-                SyntaxType::Series(_) => {
-                    is_cast_err = true;
-                    SyntaxType::Series(SimpleSyntaxType::Float)
-                }
-
-                SyntaxType::Simple(SimpleSyntaxType::Int)
-                | SyntaxType::Simple(SimpleSyntaxType::Float)
-                | SyntaxType::Simple(SimpleSyntaxType::Na) => {
-                    SyntaxType::Simple(SimpleSyntaxType::Float)
-                }
-                _ => {
-                    is_cast_err = true;
-                    SyntaxType::Simple(SimpleSyntaxType::Float)
-                }
-            },
-            DataType::Color => match origin_type {
-                SyntaxType::Series(SimpleSyntaxType::Color) => {
-                    SyntaxType::Series(SimpleSyntaxType::Color)
-                }
-                SyntaxType::Series(_) => {
-                    is_cast_err = true;
-                    SyntaxType::Series(SimpleSyntaxType::Color)
-                }
-                SyntaxType::Simple(SimpleSyntaxType::Color) => {
-                    SyntaxType::Simple(SimpleSyntaxType::Color)
-                }
-                _ => {
-                    is_cast_err = true;
-                    SyntaxType::Simple(SimpleSyntaxType::Color)
-                }
-            },
-            DataType::String => match origin_type {
-                SyntaxType::Series(SimpleSyntaxType::String) => {
-                    SyntaxType::Series(SimpleSyntaxType::String)
-                }
-                SyntaxType::Series(_) => {
-                    is_cast_err = true;
-                    SyntaxType::Series(SimpleSyntaxType::String)
-                }
-                SyntaxType::Simple(SimpleSyntaxType::String) => {
-                    SyntaxType::Simple(SimpleSyntaxType::String)
-                }
-                _ => {
-                    is_cast_err = true;
-                    SyntaxType::Simple(SimpleSyntaxType::String)
-                }
-            },
-        };
+        let (is_cast_err, result) = parse_type_cast(&origin_type, &type_cast.data_type);
         if is_cast_err {
             self.catch(PineInputError::new(
                 PineErrorKind::InvalidTypeCast {
@@ -538,9 +475,13 @@ impl<'a> SyntaxParser<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ast::color::ColorNode;
     use crate::ast::input::{Position, StrRange};
     use crate::ast::name::VarName;
-    use crate::ast::stat_expr_types::{Assignment, DataType, RefCall, TypeCast, VarAssignment};
+    use crate::ast::stat_expr_types::{
+        Assignment, BoolNode, DataType, NaNode, RefCall, TypeCast, VarAssignment,
+    };
+    use crate::ast::string::StringNode;
 
     fn varname(n: &str) -> VarName {
         VarName::new(n, StrRange::new_empty())
@@ -697,5 +638,137 @@ mod tests {
                 .contains_key("a1"),
             true
         );
+    }
+
+    #[test]
+    fn simple_test() {
+        let mut parser = SyntaxParser::new();
+        assert_eq!(
+            parser.parse_exp(&mut Exp::Na(NaNode::new(StrRange::new_empty()))),
+            Ok(ParseValue::new_with_type(SyntaxType::Simple(
+                SimpleSyntaxType::Na
+            )))
+        );
+
+        assert_eq!(
+            parser.parse_exp(&mut Exp::Bool(BoolNode::new_no_range(true))),
+            Ok(ParseValue::new_with_type(SyntaxType::Simple(
+                SimpleSyntaxType::Bool
+            )))
+        );
+
+        assert_eq!(
+            parser.parse_exp(&mut Exp::Num(Numeral::from_f64(1f64))),
+            Ok(ParseValue::new_with_type(SyntaxType::Simple(
+                SimpleSyntaxType::Float
+            )))
+        );
+
+        assert_eq!(
+            parser.parse_exp(&mut Exp::Num(Numeral::from_i32(1))),
+            Ok(ParseValue::new_with_type(SyntaxType::Simple(
+                SimpleSyntaxType::Int
+            )))
+        );
+
+        assert_eq!(
+            parser.parse_exp(&mut Exp::Color(ColorNode::from_str("#AAAAAA"))),
+            Ok(ParseValue::new_with_type(SyntaxType::Simple(
+                SimpleSyntaxType::Color
+            )))
+        );
+
+        assert_eq!(
+            parser.parse_exp(&mut Exp::Str(StringNode::new(
+                String::from("hello"),
+                StrRange::new_empty()
+            ))),
+            Ok(ParseValue::new_with_type(SyntaxType::Simple(
+                SimpleSyntaxType::String
+            )))
+        );
+    }
+
+    #[test]
+    fn varname_test() {
+        let mut parser = SyntaxParser::new();
+        downcast_ctx(parser.context).declare_var("hello", INT_TYPE);
+        assert_eq!(
+            parser.parse_exp(&mut Exp::VarName(varname("hello"))),
+            Ok(ParseValue::new(INT_TYPE, "hello"))
+        );
+    }
+
+    #[test]
+    fn tuple_test() {
+        let mut parser = SyntaxParser::new();
+        downcast_ctx(parser.context).declare_var("arg1", INT_TYPE);
+        downcast_ctx(parser.context).declare_var("arg2", FLOAT_TYPE);
+        assert_eq!(
+            parser.parse_exp(&mut Exp::Tuple(Box::new(TupleNode::new(
+                vec![Exp::VarName(varname("arg1")), Exp::VarName(varname("arg2"))],
+                StrRange::new_empty()
+            )))),
+            Ok(ParseValue::new_with_type(SyntaxType::Tuple(Rc::new(vec![
+                INT_TYPE, FLOAT_TYPE
+            ]))))
+        );
+    }
+
+    #[test]
+    fn tuple_type_cast() {
+        let mut parser = SyntaxParser::new();
+        downcast_ctx(parser.context)
+            .declare_var("arg1", SyntaxType::Series(SimpleSyntaxType::Float));
+
+        assert_eq!(
+            parser.parse_exp(&mut Exp::TypeCast(Box::new(TypeCast::new_no_input(
+                DataType::Int,
+                Exp::VarName(varname("arg1"))
+            )))),
+            Ok(ParseValue::new_with_type(SyntaxType::Series(
+                SimpleSyntaxType::Int
+            )))
+        );
+    }
+
+    #[test]
+    fn ref_call_cast() {
+        let mut parser = SyntaxParser::new();
+        let context = downcast_ctx(parser.context);
+        context.declare_var("series", SyntaxType::Series(SimpleSyntaxType::Float));
+        context.declare_var("arg", SyntaxType::Series(SimpleSyntaxType::Float));
+
+        assert_eq!(
+            parser.parse_exp(&mut Exp::RefCall(Box::new(RefCall::new_no_input(
+                Exp::VarName(varname("series")),
+                Exp::VarName(varname("arg"))
+            )))),
+            Ok(ParseValue::new_with_type(SyntaxType::Series(
+                SimpleSyntaxType::Float
+            )))
+        );
+        assert_eq!(parser.errors.len(), 1);
+    }
+
+    #[test]
+    fn condition_test() {
+        let mut parser = SyntaxParser::new();
+        let context = downcast_ctx(parser.context);
+        context.declare_var("cond", SyntaxType::Series(SimpleSyntaxType::Float));
+        context.declare_var("arg1", SyntaxType::Series(SimpleSyntaxType::Float));
+        context.declare_var("arg2", SyntaxType::Series(SimpleSyntaxType::Int));
+
+        assert_eq!(
+            parser.parse_exp(&mut Exp::Condition(Box::new(Condition::new_no_input(
+                Exp::VarName(varname("cond")),
+                Exp::VarName(varname("arg1")),
+                Exp::VarName(varname("arg2"))
+            )))),
+            Ok(ParseValue::new_with_type(SyntaxType::Series(
+                SimpleSyntaxType::Float
+            )))
+        );
+        // assert_eq!(parser.errors.len(), 1);
     }
 }

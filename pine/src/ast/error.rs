@@ -25,6 +25,10 @@ pub enum PineErrorKind {
     VarNotCallable,
     FuncCallSignatureNotMatch,
     ForbiddenDictArgsForUserFunc,
+    VarNotSeriesInRef,   // The variable in reference operate is not series.
+    RefIndexNotInt,      // The reference index is not int
+    CondNotBool,         // condition is not bool
+    CondExpTypesNotSame, // The expression types of condition is not the same
 }
 
 #[derive(Debug, PartialEq)]

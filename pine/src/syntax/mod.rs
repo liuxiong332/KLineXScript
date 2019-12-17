@@ -9,6 +9,10 @@ use crate::ast::state::PineInputError;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+mod convert;
+
+use convert::implicity_convert;
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct FunctionType<'a> {
     types: Vec<(Vec<(&'a str, SyntaxType<'a>)>, SyntaxType<'a>)>,
@@ -112,14 +116,13 @@ impl<'a> SyntaxContext<'a> {
 }
 
 pub struct SyntaxParser<'a> {
-    ctxid: i32,
     ctxs: HashMap<i32, Box<dyn SyntaxCtx<'a> + 'a>>,
-    current_ctxid: i32,
     context: *mut (dyn SyntaxCtx<'a> + 'a),
     user_funcs: HashMap<&'a str, *mut FunctionDef<'a>>,
     errors: Vec<PineInputError>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct ParseValue<'a> {
     pub syntax_type: SyntaxType<'a>,
     pub varname: Option<&'a str>,
@@ -149,8 +152,6 @@ impl<'a> SyntaxParser<'a> {
             Box::new(SyntaxContext::new(None, ContextType::Normal));
         ctxs.insert(0, top_ctx);
         SyntaxParser {
-            ctxid: 0,
-            current_ctxid: 0,
             context: &mut **ctxs.get_mut(&0).unwrap(),
             ctxs,
             user_funcs: HashMap::new(),
@@ -158,142 +159,104 @@ impl<'a> SyntaxParser<'a> {
         }
     }
 
-    pub fn gen_ctx_id(&mut self) -> i32 {
-        self.ctxid += 1;
-        self.ctxid
-    }
+    // pub fn gen_ctx_id(&mut self) -> i32 {
+    //     self.ctxid += 1;
+    //     self.ctxid
+    // }
 
     pub fn catch(&mut self, err: PineInputError) {
         self.errors.push(err)
     }
 
-    fn implicity_convert(origin_type: SyntaxType<'a>, dest_type: SyntaxType<'a>) -> bool {
-        if origin_type == dest_type {
-            return true;
+    fn parse_std_func_call(
+        &mut self,
+        func_call: &mut FunctionCall<'a>,
+        fun_type: &Rc<FunctionType<'a>>,
+    ) -> ParseResult<'a> {
+        let mut pos_arg_type = vec![];
+        for arg in func_call.pos_args.iter_mut() {
+            pos_arg_type.push(self.parse_exp(arg)?);
         }
-        match origin_type {
-            SyntaxType::Series(SimpleSyntaxType::Na) => match dest_type {
-                SyntaxType::Series(_) => true,
-                _ => false,
-            },
-            SyntaxType::Simple(SimpleSyntaxType::Na) => match dest_type {
-                SyntaxType::Simple(_) => true,
-                SyntaxType::Series(_) => true,
-                _ => false,
-            },
-            SyntaxType::Series(SimpleSyntaxType::Int) => match dest_type {
-                SyntaxType::Series(SimpleSyntaxType::Bool)
-                | SyntaxType::Series(SimpleSyntaxType::Float)
-                | SyntaxType::Series(SimpleSyntaxType::Int) => true,
-                _ => false,
-            },
-            SyntaxType::Simple(SimpleSyntaxType::Int) => match dest_type {
-                SyntaxType::Simple(SimpleSyntaxType::Bool)
-                | SyntaxType::Simple(SimpleSyntaxType::Int)
-                | SyntaxType::Simple(SimpleSyntaxType::Float) => true,
-
-                SyntaxType::Series(SimpleSyntaxType::Bool)
-                | SyntaxType::Series(SimpleSyntaxType::Float)
-                | SyntaxType::Series(SimpleSyntaxType::Int) => true,
-
-                _ => false,
-            },
-            SyntaxType::Series(SimpleSyntaxType::Float) => match dest_type {
-                SyntaxType::Series(SimpleSyntaxType::Bool)
-                | SyntaxType::Series(SimpleSyntaxType::Float) => true,
-
-                _ => false,
-            },
-            SyntaxType::Simple(SimpleSyntaxType::Float) => match dest_type {
-                SyntaxType::Simple(SimpleSyntaxType::Bool)
-                | SyntaxType::Simple(SimpleSyntaxType::Float) => true,
-
-                SyntaxType::Series(SimpleSyntaxType::Bool)
-                | SyntaxType::Series(SimpleSyntaxType::Float) => true,
-
-                _ => false,
-            },
-            _ => false,
+        let mut dict_arg_type = vec![];
+        for (name, exp) in func_call.dict_args.iter_mut() {
+            dict_arg_type.push((name, self.parse_exp(exp)?));
+        }
+        let res_fun = fun_type.types.iter().find(|(args, _)| {
+            if args.len() >= pos_arg_type.len() {
+                let pos_match = pos_arg_type.iter().zip(args.iter()).all(|(x1, x2)| {
+                    x1.syntax_type == x2.1 || implicity_convert(&x1.syntax_type, &x2.1)
+                });
+                let dict_match = dict_arg_type.iter().all(|(name, t)| {
+                    match args.iter().find(|s| s.0 == name.value) {
+                        None => false,
+                        Some(val) => {
+                            t.syntax_type == val.1 || implicity_convert(&t.syntax_type, &val.1)
+                        }
+                    }
+                });
+                pos_match && dict_match
+            } else {
+                false
+            }
+        });
+        match res_fun {
+            None => Err(PineInputError::new(
+                PineErrorKind::FuncCallSignatureNotMatch,
+                func_call.range,
+            )),
+            Some(d) => Ok(ParseValue::new_with_type(d.1.clone())),
         }
     }
 
-    fn parse_func_call(&mut self, func_call: &mut FunctionCall<'a>) -> ParseResult<'a> {
-        func_call.ctxid = self.gen_ctx_id();
-
-        let method_type = self.parse_exp(&mut func_call.method)?;
-        if let SyntaxType::Function(fun_type) = method_type.syntax_type {
+    fn parse_user_func_call(
+        &mut self,
+        func_call: &mut FunctionCall<'a>,
+        names: &Rc<Vec<&'a str>>,
+        method_name: &'a str,
+    ) -> ParseResult<'a> {
+        if func_call.dict_args.len() > 0 {
+            Err(PineInputError::new(
+                PineErrorKind::ForbiddenDictArgsForUserFunc,
+                func_call.range,
+            ))
+        } else if func_call.pos_args.len() != names.len() {
+            Err(PineInputError::new(
+                PineErrorKind::FuncCallSignatureNotMatch,
+                func_call.range,
+            ))
+        } else {
             let mut pos_arg_type = vec![];
             for arg in func_call.pos_args.iter_mut() {
                 pos_arg_type.push(self.parse_exp(arg)?);
             }
-            let mut dict_arg_type = vec![];
-            for (name, exp) in func_call.dict_args.iter_mut() {
-                dict_arg_type.push((name, self.parse_exp(exp)?));
-            }
-            let res_fun = fun_type.types.iter().find(|(args, ret_type)| {
-                if args.len() >= pos_arg_type.len() {
-                    let pos_match = pos_arg_type.iter().zip(args.iter()).all(|(x1, x2)| {
-                        x1.syntax_type == x2.1
-                            || SyntaxParser::implicity_convert(x1.syntax_type.clone(), x2.1.clone())
-                    });
-                    let dict_match = dict_arg_type.iter().all(|(name, t)| {
-                        match args.iter().find(|s| s.0 == name.value) {
-                            None => false,
-                            Some(val) => {
-                                val.1 == t.syntax_type
-                                    || SyntaxParser::implicity_convert(
-                                        val.1.clone(),
-                                        t.syntax_type.clone(),
-                                    )
-                            }
-                        }
-                    });
-                    pos_match && dict_match
-                } else {
-                    false
-                }
-            });
-            match res_fun {
-                None => Err(PineInputError::new(
-                    PineErrorKind::FuncCallSignatureNotMatch,
-                    func_call.range,
-                )),
-                Some(d) => Ok(ParseValue::new_with_type(d.1.clone())),
-            }
-        } else if let SyntaxType::UserFunction(names) = method_type.syntax_type {
-            if func_call.dict_args.len() > 0 {
-                Err(PineInputError::new(
-                    PineErrorKind::ForbiddenDictArgsForUserFunc,
-                    func_call.range,
-                ))
-            } else if func_call.pos_args.len() != names.len() {
-                Err(PineInputError::new(
-                    PineErrorKind::FuncCallSignatureNotMatch,
-                    func_call.range,
-                ))
-            } else {
-                let mut pos_arg_type = vec![];
-                for arg in func_call.pos_args.iter_mut() {
-                    pos_arg_type.push(self.parse_exp(arg)?);
-                }
-                let mut sub_ctx = SyntaxContext::new(Some(self.context), ContextType::FuncDefBlock);
-                names
-                    .iter()
-                    .zip(pos_arg_type.iter())
-                    .for_each(|(&n, t)| sub_ctx.declare_var(n, t.syntax_type.clone()));
-                self.context = &mut sub_ctx;
+            let mut sub_ctx = Box::new(SyntaxContext::new(
+                Some(self.context),
+                ContextType::FuncDefBlock,
+            ));
+            names
+                .iter()
+                .zip(pos_arg_type.iter())
+                .for_each(|(&n, t)| sub_ctx.declare_var(n, t.syntax_type.clone()));
+            self.context = &mut *sub_ctx;
 
-                let body;
-                unsafe {
-                    body = &mut self.user_funcs[method_type.varname.unwrap()]
-                        .as_mut()
-                        .unwrap()
-                        .body;
-                };
-                let parse_res = self.parse_blk(body)?;
-                Ok(ParseValue::new_with_type(parse_res.syntax_type))
-            }
-        // sub_ctx
+            let body;
+            unsafe {
+                body = &mut self.user_funcs[method_name].as_mut().unwrap().body;
+            };
+            let parse_res = self.parse_blk(body)?;
+
+            self.context = sub_ctx.parent.unwrap();
+            self.ctxs.insert(func_call.ctxid, sub_ctx);
+            Ok(ParseValue::new_with_type(parse_res.syntax_type))
+        }
+    }
+
+    fn parse_func_call(&mut self, func_call: &mut FunctionCall<'a>) -> ParseResult<'a> {
+        let method_type = self.parse_exp(&mut func_call.method)?;
+        if let SyntaxType::Function(fun_type) = method_type.syntax_type {
+            self.parse_std_func_call(func_call, &fun_type)
+        } else if let SyntaxType::UserFunction(names) = method_type.syntax_type {
+            self.parse_user_func_call(func_call, &names, method_type.varname.unwrap())
         } else {
             Err(PineInputError::new(
                 PineErrorKind::VarNotCallable,
@@ -363,7 +326,7 @@ impl<'a> SyntaxParser<'a> {
     }
 
     fn parse_varname(&mut self, varname: &mut VarName<'a>) -> ParseResult<'a> {
-        match self.ctxs[&self.current_ctxid].get_var(varname.value) {
+        match downcast_ctx(self.context).get_var(varname.value) {
             None => Err(PineInputError::new(
                 PineErrorKind::VarNotDeclare,
                 varname.range,
@@ -524,6 +487,15 @@ impl<'a> SyntaxParser<'a> {
         }
     }
 
+    fn parse_func_def(&mut self, func_def: &mut FunctionDef<'a>) -> ParseResult<'a> {
+        let names: Vec<&'a str> = func_def.params.iter().map(|s| s.value).collect();
+        let stype = SyntaxType::UserFunction(Rc::new(names));
+
+        downcast_ctx(self.context).declare_var(func_def.name.value, stype.clone());
+        self.user_funcs.insert(func_def.name.value, func_def);
+        Ok(ParseValue::new_with_type(stype))
+    }
+
     fn parse_stmt(&mut self, stmt: &mut Statement<'a>) -> ParseResult<'a> {
         match stmt {
             Statement::FuncCall(func_call) => self.parse_func_call(func_call),
@@ -549,185 +521,181 @@ impl<'a> SyntaxParser<'a> {
         // for stmt in blk.stmts.iter_mut() {
         //     self.parse_stmt(stmt)
         // }
-        // if let Some(ref mut exp) = blk.ret_stmt {
-        //     self.parse_exp(exp)
-        // }
-        Err(PineInputError::new(
-            PineErrorKind::VarNotCallable,
-            blk.range,
-        ))
+        if let Some(ref mut exp) = blk.ret_stmt {
+            self.parse_exp(exp)
+        } else {
+            Ok(ParseValue::new_with_type(SyntaxType::Simple(
+                SimpleSyntaxType::Na,
+            )))
+        }
+        // Err(PineInputError::new(
+        //     PineErrorKind::VarNotCallable,
+        //     blk.range,
+        // ))
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use crate::ast::input::{Position, StrRange};
-//     use crate::ast::name::VarName;
-//     use crate::ast::stat_expr_types::{Assignment, DataType, RefCall, TypeCast, VarAssignment};
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ast::input::{Position, StrRange};
+    use crate::ast::name::VarName;
+    use crate::ast::stat_expr_types::{Assignment, DataType, RefCall, TypeCast, VarAssignment};
 
-//     fn name<'a>(n: &'a str) -> Exp<'a> {
-//         Exp::VarName(VarName::new_with_start(n, Position::new(0, 0)))
-//     }
+    fn varname(n: &str) -> VarName {
+        VarName::new(n, StrRange::new_empty())
+    }
 
-//     fn func_call<'a>(
-//         method: Exp<'a>,
-//         pos_args: Vec<Exp<'a>>,
-//         dict_args: Vec<(VarName<'a>, Exp<'a>)>,
-//     ) -> Exp<'a> {
-//         Exp::FuncCall(Box::new(FunctionCall::new_no_ctxid(
-//             method,
-//             pos_args,
-//             dict_args,
-//             StrRange::new_empty(),
-//         )))
-//     }
+    #[test]
+    fn func_def_test() {
+        let mut parser = SyntaxParser::new();
+        let mut func_def = FunctionDef {
+            name: varname("funa"),
+            params: vec![varname("hello"), varname("hello2")],
+            body: Block::new(vec![], None, StrRange::new_empty()),
+            range: StrRange::new_empty(),
+        };
+        assert_eq!(
+            parser.parse_func_def(&mut func_def),
+            Ok(ParseValue::new_with_type(SyntaxType::UserFunction(
+                Rc::new(vec!["hello", "hello2"])
+            )))
+        );
+        assert_eq!(parser.user_funcs["funa"], &mut func_def as *mut FunctionDef);
+        assert_eq!(downcast_ctx(parser.context).vars.contains_key("funa"), true);
+    }
 
-//     fn func_call_stmt<'a>(
-//         method: Exp<'a>,
-//         pos_args: Vec<Exp<'a>>,
-//         dict_args: Vec<(VarName<'a>, Exp<'a>)>,
-//     ) -> Statement<'a> {
-//         Statement::FuncCall(Box::new(FunctionCall::new_no_ctxid(
-//             method,
-//             pos_args,
-//             dict_args,
-//             StrRange::new_empty(),
-//         )))
-//     }
+    const INT_TYPE: SyntaxType = SyntaxType::Simple(SimpleSyntaxType::Int);
+    const FLOAT_TYPE: SyntaxType = SyntaxType::Simple(SimpleSyntaxType::Float);
 
-//     #[test]
-//     fn func_call_test() {
-//         let mut call_exp = FunctionCall::new_no_ctxid(
-//             name("func"),
-//             vec![func_call(name("arg"), vec![], vec![])],
-//             vec![(
-//                 VarName::new_no_input("arg2"),
-//                 func_call(name("arg2"), vec![], vec![]),
-//             )],
-//             StrRange::new_empty(),
-//         );
-//         let mut parser = CtxIdParser::new();
-//         parser.parse_func_call(&mut call_exp);
-//         assert_eq!(call_exp.ctxid, 0);
-//         assert_eq!(parser.ctxid, 3);
-//     }
+    fn int_exp<'a>(i: i32) -> Exp<'a> {
+        Exp::Num(Numeral::from_i32(i))
+    }
 
-//     #[test]
-//     fn ref_call_test() {
-//         let mut ref_exp = RefCall {
-//             name: func_call(name("ref"), vec![], vec![]),
-//             arg: func_call(name("arg"), vec![], vec![]),
-//             range: StrRange::new_empty(),
-//         };
-//         let mut parser = CtxIdParser::new();
-//         parser.parse_ref_call(&mut ref_exp);
-//         assert_eq!(parser.ctxid, 2);
-//     }
+    fn float_exp<'a>(i: f64) -> Exp<'a> {
+        Exp::Num(Numeral::from_f64(i))
+    }
 
-//     #[test]
-//     fn condition_test() {
-//         let mut cond = Condition {
-//             cond: func_call(name("cond"), vec![], vec![]),
-//             exp1: func_call(name("exp1"), vec![], vec![]),
-//             exp2: func_call(name("exp2"), vec![], vec![]),
-//             range: StrRange::new_empty(),
-//         };
-//         let mut parser = CtxIdParser::new();
-//         parser.parse_condition(&mut cond);
-//         assert_eq!(parser.ctxid, 3);
-//     }
+    fn fun_nm<'a>() -> Exp<'a> {
+        Exp::VarName(varname("func"))
+    }
 
-//     #[test]
-//     fn type_cast_test() {
-//         let mut cast = Exp::TypeCast(Box::new(TypeCast {
-//             data_type: DataType::Bool,
-//             exp: func_call(name("cond"), vec![], vec![]),
-//             range: StrRange::new_empty(),
-//         }));
-//         let mut parser = CtxIdParser::new();
-//         parser.parse_exp(&mut cast);
-//         assert_eq!(parser.ctxid, 1);
-//     }
+    #[test]
+    fn func_call_test() {
+        let mut parser = SyntaxParser::new();
+        downcast_ctx(parser.context).declare_var(
+            "func",
+            SyntaxType::Function(Rc::new(FunctionType {
+                types: vec![
+                    (vec![("arg1", INT_TYPE), ("arg2", INT_TYPE)], INT_TYPE),
+                    (vec![("arg1", FLOAT_TYPE), ("arg2", FLOAT_TYPE)], FLOAT_TYPE),
+                ],
+            })),
+        );
 
-//     #[test]
-//     fn assign_test() {
-//         let mut cast = Statement::Assignment(Box::new(Assignment::new(
-//             vec![VarName::new_no_input("n")],
-//             func_call(name("func"), vec![], vec![]),
-//             false,
-//             None,
-//             StrRange::new_empty(),
-//         )));
-//         let mut parser = CtxIdParser::new();
-//         parser.parse_stmt(&mut cast);
-//         assert_eq!(parser.ctxid, 1);
-//     }
+        let mut func_call = FunctionCall::new(
+            fun_nm(),
+            vec![int_exp(1), int_exp(2)],
+            vec![],
+            1,
+            StrRange::new_empty(),
+        );
+        assert_eq!(
+            parser.parse_func_call(&mut func_call),
+            Ok(ParseValue::new_with_type(INT_TYPE))
+        );
 
-//     #[test]
-//     fn var_assign_test() {
-//         let mut cast = Statement::VarAssignment(Box::new(VarAssignment::new_no_input(
-//             VarName::new_no_input("n"),
-//             func_call(name("func"), vec![], vec![]),
-//         )));
-//         let mut parser = CtxIdParser::new();
-//         parser.parse_stmt(&mut cast);
-//         assert_eq!(parser.ctxid, 1);
-//     }
+        let mut func_call =
+            FunctionCall::new(fun_nm(), vec![int_exp(1)], vec![], 1, StrRange::new_empty());
+        assert_eq!(
+            parser.parse_func_call(&mut func_call),
+            Ok(ParseValue::new_with_type(INT_TYPE))
+        );
 
-//     #[test]
-//     fn ife_test() {
-//         let mut ite = IfThenElse::new_no_ctxid(
-//             func_call(name("cond"), vec![], vec![]),
-//             Block::new_no_input(
-//                 vec![func_call_stmt(name("t1"), vec![], vec![])],
-//                 Some(func_call(name("then"), vec![], vec![])),
-//             ),
-//             Some(Block::new_no_input(
-//                 vec![func_call_stmt(name("e1"), vec![], vec![])],
-//                 Some(func_call(name("else"), vec![], vec![])),
-//             )),
-//             StrRange::new_empty(),
-//         );
-//         let mut parser = CtxIdParser::new();
-//         parser.parse_ifthenelse(&mut ite);
-//         assert_eq!(ite.then_ctxid, 0);
-//         assert_eq!(ite.else_ctxid, 1);
-//         assert_eq!(parser.ctxid, 7);
-//     }
+        let mut func_call = FunctionCall::new(
+            fun_nm(),
+            vec![int_exp(1)],
+            vec![(varname("arg2"), int_exp(1))],
+            1,
+            StrRange::new_empty(),
+        );
+        assert_eq!(
+            parser.parse_func_call(&mut func_call),
+            Ok(ParseValue::new_with_type(INT_TYPE))
+        );
 
-//     #[test]
-//     fn for_range_test() {
-//         let mut fr = ForRange::new_no_ctxid(
-//             VarName::new_no_input("fr"),
-//             func_call(name("start"), vec![], vec![]),
-//             func_call(name("end"), vec![], vec![]),
-//             Some(func_call(name("step"), vec![], vec![])),
-//             Block::new_no_input(
-//                 vec![func_call_stmt(name("e1"), vec![], vec![])],
-//                 Some(func_call(name("else"), vec![], vec![])),
-//             ),
-//             StrRange::new_empty(),
-//         );
-//         let mut parser = CtxIdParser::new();
-//         parser.parse_forrange(&mut fr);
-//         assert_eq!(fr.ctxid, 0);
-//         assert_eq!(parser.ctxid, 6);
-//     }
+        let mut func_call = FunctionCall::new(
+            fun_nm(),
+            vec![int_exp(1)],
+            vec![(varname("arg2"), float_exp(1f64))],
+            1,
+            StrRange::new_empty(),
+        );
+        assert_eq!(
+            parser.parse_func_call(&mut func_call),
+            Ok(ParseValue::new_with_type(FLOAT_TYPE))
+        );
 
-//     #[test]
-//     fn func_def_test() {
-//         let mut def = Statement::FuncDef(Box::new(FunctionDef {
-//             name: VarName::new_no_input("fr"),
-//             params: vec![VarName::new_no_input("arg1")],
-//             body: Block::new_no_input(
-//                 vec![func_call_stmt(name("e1"), vec![], vec![])],
-//                 Some(func_call(name("else"), vec![], vec![])),
-//             ),
-//             range: StrRange::new_empty(),
-//         }));
-//         let mut parser = CtxIdParser::new();
-//         parser.parse_stmt(&mut def);
-//         assert_eq!(parser.ctxid, 2);
-//     }
-// }
+        let mut func_call = FunctionCall::new(
+            fun_nm(),
+            vec![float_exp(1f64)],
+            vec![(varname("arg2"), int_exp(1))],
+            1,
+            StrRange::new_empty(),
+        );
+        assert_eq!(
+            parser.parse_func_call(&mut func_call),
+            Ok(ParseValue::new_with_type(FLOAT_TYPE))
+        );
+
+        let mut func_call = FunctionCall::new(
+            fun_nm(),
+            vec![float_exp(1f64)],
+            vec![(varname("arg3"), int_exp(1))],
+            1,
+            StrRange::new_empty(),
+        );
+        assert_eq!(
+            parser.parse_func_call(&mut func_call),
+            Err(PineInputError::new(
+                PineErrorKind::FuncCallSignatureNotMatch,
+                StrRange::new_empty()
+            ))
+        );
+    }
+
+    #[test]
+    fn user_func_call_test() {
+        let mut parser = SyntaxParser::new();
+        let mut func_def = FunctionDef {
+            name: varname("fun"),
+            params: vec![varname("a1"), varname("a2")],
+            body: Block::new(
+                vec![],
+                Some(Exp::VarName(varname("a2"))),
+                StrRange::new_empty(),
+            ),
+            range: StrRange::new_empty(),
+        };
+        assert!(parser.parse_func_def(&mut func_def).is_ok());
+
+        let mut func_call = FunctionCall::new(
+            Exp::VarName(varname("fun")),
+            vec![int_exp(1), float_exp(2f64)],
+            vec![],
+            1,
+            StrRange::new_empty(),
+        );
+        assert_eq!(
+            parser.parse_func_call(&mut func_call),
+            Ok(ParseValue::new_with_type(FLOAT_TYPE))
+        );
+        assert_eq!(downcast_ctx(parser.context).parent, None);
+        assert_eq!(
+            downcast_ctx(&mut **parser.ctxs.get_mut(&1).unwrap())
+                .vars
+                .contains_key("a1"),
+            true
+        );
+    }
+}

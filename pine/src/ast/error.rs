@@ -24,6 +24,7 @@ pub enum PineErrorKind {
     InvalidTypeCast { origin: String, cast: String }, // This type cast is not valid
     VarNotCallable,
     FuncCallSignatureNotMatch,
+    ForbiddenDictArgsForUserFunc,
 }
 
 #[derive(Debug, PartialEq)]

@@ -1,9 +1,10 @@
 use crate::ast::error::PineErrorKind;
 use crate::ast::name::VarName;
 use crate::ast::num::Numeral;
+use crate::ast::op::{BinaryOp, UnaryOp};
 use crate::ast::stat_expr_types::{
-    Block, Condition, DataType, Exp, ForRange, FunctionCall, FunctionDef, IfThenElse, RefCall,
-    Statement, TupleNode, TypeCast,
+    BinaryExp, Block, Condition, DataType, Exp, ForRange, FunctionCall, FunctionDef, IfThenElse,
+    RefCall, Statement, TupleNode, TypeCast, UnaryExp,
 };
 use crate::ast::state::PineInputError;
 use std::collections::HashMap;
@@ -60,6 +61,24 @@ impl<'a> SyntaxType<'a> {
         match self {
             SyntaxType::Simple(SimpleSyntaxType::Int)
             | SyntaxType::Series(SimpleSyntaxType::Int) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_num(&self) -> bool {
+        match self {
+            SyntaxType::Simple(SimpleSyntaxType::Int)
+            | SyntaxType::Series(SimpleSyntaxType::Int)
+            | SyntaxType::Simple(SimpleSyntaxType::Float)
+            | SyntaxType::Series(SimpleSyntaxType::Float) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_string(&self) -> bool {
+        match self {
+            SyntaxType::Simple(SimpleSyntaxType::String)
+            | SyntaxType::Series(SimpleSyntaxType::String) => true,
             _ => false,
         }
     }
@@ -528,6 +547,124 @@ impl<'a> SyntaxParser<'a> {
         Ok(ParseValue::new_with_type(result))
     }
 
+    fn parse_unary(&mut self, unary: &mut UnaryExp<'a>) -> ParseResult<'a> {
+        let exp_type = self.parse_exp(&mut unary.exp)?.syntax_type;
+        match unary.op {
+            UnaryOp::Plus | UnaryOp::Minus => {
+                if !exp_type.is_num() {
+                    Err(PineInputError::new(
+                        PineErrorKind::UnaryTypeNotNum,
+                        unary.range,
+                    ))
+                } else {
+                    Ok(ParseValue::new_with_type(exp_type))
+                }
+            }
+            UnaryOp::BoolNot => {
+                if implicity_convert(&exp_type, &SyntaxType::Series(SimpleSyntaxType::Bool)) {
+                    Ok(ParseValue::new_with_type(SyntaxType::Series(
+                        SimpleSyntaxType::Bool,
+                    )))
+                } else if implicity_convert(&exp_type, &SyntaxType::Simple(SimpleSyntaxType::Bool))
+                {
+                    Ok(ParseValue::new_with_type(SyntaxType::Simple(
+                        SimpleSyntaxType::Bool,
+                    )))
+                } else {
+                    Err(PineInputError::new(
+                        PineErrorKind::UnaryTypeNotNum,
+                        unary.range,
+                    ))
+                }
+            }
+        }
+    }
+
+    fn parse_binary(&mut self, binary: &mut BinaryExp<'a>) -> ParseResult<'a> {
+        let exp1_type = self.parse_exp(&mut binary.exp1)?.syntax_type;
+        let exp2_type = self.parse_exp(&mut binary.exp2)?.syntax_type;
+        let gen_bool = |exp1_type, exp2_type| match (exp1_type, exp2_type) {
+            (SyntaxType::Series(_), _) | (_, SyntaxType::Series(_)) => {
+                return Ok(ParseValue::new_with_type(SyntaxType::Series(
+                    SimpleSyntaxType::Bool,
+                )));
+            }
+            _ => {
+                return Ok(ParseValue::new_with_type(SyntaxType::Simple(
+                    SimpleSyntaxType::Bool,
+                )));
+            }
+        };
+        match binary.op {
+            BinaryOp::Plus | BinaryOp::Minus | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => {
+                if binary.op == BinaryOp::Plus && exp1_type.is_string() && exp2_type.is_string() {
+                    match (exp1_type, exp2_type) {
+                        (SyntaxType::Series(_), _) | (_, SyntaxType::Series(_)) => {
+                            return Ok(ParseValue::new_with_type(SyntaxType::Series(
+                                SimpleSyntaxType::String,
+                            )));
+                        }
+                        _ => {
+                            return Ok(ParseValue::new_with_type(SyntaxType::Simple(
+                                SimpleSyntaxType::String,
+                            )));
+                        }
+                    }
+                }
+                if !(exp1_type.is_num() && exp2_type.is_num()) {
+                    return Err(PineInputError::new(
+                        PineErrorKind::BinaryTypeNotNum,
+                        binary.range,
+                    ));
+                }
+                if implicity_convert(&exp1_type, &exp2_type) {
+                    Ok(ParseValue::new_with_type(exp2_type))
+                } else if implicity_convert(&exp2_type, &exp1_type) {
+                    Ok(ParseValue::new_with_type(exp1_type))
+                } else {
+                    Err(PineInputError::new(
+                        PineErrorKind::TypeMismatch,
+                        binary.range,
+                    ))
+                }
+            }
+            BinaryOp::Gt | BinaryOp::Geq | BinaryOp::Lt | BinaryOp::Leq => {
+                if !(exp1_type.is_num() && exp2_type.is_num()) {
+                    return Err(PineInputError::new(
+                        PineErrorKind::BinaryTypeNotNum,
+                        binary.range,
+                    ));
+                }
+                gen_bool(exp1_type, exp2_type)
+            }
+            BinaryOp::Eq | BinaryOp::Neq => {
+                if implicity_convert(&exp1_type, &exp2_type)
+                    || implicity_convert(&exp2_type, &exp1_type)
+                {
+                    gen_bool(exp1_type, exp2_type)
+                } else {
+                    Err(PineInputError::new(
+                        PineErrorKind::TypeMismatch,
+                        binary.range,
+                    ))
+                }
+            }
+            BinaryOp::BoolAnd | BinaryOp::BoolOr => {
+                let bool_type = SyntaxType::Series(SimpleSyntaxType::Bool);
+                if implicity_convert(&exp1_type, &bool_type)
+                    && implicity_convert(&exp2_type, &bool_type)
+                {
+                    gen_bool(exp1_type, exp2_type)
+                } else {
+                    Err(PineInputError::new(
+                        PineErrorKind::BoolExpTypeNotBool,
+                        binary.range,
+                    ))
+                }
+            }
+        }
+    }
+
     fn parse_exp(&mut self, exp: &mut Exp<'a>) -> ParseResult<'a> {
         match exp {
             Exp::Na(_) => Ok(ParseValue::new_with_type(SyntaxType::Simple(
@@ -556,11 +693,8 @@ impl<'a> SyntaxParser<'a> {
             Exp::Condition(condition) => self.parse_condition(condition),
             Exp::Ite(ite) => self.parse_ifthenelse_exp(ite),
             Exp::ForRange(fr) => self.parse_forrange_exp(fr),
-            Exp::UnaryExp(node) => self.parse_exp(&mut node.exp),
-            // Exp::BinaryExp(node) => {
-            //     self.parse_exp(&mut node.exp1);
-            //     self.parse_exp(&mut node.exp2);
-            // }
+            Exp::UnaryExp(node) => self.parse_unary(node),
+            Exp::BinaryExp(node) => self.parse_binary(node),
             t => Err(PineInputError::new(
                 PineErrorKind::VarNotCallable,
                 t.range(),
@@ -980,7 +1114,7 @@ mod tests {
 
         let input = Input::new_with_str("for i = 1 to 2\n    i");
         assert_eq!(
-            parser.parse_forrange(&mut for_range_exp(0)(input, &AstState::new()).unwrap().1),
+            parser.parse_forrange_exp(&mut for_range_exp(0)(input, &AstState::new()).unwrap().1),
             Ok(ParseValue::new_with_type(SyntaxType::Series(
                 SimpleSyntaxType::Int
             )))

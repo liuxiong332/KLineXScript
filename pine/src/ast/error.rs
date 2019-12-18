@@ -32,6 +32,7 @@ pub enum PineErrorKind {
     ExpNoReturn,                  //The block in expression not return anything
     ExpReturnNa,                  // The block in expression return na
     TypeMismatch,                 // The return type is not match
+    ForRangeIndexNotInt,          // The index of for-range expression is not int
 }
 
 #[derive(Debug, PartialEq)]

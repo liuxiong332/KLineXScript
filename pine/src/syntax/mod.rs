@@ -55,6 +55,14 @@ impl<'a> SyntaxType<'a> {
     pub fn is_void(&self) -> bool {
         self == &SyntaxType::Void
     }
+
+    pub fn is_int(&self) -> bool {
+        match self {
+            SyntaxType::Simple(SimpleSyntaxType::Int)
+            | SyntaxType::Series(SimpleSyntaxType::Int) => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -293,29 +301,47 @@ impl<'a> SyntaxParser<'a> {
         ))))
     }
 
+    fn parse_ref_call_arg(
+        &mut self,
+        ref_call: &mut RefCall<'a>,
+        name_type: SyntaxType<'a>,
+    ) -> ParseResult<'a> {
+        let arg_res = self.parse_exp(&mut ref_call.arg)?;
+        match arg_res.syntax_type {
+            SyntaxType::Simple(SimpleSyntaxType::Int)
+            | SyntaxType::Series(SimpleSyntaxType::Int) => Ok(ParseValue::new_with_type(name_type)),
+            _ => {
+                self.catch(PineInputError::new(
+                    PineErrorKind::RefIndexNotInt,
+                    ref_call.range,
+                ));
+                Ok(ParseValue::new_with_type(name_type))
+            }
+        }
+    }
+
     fn parse_ref_call(&mut self, ref_call: &mut RefCall<'a>) -> ParseResult<'a> {
         let name_res = self.parse_exp(&mut ref_call.name)?;
 
-        if let SyntaxType::Series(_) = name_res.syntax_type {
-            let arg_res = self.parse_exp(&mut ref_call.arg)?;
-            match arg_res.syntax_type {
-                SyntaxType::Simple(SimpleSyntaxType::Int)
-                | SyntaxType::Series(SimpleSyntaxType::Int) => {
-                    Ok(ParseValue::new_with_type(name_res.syntax_type))
-                }
-                _ => {
-                    self.catch(PineInputError::new(
-                        PineErrorKind::RefIndexNotInt,
+        match name_res.syntax_type {
+            // If the type is simple, then we need to update the var to series.
+            SyntaxType::Simple(t) => {
+                if let Some(name) = name_res.varname {
+                    let series_type = SyntaxType::Series(t);
+                    downcast_ctx(self.context).update_var(name, series_type.clone());
+                    self.parse_ref_call_arg(ref_call, series_type)
+                } else {
+                    Err(PineInputError::new(
+                        PineErrorKind::VarNotSeriesInRef,
                         ref_call.range,
-                    ));
-                    Ok(ParseValue::new_with_type(name_res.syntax_type))
+                    ))
                 }
             }
-        } else {
-            Err(PineInputError::new(
+            SyntaxType::Series(_) => self.parse_ref_call_arg(ref_call, name_res.syntax_type),
+            _ => Err(PineInputError::new(
                 PineErrorKind::VarNotSeriesInRef,
                 ref_call.range,
-            ))
+            )),
         }
     }
 
@@ -328,9 +354,13 @@ impl<'a> SyntaxParser<'a> {
             let exp1_res = self.parse_exp(&mut condition.exp1)?;
             let exp2_res = self.parse_exp(&mut condition.exp2)?;
             if implicity_convert(&exp1_res.syntax_type, &exp2_res.syntax_type) {
-                Ok(ParseValue::new_with_type(exp2_res.syntax_type))
+                Ok(ParseValue::new_with_type(simple_to_series(
+                    exp2_res.syntax_type,
+                )))
             } else if implicity_convert(&exp2_res.syntax_type, &exp1_res.syntax_type) {
-                Ok(ParseValue::new_with_type(exp1_res.syntax_type))
+                Ok(ParseValue::new_with_type(simple_to_series(
+                    exp1_res.syntax_type,
+                )))
             } else {
                 Err(PineInputError::new(
                     PineErrorKind::CondExpTypesNotSame,
@@ -418,19 +448,59 @@ impl<'a> SyntaxParser<'a> {
         }
     }
 
-    fn parse_forrange(&mut self, for_range: &mut ForRange<'a>) -> ParseResult<'a> {
-        // for_range.ctxid = self.gen_ctx_id();
+    fn parse_forrange_exp(&mut self, for_range: &mut ForRange<'a>) -> ParseResult<'a> {
+        let start_res = self.parse_exp(&mut for_range.start)?;
+        if !start_res.syntax_type.is_int() {
+            self.catch(PineInputError::new(
+                PineErrorKind::ForRangeIndexNotInt,
+                for_range.start.range(),
+            ));
+        }
+        let end_res = self.parse_exp(&mut for_range.end)?;
+        if !end_res.syntax_type.is_int() {
+            self.catch(PineInputError::new(
+                PineErrorKind::ForRangeIndexNotInt,
+                for_range.end.range(),
+            ));
+        }
+        if let Some(step) = &mut for_range.step {
+            let step_res = self.parse_exp(step)?;
+            if !step_res.syntax_type.is_int() {
+                self.catch(PineInputError::new(
+                    PineErrorKind::ForRangeIndexNotInt,
+                    step.range(),
+                ));
+            }
+        }
+        let mut for_ctx = Box::new(SyntaxContext::new(
+            Some(self.context),
+            ContextType::ForRangeBlock,
+        ));
+        for_ctx.declare_var(
+            for_range.var.value,
+            SyntaxType::Simple(SimpleSyntaxType::Int),
+        );
+        self.context = &mut *for_ctx;
 
-        // self.parse_exp(&mut for_range.start);
-        // self.parse_exp(&mut for_range.end);
-        // if let Some(step) = &mut for_range.step {
-        //     self.parse_exp(step);
-        // }
-        // self.parse_blk(&mut for_range.do_blk);
-        Err(PineInputError::new(
-            PineErrorKind::VarNotCallable,
-            for_range.range,
-        ))
+        let blk_res = self.parse_blk(&mut for_range.do_blk)?;
+        self.context = for_ctx.parent.unwrap();
+        self.ctxs.insert(for_range.ctxid, for_ctx);
+
+        if blk_res.syntax_type.is_void() {
+            return Err(PineInputError::new(
+                PineErrorKind::ExpNoReturn,
+                for_range.do_blk.range,
+            ));
+        }
+        if blk_res.syntax_type.is_na() {
+            return Err(PineInputError::new(
+                PineErrorKind::ExpReturnNa,
+                for_range.do_blk.range,
+            ));
+        }
+        Ok(ParseValue::new_with_type(simple_to_series(
+            blk_res.syntax_type,
+        )))
     }
 
     fn parse_varname(&mut self, varname: &mut VarName<'a>) -> ParseResult<'a> {
@@ -485,7 +555,7 @@ impl<'a> SyntaxParser<'a> {
             Exp::RefCall(ref_call) => self.parse_ref_call(ref_call),
             Exp::Condition(condition) => self.parse_condition(condition),
             Exp::Ite(ite) => self.parse_ifthenelse_exp(ite),
-            Exp::ForRange(fr) => self.parse_forrange(fr),
+            Exp::ForRange(fr) => self.parse_forrange_exp(fr),
             Exp::UnaryExp(node) => self.parse_exp(&mut node.exp),
             // Exp::BinaryExp(node) => {
             //     self.parse_exp(&mut node.exp1);
@@ -511,7 +581,7 @@ impl<'a> SyntaxParser<'a> {
         match stmt {
             Statement::FuncCall(func_call) => self.parse_func_call(func_call),
             // Statement::Ite(ite) => self.parse_ifthenelse(ite),
-            Statement::ForRange(fr) => self.parse_forrange(fr),
+            // Statement::ForRange(fr) => self.parse_forrange(fr),
             // Statement::Assignment(assign) => {
             //     self.parse_exp(&mut assign.val);
             // }
@@ -811,6 +881,7 @@ mod tests {
         let mut parser = SyntaxParser::new();
         let context = downcast_ctx(parser.context);
         context.declare_var("series", SyntaxType::Series(SimpleSyntaxType::Float));
+        context.declare_var("simple", SyntaxType::Simple(SimpleSyntaxType::Float));
         context.declare_var("arg", SyntaxType::Series(SimpleSyntaxType::Float));
 
         assert_eq!(
@@ -823,6 +894,20 @@ mod tests {
             )))
         );
         assert_eq!(parser.errors.len(), 1);
+
+        assert_eq!(
+            parser.parse_exp(&mut Exp::RefCall(Box::new(RefCall::new_no_input(
+                Exp::VarName(varname("simple")),
+                Exp::VarName(varname("arg"))
+            )))),
+            Ok(ParseValue::new_with_type(SyntaxType::Series(
+                SimpleSyntaxType::Float
+            )))
+        );
+        assert_eq!(
+            context.get_var_scope("simple"),
+            Some(&SyntaxType::Series(SimpleSyntaxType::Float))
+        );
     }
 
     #[test]
@@ -841,6 +926,17 @@ mod tests {
             )))),
             Ok(ParseValue::new_with_type(SyntaxType::Series(
                 SimpleSyntaxType::Float
+            )))
+        );
+
+        assert_eq!(
+            parser.parse_exp(&mut Exp::Condition(Box::new(Condition::new_no_input(
+                Exp::Num(Numeral::from_i32(1)),
+                Exp::Num(Numeral::from_i32(2)),
+                Exp::Num(Numeral::from_i32(3))
+            )))),
+            Ok(ParseValue::new_with_type(SyntaxType::Series(
+                SimpleSyntaxType::Int
             )))
         );
     }
@@ -871,5 +967,23 @@ mod tests {
         //         SimpleSyntaxType::Float
         //     )))
         // )
+    }
+
+    #[test]
+    fn for_range_exp_test() {
+        use crate::ast::stat_expr::for_range_exp;
+        use crate::ast::state::AstState;
+
+        let mut parser = SyntaxParser::new();
+        let context = downcast_ctx(parser.context);
+        context.declare_var("var", SyntaxType::Simple(SimpleSyntaxType::Int));
+
+        let input = Input::new_with_str("for i = 1 to 2\n    i");
+        assert_eq!(
+            parser.parse_forrange(&mut for_range_exp(0)(input, &AstState::new()).unwrap().1),
+            Ok(ParseValue::new_with_type(SyntaxType::Series(
+                SimpleSyntaxType::Int
+            )))
+        );
     }
 }

@@ -269,7 +269,7 @@ where
     }
 }
 
-fn for_range_exp<'a>(
+pub fn for_range_exp<'a>(
     indent: usize,
 ) -> impl Fn(Input<'a>, &AstState) -> PineResult<'a, ForRange<'a>> {
     move |input: Input<'a>, state| for_range(indent, block_ret_with_indent)(input, state)

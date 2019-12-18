@@ -347,75 +347,74 @@ impl<'a> SyntaxParser<'a> {
 
     fn parse_ifthenelse_exp(&mut self, ite: &mut IfThenElse<'a>) -> ParseResult<'a> {
         let cond_res = self.parse_exp(&mut ite.cond)?;
-        if implicity_convert(
+        if !implicity_convert(
             &cond_res.syntax_type,
             &SyntaxType::Series(SimpleSyntaxType::Bool),
         ) {
+            return Err(PineInputError::new(PineErrorKind::CondNotBool, ite.range));
+        }
+        // Create new context for if block
+        let mut if_ctx = Box::new(SyntaxContext::new(
+            Some(self.context),
+            ContextType::IfElseBlock,
+        ));
+        self.context = &mut *if_ctx;
+
+        let then_res = self.parse_blk(&mut ite.then_blk)?;
+        self.context = if_ctx.parent.unwrap();
+        self.ctxs.insert(ite.then_ctxid, if_ctx);
+
+        if then_res.syntax_type.is_void() {
+            return Err(PineInputError::new(
+                PineErrorKind::ExpNoReturn,
+                ite.then_blk.range,
+            ));
+        }
+        if then_res.syntax_type.is_na() {
+            return Err(PineInputError::new(
+                PineErrorKind::ExpReturnNa,
+                ite.then_blk.range,
+            ));
+        }
+        if let Some(else_blk) = &mut ite.else_blk {
             // Create new context for if block
-            let mut if_ctx = Box::new(SyntaxContext::new(
+            let mut else_ctx = Box::new(SyntaxContext::new(
                 Some(self.context),
                 ContextType::IfElseBlock,
             ));
-            self.context = &mut *if_ctx;
+            self.context = &mut *else_ctx;
 
-            let then_res = self.parse_blk(&mut ite.then_blk)?;
-            self.context = if_ctx.parent.unwrap();
-            self.ctxs.insert(ite.then_ctxid, if_ctx);
+            let else_res = self.parse_blk(else_blk)?;
+            self.context = else_ctx.parent.unwrap();
+            self.ctxs.insert(ite.else_ctxid, else_ctx);
 
-            if then_res.syntax_type.is_void() {
+            if else_res.syntax_type.is_void() {
                 return Err(PineInputError::new(
                     PineErrorKind::ExpNoReturn,
-                    ite.then_blk.range,
+                    else_blk.range,
                 ));
             }
-            if then_res.syntax_type.is_na() {
+            if else_res.syntax_type.is_na() {
                 return Err(PineInputError::new(
                     PineErrorKind::ExpReturnNa,
-                    ite.then_blk.range,
+                    else_blk.range,
                 ));
             }
-            if let Some(else_blk) = &mut ite.else_blk {
-                // Create new context for if block
-                let mut else_ctx = Box::new(SyntaxContext::new(
-                    Some(self.context),
-                    ContextType::IfElseBlock,
-                ));
-                self.context = &mut *else_ctx;
-
-                let else_res = self.parse_blk(else_blk)?;
-                self.context = else_ctx.parent.unwrap();
-                self.ctxs.insert(ite.else_ctxid, else_ctx);
-
-                if else_res.syntax_type.is_void() {
-                    return Err(PineInputError::new(
-                        PineErrorKind::ExpNoReturn,
-                        else_blk.range,
-                    ));
-                }
-                if else_res.syntax_type.is_na() {
-                    return Err(PineInputError::new(
-                        PineErrorKind::ExpReturnNa,
-                        else_blk.range,
-                    ));
-                }
-                // Find the common type that can satisfy the then type and else type
-                if implicity_convert(&then_res.syntax_type, &else_res.syntax_type) {
-                    // The return type of if-then-else block must be series.
-                    return Ok(ParseValue::new_with_type(simple_to_series(
-                        else_res.syntax_type,
-                    )));
-                } else if implicity_convert(&else_res.syntax_type, &then_res.syntax_type) {
-                    return Ok(ParseValue::new_with_type(simple_to_series(
-                        then_res.syntax_type,
-                    )));
-                } else {
-                    return Err(PineInputError::new(PineErrorKind::TypeMismatch, ite.range));
-                }
+            // Find the common type that can satisfy the then type and else type
+            if implicity_convert(&then_res.syntax_type, &else_res.syntax_type) {
+                // The return type of if-then-else block must be series.
+                return Ok(ParseValue::new_with_type(simple_to_series(
+                    else_res.syntax_type,
+                )));
+            } else if implicity_convert(&else_res.syntax_type, &then_res.syntax_type) {
+                return Ok(ParseValue::new_with_type(simple_to_series(
+                    then_res.syntax_type,
+                )));
             } else {
-                Ok(ParseValue::new_with_type(then_res.syntax_type))
+                return Err(PineInputError::new(PineErrorKind::TypeMismatch, ite.range));
             }
         } else {
-            Err(PineInputError::new(PineErrorKind::CondNotBool, ite.range))
+            Ok(ParseValue::new_with_type(then_res.syntax_type))
         }
     }
 

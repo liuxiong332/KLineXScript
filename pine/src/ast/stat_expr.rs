@@ -216,7 +216,7 @@ where
     }
 }
 
-fn if_then_else_exp<'a>(
+pub fn if_then_else_exp<'a>(
     indent: usize,
 ) -> impl Fn(Input<'a>, &AstState) -> PineResult<'a, IfThenElse<'a>> {
     move |input: Input<'a>, state: &AstState| {

@@ -50,6 +50,13 @@ pub fn implicity_convert<'a>(origin_type: &SyntaxType<'a>, dest_type: &SyntaxTyp
     }
 }
 
+pub fn simple_to_series<'a>(origin_type: SyntaxType<'a>) -> SyntaxType<'a> {
+    match origin_type {
+        SyntaxType::Simple(t) => SyntaxType::Series(t),
+        _ => origin_type,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

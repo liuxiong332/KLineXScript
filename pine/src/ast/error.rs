@@ -24,11 +24,14 @@ pub enum PineErrorKind {
     InvalidTypeCast { origin: String, cast: String }, // This type cast is not valid
     VarNotCallable,
     FuncCallSignatureNotMatch,
-    ForbiddenDictArgsForUserFunc,
-    VarNotSeriesInRef,   // The variable in reference operate is not series.
-    RefIndexNotInt,      // The reference index is not int
-    CondNotBool,         // condition is not bool
-    CondExpTypesNotSame, // The expression types of condition is not the same
+    ForbiddenDictArgsForUserFunc, // cannot call user defined function with dict arguments.
+    VarNotSeriesInRef,            // The variable in reference operate is not series.
+    RefIndexNotInt,               // The reference index is not int
+    CondNotBool,                  // condition is not bool
+    CondExpTypesNotSame,          // The expression types of condition is not the same
+    ExpNoReturn,                  //The block in expression not return anything
+    ExpReturnNa,                  // The block in expression return na
+    TypeMismatch,                 // The return type is not match
 }
 
 #[derive(Debug, PartialEq)]

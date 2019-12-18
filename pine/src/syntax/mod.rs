@@ -12,7 +12,7 @@ use std::rc::Rc;
 mod convert;
 mod type_cast;
 
-use convert::implicity_convert;
+use convert::{implicity_convert, simple_to_series};
 use type_cast::parse_type_cast;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -32,6 +32,7 @@ pub enum SimpleSyntaxType {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum SyntaxType<'a> {
+    Void,
     Simple(SimpleSyntaxType),
     Series(SimpleSyntaxType),
     Tuple(Rc<Vec<SyntaxType<'a>>>),
@@ -39,6 +40,21 @@ pub enum SyntaxType<'a> {
     Function(Rc<FunctionType<'a>>),
     UserFunction(Rc<Vec<&'a str>>),
     Any,
+}
+
+impl<'a> SyntaxType<'a> {
+    pub fn is_na(&self) -> bool {
+        match self {
+            SyntaxType::Simple(SimpleSyntaxType::Na) | SyntaxType::Series(SimpleSyntaxType::Na) => {
+                true
+            }
+            _ => false,
+        }
+    }
+
+    pub fn is_void(&self) -> bool {
+        self == &SyntaxType::Void
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -323,25 +339,84 @@ impl<'a> SyntaxParser<'a> {
             }
         } else {
             Err(PineInputError::new(
-                PineErrorKind::VarNotCallable,
+                PineErrorKind::CondNotBool,
                 condition.range,
             ))
         }
     }
 
-    fn parse_ifthenelse(&mut self, ite: &mut IfThenElse<'a>) -> ParseResult<'a> {
-        // ite.then_ctxid = self.gen_ctx_id();
-        // ite.else_ctxid = self.gen_ctx_id();
+    fn parse_ifthenelse_exp(&mut self, ite: &mut IfThenElse<'a>) -> ParseResult<'a> {
+        let cond_res = self.parse_exp(&mut ite.cond)?;
+        if implicity_convert(
+            &cond_res.syntax_type,
+            &SyntaxType::Series(SimpleSyntaxType::Bool),
+        ) {
+            // Create new context for if block
+            let mut if_ctx = Box::new(SyntaxContext::new(
+                Some(self.context),
+                ContextType::IfElseBlock,
+            ));
+            self.context = &mut *if_ctx;
 
-        // self.parse_exp(&mut ite.cond);
-        // self.parse_blk(&mut ite.then_blk);
-        // if let Some(else_blk) = &mut ite.else_blk {
-        //     self.parse_blk(else_blk);
-        // }
-        Err(PineInputError::new(
-            PineErrorKind::VarNotCallable,
-            ite.range,
-        ))
+            let then_res = self.parse_blk(&mut ite.then_blk)?;
+            self.context = if_ctx.parent.unwrap();
+            self.ctxs.insert(ite.then_ctxid, if_ctx);
+
+            if then_res.syntax_type.is_void() {
+                return Err(PineInputError::new(
+                    PineErrorKind::ExpNoReturn,
+                    ite.then_blk.range,
+                ));
+            }
+            if then_res.syntax_type.is_na() {
+                return Err(PineInputError::new(
+                    PineErrorKind::ExpReturnNa,
+                    ite.then_blk.range,
+                ));
+            }
+            if let Some(else_blk) = &mut ite.else_blk {
+                // Create new context for if block
+                let mut else_ctx = Box::new(SyntaxContext::new(
+                    Some(self.context),
+                    ContextType::IfElseBlock,
+                ));
+                self.context = &mut *else_ctx;
+
+                let else_res = self.parse_blk(else_blk)?;
+                self.context = else_ctx.parent.unwrap();
+                self.ctxs.insert(ite.else_ctxid, else_ctx);
+
+                if else_res.syntax_type.is_void() {
+                    return Err(PineInputError::new(
+                        PineErrorKind::ExpNoReturn,
+                        else_blk.range,
+                    ));
+                }
+                if else_res.syntax_type.is_na() {
+                    return Err(PineInputError::new(
+                        PineErrorKind::ExpReturnNa,
+                        else_blk.range,
+                    ));
+                }
+                // Find the common type that can satisfy the then type and else type
+                if implicity_convert(&then_res.syntax_type, &else_res.syntax_type) {
+                    // The return type of if-then-else block must be series.
+                    return Ok(ParseValue::new_with_type(simple_to_series(
+                        else_res.syntax_type,
+                    )));
+                } else if implicity_convert(&else_res.syntax_type, &then_res.syntax_type) {
+                    return Ok(ParseValue::new_with_type(simple_to_series(
+                        then_res.syntax_type,
+                    )));
+                } else {
+                    return Err(PineInputError::new(PineErrorKind::TypeMismatch, ite.range));
+                }
+            } else {
+                Ok(ParseValue::new_with_type(then_res.syntax_type))
+            }
+        } else {
+            Err(PineInputError::new(PineErrorKind::CondNotBool, ite.range))
+        }
     }
 
     fn parse_forrange(&mut self, for_range: &mut ForRange<'a>) -> ParseResult<'a> {
@@ -410,7 +485,7 @@ impl<'a> SyntaxParser<'a> {
             Exp::FuncCall(func_call) => self.parse_func_call(func_call),
             Exp::RefCall(ref_call) => self.parse_ref_call(ref_call),
             Exp::Condition(condition) => self.parse_condition(condition),
-            Exp::Ite(ite) => self.parse_ifthenelse(ite),
+            Exp::Ite(ite) => self.parse_ifthenelse_exp(ite),
             Exp::ForRange(fr) => self.parse_forrange(fr),
             Exp::UnaryExp(node) => self.parse_exp(&mut node.exp),
             // Exp::BinaryExp(node) => {
@@ -436,7 +511,7 @@ impl<'a> SyntaxParser<'a> {
     fn parse_stmt(&mut self, stmt: &mut Statement<'a>) -> ParseResult<'a> {
         match stmt {
             Statement::FuncCall(func_call) => self.parse_func_call(func_call),
-            Statement::Ite(ite) => self.parse_ifthenelse(ite),
+            // Statement::Ite(ite) => self.parse_ifthenelse(ite),
             Statement::ForRange(fr) => self.parse_forrange(fr),
             // Statement::Assignment(assign) => {
             //     self.parse_exp(&mut assign.val);
@@ -476,7 +551,7 @@ impl<'a> SyntaxParser<'a> {
 mod tests {
     use super::*;
     use crate::ast::color::ColorNode;
-    use crate::ast::input::{Position, StrRange};
+    use crate::ast::input::{Input, Position, StrRange};
     use crate::ast::name::VarName;
     use crate::ast::stat_expr_types::{
         Assignment, BoolNode, DataType, NaNode, RefCall, TypeCast, VarAssignment,
@@ -769,6 +844,33 @@ mod tests {
                 SimpleSyntaxType::Float
             )))
         );
-        // assert_eq!(parser.errors.len(), 1);
+    }
+
+    #[test]
+    fn if_then_else_exp_test() {
+        use crate::ast::stat_expr::if_then_else_exp;
+        use crate::ast::state::AstState;
+
+        let mut parser = SyntaxParser::new();
+        let context = downcast_ctx(parser.context);
+        context.declare_var("var", SyntaxType::Simple(SimpleSyntaxType::Int));
+
+        let input = Input::new_with_str("if var\n    1\nelse\n    1.0");
+        assert_eq!(
+            parser
+                .parse_ifthenelse_exp(&mut if_then_else_exp(0)(input, &AstState::new()).unwrap().1),
+            Ok(ParseValue::new_with_type(SyntaxType::Series(
+                SimpleSyntaxType::Float
+            )))
+        );
+
+        // let input = Input::new_with_str("if var\n    var = 1\n    var\nelse\n    var=1.0\n    var");
+        // assert_eq!(
+        //     parser
+        //         .parse_ifthenelse_exp(&mut if_then_else_exp(0)(input, &AstState::new()).unwrap().1),
+        //     Ok(ParseValue::new_with_type(SyntaxType::Simple(
+        //         SimpleSyntaxType::Float
+        //     )))
+        // )
     }
 }

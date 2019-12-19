@@ -561,13 +561,13 @@ impl<'a> SyntaxParser<'a> {
                 }
             }
             UnaryOp::BoolNot => {
-                if implicity_convert(&exp_type, &SyntaxType::Series(SimpleSyntaxType::Bool)) {
-                    Ok(ParseValue::new_with_type(SyntaxType::Series(
+                if implicity_convert(&exp_type, &SyntaxType::Simple(SimpleSyntaxType::Bool)) {
+                    Ok(ParseValue::new_with_type(SyntaxType::Simple(
                         SimpleSyntaxType::Bool,
                     )))
-                } else if implicity_convert(&exp_type, &SyntaxType::Simple(SimpleSyntaxType::Bool))
+                } else if implicity_convert(&exp_type, &SyntaxType::Series(SimpleSyntaxType::Bool))
                 {
-                    Ok(ParseValue::new_with_type(SyntaxType::Simple(
+                    Ok(ParseValue::new_with_type(SyntaxType::Series(
                         SimpleSyntaxType::Bool,
                     )))
                 } else {
@@ -630,7 +630,7 @@ impl<'a> SyntaxParser<'a> {
             }
             BinaryOp::Gt | BinaryOp::Geq | BinaryOp::Lt | BinaryOp::Leq => {
                 if !(exp1_type.is_num() && exp2_type.is_num()) {
-                    return Err(PineInputError::new(
+                    self.catch(PineInputError::new(
                         PineErrorKind::BinaryTypeNotNum,
                         binary.range,
                     ));
@@ -643,10 +643,11 @@ impl<'a> SyntaxParser<'a> {
                 {
                     gen_bool(exp1_type, exp2_type)
                 } else {
-                    Err(PineInputError::new(
+                    self.catch(PineInputError::new(
                         PineErrorKind::TypeMismatch,
                         binary.range,
-                    ))
+                    ));
+                    gen_bool(exp1_type, exp2_type)
                 }
             }
             BinaryOp::BoolAnd | BinaryOp::BoolOr => {
@@ -656,10 +657,11 @@ impl<'a> SyntaxParser<'a> {
                 {
                     gen_bool(exp1_type, exp2_type)
                 } else {
-                    Err(PineInputError::new(
+                    self.catch(PineInputError::new(
                         PineErrorKind::BoolExpTypeNotBool,
                         binary.range,
-                    ))
+                    ));
+                    gen_bool(exp1_type, exp2_type)
                 }
             }
         }
@@ -1118,6 +1120,256 @@ mod tests {
             Ok(ParseValue::new_with_type(SyntaxType::Series(
                 SimpleSyntaxType::Int
             )))
+        );
+    }
+
+    #[test]
+    fn unary_exp_test() {
+        use crate::ast::stat_expr_types::UnaryExp;
+        use crate::ast::state::AstState;
+
+        let mut parser = SyntaxParser::new();
+        let context = downcast_ctx(parser.context);
+
+        let mut plus_exp = UnaryExp::new(UnaryOp::Plus, int_exp(1), StrRange::new_empty());
+        assert_eq!(
+            parser.parse_unary(&mut plus_exp),
+            Ok(ParseValue::new_with_type(SyntaxType::Simple(
+                SimpleSyntaxType::Int
+            )))
+        );
+
+        context.declare_var("var", SyntaxType::Series(SimpleSyntaxType::Int));
+        let mut series_plus_exp = UnaryExp::new(
+            UnaryOp::Plus,
+            Exp::VarName(varname("var")),
+            StrRange::new_empty(),
+        );
+        assert_eq!(
+            parser.parse_unary(&mut series_plus_exp),
+            Ok(ParseValue::new_with_type(SyntaxType::Series(
+                SimpleSyntaxType::Int
+            )))
+        );
+
+        let mut na_plus_exp = UnaryExp::new(
+            UnaryOp::Plus,
+            Exp::Na(NaNode::new(StrRange::new_empty())),
+            StrRange::new_empty(),
+        );
+        assert_eq!(
+            parser.parse_unary(&mut na_plus_exp),
+            Err(PineInputError::new(
+                PineErrorKind::UnaryTypeNotNum,
+                StrRange::new_empty()
+            ))
+        );
+
+        let mut bool_exp = UnaryExp::new(UnaryOp::BoolNot, int_exp(1), StrRange::new_empty());
+        assert_eq!(
+            parser.parse_unary(&mut bool_exp),
+            Ok(ParseValue::new_with_type(SyntaxType::Simple(
+                SimpleSyntaxType::Bool
+            )))
+        );
+
+        context.declare_var("var", SyntaxType::Series(SimpleSyntaxType::Int));
+        let mut series_plus_exp = UnaryExp::new(
+            UnaryOp::BoolNot,
+            Exp::VarName(varname("var")),
+            StrRange::new_empty(),
+        );
+        assert_eq!(
+            parser.parse_unary(&mut series_plus_exp),
+            Ok(ParseValue::new_with_type(SyntaxType::Series(
+                SimpleSyntaxType::Bool
+            )))
+        );
+    }
+
+    #[test]
+    fn add_binary_exp_test() {
+        use crate::ast::string::StringNode;
+
+        let mut parser = SyntaxParser::new();
+        let context = downcast_ctx(parser.context);
+
+        let mut str_add_exp = BinaryExp::new(
+            BinaryOp::Plus,
+            Exp::Str(StringNode::new(String::from("he"), StrRange::new_empty())),
+            Exp::Str(StringNode::new(String::from("llo"), StrRange::new_empty())),
+            StrRange::new_empty(),
+        );
+        assert_eq!(
+            parser.parse_binary(&mut str_add_exp),
+            Ok(ParseValue::new_with_type(SyntaxType::Simple(
+                SimpleSyntaxType::String
+            )))
+        );
+
+        context.declare_var("str1", SyntaxType::Series(SimpleSyntaxType::String));
+        context.declare_var("str2", SyntaxType::Series(SimpleSyntaxType::String));
+        let mut sstr_add_exp = BinaryExp::new(
+            BinaryOp::Plus,
+            Exp::VarName(varname("str1")),
+            Exp::VarName(varname("str2")),
+            StrRange::new_empty(),
+        );
+        assert_eq!(
+            parser.parse_binary(&mut sstr_add_exp),
+            Ok(ParseValue::new_with_type(SyntaxType::Series(
+                SimpleSyntaxType::String
+            )))
+        );
+
+        let mut int_add_exp = BinaryExp::new(
+            BinaryOp::Plus,
+            int_exp(1),
+            int_exp(2),
+            StrRange::new_empty(),
+        );
+        assert_eq!(
+            parser.parse_binary(&mut int_add_exp),
+            Ok(ParseValue::new_with_type(SyntaxType::Simple(
+                SimpleSyntaxType::Int
+            )))
+        );
+
+        context.declare_var("sint", SyntaxType::Series(SimpleSyntaxType::Int));
+        let mut int_add_exp = BinaryExp::new(
+            BinaryOp::Plus,
+            int_exp(1),
+            Exp::VarName(varname("sint")),
+            StrRange::new_empty(),
+        );
+        assert_eq!(
+            parser.parse_binary(&mut int_add_exp),
+            Ok(ParseValue::new_with_type(SyntaxType::Series(
+                SimpleSyntaxType::Int
+            )))
+        );
+
+        let mut na_add_exp = BinaryExp::new(
+            BinaryOp::Plus,
+            int_exp(1),
+            Exp::Na(NaNode::new(StrRange::new_empty())),
+            StrRange::new_empty(),
+        );
+        assert_eq!(
+            parser.parse_binary(&mut na_add_exp),
+            Err(PineInputError::new(
+                PineErrorKind::BinaryTypeNotNum,
+                StrRange::new_empty()
+            ))
+        );
+    }
+
+    #[test]
+    fn binary_exp_test() {
+        let mut parser = SyntaxParser::new();
+        let context = downcast_ctx(parser.context);
+
+        context.declare_var("sint", SyntaxType::Series(SimpleSyntaxType::Int));
+        let mut geq_exp =
+            BinaryExp::new(BinaryOp::Geq, int_exp(1), int_exp(2), StrRange::new_empty());
+        assert_eq!(
+            parser.parse_binary(&mut geq_exp),
+            Ok(ParseValue::new_with_type(SyntaxType::Simple(
+                SimpleSyntaxType::Bool
+            )))
+        );
+
+        let mut series_geq_exp = BinaryExp::new(
+            BinaryOp::Geq,
+            int_exp(1),
+            Exp::VarName(varname("sint")),
+            StrRange::new_empty(),
+        );
+        assert_eq!(
+            parser.parse_binary(&mut series_geq_exp),
+            Ok(ParseValue::new_with_type(SyntaxType::Series(
+                SimpleSyntaxType::Bool
+            )))
+        );
+
+        let mut na_geq_exp = BinaryExp::new(
+            BinaryOp::Geq,
+            int_exp(1),
+            Exp::Na(NaNode::new(StrRange::new_empty())),
+            StrRange::new_empty(),
+        );
+        assert_eq!(
+            parser.parse_binary(&mut na_geq_exp),
+            Ok(ParseValue::new_with_type(SyntaxType::Simple(
+                SimpleSyntaxType::Bool
+            )))
+        );
+        assert_eq!(
+            *parser.errors.last().unwrap(),
+            PineInputError::new(PineErrorKind::BinaryTypeNotNum, StrRange::new_empty())
+        );
+
+        parser.errors.clear();
+        let mut eq_exp = BinaryExp::new(
+            BinaryOp::Eq,
+            int_exp(1),
+            Exp::Na(NaNode::new(StrRange::new_empty())),
+            StrRange::new_empty(),
+        );
+        assert_eq!(
+            parser.parse_binary(&mut eq_exp),
+            Ok(ParseValue::new_with_type(SyntaxType::Simple(
+                SimpleSyntaxType::Bool
+            )))
+        );
+        assert!(parser.errors.is_empty());
+
+        let mut eq_dif_type_exp = BinaryExp::new(
+            BinaryOp::Eq,
+            int_exp(1),
+            Exp::Str(StringNode::new(String::from("h"), StrRange::new_empty())),
+            StrRange::new_empty(),
+        );
+        assert_eq!(
+            parser.parse_binary(&mut eq_dif_type_exp),
+            Ok(ParseValue::new_with_type(SyntaxType::Simple(
+                SimpleSyntaxType::Bool
+            )))
+        );
+        assert_eq!(
+            *parser.errors.last().unwrap(),
+            PineInputError::new(PineErrorKind::TypeMismatch, StrRange::new_empty())
+        );
+
+        context.declare_var("var", SyntaxType::Series(SimpleSyntaxType::Int));
+        let mut bool_and_exp = BinaryExp::new(
+            BinaryOp::BoolAnd,
+            int_exp(1),
+            Exp::VarName(varname("var")),
+            StrRange::new_empty(),
+        );
+        assert_eq!(
+            parser.parse_binary(&mut bool_and_exp),
+            Ok(ParseValue::new_with_type(SyntaxType::Series(
+                SimpleSyntaxType::Bool
+            )))
+        );
+
+        let mut bool_and_exp = BinaryExp::new(
+            BinaryOp::BoolAnd,
+            int_exp(1),
+            Exp::Str(StringNode::new(String::from("h"), StrRange::new_empty())),
+            StrRange::new_empty(),
+        );
+        assert_eq!(
+            parser.parse_binary(&mut bool_and_exp),
+            Ok(ParseValue::new_with_type(SyntaxType::Simple(
+                SimpleSyntaxType::Bool
+            )))
+        );
+        assert_eq!(
+            *parser.errors.last().unwrap(),
+            PineInputError::new(PineErrorKind::BoolExpTypeNotBool, StrRange::new_empty())
         );
     }
 }

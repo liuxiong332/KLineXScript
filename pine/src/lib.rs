@@ -5,6 +5,9 @@ use nom::Err;
 #[macro_use]
 extern crate lazy_static;
 
+#[macro_use]
+extern crate assert_matches;
+
 pub mod ast;
 pub mod libs;
 pub mod runtime;

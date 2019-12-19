@@ -5,8 +5,8 @@ use std::cell::RefCell;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct PineInputError {
-    code: PineErrorKind,
-    range: StrRange,
+    pub code: PineErrorKind,
+    pub range: StrRange,
 }
 
 impl PineInputError {

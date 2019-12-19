@@ -1,7 +1,30 @@
 use super::{SimpleSyntaxType, SyntaxType};
 use crate::ast::stat_expr_types::DataType;
 
-pub fn parse_type_cast<'a>(
+pub fn explicity_type_cast<'a>(
+    cur_type: &SyntaxType<'a>,
+    dest_type: &DataType,
+) -> (bool, SyntaxType<'a>) {
+    let (mut is_cast_err, mut result) = implicity_type_cast(cur_type, dest_type);
+    match dest_type {
+        DataType::Int => match cur_type {
+            SyntaxType::Series(SimpleSyntaxType::Float) => {
+                is_cast_err = false;
+                result = SyntaxType::Series(SimpleSyntaxType::Int);
+            }
+
+            SyntaxType::Simple(SimpleSyntaxType::Float) => {
+                is_cast_err = false;
+                result = SyntaxType::Simple(SimpleSyntaxType::Int);
+            }
+            _ => (),
+        },
+        _ => (),
+    };
+    (is_cast_err, result)
+}
+
+pub fn implicity_type_cast<'a>(
     cur_type: &SyntaxType<'a>,
     dest_type: &DataType,
 ) -> (bool, SyntaxType<'a>) {
@@ -31,14 +54,12 @@ pub fn parse_type_cast<'a>(
         },
         DataType::Int => match cur_type {
             SyntaxType::Series(SimpleSyntaxType::Int)
-            | SyntaxType::Series(SimpleSyntaxType::Float)
             | SyntaxType::Series(SimpleSyntaxType::Na) => SyntaxType::Series(SimpleSyntaxType::Int),
             SyntaxType::Series(_) => {
                 is_cast_err = true;
                 SyntaxType::Series(SimpleSyntaxType::Int)
             }
             SyntaxType::Simple(SimpleSyntaxType::Int)
-            | SyntaxType::Simple(SimpleSyntaxType::Float)
             | SyntaxType::Simple(SimpleSyntaxType::Na) => SyntaxType::Simple(SimpleSyntaxType::Int),
             _ => {
                 is_cast_err = true;

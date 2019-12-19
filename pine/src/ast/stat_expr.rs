@@ -224,7 +224,7 @@ pub fn if_then_else_exp<'a>(
     }
 }
 
-fn if_then_else_with_indent<'a>(
+pub fn if_then_else_with_indent<'a>(
     indent: usize,
 ) -> impl Fn(Input<'a>, &AstState) -> PineResult<'a, IfThenElse<'a>> {
     move |input: Input<'a>, state| {
@@ -285,7 +285,7 @@ fn for_range_with_indent<'a>(
     }
 }
 
-fn function_def_with_indent<'a>(
+pub fn function_def_with_indent<'a>(
     indent: usize,
 ) -> impl Fn(Input<'a>, &AstState) -> PineResult<'a, FunctionDef<'a>> {
     move |input: Input<'a>, state| {
@@ -382,7 +382,7 @@ fn assign_lv_names<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, LVT
     ))(input)
 }
 
-fn assign_with_indent<'a>(
+pub fn assign_with_indent<'a>(
     indent: usize,
 ) -> impl Fn(Input<'a>, &AstState) -> PineResult<'a, Assignment<'a>> {
     move |input: Input<'a>, state| {
@@ -439,7 +439,7 @@ fn assign_with_indent<'a>(
     }
 }
 
-fn var_assign_with_indent<'a>(
+pub fn var_assign_with_indent<'a>(
     indent: usize,
 ) -> impl Fn(Input<'a>, &AstState) -> PineResult<'a, VarAssignment<'a>> {
     move |input: Input<'a>, state| {

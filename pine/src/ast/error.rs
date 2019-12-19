@@ -27,6 +27,8 @@ pub enum PineErrorKind {
     ForbiddenDictArgsForUserFunc, // cannot call user defined function with dict arguments.
     VarNotSeriesInRef,            // The variable in reference operate is not series.
     RefIndexNotInt,               // The reference index is not int
+    RefObjTypeNotObj,             // The reference type is not object
+    RefKeyNotExist,               // The specific reference key not exists in the object
     CondNotBool,                  // condition is not bool
     CondExpTypesNotSame,          // The expression types of condition is not the same
     ExpNoReturn,                  //The block in expression not return anything
@@ -36,6 +38,9 @@ pub enum PineErrorKind {
     UnaryTypeNotNum,              // The destination type is not num for unary operator.
     BinaryTypeNotNum,             // The destination type is not num for binary operator.
     BoolExpTypeNotBool,           // The type of bool expression is not bool
+    VarHasDeclare,                // The variable in assignment has declared before.
+    BreakNotInForStmt,            // Use break in non for-range statement.
+    ContinueNotInForStmt,         // Use break in non for-range statement.
 }
 
 #[derive(Debug, PartialEq)]

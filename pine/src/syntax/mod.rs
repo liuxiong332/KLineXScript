@@ -1,10 +1,11 @@
 use crate::ast::error::PineErrorKind;
+use crate::ast::input::StrRange;
 use crate::ast::name::VarName;
 use crate::ast::num::Numeral;
 use crate::ast::op::{BinaryOp, UnaryOp};
 use crate::ast::stat_expr_types::{
-    BinaryExp, Block, Condition, DataType, Exp, ForRange, FunctionCall, FunctionDef, IfThenElse,
-    RefCall, Statement, TupleNode, TypeCast, UnaryExp,
+    Assignment, BinaryExp, Block, Condition, DataType, Exp, ForRange, FunctionCall, FunctionDef,
+    IfThenElse, PrefixExp, RefCall, Statement, TupleNode, TypeCast, UnaryExp, VarAssignment,
 };
 use crate::ast::state::PineInputError;
 use std::collections::HashMap;
@@ -14,7 +15,7 @@ mod convert;
 mod type_cast;
 
 use convert::{implicity_convert, simple_to_series};
-use type_cast::parse_type_cast;
+use type_cast::{explicity_type_cast, implicity_type_cast};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct FunctionType<'a> {
@@ -158,6 +159,10 @@ impl<'a> SyntaxContext<'a> {
             vars: HashMap::new(),
         }
     }
+
+    pub fn get_type(&self) -> ContextType {
+        self.context_type
+    }
 }
 
 pub struct SyntaxParser<'a> {
@@ -203,11 +208,6 @@ impl<'a> SyntaxParser<'a> {
             errors: vec![],
         }
     }
-
-    // pub fn gen_ctx_id(&mut self) -> i32 {
-    //     self.ctxid += 1;
-    //     self.ctxid
-    // }
 
     pub fn catch(&mut self, err: PineInputError) {
         self.errors.push(err)
@@ -364,6 +364,40 @@ impl<'a> SyntaxParser<'a> {
         }
     }
 
+    fn get_for_obj(
+        obj: &SyntaxType<'a>,
+        keys: &[&'a str],
+    ) -> Result<SyntaxType<'a>, PineErrorKind> {
+        if let SyntaxType::Object(map) = obj {
+            match map.get(&keys[0]) {
+                None => Err(PineErrorKind::RefKeyNotExist),
+                Some(dest_type) => {
+                    if keys.len() > 1 {
+                        Self::get_for_obj(&dest_type, &keys[1..])
+                    } else {
+                        Ok(dest_type.clone())
+                    }
+                }
+            }
+        } else {
+            Err(PineErrorKind::RefObjTypeNotObj)
+        }
+    }
+
+    fn parse_prefix(&mut self, prefix: &mut PrefixExp<'a>) -> ParseResult<'a> {
+        let subkeys: Vec<_> = prefix.var_chain.iter().map(|s| s.value).collect();
+        match downcast_ctx(self.context).get_var(prefix.var_chain[0].value) {
+            None => Err(PineInputError::new(
+                PineErrorKind::VarNotDeclare,
+                prefix.range,
+            )),
+            Some(obj) => match Self::get_for_obj(obj, &subkeys[1..]) {
+                Ok(val_type) => Ok(ParseValue::new_with_type(val_type)),
+                Err(code) => Err(PineInputError::new(code, prefix.range)),
+            },
+        }
+    }
+
     fn parse_condition(&mut self, condition: &mut Condition<'a>) -> ParseResult<'a> {
         let cond_res = self.parse_exp(&mut condition.cond)?;
         if implicity_convert(
@@ -394,7 +428,7 @@ impl<'a> SyntaxParser<'a> {
         }
     }
 
-    fn parse_ifthenelse_exp(&mut self, ite: &mut IfThenElse<'a>) -> ParseResult<'a> {
+    fn parse_ifthenelse_cond(&mut self, ite: &mut IfThenElse<'a>) -> Result<(), PineInputError> {
         let cond_res = self.parse_exp(&mut ite.cond)?;
         if !implicity_convert(
             &cond_res.syntax_type,
@@ -402,6 +436,10 @@ impl<'a> SyntaxParser<'a> {
         ) {
             return Err(PineInputError::new(PineErrorKind::CondNotBool, ite.range));
         }
+        Ok(())
+    }
+
+    fn parse_ifthenelse_then(&mut self, ite: &mut IfThenElse<'a>) -> ParseResult<'a> {
         // Create new context for if block
         let mut if_ctx = Box::new(SyntaxContext::new(
             Some(self.context),
@@ -412,6 +450,26 @@ impl<'a> SyntaxParser<'a> {
         let then_res = self.parse_blk(&mut ite.then_blk)?;
         self.context = if_ctx.parent.unwrap();
         self.ctxs.insert(ite.then_ctxid, if_ctx);
+        Ok(then_res)
+    }
+
+    fn parse_ifthenelse_else(&mut self, else_blk: &mut Block<'a>, ctxid: i32) -> ParseResult<'a> {
+        // Create new context for if block
+        let mut else_ctx = Box::new(SyntaxContext::new(
+            Some(self.context),
+            ContextType::IfElseBlock,
+        ));
+        self.context = &mut *else_ctx;
+
+        let else_res = self.parse_blk(else_blk)?;
+        self.context = else_ctx.parent.unwrap();
+        self.ctxs.insert(ctxid, else_ctx);
+        Ok(else_res)
+    }
+
+    fn parse_ifthenelse_exp(&mut self, ite: &mut IfThenElse<'a>) -> ParseResult<'a> {
+        self.parse_ifthenelse_cond(ite)?;
+        let then_res = self.parse_ifthenelse_then(ite)?;
 
         if then_res.syntax_type.is_void() {
             return Err(PineInputError::new(
@@ -427,15 +485,7 @@ impl<'a> SyntaxParser<'a> {
         }
         if let Some(else_blk) = &mut ite.else_blk {
             // Create new context for if block
-            let mut else_ctx = Box::new(SyntaxContext::new(
-                Some(self.context),
-                ContextType::IfElseBlock,
-            ));
-            self.context = &mut *else_ctx;
-
-            let else_res = self.parse_blk(else_blk)?;
-            self.context = else_ctx.parent.unwrap();
-            self.ctxs.insert(ite.else_ctxid, else_ctx);
+            let else_res = self.parse_ifthenelse_else(else_blk, ite.else_ctxid)?;
 
             if else_res.syntax_type.is_void() {
                 return Err(PineInputError::new(
@@ -467,7 +517,16 @@ impl<'a> SyntaxParser<'a> {
         }
     }
 
-    fn parse_forrange_exp(&mut self, for_range: &mut ForRange<'a>) -> ParseResult<'a> {
+    fn parse_ifthenelse_stmt(&mut self, ite: &mut IfThenElse<'a>) -> ParseResult<'a> {
+        self.parse_ifthenelse_cond(ite)?;
+        self.parse_ifthenelse_then(ite)?;
+        if let Some(else_blk) = &mut ite.else_blk {
+            self.parse_ifthenelse_else(else_blk, ite.else_ctxid)?;
+        }
+        Ok(ParseValue::new_with_type(SyntaxType::Void))
+    }
+
+    fn parse_forrange(&mut self, for_range: &mut ForRange<'a>) -> ParseResult<'a> {
         let start_res = self.parse_exp(&mut for_range.start)?;
         if !start_res.syntax_type.is_int() {
             self.catch(PineInputError::new(
@@ -504,7 +563,16 @@ impl<'a> SyntaxParser<'a> {
         let blk_res = self.parse_blk(&mut for_range.do_blk)?;
         self.context = for_ctx.parent.unwrap();
         self.ctxs.insert(for_range.ctxid, for_ctx);
+        Ok(blk_res)
+    }
 
+    fn parse_forrange_stmt(&mut self, for_range: &mut ForRange<'a>) -> ParseResult<'a> {
+        self.parse_forrange(for_range)?;
+        Ok(ParseValue::new_with_type(SyntaxType::Void))
+    }
+
+    fn parse_forrange_exp(&mut self, for_range: &mut ForRange<'a>) -> ParseResult<'a> {
+        let blk_res = self.parse_forrange(for_range)?;
         if blk_res.syntax_type.is_void() {
             return Err(PineInputError::new(
                 PineErrorKind::ExpNoReturn,
@@ -534,7 +602,7 @@ impl<'a> SyntaxParser<'a> {
 
     fn parse_type_cast(&mut self, type_cast: &mut TypeCast<'a>) -> ParseResult<'a> {
         let origin_type = self.parse_exp(&mut type_cast.exp)?.syntax_type;
-        let (is_cast_err, result) = parse_type_cast(&origin_type, &type_cast.data_type);
+        let (is_cast_err, result) = explicity_type_cast(&origin_type, &type_cast.data_type);
         if is_cast_err {
             self.catch(PineInputError::new(
                 PineErrorKind::InvalidTypeCast {
@@ -667,6 +735,122 @@ impl<'a> SyntaxParser<'a> {
         }
     }
 
+    fn parse_one_assign(
+        &mut self,
+        var_type: &Option<DataType>,
+        name: &VarName<'a>,
+        val: SyntaxType<'a>,
+        range: StrRange,
+    ) -> Result<SyntaxType<'a>, PineInputError> {
+        let context = downcast_ctx(self.context);
+        if context.get_var_scope(name.value).is_some() {
+            self.catch(PineInputError::new(
+                PineErrorKind::VarHasDeclare,
+                name.range,
+            ));
+        }
+        if let Some(data_type) = var_type {
+            let (is_cast_err, result) = implicity_type_cast(&val, &data_type);
+            if is_cast_err {
+                self.catch(PineInputError::new(
+                    PineErrorKind::InvalidTypeCast {
+                        origin: format!("{:?}", val),
+                        cast: format!("{:?}", data_type),
+                    },
+                    range,
+                ));
+            }
+            context.declare_var(name.value, result.clone());
+            Ok(result)
+        } else {
+            context.declare_var(name.value, val.clone());
+            Ok(val)
+        }
+    }
+
+    fn parse_assign(&mut self, assign: &mut Assignment<'a>) -> ParseResult<'a> {
+        let val_res = self.parse_exp(&mut assign.val)?;
+        if assign.names.len() > 1 {
+            if let SyntaxType::Tuple(tuple) = val_res.syntax_type {
+                if tuple.len() != assign.names.len() {
+                    Err(PineInputError::new(
+                        PineErrorKind::BinaryTypeNotNum,
+                        assign.range,
+                    ))
+                } else {
+                    let mut ret_tuple = vec![];
+                    for (name, val_type) in assign.names.iter().zip(tuple.iter()) {
+                        ret_tuple.push(self.parse_one_assign(
+                            &assign.var_type,
+                            name,
+                            val_type.clone(),
+                            assign.range,
+                        )?);
+                    }
+                    Ok(ParseValue::new_with_type(SyntaxType::Tuple(Rc::new(
+                        ret_tuple,
+                    ))))
+                }
+            } else {
+                Err(PineInputError::new(
+                    PineErrorKind::BinaryTypeNotNum,
+                    assign.range,
+                ))
+            }
+        } else {
+            let rtype = self.parse_one_assign(
+                &assign.var_type,
+                &assign.names[0],
+                val_res.syntax_type,
+                assign.range,
+            )?;
+            Ok(ParseValue::new_with_type(rtype))
+        }
+    }
+
+    fn parse_var_assign(&mut self, assign: &mut VarAssignment<'a>) -> ParseResult<'a> {
+        let context = downcast_ctx(self.context);
+        match context.get_var(assign.name.value) {
+            None => Err(PineInputError::new(
+                PineErrorKind::VarNotDeclare,
+                assign.range,
+            )),
+            Some(cur_type) => {
+                let last_type = simple_to_series(cur_type.clone());
+                let val_res = self.parse_exp(&mut assign.val)?;
+                if implicity_convert(&val_res.syntax_type, &last_type) {
+                    Ok(ParseValue::new_with_type(last_type))
+                } else {
+                    self.catch(PineInputError::new(
+                        PineErrorKind::InvalidTypeCast {
+                            origin: format!("{:?}", val_res.syntax_type),
+                            cast: format!("{:?}", last_type),
+                        },
+                        assign.range,
+                    ));
+                    Ok(ParseValue::new_with_type(last_type))
+                }
+            }
+        }
+    }
+
+    fn parse_func_def(&mut self, func_def: &mut FunctionDef<'a>) -> ParseResult<'a> {
+        let context = downcast_ctx(self.context);
+        let name = func_def.name.value;
+        if context.get_var_scope(name).is_some() {
+            self.catch(PineInputError::new(
+                PineErrorKind::VarHasDeclare,
+                func_def.name.range,
+            ));
+        }
+
+        self.user_funcs.insert(name, func_def);
+        let param_names: Vec<_> = func_def.params.iter().map(|v| v.value).collect();
+        let name_type = SyntaxType::UserFunction(Rc::new(param_names));
+        context.declare_var(name, name_type.clone());
+        Ok(ParseValue::new_with_type(name_type))
+    }
+
     fn parse_exp(&mut self, exp: &mut Exp<'a>) -> ParseResult<'a> {
         match exp {
             Exp::Na(_) => Ok(ParseValue::new_with_type(SyntaxType::Simple(
@@ -692,63 +876,54 @@ impl<'a> SyntaxParser<'a> {
             Exp::TypeCast(type_cast) => self.parse_type_cast(type_cast),
             Exp::FuncCall(func_call) => self.parse_func_call(func_call),
             Exp::RefCall(ref_call) => self.parse_ref_call(ref_call),
+            Exp::PrefixExp(prefix) => self.parse_prefix(prefix),
             Exp::Condition(condition) => self.parse_condition(condition),
             Exp::Ite(ite) => self.parse_ifthenelse_exp(ite),
             Exp::ForRange(fr) => self.parse_forrange_exp(fr),
             Exp::UnaryExp(node) => self.parse_unary(node),
             Exp::BinaryExp(node) => self.parse_binary(node),
-            t => Err(PineInputError::new(
-                PineErrorKind::VarNotCallable,
-                t.range(),
-            )),
         }
     }
 
-    fn parse_func_def(&mut self, func_def: &mut FunctionDef<'a>) -> ParseResult<'a> {
-        let names: Vec<&'a str> = func_def.params.iter().map(|s| s.value).collect();
-        let stype = SyntaxType::UserFunction(Rc::new(names));
+    fn parse_interrupt(&mut self, range: &StrRange, code: PineErrorKind) -> ParseResult<'a> {
+        let context = downcast_ctx(self.context);
+        if context.get_type() != ContextType::ForRangeBlock {
+            self.catch(PineInputError::new(code, *range));
+        }
+        Ok(ParseValue::new_with_type(SyntaxType::Void))
+    }
 
-        downcast_ctx(self.context).declare_var(func_def.name.value, stype.clone());
-        self.user_funcs.insert(func_def.name.value, func_def);
-        Ok(ParseValue::new_with_type(stype))
+    fn parse_break(&mut self, range: &StrRange) -> ParseResult<'a> {
+        self.parse_interrupt(range, PineErrorKind::BreakNotInForStmt)
+    }
+
+    fn parse_continue(&mut self, range: &StrRange) -> ParseResult<'a> {
+        self.parse_interrupt(range, PineErrorKind::ContinueNotInForStmt)
     }
 
     fn parse_stmt(&mut self, stmt: &mut Statement<'a>) -> ParseResult<'a> {
         match stmt {
+            Statement::Break(node) => self.parse_break(node),
+            Statement::Continue(node) => self.parse_continue(node),
             Statement::FuncCall(func_call) => self.parse_func_call(func_call),
-            // Statement::Ite(ite) => self.parse_ifthenelse(ite),
-            // Statement::ForRange(fr) => self.parse_forrange(fr),
-            // Statement::Assignment(assign) => {
-            //     self.parse_exp(&mut assign.val);
-            // }
-            // Statement::VarAssignment(assign) => {
-            //     self.parse_exp(&mut assign.val);
-            // }
-            // Statement::FuncDef(func_def) => {
-            //     self.parse_blk(&mut func_def.body);
-            // }
-            t => Err(PineInputError::new(
-                PineErrorKind::VarNotCallable,
-                t.range(),
-            )),
+            Statement::Ite(ite) => self.parse_ifthenelse_stmt(ite),
+            Statement::ForRange(fr) => self.parse_forrange_stmt(fr),
+            Statement::Assignment(assign) => self.parse_assign(assign),
+            Statement::VarAssignment(assign) => self.parse_var_assign(assign),
+            Statement::FuncDef(func_def) => self.parse_func_def(func_def),
+            Statement::None(_) => Ok(ParseValue::new_with_type(SyntaxType::Void)),
         }
     }
 
     pub fn parse_blk(&mut self, blk: &mut Block<'a>) -> ParseResult<'a> {
-        // for stmt in blk.stmts.iter_mut() {
-        //     self.parse_stmt(stmt)
-        // }
+        for stmt in blk.stmts.iter_mut() {
+            self.parse_stmt(stmt)?;
+        }
         if let Some(ref mut exp) = blk.ret_stmt {
             self.parse_exp(exp)
         } else {
-            Ok(ParseValue::new_with_type(SyntaxType::Simple(
-                SimpleSyntaxType::Na,
-            )))
+            Ok(ParseValue::new_with_type(SyntaxType::Void))
         }
-        // Err(PineInputError::new(
-        //     PineErrorKind::VarNotCallable,
-        //     blk.range,
-        // ))
     }
 }
 
@@ -758,9 +933,7 @@ mod tests {
     use crate::ast::color::ColorNode;
     use crate::ast::input::{Input, Position, StrRange};
     use crate::ast::name::VarName;
-    use crate::ast::stat_expr_types::{
-        Assignment, BoolNode, DataType, NaNode, RefCall, TypeCast, VarAssignment,
-    };
+    use crate::ast::stat_expr_types::{BoolNode, DataType, NaNode, RefCall, TypeCast};
     use crate::ast::string::StringNode;
 
     fn varname(n: &str) -> VarName {
@@ -1126,7 +1299,6 @@ mod tests {
     #[test]
     fn unary_exp_test() {
         use crate::ast::stat_expr_types::UnaryExp;
-        use crate::ast::state::AstState;
 
         let mut parser = SyntaxParser::new();
         let context = downcast_ctx(parser.context);
@@ -1370,6 +1542,153 @@ mod tests {
         assert_eq!(
             *parser.errors.last().unwrap(),
             PineInputError::new(PineErrorKind::BoolExpTypeNotBool, StrRange::new_empty())
+        );
+    }
+
+    #[test]
+    fn prefix_exp_test() {
+        let mut parser = SyntaxParser::new();
+        let context = downcast_ctx(parser.context);
+
+        let map2: HashMap<_, _> = [("key2", SyntaxType::Simple(SimpleSyntaxType::Int))]
+            .iter()
+            .cloned()
+            .collect();
+        let map1: HashMap<_, _> = [("key1", SyntaxType::Object(Rc::new(map2)))]
+            .iter()
+            .cloned()
+            .collect();
+        context.declare_var("var", SyntaxType::Object(Rc::new(map1)));
+
+        let mut prefix_exp =
+            PrefixExp::new_no_input(vec![varname("var"), varname("key1"), varname("key2")]);
+        assert_eq!(
+            parser.parse_prefix(&mut prefix_exp),
+            Ok(ParseValue::new_with_type(SyntaxType::Simple(
+                SimpleSyntaxType::Int
+            )))
+        );
+
+        let mut prefix_exp = PrefixExp::new_no_input(vec![varname("var"), varname("nokey")]);
+        assert_eq!(
+            parser.parse_prefix(&mut prefix_exp),
+            Err(PineInputError::new(
+                PineErrorKind::RefKeyNotExist,
+                StrRange::new_empty()
+            ))
+        );
+
+        let mut prefix_exp = PrefixExp::new_no_input(vec![varname("var2"), varname("nokey")]);
+        assert_eq!(
+            parser.parse_prefix(&mut prefix_exp),
+            Err(PineInputError::new(
+                PineErrorKind::VarNotDeclare,
+                StrRange::new_empty()
+            ))
+        );
+    }
+
+    #[test]
+    fn if_then_else_stmt_test() {
+        use crate::ast::stat_expr::if_then_else_with_indent;
+        use crate::ast::state::AstState;
+
+        let mut parser = SyntaxParser::new();
+        let context = downcast_ctx(parser.context);
+        context.declare_var("var", SyntaxType::Simple(SimpleSyntaxType::Int));
+
+        let input = Input::new_with_str("if var\n    1\nelse\n    na");
+        assert_eq!(
+            parser.parse_ifthenelse_stmt(
+                &mut if_then_else_with_indent(0)(input, &AstState::new())
+                    .unwrap()
+                    .1
+            ),
+            Ok(ParseValue::new_with_type(SyntaxType::Void))
+        );
+    }
+
+    #[test]
+    fn assign_test() {
+        use crate::ast::stat_expr::assign_with_indent;
+        use crate::ast::state::AstState;
+
+        let mut parser = SyntaxParser::new();
+        let context = downcast_ctx(parser.context);
+        context.declare_var("var", SyntaxType::Simple(SimpleSyntaxType::Int));
+
+        let input = Input::new_with_str("a = 1");
+        let val_type = SyntaxType::Simple(SimpleSyntaxType::Int);
+        assert_eq!(
+            parser.parse_assign(&mut assign_with_indent(0)(input, &AstState::new()).unwrap().1),
+            Ok(ParseValue::new_with_type(val_type.clone()))
+        );
+        assert_eq!(context.get_var_scope("a"), Some(&val_type));
+
+        assert_eq!(
+            parser.parse_assign(&mut assign_with_indent(0)(input, &AstState::new()).unwrap().1),
+            Ok(ParseValue::new_with_type(val_type.clone()))
+        );
+        assert_eq!(
+            parser.errors.last(),
+            Some(&PineInputError::new(
+                PineErrorKind::VarHasDeclare,
+                StrRange::from_start("a", Position::new(0, 0))
+            ))
+        );
+
+        let input = Input::new_with_str("[a1, a2] = [1, 2]");
+        assert_eq!(
+            parser.parse_assign(&mut assign_with_indent(0)(input, &AstState::new()).unwrap().1),
+            Ok(ParseValue::new_with_type(SyntaxType::Tuple(Rc::new(vec![
+                val_type.clone(),
+                val_type.clone()
+            ]))))
+        );
+
+        let input = Input::new_with_str("int [a1, a2] = [1.0, 2.0]");
+        assert_eq!(
+            parser.parse_assign(&mut assign_with_indent(0)(input, &AstState::new()).unwrap().1),
+            Ok(ParseValue::new_with_type(SyntaxType::Tuple(Rc::new(vec![
+                val_type.clone(),
+                val_type.clone()
+            ]))))
+        );
+        assert_matches!(
+            parser.errors.last().unwrap(),
+            &PineInputError {
+                code: PineErrorKind::InvalidTypeCast { origin: _, cast: _ },
+                range: _,
+            }
+        );
+    }
+
+    #[test]
+    fn var_assign_test() {
+        use crate::ast::stat_expr::var_assign_with_indent;
+        use crate::ast::state::AstState;
+
+        let mut parser = SyntaxParser::new();
+        let context = downcast_ctx(parser.context);
+        context.declare_var("a", SyntaxType::Simple(SimpleSyntaxType::Float));
+
+        let input = Input::new_with_str("a := 1");
+        let val_type = SyntaxType::Series(SimpleSyntaxType::Float);
+        let mut assign = var_assign_with_indent(0)(input, &AstState::new())
+            .unwrap()
+            .1;
+        assert_eq!(
+            parser.parse_var_assign(&mut assign),
+            Ok(ParseValue::new_with_type(val_type.clone()))
+        );
+
+        context.vars.remove("a");
+        assert_eq!(
+            parser.parse_var_assign(&mut assign),
+            Err(PineInputError::new(
+                PineErrorKind::VarNotDeclare,
+                StrRange::from_start("a := 1", Position::new(0, 0))
+            ))
         );
     }
 }

@@ -1329,6 +1329,10 @@ mod tests {
                 SimpleSyntaxType::String
             )))
         );
+        assert_eq!(
+            sstr_add_exp.result_type,
+            SyntaxType::Series(SimpleSyntaxType::String)
+        );
 
         let mut int_add_exp = BinaryExp::new(
             BinaryOp::Plus,
@@ -1341,6 +1345,10 @@ mod tests {
             Ok(ParseValue::new_with_type(SyntaxType::Simple(
                 SimpleSyntaxType::Int
             )))
+        );
+        assert_eq!(
+            int_add_exp.result_type,
+            SyntaxType::Simple(SimpleSyntaxType::Int)
         );
 
         context.declare_var("sint", SyntaxType::Series(SimpleSyntaxType::Int));
@@ -1356,6 +1364,10 @@ mod tests {
                 SimpleSyntaxType::Int
             )))
         );
+        assert_eq!(
+            int_add_exp.result_type,
+            SyntaxType::Series(SimpleSyntaxType::Int)
+        );
 
         let mut na_add_exp = BinaryExp::new(
             BinaryOp::Plus,
@@ -1370,6 +1382,7 @@ mod tests {
                 StrRange::new_empty()
             ))
         );
+        assert_eq!(na_add_exp.result_type, SyntaxType::Any);
     }
 
     #[test]
@@ -1386,6 +1399,10 @@ mod tests {
                 SimpleSyntaxType::Bool
             )))
         );
+        assert_eq!(
+            geq_exp.result_type,
+            SyntaxType::Simple(SimpleSyntaxType::Bool)
+        );
 
         let mut series_geq_exp = BinaryExp::new(
             BinaryOp::Geq,
@@ -1398,6 +1415,10 @@ mod tests {
             Ok(ParseValue::new_with_type(SyntaxType::Series(
                 SimpleSyntaxType::Bool
             )))
+        );
+        assert_eq!(
+            series_geq_exp.result_type,
+            SyntaxType::Series(SimpleSyntaxType::Bool)
         );
 
         let mut na_geq_exp = BinaryExp::new(
@@ -1431,6 +1452,10 @@ mod tests {
             )))
         );
         assert!(parser.errors.is_empty());
+        assert_eq!(
+            eq_exp.result_type,
+            SyntaxType::Simple(SimpleSyntaxType::Bool)
+        );
 
         let mut eq_dif_type_exp = BinaryExp::new(
             BinaryOp::Eq,

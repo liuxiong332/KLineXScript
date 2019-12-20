@@ -10,5 +10,6 @@ pub mod stat_expr;
 pub mod stat_expr_types;
 pub mod state;
 pub mod string;
+pub mod syntax_type;
 pub mod trans;
 pub mod utils;

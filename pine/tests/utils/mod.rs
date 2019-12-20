@@ -9,12 +9,7 @@ pub fn gen_unop<'a>(op: UnaryOp, exp: Exp<'a>, range: StrRange) -> Exp<'a> {
 }
 
 pub fn gen_binop<'a>(op: BinaryOp, exp1: Exp<'a>, exp2: Exp<'a>, range: StrRange) -> Exp<'a> {
-    Exp::BinaryExp(Box::new(BinaryExp {
-        op,
-        exp1,
-        exp2,
-        range,
-    }))
+    Exp::BinaryExp(Box::new(BinaryExp::new(op, exp1, exp2, range)))
 }
 
 pub fn gen_func_call<'a>(

@@ -1,5 +1,4 @@
 use super::context::{Ctx, PineRuntimeError, RVRunner};
-use super::exp::Exp;
 use crate::ast::op::{BinaryOp, UnaryOp};
 use crate::ast::stat_expr_types::{BinaryExp, UnaryExp};
 use crate::types::{
@@ -16,6 +15,7 @@ pub fn unary_op_run<'a>(
         UnaryOp::Plus => unary_exp.exp.rv_run(context),
         UnaryOp::Minus => {
             let val = unary_exp.exp.rv_run(context)?;
+            // minus destination type can be int, float, series(int) or series(float)
             match val.get_type() {
                 (FirstType::Int, SecondType::Simple) => Ok(PineRef::new_box(
                     downcast_pf::<Int>(val).unwrap().negative(),
@@ -31,10 +31,7 @@ pub fn unary_op_run<'a>(
                     let s = downcast_pf::<Series<Float>>(val).unwrap();
                     Ok(PineRef::new(Series::from(s.get_current().negative())))
                 }
-                _ => Err(PineRuntimeError::new(
-                    RuntimeErr::NotSupportOperator,
-                    unary_exp.range,
-                )),
+                _ => unreachable!(),
             }
         }
         UnaryOp::BoolNot => {
@@ -97,35 +94,49 @@ pub fn binary_op_run<'a, 'b>(
             let val1 = binary_exp.exp1.rv_run(context)?;
             let val2 = binary_exp.exp2.rv_run(context)?;
             match (&binary_exp.op, val1.get_type(), val2.get_type()) {
+                // series(string) + series(string)
+                (BinaryOp::Plus, (FirstType::String, SecondType::Series), _)
+                | (_, _, (FirstType::String, SecondType::Series)) => {
+                    let s1: RefData<Series<String>> = Series::implicity_from(val1).unwrap();
+                    let s2: RefData<Series<String>> = Series::implicity_from(val2).unwrap();
+                    Ok(PineRef::new_rc(Series::from(
+                        s1.get_current() + &s2.get_current(),
+                    )))
+                }
+                // string + string
+                (BinaryOp::Plus, (FirstType::String, SecondType::Simple), _)
+                | (_, _, (FirstType::String, SecondType::Simple)) => Ok(PineRef::new_rc(
+                    String::implicity_from(val1).unwrap().into_inner()
+                        + &(String::implicity_from(val2).unwrap().into_inner()),
+                )),
+                // series(float) +/-/.. any
                 (op, (FirstType::Float, SecondType::Series), _)
                 | (op, _, (FirstType::Float, SecondType::Series)) => {
                     let f1: RefData<Series<Float>> = Series::implicity_from(val1).unwrap();
                     let f2: RefData<Series<Float>> = Series::implicity_from(val2).unwrap();
                     Ok(bi_operate(op, f1, f2))
                 }
+                // series(int) +/-/.. any
                 (op, (FirstType::Int, SecondType::Series), _)
                 | (op, _, (FirstType::Int, SecondType::Series)) => {
                     let d1: RefData<Series<Int>> = Series::implicity_from(val1).unwrap();
                     let d2: RefData<Series<Int>> = Series::implicity_from(val2).unwrap();
                     Ok(bi_operate(op, d1, d2))
                 }
+                // float +/-/.. any
                 (op, (FirstType::Float, SecondType::Simple), _)
                 | (op, _, (FirstType::Float, SecondType::Simple)) => {
                     let f1 = Float::implicity_from(val1).unwrap();
                     let f2 = Float::implicity_from(val2).unwrap();
                     Ok(bi_operate(op, f1, f2))
                 }
+                // int +/-/.. any
                 (op, (FirstType::Int, SecondType::Simple), _)
                 | (op, _, (FirstType::Int, SecondType::Simple)) => {
                     let d1 = Int::implicity_from(val1).unwrap();
                     let d2 = Int::implicity_from(val2).unwrap();
                     Ok(bi_operate(op, d1, d2))
                 }
-                (BinaryOp::Plus, (FirstType::String, SecondType::Simple), _)
-                | (_, _, (FirstType::String, SecondType::Simple)) => Ok(PineRef::new_rc(
-                    String::implicity_from(val1).unwrap().into_inner()
-                        + &(String::implicity_from(val2).unwrap().into_inner()),
-                )),
                 _ => Err(PineRuntimeError::new(
                     RuntimeErr::NotSupportOperator,
                     binary_exp.range,
@@ -142,6 +153,7 @@ mod tests {
     use crate::ast::name::VarName;
     use crate::ast::num::Numeral;
     use crate::ast::stat_expr_types::BoolNode;
+    use crate::ast::stat_expr_types::Exp;
     use crate::ast::string::StringNode;
     use crate::runtime::context::{Context, ContextType, VarOperate};
     use crate::types::PineStaticType;

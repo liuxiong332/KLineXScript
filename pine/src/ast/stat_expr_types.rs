@@ -4,6 +4,7 @@ use super::name::VarName;
 use super::num::Numeral;
 use super::op::{BinaryOp, BinaryOpNode, UnaryOp, UnaryOpNode};
 use super::string::StringNode;
+use super::syntax_type::SyntaxType;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct FunctionCall<'a> {
@@ -149,6 +150,7 @@ pub struct BinaryExp<'a> {
     pub exp1: Exp<'a>,
     pub exp2: Exp<'a>,
     pub range: StrRange,
+    pub result_type: SyntaxType<'a>,
 }
 
 impl<'a> BinaryExp<'a> {
@@ -158,6 +160,7 @@ impl<'a> BinaryExp<'a> {
             exp1,
             exp2,
             range,
+            result_type: SyntaxType::Any,
         }
     }
 }

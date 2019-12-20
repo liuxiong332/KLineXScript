@@ -1,4 +1,4 @@
-use super::context::{Ctx, RVRunner, Runner, VarOperate};
+use super::context::{Ctx, PineRuntimeError, RVRunner, Runner};
 use super::op::{binary_op_run, unary_op_run};
 use crate::ast::name::VarName;
 use crate::ast::num::Numeral;
@@ -12,7 +12,7 @@ use crate::types::{
 use std::fmt::Debug;
 
 impl<'a> Runner<'a> for Exp<'a> {
-    fn run(&'a self, _context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
+    fn run(&'a self, _context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
         match self {
             Exp::Na(_) => Ok(PineRef::new_box(NA)),
             Exp::Bool(b) => Ok(PineRef::new_box(b.value)),
@@ -35,17 +35,17 @@ impl<'a> Runner<'a> for Exp<'a> {
             Exp::Condition(ref cond) => cond.run(_context),
             Exp::Ite(ref ite) => ite.run(_context),
             Exp::ForRange(ref for_range) => for_range.run(_context),
-            Exp::UnaryExp(ref node) => unary_op_run(&node.op, &node.exp, _context),
-            Exp::BinaryExp(ref node) => binary_op_run(&node.op, &node.exp1, &node.exp2, _context),
+            Exp::UnaryExp(ref node) => unary_op_run(&node, _context),
+            Exp::BinaryExp(ref node) => binary_op_run(&node, _context),
         }
     }
 }
 
 impl<'a> RVRunner<'a> for Exp<'a> {
-    fn rv_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
+    fn rv_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
         match *self {
             Exp::VarName(name) => match context.move_var(name.value) {
-                None => Err(RuntimeErr::VarNotFound),
+                None => Err(PineRuntimeError::new(RuntimeErr::VarNotFound, self.range())),
                 Some(s) => {
                     let ret = s.copy();
                     context.update_var(name.value, s);
@@ -65,68 +65,83 @@ impl<'a> RVRunner<'a> for Exp<'a> {
 }
 
 impl<'a> Runner<'a> for TypeCast<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
         let result = self.exp.rv_run(context)?;
         match (&self.data_type, result.get_type().1) {
-            (&DataType::Bool, SecondType::Simple) => Ok(Bool::explicity_from(result)?.into_pf()),
+            (&DataType::Bool, SecondType::Simple) => {
+                Ok(Bool::explicity_from(result).unwrap().into_pf())
+            }
             (&DataType::Bool, SecondType::Series) => {
-                let s: RefData<Series<Bool>> = Series::explicity_from(result)?;
+                let s: RefData<Series<Bool>> = Series::explicity_from(result).unwrap();
                 Ok(s.into_pf())
             }
-            (&DataType::Int, SecondType::Simple) => Ok(Int::explicity_from(result)?.into_pf()),
+            (&DataType::Int, SecondType::Simple) => {
+                Ok(Int::explicity_from(result).unwrap().into_pf())
+            }
             (&DataType::Int, SecondType::Series) => {
-                let s: RefData<Series<Int>> = Series::explicity_from(result)?;
+                let s: RefData<Series<Int>> = Series::explicity_from(result).unwrap();
                 Ok(s.into_pf())
             }
-            (&DataType::Float, SecondType::Simple) => Ok(Float::explicity_from(result)?.into_pf()),
+            (&DataType::Float, SecondType::Simple) => {
+                Ok(Float::explicity_from(result).unwrap().into_pf())
+            }
             (&DataType::Float, SecondType::Series) => {
-                let s: RefData<Series<Float>> = Series::explicity_from(result)?;
+                let s: RefData<Series<Float>> = Series::explicity_from(result).unwrap();
                 Ok(s.into_pf())
             }
-            (&DataType::Color, SecondType::Simple) => Ok(Color::explicity_from(result)?.into_pf()),
+            (&DataType::Color, SecondType::Simple) => {
+                Ok(Color::explicity_from(result).unwrap().into_pf())
+            }
             (&DataType::Color, SecondType::Series) => {
-                let s: RefData<Series<Color>> = Series::explicity_from(result)?;
+                let s: RefData<Series<Color>> = Series::explicity_from(result).unwrap();
                 Ok(s.into_pf())
             }
             (&DataType::String, SecondType::Simple) => {
-                Ok(String::explicity_from(result)?.into_pf())
+                Ok(String::explicity_from(result).unwrap().into_pf())
             }
             (&DataType::String, SecondType::Series) => {
-                let s: RefData<Series<String>> = Series::explicity_from(result)?;
+                let s: RefData<Series<String>> = Series::explicity_from(result).unwrap();
                 Ok(s.into_pf())
             }
-            _t => Err(RuntimeErr::NotCompatible(format!(
-                "Cannot convert {:?} to {:?}",
-                result.get_type(),
-                _t
-            ))),
+            _t => Err(PineRuntimeError::new(
+                RuntimeErr::NotCompatible(format!(
+                    "Cannot convert {:?} to {:?}",
+                    result.get_type(),
+                    _t
+                )),
+                self.range,
+            )),
         }
     }
 }
 
 impl<'a> Runner<'a> for PrefixExp<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
         let varname = self.var_chain[0].value;
-        let var = context.move_var(varname);
-        if var.is_none() {
-            return Err(RuntimeErr::NotSupportOperator);
+        let var = context.move_var(varname).unwrap();
+        if var.get_type() != (FirstType::Object, SecondType::Simple) {
+            return Err(PineRuntimeError::new(
+                RuntimeErr::InvalidVarType(format!(
+                    "Expect Object type, but get {:?}",
+                    var.get_type().0
+                )),
+                self.range,
+            ));
         }
-        let var_unwrap = var.unwrap();
-        if var_unwrap.get_type() != (FirstType::Object, SecondType::Simple) {
-            return Err(RuntimeErr::InvalidVarType(format!(
-                "Expect Object type, but get {:?}",
-                var_unwrap.get_type().0
-            )));
-        }
-        let object = downcast_pf::<Object>(var_unwrap)?;
-        let mut subobj = object.get(self.var_chain[1].value)?;
+        let object = downcast_pf::<Object>(var).unwrap();
+        let mut subobj = object.get(self.var_chain[1].value).unwrap();
         for name in self.var_chain[2..].iter() {
             match subobj.get_type() {
                 (FirstType::Object, SecondType::Simple) => {
                     let obj = downcast_pf::<Object>(subobj).unwrap();
-                    subobj = obj.get(name.value)?;
+                    subobj = obj.get(name.value).unwrap();
                 }
-                _ => return Err(RuntimeErr::NotSupportOperator),
+                _ => {
+                    return Err(PineRuntimeError::new(
+                        RuntimeErr::NotSupportOperator,
+                        self.range,
+                    ))
+                }
             }
         }
         context.update_var(varname, object.into_pf());
@@ -135,9 +150,9 @@ impl<'a> Runner<'a> for PrefixExp<'a> {
 }
 
 impl<'a> Runner<'a> for Condition<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
         let cond = self.cond.rv_run(context)?;
-        let bool_val = Bool::implicity_from(cond)?;
+        let bool_val = Bool::implicity_from(cond).unwrap();
         match *bool_val {
             true => self.exp1.rv_run(context),
             false => self.exp2.rv_run(context),
@@ -171,7 +186,7 @@ where
 }
 
 impl<'a> Runner<'a> for RefCall<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
         let var = self.name.rv_run(context)?;
         let arg = self.arg.rv_run(context)?;
         // if name.get_type() != (FirstType::PineVar, SecondType::Simple) {
@@ -184,13 +199,17 @@ impl<'a> Runner<'a> for RefCall<'a> {
         // }
 
         // let var = var_opt.unwrap();
-        match var.get_type() {
+        let result = match var.get_type() {
             (FirstType::Int, _) => get_slice::<Int>(var, arg),
             (FirstType::Float, _) => get_slice::<Float>(var, arg),
             (FirstType::Bool, _) => get_slice::<Bool>(var, arg),
             (FirstType::Color, _) => get_slice::<Color>(var, arg),
             (FirstType::String, _) => get_slice::<String>(var, arg),
             _ => Err(RuntimeErr::NotSupportOperator),
+        };
+        match result {
+            Ok(val) => Ok(val),
+            Err(code) => Err(PineRuntimeError::new(code, self.range)),
         }
     }
 }
@@ -203,7 +222,7 @@ mod tests {
     use crate::ast::num::Numeral;
     use crate::ast::stat_expr_types::{BoolNode, NaNode, TupleNode};
     use crate::ast::string::StringNode;
-    use crate::runtime::context::{Context, ContextType};
+    use crate::runtime::context::{Context, ContextType, VarOperate};
     use crate::types::PineClass;
     use std::fmt::Debug;
 

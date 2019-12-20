@@ -1,7 +1,8 @@
 use super::context::{
-    downcast_ctx, Context, ContextType, Ctx, RVRunner, Runner, StmtRunner, VarOperate,
+    downcast_ctx, ContextType, Ctx, PineRuntimeError, RVRunner, Runner, StmtRunner, VarOperate,
 };
 use super::function::Function;
+use crate::ast::input::StrRange;
 use crate::ast::name::VarName;
 use crate::ast::stat_expr_types::{
     Assignment, Block, DataType, ForRange, FunctionCall, FunctionDef, IfThenElse, Statement,
@@ -14,11 +15,11 @@ use crate::types::{
 use std::fmt::Debug;
 
 impl<'a> StmtRunner<'a> for Statement<'a> {
-    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
+    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), PineRuntimeError> {
         match *self {
             Statement::None(_) => Ok(()),
-            Statement::Break(_) => Err(RuntimeErr::Break),
-            Statement::Continue(_) => Err(RuntimeErr::Continue),
+            Statement::Break(range) => Err(PineRuntimeError::new(RuntimeErr::Break, range)),
+            Statement::Continue(range) => Err(PineRuntimeError::new(RuntimeErr::Continue, range)),
             Statement::Assignment(ref assign) => assign.st_run(context),
             Statement::VarAssignment(ref var_assign) => var_assign.st_run(context),
             Statement::Ite(ref ite) => StmtRunner::st_run(ite.as_ref(), context),
@@ -122,6 +123,22 @@ where
     Ok(())
 }
 
+fn update_series_range<'a, 'b, D>(
+    context: &mut (dyn 'b + VarOperate<'a>),
+    name: &'a str,
+    exist_val: PineRef<'a>,
+    val: PineRef<'a>,
+    range: StrRange,
+) -> Result<(), PineRuntimeError>
+where
+    D: Default + PineType<'a> + PineStaticType + 'a + PineFrom<'a, D> + Clone + PartialEq + Debug,
+{
+    match update_series::<D>(context, name, exist_val, val) {
+        Ok(_) => Ok(()),
+        Err(code) => Err(PineRuntimeError::new(code, range)),
+    }
+}
+
 impl<'a> RunnerForName<'a> for Assignment<'a> {
     fn run_name(
         &'a self,
@@ -158,54 +175,78 @@ impl<'a> RunnerForName<'a> for Assignment<'a> {
 }
 
 impl<'a> StmtRunner<'a> for Assignment<'a> {
-    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
+    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), PineRuntimeError> {
         let val = self.val.rv_run(context)?;
         if self.names.len() == 1 {
-            return self.run_name(context, &self.names[0], val);
+            return match self.run_name(context, &self.names[0], val) {
+                Err(code) => Err(PineRuntimeError::new(code, self.range)),
+                Ok(_) => Ok(()),
+            };
         }
         match val.get_type() {
             (FirstType::Tuple, SecondType::Simple) => {
-                let mut tuple = downcast_pf::<Tuple>(val)?;
+                let mut tuple = downcast_pf::<Tuple>(val).unwrap();
 
                 if tuple.0.len() != self.names.len() {
-                    return Err(RuntimeErr::TupleMismatch);
+                    return Err(PineRuntimeError::new(RuntimeErr::TupleMismatch, self.range));
                 }
 
                 for n in self.names.iter().rev() {
-                    self.run_name(context, n, tuple.0.pop().unwrap())?;
+                    if let Err(code) = self.run_name(context, n, tuple.0.pop().unwrap()) {
+                        return Err(PineRuntimeError::new(code, self.range));
+                    }
                 }
                 Ok(())
             }
-            _ => Err(RuntimeErr::NotSupportOperator),
+            _ => Err(PineRuntimeError::new(
+                RuntimeErr::NotSupportOperator,
+                self.range,
+            )),
         }
     }
 }
 
 impl<'a> StmtRunner<'a> for VarAssignment<'a> {
-    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
+    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), PineRuntimeError> {
         let name = self.name.value;
         if !context.contains_declare(name) {
-            return Err(RuntimeErr::NameNotDeclard);
+            return Err(PineRuntimeError::new(
+                RuntimeErr::NameNotDeclard,
+                self.range,
+            ));
         }
         let val = self.val.rv_run(context)?;
 
         let exist_val = context.move_var(name).unwrap();
         let ctx_instance = downcast_ctx(context).unwrap();
         match exist_val.get_type() {
-            (FirstType::Bool, _) => update_series::<Bool>(ctx_instance, name, exist_val, val),
-            (FirstType::Int, _) => update_series::<Int>(ctx_instance, name, exist_val, val),
-            (FirstType::Float, _) => update_series::<Float>(ctx_instance, name, exist_val, val),
-            (FirstType::Color, _) => update_series::<Color>(ctx_instance, name, exist_val, val),
-            (FirstType::String, _) => update_series::<String>(ctx_instance, name, exist_val, val),
-            _ => Err(RuntimeErr::NotSupportOperator),
+            (FirstType::Bool, _) => {
+                update_series_range::<Bool>(ctx_instance, name, exist_val, val, self.range)
+            }
+            (FirstType::Int, _) => {
+                update_series_range::<Int>(ctx_instance, name, exist_val, val, self.range)
+            }
+            (FirstType::Float, _) => {
+                update_series_range::<Float>(ctx_instance, name, exist_val, val, self.range)
+            }
+            (FirstType::Color, _) => {
+                update_series_range::<Color>(ctx_instance, name, exist_val, val, self.range)
+            }
+            (FirstType::String, _) => {
+                update_series_range::<String>(ctx_instance, name, exist_val, val, self.range)
+            }
+            _ => Err(PineRuntimeError::new(
+                RuntimeErr::NotSupportOperator,
+                self.range,
+            )),
         }
     }
 }
 
 impl<'a> Runner<'a> for IfThenElse<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
         let cond = self.cond.rv_run(context)?;
-        let cond_bool = Bool::implicity_from(cond)?;
+        let cond_bool = Bool::implicity_from(cond).unwrap();
         if *cond_bool {
             let subctx = create_sub_ctx(context, self.then_ctxid, ContextType::IfElseBlock);
             let result = self.then_blk.run(subctx);
@@ -223,7 +264,7 @@ impl<'a> Runner<'a> for IfThenElse<'a> {
 }
 
 impl<'a> StmtRunner<'a> for IfThenElse<'a> {
-    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
+    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), PineRuntimeError> {
         match Runner::run(self, context) {
             Ok(_) => Ok(()),
             Err(e) => Err(e),
@@ -231,36 +272,29 @@ impl<'a> StmtRunner<'a> for IfThenElse<'a> {
     }
 }
 
+fn extract_int(val: Int, range: StrRange) -> Result<i32, PineRuntimeError> {
+    match val {
+        Some(ival) => Ok(ival),
+        None => Err(PineRuntimeError::new(RuntimeErr::ForRangeIndexIsNA, range)),
+    }
+}
+
 impl<'a> Runner<'a> for ForRange<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
         let iter_name = self.var.value;
-        let start: i32;
-        match *Int::implicity_from(self.start.rv_run(context)?)? {
-            Some(val) => start = val,
-            None => {
-                return Err(RuntimeErr::NotCompatible(format!(
-                    "The start index of for-range must be not na int, but get na"
-                )))
-            }
-        }
-        let end: i32;
-        match *Int::implicity_from(self.end.rv_run(context)?)? {
-            Some(val) => end = val,
-            None => {
-                return Err(RuntimeErr::NotCompatible(format!(
-                    "The start index of for-range must be not na int, but get na"
-                )))
-            }
-        }
+        let start = extract_int(
+            *Int::implicity_from(self.start.rv_run(context)?).unwrap(),
+            self.range,
+        )?;
+        let end = extract_int(
+            *Int::implicity_from(self.end.rv_run(context)?).unwrap(),
+            self.range,
+        )?;
         let step = if let Some(s) = &self.step {
-            match *Int::implicity_from(s.rv_run(context)?)? {
-                Some(val) => val,
-                None => {
-                    return Err(RuntimeErr::NotCompatible(format!(
-                        "The start index of for-range must be not na int, but get na"
-                    )))
-                }
-            }
+            extract_int(
+                *Int::implicity_from(s.rv_run(context)?).unwrap(),
+                self.range,
+            )?
         } else if start < end {
             1
         } else {
@@ -277,13 +311,19 @@ impl<'a> Runner<'a> for ForRange<'a> {
                     ret_val = val;
                     iter += step;
                 }
-                Err(RuntimeErr::Break) => {
+                Err(PineRuntimeError {
+                    code: RuntimeErr::Break,
+                    range: _,
+                }) => {
                     if let Some(ref exp) = self.do_blk.ret_stmt {
                         ret_val = exp.rv_run(subctx)?
                     }
                     break;
                 }
-                Err(RuntimeErr::Continue) => {
+                Err(PineRuntimeError {
+                    code: RuntimeErr::Continue,
+                    range: _,
+                }) => {
                     if let Some(ref exp) = self.do_blk.ret_stmt {
                         ret_val = exp.rv_run(subctx)?
                     }
@@ -301,7 +341,7 @@ impl<'a> Runner<'a> for ForRange<'a> {
 }
 
 impl<'a> StmtRunner<'a> for ForRange<'a> {
-    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
+    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), PineRuntimeError> {
         match Runner::run(self, context) {
             Ok(_) => Ok(()),
             Err(e) => Err(e),
@@ -312,7 +352,7 @@ impl<'a> StmtRunner<'a> for ForRange<'a> {
 fn extract_args<'a>(
     context: &mut dyn Ctx<'a>,
     exp: &'a FunctionCall<'a>,
-) -> Result<(Vec<PineRef<'a>>, Vec<(&'a str, PineRef<'a>)>), RuntimeErr> {
+) -> Result<(Vec<PineRef<'a>>, Vec<(&'a str, PineRef<'a>)>), PineRuntimeError> {
     let mut ret_pos = vec![];
     for exp in exp.pos_args.iter() {
         ret_pos.push(exp.rv_run(context)?);
@@ -379,13 +419,13 @@ pub fn get_sub_ctx<'a, 'b, 'c>(
 }
 
 impl<'a> Runner<'a> for FunctionCall<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
         let result = self.method.rv_run(context)?;
 
         let (pos_args, dict_args) = extract_args(context, self)?;
         let ctx_ref = create_sub_ctx(context, self.ctxid, ContextType::FuncDefBlock);
 
-        match result.get_type() {
+        let result = match result.get_type() {
             (FirstType::Callable, SecondType::Simple) => {
                 let callable = downcast_pf::<Callable>(result).unwrap();
                 let result = callable.call(ctx_ref, pos_args, dict_args);
@@ -395,17 +435,21 @@ impl<'a> Runner<'a> for FunctionCall<'a> {
             }
             (FirstType::Function, SecondType::Simple) => {
                 let callable = downcast_pf::<Function>(result).unwrap();
-                let result = callable.call(ctx_ref, pos_args, dict_args);
+                let result = callable.call(ctx_ref, pos_args, dict_args, self.range);
                 ctx_ref.set_is_run(true);
-                result
+                return result;
             }
             _ => Err(RuntimeErr::NotSupportOperator),
+        };
+        match result {
+            Ok(val) => Ok(val),
+            Err(code) => Err(PineRuntimeError::new(code, self.range)),
         }
     }
 }
 
 impl<'a> StmtRunner<'a> for FunctionCall<'a> {
-    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
+    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), PineRuntimeError> {
         match Runner::run(self, context) {
             Ok(_) => Ok(()),
             Err(e) => Err(e),
@@ -414,7 +458,7 @@ impl<'a> StmtRunner<'a> for FunctionCall<'a> {
 }
 
 impl<'a> StmtRunner<'a> for FunctionDef<'a> {
-    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
+    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), PineRuntimeError> {
         let func = Function::new(self);
         context.create_var(self.name.value, PineRef::new_rc(func));
         Ok(())
@@ -422,7 +466,7 @@ impl<'a> StmtRunner<'a> for FunctionDef<'a> {
 }
 
 impl<'a> Runner<'a> for Block<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
         for st in self.stmts.iter() {
             st.st_run(context)?;
         }
@@ -441,6 +485,7 @@ mod tests {
     use crate::ast::name::VarName;
     use crate::ast::num::Numeral;
     use crate::ast::stat_expr_types::{BoolNode, TupleNode};
+    use crate::runtime::context::Context;
     use crate::runtime::exp::Exp;
 
     #[test]

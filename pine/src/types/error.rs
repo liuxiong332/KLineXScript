@@ -1,4 +1,4 @@
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum RuntimeErr {
     NotCompatible(String),
     NotValidParam,
@@ -18,4 +18,6 @@ pub enum RuntimeErr {
 
     Continue,
     Break,
+
+    ForRangeIndexIsNA, // The index of for-range is na
 }

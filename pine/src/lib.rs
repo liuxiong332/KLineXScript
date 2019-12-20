@@ -18,7 +18,9 @@ use ast::error::{PineError, PineErrorKind};
 use ast::input::{Input, Position};
 use ast::stat_expr::block;
 use ast::stat_expr_types::Block;
-use ast::state::AstState;
+use ast::state::{AstState, PineInputError};
+
+use syntax::SyntaxParser;
 
 pub fn parse_all(in_str: &str) -> Result<Block, PineError<Input>> {
     let input = Input::new(in_str, Position::new(0, 0), Position::max());
@@ -39,4 +41,9 @@ pub fn parse_all(in_str: &str) -> Result<Block, PineError<Input>> {
             PineErrorKind::Context("Parse error"),
         )),
     }
+}
+
+pub fn parse_syntax(blk: &mut Block) -> Result<(), PineInputError> {
+    SyntaxParser::new().parse_blk(blk)?;
+    Ok(())
 }

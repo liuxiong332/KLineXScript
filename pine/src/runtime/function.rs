@@ -1,5 +1,6 @@
-use super::context::{downcast_ctx, Ctx, Runner};
+use super::context::{downcast_ctx, Ctx, PineRuntimeError, Runner};
 use super::statement::process_assign_val;
+use crate::ast::input::StrRange;
 use crate::ast::stat_expr_types::FunctionDef;
 use crate::types::{
     Category, ComplexType, DataType, PineFrom, PineRef, PineStaticType, PineType, RuntimeErr,
@@ -45,9 +46,10 @@ impl<'a> Function<'a> {
         context: &mut dyn Ctx<'a>,
         pos_args: Vec<PineRef<'a>>,
         dict_args: Vec<(&'a str, PineRef<'a>)>,
-    ) -> Result<PineRef<'a>, RuntimeErr> {
+        range: StrRange,
+    ) -> Result<PineRef<'a>, PineRuntimeError> {
         if pos_args.len() > self.def.params.len() {
-            return Err(RuntimeErr::NotValidParam);
+            return Err(PineRuntimeError::new(RuntimeErr::NotValidParam, range));
         }
 
         let mut all_args: HashMap<&'a str, PineRef<'a>> = HashMap::new();
@@ -57,7 +59,7 @@ impl<'a> Function<'a> {
         }
         for (name, val) in dict_args.into_iter() {
             match self.def.params.iter().any(|&v| name == v.value) {
-                false => return Err(RuntimeErr::NotValidParam),
+                false => return Err(PineRuntimeError::new(RuntimeErr::NotValidParam, range)),
                 true => {
                     all_args.insert(name, val);
                 }
@@ -66,7 +68,9 @@ impl<'a> Function<'a> {
         // let mut new_context = Context::new(Some(context), ContextType::FuncDefBlock);
         for (k, v) in all_args {
             // context.create_var(k, v);
-            process_assign_val(v, downcast_ctx(context).unwrap(), k)?;
+            if let Err(err) = process_assign_val(v, downcast_ctx(context).unwrap(), k) {
+                return Err(PineRuntimeError::new(err, range));
+            }
         }
         self.def.body.run(context)
     }
@@ -92,11 +96,21 @@ mod tests {
         let func = Function::new(&func_def);
         let mut ctx = Context::new(None, ContextType::FuncDefBlock);
         assert_eq!(
-            func.call(&mut ctx, vec![PineRef::new(Series::from(Some(1)))], vec![]),
+            func.call(
+                &mut ctx,
+                vec![PineRef::new(Series::from(Some(1)))],
+                vec![],
+                StrRange::new_empty()
+            ),
             Ok(PineRef::new(Series::from(Some(1))))
         );
         assert_eq!(
-            func.call(&mut ctx, vec![PineRef::new(Series::from(Some(10)))], vec![]),
+            func.call(
+                &mut ctx,
+                vec![PineRef::new(Series::from(Some(10)))],
+                vec![],
+                StrRange::new_empty()
+            ),
             Ok(PineRef::new(Series::from(Some(10))))
         );
         ctx.commit();
@@ -104,7 +118,8 @@ mod tests {
             func.call(
                 &mut ctx,
                 vec![PineRef::new(Series::from(Some(100)))],
-                vec![]
+                vec![],
+                StrRange::new_empty()
             ),
             Ok(PineRef::new(Series::from_cur_history(
                 Some(100),

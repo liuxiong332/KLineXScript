@@ -1,6 +1,7 @@
-use super::context::{Ctx, RVRunner, VarOperate};
+use super::context::{Ctx, PineRuntimeError, RVRunner};
 use super::exp::Exp;
 use crate::ast::op::{BinaryOp, UnaryOp};
+use crate::ast::stat_expr_types::{BinaryExp, UnaryExp};
 use crate::types::{
     downcast_pf, Arithmetic, Bool, DataType as FirstType, Float, Int, Negative, PineFrom, PineRef,
     PineType, RefData, RuntimeErr, SecondType, Series,
@@ -8,14 +9,13 @@ use crate::types::{
 use std::fmt::Debug;
 
 pub fn unary_op_run<'a>(
-    op: &UnaryOp,
-    exp: &'a Exp<'a>,
+    unary_exp: &'a UnaryExp<'a>,
     context: &mut (dyn Ctx<'a>),
-) -> Result<PineRef<'a>, RuntimeErr> {
-    match op {
-        UnaryOp::Plus => exp.rv_run(context),
+) -> Result<PineRef<'a>, PineRuntimeError> {
+    match unary_exp.op {
+        UnaryOp::Plus => unary_exp.exp.rv_run(context),
         UnaryOp::Minus => {
-            let val = exp.rv_run(context)?;
+            let val = unary_exp.exp.rv_run(context)?;
             match val.get_type() {
                 (FirstType::Int, SecondType::Simple) => Ok(PineRef::new_box(
                     downcast_pf::<Int>(val).unwrap().negative(),
@@ -31,12 +31,15 @@ pub fn unary_op_run<'a>(
                     let s = downcast_pf::<Series<Float>>(val).unwrap();
                     Ok(PineRef::new(Series::from(s.get_current().negative())))
                 }
-                _ => Err(RuntimeErr::NotSupportOperator),
+                _ => Err(PineRuntimeError::new(
+                    RuntimeErr::NotSupportOperator,
+                    unary_exp.range,
+                )),
             }
         }
         UnaryOp::BoolNot => {
-            let val = exp.rv_run(context)?;
-            let bool_val = Bool::implicity_from(val)?;
+            let val = unary_exp.exp.rv_run(context)?;
+            let bool_val = Bool::implicity_from(val).unwrap();
             match *bool_val {
                 true => Ok(PineRef::new_box(false)),
                 false => Ok(PineRef::new_box(true)),
@@ -66,66 +69,67 @@ where
 }
 
 pub fn binary_op_run<'a, 'b>(
-    op: &BinaryOp,
-    exp1: &'a Exp<'a>,
-    exp2: &'a Exp<'a>,
+    binary_exp: &'a BinaryExp,
     context: &mut (dyn 'b + Ctx<'a>),
-) -> Result<PineRef<'a>, RuntimeErr> {
-    match op {
+) -> Result<PineRef<'a>, PineRuntimeError> {
+    match binary_exp.op {
         BinaryOp::BoolAnd => {
-            let val1 = exp1.rv_run(context)?;
-            let bval1 = Bool::implicity_from(val1)?;
+            let val1 = binary_exp.exp1.rv_run(context)?;
+            let bval1 = Bool::implicity_from(val1).unwrap();
             if *bval1 == false {
                 return Ok(PineRef::new_box(false));
             }
-            let val2 = exp2.rv_run(context)?;
-            let bval2 = Bool::implicity_from(val2)?;
+            let val2 = binary_exp.exp2.rv_run(context)?;
+            let bval2 = Bool::implicity_from(val2).unwrap();
             Ok(bval2.into_pf())
         }
         BinaryOp::BoolOr => {
-            let val1 = exp1.rv_run(context)?;
-            let bval1 = Bool::implicity_from(val1)?;
+            let val1 = binary_exp.exp1.rv_run(context)?;
+            let bval1 = Bool::implicity_from(val1).unwrap();
             if *bval1 == true {
                 return Ok(PineRef::new_box(true));
             }
-            let val2 = exp2.rv_run(context)?;
-            let bval2 = Bool::implicity_from(val2)?;
+            let val2 = binary_exp.exp2.rv_run(context)?;
+            let bval2 = Bool::implicity_from(val2).unwrap();
             Ok(bval2.into_pf())
         }
         _ => {
-            let val1 = exp1.rv_run(context)?;
-            let val2 = exp2.rv_run(context)?;
-            match (op, val1.get_type(), val2.get_type()) {
+            let val1 = binary_exp.exp1.rv_run(context)?;
+            let val2 = binary_exp.exp2.rv_run(context)?;
+            match (&binary_exp.op, val1.get_type(), val2.get_type()) {
                 (op, (FirstType::Float, SecondType::Series), _)
                 | (op, _, (FirstType::Float, SecondType::Series)) => {
-                    let f1: RefData<Series<Float>> = Series::implicity_from(val1)?;
-                    let f2: RefData<Series<Float>> = Series::implicity_from(val2)?;
+                    let f1: RefData<Series<Float>> = Series::implicity_from(val1).unwrap();
+                    let f2: RefData<Series<Float>> = Series::implicity_from(val2).unwrap();
                     Ok(bi_operate(op, f1, f2))
                 }
                 (op, (FirstType::Int, SecondType::Series), _)
                 | (op, _, (FirstType::Int, SecondType::Series)) => {
-                    let d1: RefData<Series<Int>> = Series::implicity_from(val1)?;
-                    let d2: RefData<Series<Int>> = Series::implicity_from(val2)?;
+                    let d1: RefData<Series<Int>> = Series::implicity_from(val1).unwrap();
+                    let d2: RefData<Series<Int>> = Series::implicity_from(val2).unwrap();
                     Ok(bi_operate(op, d1, d2))
                 }
                 (op, (FirstType::Float, SecondType::Simple), _)
                 | (op, _, (FirstType::Float, SecondType::Simple)) => {
-                    let f1 = Float::implicity_from(val1)?;
-                    let f2 = Float::implicity_from(val2)?;
+                    let f1 = Float::implicity_from(val1).unwrap();
+                    let f2 = Float::implicity_from(val2).unwrap();
                     Ok(bi_operate(op, f1, f2))
                 }
                 (op, (FirstType::Int, SecondType::Simple), _)
                 | (op, _, (FirstType::Int, SecondType::Simple)) => {
-                    let d1 = Int::implicity_from(val1)?;
-                    let d2 = Int::implicity_from(val2)?;
+                    let d1 = Int::implicity_from(val1).unwrap();
+                    let d2 = Int::implicity_from(val2).unwrap();
                     Ok(bi_operate(op, d1, d2))
                 }
                 (BinaryOp::Plus, (FirstType::String, SecondType::Simple), _)
                 | (_, _, (FirstType::String, SecondType::Simple)) => Ok(PineRef::new_rc(
-                    String::implicity_from(val1)?.into_inner()
-                        + &(String::implicity_from(val2)?.into_inner()),
+                    String::implicity_from(val1).unwrap().into_inner()
+                        + &(String::implicity_from(val2).unwrap().into_inner()),
                 )),
-                _ => Err(RuntimeErr::NotSupportOperator),
+                _ => Err(PineRuntimeError::new(
+                    RuntimeErr::NotSupportOperator,
+                    binary_exp.range,
+                )),
             }
         }
     }
@@ -139,22 +143,25 @@ mod tests {
     use crate::ast::num::Numeral;
     use crate::ast::stat_expr_types::BoolNode;
     use crate::ast::string::StringNode;
-    use crate::runtime::context::{Context, ContextType};
+    use crate::runtime::context::{Context, ContextType, VarOperate};
     use crate::types::PineStaticType;
 
     #[test]
     fn unary_op_test() {
-        let exp = Box::new(Exp::Num(Numeral::from_i32(1)));
-        let exp2 = Box::new(Exp::Bool(BoolNode::new(true, StrRange::new_empty())));
+        let exp = Exp::Num(Numeral::from_i32(1));
+        let exp2 = Exp::Bool(BoolNode::new(true, StrRange::new_empty()));
+
+        let minus_exp = UnaryExp::new(UnaryOp::Minus, exp, StrRange::new_empty());
+        let not_exp = UnaryExp::new(UnaryOp::BoolNot, exp2, StrRange::new_empty());
 
         let mut context = Context::new(None, ContextType::Normal);
         assert_eq!(
-            downcast_pf::<Int>(unary_op_run(&UnaryOp::Minus, &exp, &mut context,).unwrap()),
+            downcast_pf::<Int>(unary_op_run(&minus_exp, &mut context,).unwrap()),
             Ok(RefData::new_box(Some(-1)))
         );
 
         assert_eq!(
-            downcast_pf::<Bool>(unary_op_run(&UnaryOp::BoolNot, &exp2, &mut context,).unwrap()),
+            downcast_pf::<Bool>(unary_op_run(&not_exp, &mut context,).unwrap()),
             Ok(RefData::new_box(false))
         );
     }
@@ -173,7 +180,13 @@ mod tests {
         v2: Exp<'a>,
     ) -> Result<RefData<D>, RuntimeErr> {
         let mut context = Context::new(None, ContextType::Normal);
-        downcast_pf::<D>(binary_op_run(&op, &Box::new(v1), &Box::new(v2), &mut context).unwrap())
+        downcast_pf::<D>(
+            binary_op_run(
+                &BinaryExp::new(op, v1, v2, StrRange::new_empty()),
+                &mut context,
+            )
+            .unwrap(),
+        )
     }
 
     #[test]
@@ -298,7 +311,13 @@ mod tests {
         context.create_var("arg1", PineRef::new_box(Some(4)));
         context.create_var("arg2", PineRef::new_box(Some(2)));
 
-        downcast_pf::<D>(binary_op_run(&op, &Box::new(v1), &Box::new(v2), &mut context).unwrap())
+        downcast_pf::<D>(
+            binary_op_run(
+                &BinaryExp::new(op, v1, v2, StrRange::new_empty()),
+                &mut context,
+            )
+            .unwrap(),
+        )
     }
 
     fn var_exp<'a>(var: &'a str) -> Exp<'a> {

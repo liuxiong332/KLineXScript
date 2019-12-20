@@ -1,5 +1,6 @@
-use super::context::{Context, ContextType, Ctx, Runner, VarOperate};
-use super::ctxid_parser::CtxIdParser;
+use super::context::{Context, ContextType, Ctx, PineRuntimeError, Runner, VarOperate};
+// use super::ctxid_parser::CtxIdParser;
+use crate::ast::input::{Position, StrRange};
 use crate::ast::stat_expr_types::Block;
 use crate::types::{Float, PineFrom, PineRef, PineType, RefData, RuntimeErr, Series};
 use std::collections::HashMap;
@@ -16,14 +17,14 @@ pub struct DataSrc<'a, 'b, 'c> {
     pub callback: &'a dyn Callback,
 }
 
-fn get_len(data: &HashMap<&'static str, Vec<Float>>) -> Result<usize, RuntimeErr> {
+fn get_len(data: &HashMap<&'static str, Vec<Float>>) -> Result<usize, PineRuntimeError> {
     let lens: Vec<usize> = data.iter().map(|(_, v)| v.len()).collect();
     if lens.len() == 0 {
-        return Err(RuntimeErr::NotValidParam);
+        return Err(PineRuntimeError::new_no_range(RuntimeErr::NotValidParam));
     }
     for l in &lens[1..] {
         if *l != lens[0] {
-            return Err(RuntimeErr::NotValidParam);
+            return Err(PineRuntimeError::new_no_range(RuntimeErr::NotValidParam));
         }
     }
     Ok(lens[0])
@@ -35,7 +36,7 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
         vars: HashMap<&'a str, PineRef<'a>>,
         callback: &'a dyn Callback,
     ) -> DataSrc<'a, 'b, 'c> {
-        CtxIdParser::new().parse_blk(blk);
+        // CtxIdParser::new().parse_blk(blk);
         let mut context = Context::new_with_callback(callback);
         for (k, v) in vars.into_iter() {
             context.create_var(k, v);
@@ -51,7 +52,7 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
         &mut self,
         data: HashMap<&'static str, Vec<Float>>,
         len: usize,
-    ) -> Result<(), RuntimeErr> {
+    ) -> Result<(), PineRuntimeError> {
         for i in 0..len {
             // Extract data into context
             for (k, v) in data.iter() {
@@ -65,11 +66,13 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
             self.context.clear_declare();
             self.context.clear_is_run();
         }
-        self.context.run_callbacks()?;
-        Ok(())
+        match self.context.run_callbacks() {
+            Err(err) => Err(PineRuntimeError::new_no_range(err)),
+            _ => Ok(()),
+        }
     }
 
-    pub fn run(&mut self, data: HashMap<&'static str, Vec<Float>>) -> Result<(), RuntimeErr> {
+    pub fn run(&mut self, data: HashMap<&'static str, Vec<Float>>) -> Result<(), PineRuntimeError> {
         let len = get_len(&data)?;
 
         // Create variable from the hash map
@@ -80,7 +83,10 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
         self.run_data(data, len)
     }
 
-    pub fn update(&mut self, data: HashMap<&'static str, Vec<Float>>) -> Result<(), RuntimeErr> {
+    pub fn update(
+        &mut self,
+        data: HashMap<&'static str, Vec<Float>>,
+    ) -> Result<(), PineRuntimeError> {
         let len = get_len(&data)?;
         self.context.roll_back()?;
         self.run_data(data, len)

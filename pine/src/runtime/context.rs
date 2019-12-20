@@ -1,4 +1,5 @@
 use super::data_src::Callback;
+use crate::ast::input::{Position, StrRange};
 use crate::types::{
     Bool, Callable, Color, DataType, Float, Int, PineFrom, PineRef, PineStaticType, PineType,
     RefData, RuntimeErr, SecondType, Series, NA,
@@ -252,7 +253,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
         }
     }
 
-    pub fn roll_back(&mut self) -> Result<(), RuntimeErr> {
+    pub fn roll_back(&mut self) -> Result<(), PineRuntimeError> {
         let keys: Vec<&'a str> = self.vars.keys().cloned().collect();
         for k in keys {
             let val = self.move_var(k).unwrap();
@@ -267,7 +268,9 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
         }
         let callables = mem::replace(&mut self.callables, vec![]);
         for callable in callables.iter() {
-            callable.back(self)?;
+            if let Err(code) = callable.back(self) {
+                return Err(PineRuntimeError::new_no_range(code));
+            }
         }
         mem::replace(&mut self.callables, callables);
         Ok(())
@@ -411,17 +414,36 @@ impl<'a, 'b, 'c> Ctx<'a> for Context<'a, 'b, 'c> {
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct PineRuntimeError {
+    pub code: RuntimeErr,
+    pub range: StrRange,
+}
+
+impl PineRuntimeError {
+    pub fn new(code: RuntimeErr, range: StrRange) -> PineRuntimeError {
+        PineRuntimeError { code, range }
+    }
+
+    pub fn new_no_range(code: RuntimeErr) -> PineRuntimeError {
+        PineRuntimeError {
+            code,
+            range: StrRange::from_start("", Position::new(0, 0)),
+        }
+    }
+}
+
 pub trait Runner<'a> {
-    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr>;
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError>;
 }
 
 // Evaluate  the expression with right-value.
 pub trait RVRunner<'a> {
-    fn rv_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr>;
+    fn rv_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError>;
 }
 
 pub trait StmtRunner<'a> {
-    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr>;
+    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), PineRuntimeError>;
 }
 
 #[cfg(test)]

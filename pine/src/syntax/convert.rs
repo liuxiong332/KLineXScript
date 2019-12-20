@@ -50,6 +50,30 @@ pub fn implicity_convert<'a>(origin_type: &SyntaxType<'a>, dest_type: &SyntaxTyp
     }
 }
 
+fn common_simple_type(
+    type1: &SimpleSyntaxType,
+    type2: &SimpleSyntaxType,
+) -> Option<SimpleSyntaxType> {
+    match (type1, type2) {
+        (SimpleSyntaxType::Bool, SimpleSyntaxType::Bool)
+        | (SimpleSyntaxType::Bool, SimpleSyntaxType::Float)
+        | (_, SimpleSyntaxType::Bool) => Some(SimpleSyntaxType::Bool),
+        (SimpleSyntaxType::Float, _) | (_, SimpleSyntaxType::Float) => {
+            Some(SimpleSyntaxType::Float)
+        }
+        (SimpleSyntaxType::Int, _) | (_, SimpleSyntaxType::Int) => Some(SimpleSyntaxType::Int),
+        (SimpleSyntaxType::Color, _) | (_, SimpleSyntaxType::Color) => {
+            Some(SimpleSyntaxType::Color)
+        }
+        (SimpleSyntaxType::String, _) | (_, SimpleSyntaxType::String) => {
+            Some(SimpleSyntaxType::String)
+        }
+        (SimpleSyntaxType::Na, _) | (_, SimpleSyntaxType::Na) => Some(SimpleSyntaxType::Na),
+    }
+}
+
+pub fn common_type<'a>(type1: &SyntaxType<'a>, type2: &SyntaxType<'a>) -> Option<SyntaxType<'a>> {}
+
 pub fn simple_to_series<'a>(origin_type: SyntaxType<'a>) -> SyntaxType<'a> {
     match origin_type {
         SyntaxType::Simple(t) => SyntaxType::Series(t),

@@ -1,9 +1,10 @@
 use super::context::{Ctx, PineRuntimeError, RVRunner};
 use crate::ast::op::{BinaryOp, UnaryOp};
 use crate::ast::stat_expr_types::{BinaryExp, UnaryExp};
+use crate::ast::syntax_type::{SimpleSyntaxType, SyntaxType};
 use crate::types::{
-    downcast_pf, Arithmetic, Bool, DataType as FirstType, Float, Int, Negative, PineFrom, PineRef,
-    PineType, RefData, RuntimeErr, SecondType, Series,
+    downcast_pf, Arithmetic, Bool, Color, DataType as FirstType, Float, Int, Negative, PineFrom,
+    PineRef, PineType, RefData, RuntimeErr, SecondType, Series, NA,
 };
 use std::fmt::Debug;
 
@@ -65,31 +66,137 @@ where
     }
 }
 
+fn bi_eq_operate<'a, D>(op: &BinaryOp, d1: &D, d2: &D) -> bool
+where
+    D: PartialEq + Debug + Clone + PineType<'a> + 'a,
+{
+    match op {
+        BinaryOp::Eq => *d1 == *d2,
+        BinaryOp::Neq => *d1 != *d2,
+        _ => unreachable!(),
+    }
+}
+
+fn eq_run<'a, 'b>(
+    binary_exp: &'a BinaryExp,
+    context: &mut (dyn 'b + Ctx<'a>),
+) -> Result<PineRef<'a>, PineRuntimeError> {
+    let val1 = binary_exp.exp1.rv_run(context)?;
+    let val2 = binary_exp.exp2.rv_run(context)?;
+    match binary_exp.result_type {
+        SyntaxType::Series(SimpleSyntaxType::Bool) => {
+            let s1: RefData<Series<Bool>> = Series::implicity_from(val1).unwrap();
+            let s2: RefData<Series<Bool>> = Series::implicity_from(val2).unwrap();
+            let res = bi_eq_operate(&binary_exp.op, &s1.get_current(), &s2.get_current());
+            Ok(PineRef::new_rc(Series::from(res)))
+        }
+        SyntaxType::Series(SimpleSyntaxType::Int) => {
+            println!("series int {:?}", val1.get_type());
+            let s1: RefData<Series<Int>> = Series::implicity_from(val1).unwrap();
+            let s2: RefData<Series<Int>> = Series::implicity_from(val2).unwrap();
+            let res = bi_eq_operate(&binary_exp.op, &s1.get_current(), &s2.get_current());
+            Ok(PineRef::new_rc(Series::from(res)))
+        }
+        SyntaxType::Series(SimpleSyntaxType::Float) => {
+            let s1: RefData<Series<Float>> = Series::implicity_from(val1).unwrap();
+            let s2: RefData<Series<Float>> = Series::implicity_from(val2).unwrap();
+            let res = bi_eq_operate(&binary_exp.op, &s1.get_current(), &s2.get_current());
+            Ok(PineRef::new_rc(Series::from(res)))
+        }
+        SyntaxType::Series(SimpleSyntaxType::Na) => {
+            let s1: RefData<Series<NA>> = Series::implicity_from(val1).unwrap();
+            let s2: RefData<Series<NA>> = Series::implicity_from(val2).unwrap();
+            let res = bi_eq_operate(&binary_exp.op, &s1.get_current(), &s2.get_current());
+            Ok(PineRef::new_rc(Series::from(res)))
+        }
+        SyntaxType::Series(SimpleSyntaxType::Color) => {
+            let s1: RefData<Series<Color>> = Series::implicity_from(val1).unwrap();
+            let s2: RefData<Series<Color>> = Series::implicity_from(val2).unwrap();
+            let res = bi_eq_operate(&binary_exp.op, &s1.get_current(), &s2.get_current());
+            Ok(PineRef::new_rc(Series::from(res)))
+        }
+        SyntaxType::Series(SimpleSyntaxType::String) => {
+            let s1: RefData<Series<String>> = Series::implicity_from(val1).unwrap();
+            let s2: RefData<Series<String>> = Series::implicity_from(val2).unwrap();
+            let res = bi_eq_operate(&binary_exp.op, &s1.get_current(), &s2.get_current());
+            Ok(PineRef::new_rc(Series::from(res)))
+        }
+
+        SyntaxType::Simple(SimpleSyntaxType::Bool) => {
+            let s1: RefData<Bool> = Bool::implicity_from(val1).unwrap();
+            let s2: RefData<Bool> = Bool::implicity_from(val2).unwrap();
+            let res = bi_eq_operate(&binary_exp.op, &*s1, &*s2);
+            Ok(PineRef::new_box(res))
+        }
+        SyntaxType::Simple(SimpleSyntaxType::Int) => {
+            let s1: RefData<Int> = Int::implicity_from(val1).unwrap();
+            let s2: RefData<Int> = Int::implicity_from(val2).unwrap();
+            let res = bi_eq_operate(&binary_exp.op, &*s1, &*s2);
+            Ok(PineRef::new_box(res))
+        }
+        SyntaxType::Simple(SimpleSyntaxType::Float) => {
+            let s1: RefData<Float> = Float::implicity_from(val1).unwrap();
+            let s2: RefData<Float> = Float::implicity_from(val2).unwrap();
+            let res = bi_eq_operate(&binary_exp.op, &*s1, &*s2);
+            Ok(PineRef::new_box(res))
+        }
+        SyntaxType::Simple(SimpleSyntaxType::Na) => {
+            let s1: RefData<NA> = NA::implicity_from(val1).unwrap();
+            let s2: RefData<NA> = NA::implicity_from(val2).unwrap();
+            let res = bi_eq_operate(&binary_exp.op, &*s1, &*s2);
+            Ok(PineRef::new_box(res))
+        }
+        SyntaxType::Simple(SimpleSyntaxType::Color) => {
+            let s1: RefData<Color> = Color::implicity_from(val1).unwrap();
+            let s2: RefData<Color> = Color::implicity_from(val2).unwrap();
+            let res = bi_eq_operate(&binary_exp.op, &*s1, &*s2);
+            Ok(PineRef::new_box(res))
+        }
+        SyntaxType::Simple(SimpleSyntaxType::String) => {
+            let s1: RefData<String> = String::implicity_from(val1).unwrap();
+            let s2: RefData<String> = String::implicity_from(val2).unwrap();
+            let res = bi_eq_operate(&binary_exp.op, &*s1, &*s2);
+            Ok(PineRef::new_box(res))
+        }
+        _ => unreachable!(),
+    }
+}
+
+fn bool_into_val<'a>(val: bool, result_type: &SyntaxType<'a>) -> PineRef<'a> {
+    match result_type {
+        SyntaxType::Series(SimpleSyntaxType::Bool) => PineRef::new_rc(Series::from(val)),
+        SyntaxType::Simple(SimpleSyntaxType::Bool) => PineRef::new_box(val),
+        _ => unreachable!(),
+    }
+}
+
 pub fn binary_op_run<'a, 'b>(
     binary_exp: &'a BinaryExp,
     context: &mut (dyn 'b + Ctx<'a>),
 ) -> Result<PineRef<'a>, PineRuntimeError> {
     match binary_exp.op {
         BinaryOp::BoolAnd => {
+            //TODO: That can be generate many small temporary object that can be avoided.
             let val1 = binary_exp.exp1.rv_run(context)?;
             let bval1 = Bool::implicity_from(val1).unwrap();
             if *bval1 == false {
-                return Ok(PineRef::new_box(false));
+                return Ok(bool_into_val(false, &binary_exp.result_type));
             }
             let val2 = binary_exp.exp2.rv_run(context)?;
             let bval2 = Bool::implicity_from(val2).unwrap();
-            Ok(bval2.into_pf())
+            Ok(bool_into_val(*bval2, &binary_exp.result_type))
         }
         BinaryOp::BoolOr => {
             let val1 = binary_exp.exp1.rv_run(context)?;
             let bval1 = Bool::implicity_from(val1).unwrap();
             if *bval1 == true {
-                return Ok(PineRef::new_box(true));
+                return Ok(bool_into_val(true, &binary_exp.result_type));
             }
             let val2 = binary_exp.exp2.rv_run(context)?;
             let bval2 = Bool::implicity_from(val2).unwrap();
-            Ok(bval2.into_pf())
+            Ok(bool_into_val(*bval2, &binary_exp.result_type))
         }
+        BinaryOp::Eq | BinaryOp::Neq => eq_run(&binary_exp, context),
         _ => {
             let val1 = binary_exp.exp1.rv_run(context)?;
             let val2 = binary_exp.exp2.rv_run(context)?;
@@ -201,6 +308,22 @@ mod tests {
         )
     }
 
+    fn biop_runner_type<'a, D: PineStaticType + PartialEq + Debug>(
+        op: BinaryOp,
+        v1: Exp<'a>,
+        v2: Exp<'a>,
+        result_type: SyntaxType,
+    ) -> Result<RefData<D>, RuntimeErr> {
+        let mut context = Context::new(None, ContextType::Normal);
+        downcast_pf::<D>(
+            binary_op_run(
+                &BinaryExp::new_with_type(op, v1, v2, StrRange::new_empty(), result_type),
+                &mut context,
+            )
+            .unwrap(),
+        )
+    }
+
     #[test]
     fn binary_op_test() {
         assert_eq!(
@@ -268,11 +391,30 @@ mod tests {
     #[test]
     fn logic_op_test() {
         assert_eq!(
-            biop_runner(BinaryOp::Eq, int_exp(2), int_exp(1)),
+            biop_runner_type(
+                BinaryOp::Eq,
+                int_exp(2),
+                int_exp(1),
+                SyntaxType::Simple(SimpleSyntaxType::Int)
+            ),
             Ok(RefData::new_box(false))
         );
         assert_eq!(
-            biop_runner(BinaryOp::Neq, int_exp(2), int_exp(1)),
+            biop_runner_type(
+                BinaryOp::Eq,
+                int_exp(2),
+                int_exp(1),
+                SyntaxType::Series(SimpleSyntaxType::Int)
+            ),
+            Ok(RefData::new_rc(Series::from(false)))
+        );
+        assert_eq!(
+            biop_runner_type(
+                BinaryOp::Neq,
+                int_exp(2),
+                int_exp(1),
+                SyntaxType::Simple(SimpleSyntaxType::Int)
+            ),
             Ok(RefData::new_box(true))
         );
         assert_eq!(
@@ -297,19 +439,48 @@ mod tests {
     fn logic_test() {
         let gen_bool_exp = |val| Exp::Bool(BoolNode::new_no_range(val));
         assert_eq!(
-            biop_runner(BinaryOp::BoolAnd, gen_bool_exp(false), gen_bool_exp(true)),
+            biop_runner_type(
+                BinaryOp::BoolAnd,
+                gen_bool_exp(false),
+                gen_bool_exp(true),
+                SyntaxType::Simple(SimpleSyntaxType::Bool)
+            ),
             Ok(RefData::new_box(false))
         );
         assert_eq!(
-            biop_runner(BinaryOp::BoolAnd, gen_bool_exp(false), gen_bool_exp(false)),
+            biop_runner_type(
+                BinaryOp::BoolAnd,
+                gen_bool_exp(false),
+                gen_bool_exp(false),
+                SyntaxType::Simple(SimpleSyntaxType::Bool)
+            ),
             Ok(RefData::new_box(false))
         );
         assert_eq!(
-            biop_runner(BinaryOp::BoolOr, gen_bool_exp(false), gen_bool_exp(true)),
+            biop_runner_type(
+                BinaryOp::BoolAnd,
+                gen_bool_exp(false),
+                gen_bool_exp(false),
+                SyntaxType::Series(SimpleSyntaxType::Bool)
+            ),
+            Ok(RefData::new_rc(Series::from(false)))
+        );
+        assert_eq!(
+            biop_runner_type(
+                BinaryOp::BoolOr,
+                gen_bool_exp(false),
+                gen_bool_exp(true),
+                SyntaxType::Simple(SimpleSyntaxType::Bool)
+            ),
             Ok(RefData::new_box(true))
         );
         assert_eq!(
-            biop_runner(BinaryOp::BoolOr, gen_bool_exp(false), gen_bool_exp(false)),
+            biop_runner_type(
+                BinaryOp::BoolOr,
+                gen_bool_exp(false),
+                gen_bool_exp(false),
+                SyntaxType::Simple(SimpleSyntaxType::Bool)
+            ),
             Ok(RefData::new_box(false))
         );
     }
@@ -326,6 +497,25 @@ mod tests {
         downcast_pf::<D>(
             binary_op_run(
                 &BinaryExp::new(op, v1, v2, StrRange::new_empty()),
+                &mut context,
+            )
+            .unwrap(),
+        )
+    }
+
+    fn biop_rv_runner_type<'a, D: PineStaticType + PartialEq + Debug>(
+        op: BinaryOp,
+        v1: Exp<'a>,
+        v2: Exp<'a>,
+        result_type: SyntaxType<'a>,
+    ) -> Result<RefData<D>, RuntimeErr> {
+        let mut context = Context::new(None, ContextType::Normal);
+        context.create_var("arg1", PineRef::new_box(Some(4)));
+        context.create_var("arg2", PineRef::new_box(Some(2)));
+
+        downcast_pf::<D>(
+            binary_op_run(
+                &BinaryExp::new_with_type(op, v1, v2, StrRange::new_empty(), result_type),
                 &mut context,
             )
             .unwrap(),
@@ -360,11 +550,21 @@ mod tests {
         );
 
         assert_eq!(
-            biop_rv_runner(BinaryOp::Eq, var_exp("arg1"), var_exp("arg2")),
+            biop_rv_runner_type(
+                BinaryOp::Eq,
+                var_exp("arg1"),
+                var_exp("arg2"),
+                SyntaxType::Simple(SimpleSyntaxType::Int)
+            ),
             Ok(RefData::new_box(false))
         );
         assert_eq!(
-            biop_rv_runner(BinaryOp::Neq, var_exp("arg1"), var_exp("arg2")),
+            biop_rv_runner_type(
+                BinaryOp::Neq,
+                var_exp("arg1"),
+                var_exp("arg2"),
+                SyntaxType::Simple(SimpleSyntaxType::Int)
+            ),
             Ok(RefData::new_box(true))
         );
         assert_eq!(
@@ -384,11 +584,21 @@ mod tests {
             Ok(RefData::new_box(true))
         );
         assert_eq!(
-            biop_rv_runner(BinaryOp::BoolAnd, var_exp("arg1"), var_exp("arg2")),
+            biop_rv_runner_type(
+                BinaryOp::BoolAnd,
+                var_exp("arg1"),
+                var_exp("arg2"),
+                SyntaxType::Simple(SimpleSyntaxType::Bool)
+            ),
             Ok(RefData::new_box(true))
         );
         assert_eq!(
-            biop_rv_runner(BinaryOp::BoolOr, var_exp("arg1"), var_exp("arg2")),
+            biop_rv_runner_type(
+                BinaryOp::BoolOr,
+                var_exp("arg1"),
+                var_exp("arg2"),
+                SyntaxType::Simple(SimpleSyntaxType::Bool)
+            ),
             Ok(RefData::new_box(true))
         );
     }

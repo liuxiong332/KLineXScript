@@ -163,6 +163,22 @@ impl<'a> BinaryExp<'a> {
             result_type: SyntaxType::Any,
         }
     }
+
+    pub fn new_with_type(
+        op: BinaryOp,
+        exp1: Exp<'a>,
+        exp2: Exp<'a>,
+        range: StrRange,
+        result_type: SyntaxType<'a>,
+    ) -> BinaryExp<'a> {
+        BinaryExp {
+            op,
+            exp1,
+            exp2,
+            range,
+            result_type,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

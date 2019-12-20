@@ -333,7 +333,22 @@ impl<'a> PineType<'a> for Color<'a> {
     }
 }
 
-impl<'a> PineFrom<'a, Color<'a>> for Color<'a> {}
+impl<'a> PineFrom<'a, Color<'a>> for Color<'a> {
+    fn implicity_from(t: PineRef<'a>) -> Result<RefData<Color>, RuntimeErr> {
+        match t.get_type() {
+            (DataType::Color, SecondType::Simple) => Ok(downcast_pf::<Color>(t).unwrap()),
+            (DataType::Color, SecondType::Series) => {
+                let f: RefData<Series<Color>> = downcast_pf::<Series<Color>>(t).unwrap();
+                Ok(RefData::new_box(f.get_current()))
+            }
+            (DataType::NA, _) => Ok(RefData::new_box(Color(""))),
+            _ => Err(RuntimeErr::NotCompatible(format!(
+                "Cannot convert from {:?} to color",
+                t.get_type().0
+            ))),
+        }
+    }
+}
 
 impl<'a> SimpleType for Color<'a> {}
 
@@ -356,7 +371,17 @@ impl<'a> PineType<'a> for NA {
     }
 }
 
-impl<'a> PineFrom<'a, NA> for NA {}
+impl<'a> PineFrom<'a, NA> for NA {
+    fn implicity_from(t: PineRef<'a>) -> Result<RefData<NA>, RuntimeErr> {
+        match t.get_type() {
+            (DataType::NA, _) => Ok(RefData::new_box(NA)),
+            _ => Err(RuntimeErr::NotCompatible(format!(
+                "Cannot convert from {:?} to color",
+                t.get_type().0
+            ))),
+        }
+    }
+}
 impl SimpleType for NA {}
 
 // pine type that represent variable name
@@ -434,6 +459,11 @@ impl<'a> PineFrom<'a, String> for String {
     fn implicity_from(_t: PineRef<'a>) -> Result<RefData<String>, RuntimeErr> {
         match _t.get_type() {
             (DataType::String, SecondType::Simple) => Ok(downcast_pf::<String>(_t)?),
+            (DataType::String, SecondType::Series) => {
+                let f: RefData<Series<String>> = downcast_pf::<Series<String>>(_t).unwrap();
+                Ok(RefData::new_rc(f.get_current()))
+            }
+            (DataType::NA, _) => Ok(RefData::new_rc(String::from(""))),
             _ => Err(RuntimeErr::NotSupportOperator),
         }
     }

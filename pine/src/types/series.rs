@@ -1,7 +1,7 @@
 use super::downcast::downcast_pf;
 use super::error::RuntimeErr;
 use super::pine_ref::PineRef;
-use super::primitive::{Bool, Float, Int, NA};
+use super::primitive::{Bool, Color, Float, Int, NA};
 use super::ref_data::RefData;
 use super::traits::{
     Arithmetic, Category, ComplexType, DataType, Negative, PineFrom, PineStaticType, PineType,
@@ -173,6 +173,22 @@ where
             (DataType::NA, _) => Ok(RefData::new_rc(Series::from(
                 D::explicity_from(PineRef::new_box(NA))?.into_inner(),
             ))),
+            (DataType::Color, SecondType::Series) => {
+                let series: RefData<Series<Color>> = Series::explicity_from(t)?;
+                let val: RefData<D> = D::explicity_from(PineRef::new(series.get_current()))?;
+                Ok(RefData::new_rc(Series::from(val.into_inner())))
+            }
+            (DataType::Color, SecondType::Simple) => Ok(RefData::new_rc(Series::from(
+                D::explicity_from(t)?.into_inner(),
+            ))),
+            (DataType::String, SecondType::Series) => {
+                let series: RefData<Series<String>> = Series::explicity_from(t)?;
+                let val: RefData<D> = D::explicity_from(PineRef::new(series.get_current()))?;
+                Ok(RefData::new_rc(Series::from(val.into_inner())))
+            }
+            (DataType::String, SecondType::Simple) => Ok(RefData::new_rc(Series::from(
+                D::explicity_from(t)?.into_inner(),
+            ))),
             _ => Err(RuntimeErr::NotCompatible(format!(
                 "Cannot convert from {:?} to {:?} series",
                 t.get_type(),
@@ -217,6 +233,22 @@ where
             ))),
             (DataType::NA, _) => Ok(RefData::new_rc(Series::from(
                 D::implicity_from(PineRef::new_box(NA))?.into_inner(),
+            ))),
+            (DataType::Color, SecondType::Series) => {
+                let series: RefData<Series<Color>> = Series::implicity_from(t)?;
+                let val: RefData<D> = D::implicity_from(PineRef::new(series.get_current()))?;
+                Ok(RefData::new_rc(Series::from(val.into_inner())))
+            }
+            (DataType::Color, SecondType::Simple) => Ok(RefData::new_rc(Series::from(
+                D::implicity_from(t)?.into_inner(),
+            ))),
+            (DataType::String, SecondType::Series) => {
+                let series: RefData<Series<String>> = Series::implicity_from(t)?;
+                let val: RefData<D> = D::implicity_from(PineRef::new(series.get_current()))?;
+                Ok(RefData::new_rc(Series::from(val.into_inner())))
+            }
+            (DataType::String, SecondType::Simple) => Ok(RefData::new_rc(Series::from(
+                D::implicity_from(t)?.into_inner(),
             ))),
             _ => Err(RuntimeErr::NotCompatible(format!(
                 "Cannot convert from {:?} to {:?} series",

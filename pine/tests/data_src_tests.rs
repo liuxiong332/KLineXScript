@@ -1,6 +1,7 @@
 extern crate pine;
 use pine::libs;
 use pine::runtime::data_src::{Callback, DataSrc};
+use pine::syntax::ctxid_parser::CtxIdParser;
 use std::collections::HashMap;
 
 const MA_SCRIPT: &str = "
@@ -23,9 +24,9 @@ fn datasrc_test() {
     }
 
     let mut ma_block = pine::parse_all(MA_SCRIPT).unwrap();
+    CtxIdParser::new().parse_blk(&mut ma_block);
 
     let inner_vars = libs::declare_vars();
-
     let mut datasrc = DataSrc::new(&mut ma_block, inner_vars, &MyCallback);
 
     let mut data = HashMap::new();
@@ -56,6 +57,8 @@ fn func_call_test() {
     }
 
     let mut func_block = pine::parse_all(FUNC_SCRIPT).unwrap();
+    CtxIdParser::new().parse_blk(&mut func_block);
+
     let inner_vars = libs::declare_vars();
     let mut datasrc = DataSrc::new(&mut func_block, inner_vars, &MyCallback);
 
@@ -88,6 +91,8 @@ fn if_else_test() {
     }
 
     let mut func_block = pine::parse_all(IF_ELSE_SCRIPT).unwrap();
+    CtxIdParser::new().parse_blk(&mut func_block);
+
     let inner_vars = libs::declare_vars();
     let mut datasrc = DataSrc::new(&mut func_block, inner_vars, &MyCallback);
 
@@ -123,6 +128,8 @@ fn for_range_test() {
     }
 
     let mut func_block = pine::parse_all(FOR_RANGE_SCRIPT).unwrap();
+    CtxIdParser::new().parse_blk(&mut func_block);
+
     let inner_vars = libs::declare_vars();
     let mut datasrc = DataSrc::new(&mut func_block, inner_vars, &MyCallback);
 
@@ -151,6 +158,8 @@ fn ema_test() {
     }
 
     let mut func_block = pine::parse_all(EMA_SCRIPT).unwrap();
+    CtxIdParser::new().parse_blk(&mut func_block);
+
     let inner_vars = libs::declare_vars();
     let mut datasrc = DataSrc::new(&mut func_block, inner_vars, &MyCallback);
 
@@ -189,6 +198,8 @@ fn macd_test() {
     }
 
     let mut func_block = pine::parse_all(MACD_SCRIPT).unwrap();
+    CtxIdParser::new().parse_blk(&mut func_block);
+
     let inner_vars = libs::declare_vars();
     let mut datasrc = DataSrc::new(&mut func_block, inner_vars, &MyCallback);
 

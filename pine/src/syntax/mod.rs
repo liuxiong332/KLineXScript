@@ -12,6 +12,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 mod convert;
+pub mod ctxid_parser;
 mod type_cast;
 
 use convert::{implicity_convert, simple_to_series};

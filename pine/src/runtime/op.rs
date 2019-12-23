@@ -411,6 +411,10 @@ mod tests {
             Ok(RefData::new_rc(Series::from(false)))
         );
         assert_eq!(
+            biop_runner_type(BinaryOp::Eq, float_exp(1f64), var_exp("series_int"),),
+            Ok(RefData::new_rc(Series::from(true)))
+        );
+        assert_eq!(
             biop_runner_type(BinaryOp::Neq, int_exp(2), int_exp(1),),
             Ok(RefData::new_box(true))
         );

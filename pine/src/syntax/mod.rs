@@ -1395,10 +1395,81 @@ mod tests {
     }
 
     #[test]
+    fn eq_exp_test() {
+        let mut parser = SyntaxParser::new();
+        let context = downcast_ctx(parser.context);
+        context.declare_var("sint", SyntaxType::Series(SimpleSyntaxType::Int));
+
+        let mut eq_exp = BinaryExp::new(
+            BinaryOp::Eq,
+            int_exp(1),
+            Exp::VarName(varname("sint")),
+            StrRange::new_empty(),
+        );
+        assert_eq!(
+            parser.parse_binary(&mut eq_exp),
+            Ok(ParseValue::new_with_type(SyntaxType::Series(
+                SimpleSyntaxType::Bool
+            )))
+        );
+        assert_eq!(eq_exp.ref_type, SyntaxType::Series(SimpleSyntaxType::Int));
+
+        let mut eq_exp = BinaryExp::new(
+            BinaryOp::Eq,
+            float_exp(1f64),
+            Exp::VarName(varname("sint")),
+            StrRange::new_empty(),
+        );
+        assert_eq!(
+            parser.parse_binary(&mut eq_exp),
+            Ok(ParseValue::new_with_type(SyntaxType::Series(
+                SimpleSyntaxType::Bool
+            )))
+        );
+        assert_eq!(eq_exp.ref_type, SyntaxType::Series(SimpleSyntaxType::Float));
+
+        let mut eq_exp = BinaryExp::new(
+            BinaryOp::Eq,
+            int_exp(1),
+            Exp::Na(NaNode::new(StrRange::new_empty())),
+            StrRange::new_empty(),
+        );
+        assert_eq!(
+            parser.parse_binary(&mut eq_exp),
+            Ok(ParseValue::new_with_type(SyntaxType::Simple(
+                SimpleSyntaxType::Bool
+            )))
+        );
+        assert!(!parser.errors.is_empty());
+        assert_eq!(
+            eq_exp.result_type,
+            SyntaxType::Simple(SimpleSyntaxType::Bool)
+        );
+
+        let mut eq_dif_type_exp = BinaryExp::new(
+            BinaryOp::Eq,
+            int_exp(1),
+            Exp::Str(StringNode::new(String::from("h"), StrRange::new_empty())),
+            StrRange::new_empty(),
+        );
+        assert_eq!(
+            parser.parse_binary(&mut eq_dif_type_exp),
+            Ok(ParseValue::new_with_type(SyntaxType::Simple(
+                SimpleSyntaxType::Bool
+            )))
+        );
+        assert_eq!(
+            *parser.errors.last().unwrap(),
+            PineInputError::new(PineErrorKind::TypeMismatch, StrRange::new_empty())
+        );
+    }
+
+    #[test]
     fn binary_exp_test() {
         let mut parser = SyntaxParser::new();
         let context = downcast_ctx(parser.context);
 
+        // Geq
         context.declare_var("sint", SyntaxType::Series(SimpleSyntaxType::Int));
         let mut geq_exp =
             BinaryExp::new(BinaryOp::Geq, int_exp(1), int_exp(2), StrRange::new_empty());
@@ -1447,42 +1518,7 @@ mod tests {
             PineInputError::new(PineErrorKind::BinaryTypeNotNum, StrRange::new_empty())
         );
 
-        parser.errors.clear();
-        let mut eq_exp = BinaryExp::new(
-            BinaryOp::Eq,
-            int_exp(1),
-            Exp::Na(NaNode::new(StrRange::new_empty())),
-            StrRange::new_empty(),
-        );
-        assert_eq!(
-            parser.parse_binary(&mut eq_exp),
-            Ok(ParseValue::new_with_type(SyntaxType::Simple(
-                SimpleSyntaxType::Bool
-            )))
-        );
-        assert!(!parser.errors.is_empty());
-        assert_eq!(
-            eq_exp.result_type,
-            SyntaxType::Simple(SimpleSyntaxType::Bool)
-        );
-
-        let mut eq_dif_type_exp = BinaryExp::new(
-            BinaryOp::Eq,
-            int_exp(1),
-            Exp::Str(StringNode::new(String::from("h"), StrRange::new_empty())),
-            StrRange::new_empty(),
-        );
-        assert_eq!(
-            parser.parse_binary(&mut eq_dif_type_exp),
-            Ok(ParseValue::new_with_type(SyntaxType::Simple(
-                SimpleSyntaxType::Bool
-            )))
-        );
-        assert_eq!(
-            *parser.errors.last().unwrap(),
-            PineInputError::new(PineErrorKind::TypeMismatch, StrRange::new_empty())
-        );
-
+        // BoolAnd
         context.declare_var("var", SyntaxType::Series(SimpleSyntaxType::Int));
         let mut bool_and_exp = BinaryExp::new(
             BinaryOp::BoolAnd,
@@ -1496,7 +1532,6 @@ mod tests {
                 SimpleSyntaxType::Bool
             )))
         );
-
         let mut bool_and_exp = BinaryExp::new(
             BinaryOp::BoolAnd,
             int_exp(1),

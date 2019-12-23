@@ -50,29 +50,102 @@ pub fn implicity_convert<'a>(origin_type: &SyntaxType<'a>, dest_type: &SyntaxTyp
     }
 }
 
+// Get common simple syntax type for type1 and type2
 fn common_simple_type(
     type1: &SimpleSyntaxType,
     type2: &SimpleSyntaxType,
 ) -> Option<SimpleSyntaxType> {
     match (type1, type2) {
         (SimpleSyntaxType::Bool, SimpleSyntaxType::Bool)
+        | (SimpleSyntaxType::Bool, SimpleSyntaxType::Na)
         | (SimpleSyntaxType::Bool, SimpleSyntaxType::Float)
-        | (_, SimpleSyntaxType::Bool) => Some(SimpleSyntaxType::Bool),
-        (SimpleSyntaxType::Float, _) | (_, SimpleSyntaxType::Float) => {
-            Some(SimpleSyntaxType::Float)
-        }
-        (SimpleSyntaxType::Int, _) | (_, SimpleSyntaxType::Int) => Some(SimpleSyntaxType::Int),
-        (SimpleSyntaxType::Color, _) | (_, SimpleSyntaxType::Color) => {
-            Some(SimpleSyntaxType::Color)
-        }
-        (SimpleSyntaxType::String, _) | (_, SimpleSyntaxType::String) => {
-            Some(SimpleSyntaxType::String)
-        }
-        (SimpleSyntaxType::Na, _) | (_, SimpleSyntaxType::Na) => Some(SimpleSyntaxType::Na),
+        | (SimpleSyntaxType::Bool, SimpleSyntaxType::Int)
+        | (SimpleSyntaxType::Na, SimpleSyntaxType::Bool)
+        | (SimpleSyntaxType::Float, SimpleSyntaxType::Bool)
+        | (SimpleSyntaxType::Int, SimpleSyntaxType::Bool) => Some(SimpleSyntaxType::Bool),
+
+        (SimpleSyntaxType::Float, SimpleSyntaxType::Float)
+        | (SimpleSyntaxType::Float, SimpleSyntaxType::Int)
+        | (SimpleSyntaxType::Float, SimpleSyntaxType::Na)
+        | (SimpleSyntaxType::Int, SimpleSyntaxType::Float)
+        | (SimpleSyntaxType::Na, SimpleSyntaxType::Float) => Some(SimpleSyntaxType::Float),
+
+        (SimpleSyntaxType::Int, SimpleSyntaxType::Int)
+        | (SimpleSyntaxType::Int, SimpleSyntaxType::Na)
+        | (SimpleSyntaxType::Na, SimpleSyntaxType::Int) => Some(SimpleSyntaxType::Int),
+
+        (SimpleSyntaxType::Na, SimpleSyntaxType::Na) => Some(SimpleSyntaxType::Na),
+
+        (SimpleSyntaxType::Color, SimpleSyntaxType::Color)
+        | (SimpleSyntaxType::Color, SimpleSyntaxType::Na)
+        | (SimpleSyntaxType::Na, SimpleSyntaxType::Color) => Some(SimpleSyntaxType::Color),
+
+        (SimpleSyntaxType::String, SimpleSyntaxType::String)
+        | (SimpleSyntaxType::String, SimpleSyntaxType::Na)
+        | (SimpleSyntaxType::Na, SimpleSyntaxType::String) => Some(SimpleSyntaxType::String),
+
+        _ => None,
     }
 }
 
-pub fn common_type<'a>(type1: &SyntaxType<'a>, type2: &SyntaxType<'a>) -> Option<SyntaxType<'a>> {}
+// Get the common type of type1 and type2
+pub fn common_type<'a>(type1: &SyntaxType<'a>, type2: &SyntaxType<'a>) -> Option<SyntaxType<'a>> {
+    match (type1, type2) {
+        (SyntaxType::Simple(t1), SyntaxType::Simple(t2)) => {
+            let simple_type = common_simple_type(t1, t2);
+            match simple_type {
+                None => None,
+                Some(t) => Some(SyntaxType::Simple(t)),
+            }
+        }
+        (SyntaxType::Series(t1), SyntaxType::Simple(t2))
+        | (SyntaxType::Simple(t1), SyntaxType::Series(t2))
+        | (SyntaxType::Series(t1), SyntaxType::Series(t2)) => {
+            let simple_type = common_simple_type(t1, t2);
+            match simple_type {
+                None => None,
+                Some(t) => Some(SyntaxType::Series(t)),
+            }
+        }
+        _ => None,
+    }
+}
+
+pub fn similar_simple_type(
+    type1: &SimpleSyntaxType,
+    type2: &SimpleSyntaxType,
+) -> Option<SimpleSyntaxType> {
+    if type1 == type2 {
+        return Some(type1.clone());
+    }
+    match (type1, type2) {
+        (SimpleSyntaxType::Int, SimpleSyntaxType::Float)
+        | (SimpleSyntaxType::Float, SimpleSyntaxType::Int) => Some(SimpleSyntaxType::Float),
+        _ => None,
+    }
+}
+
+pub fn similar_type<'a>(type1: &SyntaxType<'a>, type2: &SyntaxType<'a>) -> Option<SyntaxType<'a>> {
+    match (type1, type2) {
+        (SyntaxType::Simple(t1), SyntaxType::Simple(t2)) => {
+            let simple_type = similar_simple_type(t1, t2);
+            match simple_type {
+                None => None,
+                Some(t) => Some(SyntaxType::Simple(t)),
+            }
+        }
+        (SyntaxType::Series(t1), SyntaxType::Simple(t2))
+        | (SyntaxType::Simple(t1), SyntaxType::Series(t2))
+        | (SyntaxType::Series(t1), SyntaxType::Series(t2)) => {
+            let simple_type = similar_simple_type(t1, t2);
+            match simple_type {
+                None => None,
+                Some(t) => Some(SyntaxType::Series(t)),
+            }
+        }
+        _ => None,
+    }
+}
 
 pub fn simple_to_series<'a>(origin_type: SyntaxType<'a>) -> SyntaxType<'a> {
     match origin_type {

@@ -150,6 +150,7 @@ pub struct BinaryExp<'a> {
     pub exp1: Exp<'a>,
     pub exp2: Exp<'a>,
     pub range: StrRange,
+    pub ref_type: SyntaxType<'a>,
     pub result_type: SyntaxType<'a>,
 }
 
@@ -160,23 +161,8 @@ impl<'a> BinaryExp<'a> {
             exp1,
             exp2,
             range,
+            ref_type: SyntaxType::Any,
             result_type: SyntaxType::Any,
-        }
-    }
-
-    pub fn new_with_type(
-        op: BinaryOp,
-        exp1: Exp<'a>,
-        exp2: Exp<'a>,
-        range: StrRange,
-        result_type: SyntaxType<'a>,
-    ) -> BinaryExp<'a> {
-        BinaryExp {
-            op,
-            exp1,
-            exp2,
-            range,
-            result_type,
         }
     }
 }

@@ -16,7 +16,7 @@ mod convert;
 pub mod ctxid_parser;
 mod type_cast;
 
-use convert::{implicity_convert, simple_to_series};
+use convert::{common_type, implicity_convert, similar_type, simple_to_series};
 use type_cast::{explicity_type_cast, implicity_type_cast};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -135,6 +135,19 @@ impl<'a> SyntaxParser<'a> {
         let top_ctx: Box<dyn SyntaxCtx<'a> + 'a> =
             Box::new(SyntaxContext::new(None, ContextType::Normal));
         ctxs.insert(0, top_ctx);
+        SyntaxParser {
+            context: &mut **ctxs.get_mut(&0).unwrap(),
+            ctxs,
+            user_funcs: HashMap::new(),
+            errors: vec![],
+        }
+    }
+
+    pub fn new_with_vars(vars: HashMap<&'a str, SyntaxType<'a>>) -> SyntaxParser<'a> {
+        let mut ctxs: HashMap<i32, Box<dyn SyntaxCtx<'a> + 'a>> = HashMap::new();
+        let mut context = SyntaxContext::new(None, ContextType::Normal);
+        context.vars = vars;
+        ctxs.insert(0, Box::new(context));
         SyntaxParser {
             context: &mut **ctxs.get_mut(&0).unwrap(),
             ctxs,
@@ -582,7 +595,7 @@ impl<'a> SyntaxParser<'a> {
         }
     }
 
-    fn parse_binary(&mut self, binary: &mut BinaryExp<'a>) -> ParseResult<'a> {
+    pub fn parse_binary(&mut self, binary: &mut BinaryExp<'a>) -> ParseResult<'a> {
         let exp1_type = self.parse_exp(&mut binary.exp1)?.syntax_type;
         let exp2_type = self.parse_exp(&mut binary.exp2)?.syntax_type;
         let gen_bool = |binary: &mut BinaryExp<'a>, exp1_type, exp2_type| {
@@ -615,12 +628,9 @@ impl<'a> SyntaxParser<'a> {
                         binary.range,
                     ));
                 }
-                if implicity_convert(&exp1_type, &exp2_type) {
-                    binary.result_type = exp2_type.clone();
+                if let Some(result_type) = similar_type(&exp1_type, &exp2_type) {
+                    binary.result_type = result_type.clone();
                     Ok(ParseValue::new_with_type(exp2_type))
-                } else if implicity_convert(&exp2_type, &exp1_type) {
-                    binary.result_type = exp1_type.clone();
-                    Ok(ParseValue::new_with_type(exp1_type))
                 } else {
                     Err(PineInputError::new(
                         PineErrorKind::TypeMismatch,
@@ -638,9 +648,8 @@ impl<'a> SyntaxParser<'a> {
                 gen_bool(binary, exp1_type, exp2_type)
             }
             BinaryOp::Eq | BinaryOp::Neq => {
-                if implicity_convert(&exp1_type, &exp2_type)
-                    || implicity_convert(&exp2_type, &exp1_type)
-                {
+                if let Some(_type) = similar_type(&exp2_type, &exp1_type) {
+                    binary.ref_type = _type;
                     gen_bool(binary, exp1_type, exp2_type)
                 } else {
                     self.catch(PineInputError::new(
@@ -1451,7 +1460,7 @@ mod tests {
                 SimpleSyntaxType::Bool
             )))
         );
-        assert!(parser.errors.is_empty());
+        assert!(!parser.errors.is_empty());
         assert_eq!(
             eq_exp.result_type,
             SyntaxType::Simple(SimpleSyntaxType::Bool)

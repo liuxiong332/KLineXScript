@@ -708,12 +708,12 @@ mod tests {
             statement_with_indent(0),
             Statement::Assignment(Box::new(Assignment::new(
                 vec![VarName::new_with_start("m", Position::new(0, 0))],
-                Exp::Condition(Box::new(Condition {
-                    cond: Exp::VarName(VarName::new_with_start("a", Position::new(0, 4))),
-                    exp1: Exp::VarName(VarName::new_with_start("b", Position::new(0, 8))),
-                    exp2: Exp::VarName(VarName::new_with_start("c", Position::new(0, 12))),
-                    range: StrRange::from_start("a ? b : c", Position::new(0, 4)),
-                })),
+                Exp::Condition(Box::new(Condition::new(
+                    Exp::VarName(VarName::new_with_start("a", Position::new(0, 4))),
+                    Exp::VarName(VarName::new_with_start("b", Position::new(0, 8))),
+                    Exp::VarName(VarName::new_with_start("c", Position::new(0, 12))),
+                    StrRange::from_start("a ? b : c", Position::new(0, 4)),
+                ))),
                 false,
                 None,
                 StrRange::from_start("m = a ? b : c", Position::new(0, 0)),

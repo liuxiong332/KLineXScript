@@ -2,6 +2,7 @@ use super::context::{
     downcast_ctx, ContextType, Ctx, PineRuntimeError, RVRunner, Runner, StmtRunner, VarOperate,
 };
 use super::function::Function;
+use super::runtime_convert::convert;
 use crate::ast::input::StrRange;
 use crate::ast::name::VarName;
 use crate::ast::stat_expr_types::{
@@ -251,14 +252,14 @@ impl<'a> Runner<'a> for IfThenElse<'a> {
             let subctx = create_sub_ctx(context, self.then_ctxid, ContextType::IfElseBlock);
             let result = self.then_blk.run(subctx);
             subctx.set_is_run(true);
-            result
+            Ok(convert(result?, &self.result_type))
         } else if let Some(ref else_blk) = self.else_blk {
             let subctx = create_sub_ctx(context, self.else_ctxid, ContextType::IfElseBlock);
             let result = else_blk.run(subctx);
             subctx.set_is_run(true);
-            result
+            Ok(convert(result?, &self.result_type))
         } else {
-            Ok(PineRef::new_box(NA))
+            Ok(convert(PineRef::new_box(NA), &self.result_type))
         }
     }
 }
@@ -336,7 +337,7 @@ impl<'a> Runner<'a> for ForRange<'a> {
         }
         subctx.set_is_run(true);
         // update_sub_ctx(context, self.ctxid, subctx);
-        Ok(ret_val)
+        Ok(convert(ret_val, &self.result_type))
     }
 }
 
@@ -648,7 +649,10 @@ mod tests {
 
     #[test]
     fn if_then_else_test() {
-        let ite = IfThenElse::new_no_ctxid(
+        use crate::ast::syntax_type::{SimpleSyntaxType, SyntaxType};
+        use crate::syntax::SyntaxParser;
+
+        let mut ite = IfThenElse::new_no_ctxid(
             Exp::VarName(VarName::new_no_input("cond")),
             Block::new_no_input(vec![], Some(Exp::VarName(VarName::new_no_input("then")))),
             Some(Block::new_no_input(
@@ -657,14 +661,27 @@ mod tests {
             )),
             StrRange::new_empty(),
         );
+        // ite.result_type = SyntaxType::Series(SimpleSyntaxType::Int);
+        SyntaxParser::new_with_vars(
+            [
+                ("cond", SyntaxType::Simple(SimpleSyntaxType::Bool)),
+                ("then", SyntaxType::Simple(SimpleSyntaxType::Int)),
+                ("else", SyntaxType::Simple(SimpleSyntaxType::Int)),
+            ]
+            .iter()
+            .cloned()
+            .collect(),
+        )
+        .parse_ifthenelse_exp(&mut ite)
+        .unwrap();
         let mut context = Context::new(None, ContextType::Normal);
         context.create_var("cond", PineRef::new_box(true));
         context.create_var("then", PineRef::new_box(Some(2)));
         context.create_var("else", PineRef::new_box(Some(4)));
 
         assert_eq!(
-            downcast_pf::<Int>(ite.run(&mut context).unwrap()),
-            Ok(RefData::new_box(Some(2)))
+            downcast_pf::<Series<Int>>(ite.run(&mut context).unwrap()),
+            Ok(RefData::new_rc(Series::from(Some(2))))
         );
         // If-Then-Else Run as statement
         assert_eq!(ite.st_run(&mut context), Ok(()));
@@ -672,6 +689,8 @@ mod tests {
 
     #[test]
     fn for_range_test() {
+        use crate::syntax::SyntaxParser;
+
         let assign = Statement::Assignment(Box::new(Assignment::new_no_input(
             vec![VarName::new_no_input("a")],
             Exp::Num(Numeral::from_i32(1)),
@@ -679,7 +698,7 @@ mod tests {
             None,
         )));
         let block = Block::new_no_input(vec![assign], Some(Exp::Num(Numeral::from_i32(10))));
-        let for_range = ForRange::new_no_ctxid(
+        let mut for_range = ForRange::new_no_ctxid(
             VarName::new_no_input("i"),
             Exp::Num(Numeral::from_i32(1)),
             Exp::Num(Numeral::from_i32(10)),
@@ -687,6 +706,9 @@ mod tests {
             block,
             StrRange::new_empty(),
         );
+        SyntaxParser::new()
+            .parse_forrange_exp(&mut for_range)
+            .unwrap();
 
         let mut context = Context::new(None, ContextType::Normal);
 
@@ -694,8 +716,8 @@ mod tests {
         assert!(result.is_ok());
 
         assert_eq!(
-            Int::implicity_from(result.unwrap()),
-            Ok(RefData::new_box(Some(10)))
+            downcast_pf::<Series<Int>>(result.unwrap()),
+            Ok(RefData::new_rc(Series::from(Some(10))))
         );
         assert!(context.move_var("a").is_none());
     }

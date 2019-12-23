@@ -4,7 +4,7 @@ use super::name::VarName;
 use super::num::Numeral;
 use super::op::{BinaryOp, BinaryOpNode, UnaryOp, UnaryOpNode};
 use super::string::StringNode;
-use super::syntax_type::SyntaxType;
+use super::syntax_type::{FunctionType, SyntaxType};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct FunctionCall<'a> {
@@ -13,6 +13,7 @@ pub struct FunctionCall<'a> {
     pub dict_args: Vec<(VarName<'a>, Exp<'a>)>,
     pub ctxid: i32,
     pub range: StrRange,
+    pub func_type: Option<FunctionType<'a>>,
 }
 
 impl<'a> FunctionCall<'a> {
@@ -30,6 +31,7 @@ impl<'a> FunctionCall<'a> {
             dict_args,
             ctxid,
             range,
+            func_type: None,
         }
     }
 
@@ -45,6 +47,7 @@ impl<'a> FunctionCall<'a> {
             dict_args,
             ctxid: 0,
             range,
+            func_type: None,
         }
     }
 }
@@ -77,6 +80,7 @@ pub struct Condition<'a> {
     pub exp1: Exp<'a>,
     pub exp2: Exp<'a>,
     pub range: StrRange,
+    pub result_type: SyntaxType<'a>,
 }
 
 impl<'a> Condition<'a> {
@@ -87,6 +91,7 @@ impl<'a> Condition<'a> {
             exp1,
             exp2,
             range,
+            result_type: SyntaxType::Any,
         }
     }
 
@@ -97,6 +102,7 @@ impl<'a> Condition<'a> {
             exp1,
             exp2,
             range: StrRange::new_empty(),
+            result_type: SyntaxType::Any,
         }
     }
 }
@@ -475,6 +481,7 @@ pub struct IfThenElse<'a> {
     pub else_blk: Option<Block<'a>>,
     pub else_ctxid: i32,
     pub range: StrRange,
+    pub result_type: SyntaxType<'a>,
 }
 
 impl<'a> IfThenElse<'a> {
@@ -493,6 +500,7 @@ impl<'a> IfThenElse<'a> {
             else_blk,
             else_ctxid,
             range,
+            result_type: SyntaxType::Any,
         }
     }
 
@@ -509,6 +517,7 @@ impl<'a> IfThenElse<'a> {
             then_ctxid: 0,
             else_ctxid: 1,
             range,
+            result_type: SyntaxType::Any,
         }
     }
 }
@@ -522,6 +531,7 @@ pub struct ForRange<'a> {
     pub do_blk: Block<'a>,
     pub ctxid: i32,
     pub range: StrRange,
+    pub result_type: SyntaxType<'a>,
 }
 
 impl<'a> ForRange<'a> {
@@ -542,6 +552,7 @@ impl<'a> ForRange<'a> {
             do_blk,
             ctxid,
             range,
+            result_type: SyntaxType::Any,
         }
     }
 
@@ -561,6 +572,7 @@ impl<'a> ForRange<'a> {
             do_blk,
             ctxid: 0,
             range,
+            result_type: SyntaxType::Any,
         }
     }
 }

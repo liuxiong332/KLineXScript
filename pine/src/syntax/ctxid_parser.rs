@@ -185,12 +185,12 @@ mod tests {
 
     #[test]
     fn condition_test() {
-        let mut cond = Condition {
-            cond: func_call(name("cond"), vec![], vec![]),
-            exp1: func_call(name("exp1"), vec![], vec![]),
-            exp2: func_call(name("exp2"), vec![], vec![]),
-            range: StrRange::new_empty(),
-        };
+        let mut cond = Condition::new(
+            func_call(name("cond"), vec![], vec![]),
+            func_call(name("exp1"), vec![], vec![]),
+            func_call(name("exp2"), vec![], vec![]),
+            StrRange::new_empty(),
+        );
         let mut parser = CtxIdParser::new();
         parser.parse_condition(&mut cond);
         assert_eq!(parser.ctxid, 3);

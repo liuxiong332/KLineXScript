@@ -2,9 +2,10 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct FunctionType<'a> {
-    pub types: Vec<(Vec<(&'a str, SyntaxType<'a>)>, SyntaxType<'a>)>,
-}
+pub struct FunctionType<'a>(pub (Vec<(&'a str, SyntaxType<'a>)>, SyntaxType<'a>));
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct FunctionTypes<'a>(pub Vec<FunctionType<'a>>);
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum SimpleSyntaxType {
@@ -23,7 +24,7 @@ pub enum SyntaxType<'a> {
     Series(SimpleSyntaxType),
     Tuple(Rc<Vec<SyntaxType<'a>>>),
     Object(Rc<HashMap<&'a str, SyntaxType<'a>>>),
-    Function(Rc<FunctionType<'a>>),
+    Function(Rc<FunctionTypes<'a>>),
     UserFunction(Rc<Vec<&'a str>>),
     Any,
 }

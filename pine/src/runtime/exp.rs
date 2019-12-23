@@ -1,6 +1,6 @@
 use super::context::{Ctx, PineRuntimeError, RVRunner, Runner};
 use super::op::{binary_op_run, unary_op_run};
-use crate::ast::name::VarName;
+use super::runtime_convert::convert;
 use crate::ast::num::Numeral;
 pub use crate::ast::stat_expr_types::{
     Condition, DataType, Exp, FunctionCall, PrefixExp, RefCall, Statement, TypeCast,
@@ -154,8 +154,8 @@ impl<'a> Runner<'a> for Condition<'a> {
         let cond = self.cond.rv_run(context)?;
         let bool_val = Bool::implicity_from(cond).unwrap();
         match *bool_val {
-            true => self.exp1.rv_run(context),
-            false => self.exp2.rv_run(context),
+            true => Ok(convert(self.exp1.rv_run(context)?, &self.result_type)),
+            false => Ok(convert(self.exp2.rv_run(context)?, &self.result_type)),
         }
     }
 }
@@ -219,6 +219,7 @@ mod tests {
     use super::*;
     use crate::ast::color::ColorNode;
     use crate::ast::input::StrRange;
+    use crate::ast::name::VarName;
     use crate::ast::num::Numeral;
     use crate::ast::stat_expr_types::{BoolNode, NaNode, TupleNode};
     use crate::ast::string::StringNode;
@@ -265,33 +266,52 @@ mod tests {
 
     #[test]
     fn condition_test() {
-        let cond_exp = Condition::new_no_input(
+        use crate::syntax::SyntaxParser;
+
+        let mut cond_exp = Condition::new_no_input(
             Exp::Bool(BoolNode::new(true, StrRange::new_empty())),
             Exp::Num(Numeral::from_i32(1)),
             Exp::Num(Numeral::from_i32(2)),
         );
+        SyntaxParser::new().parse_condition(&mut cond_exp).unwrap();
+
         let mut context = Context::new(None, ContextType::Normal);
         assert_eq!(
-            downcast_pf::<Int>(cond_exp.run(&mut context).unwrap()),
-            Ok(RefData::new_box(Some(1)))
+            downcast_pf::<Series<Int>>(cond_exp.run(&mut context).unwrap()),
+            Ok(RefData::new_rc(Series::from(Some(1))))
         );
     }
 
     #[test]
     fn condition2_test() {
-        let cond_exp = Condition::new_no_input(
+        use crate::ast::syntax_type::{SimpleSyntaxType, SyntaxType};
+        use crate::syntax::SyntaxParser;
+
+        let mut cond_exp = Condition::new_no_input(
             Exp::VarName(VarName::new_no_input("cond")),
             Exp::VarName(VarName::new_no_input("exp1")),
             Exp::VarName(VarName::new_no_input("exp2")),
         );
+        SyntaxParser::new_with_vars(
+            [
+                ("cond", SyntaxType::Simple(SimpleSyntaxType::Bool)),
+                ("exp1", SyntaxType::Simple(SimpleSyntaxType::Int)),
+                ("exp2", SyntaxType::Simple(SimpleSyntaxType::Int)),
+            ]
+            .iter()
+            .cloned()
+            .collect(),
+        )
+        .parse_condition(&mut cond_exp)
+        .unwrap();
         let mut context = Context::new(None, ContextType::Normal);
         context.create_var("cond", PineRef::new_box(true));
         context.create_var("exp1", PineRef::new_box(Some(1)));
         context.create_var("exp2", PineRef::new_box(Some(2)));
 
         assert_eq!(
-            downcast_pf::<Int>(cond_exp.run(&mut context).unwrap()),
-            Ok(RefData::new_box(Some(1)))
+            downcast_pf::<Series<Int>>(cond_exp.run(&mut context).unwrap()),
+            Ok(RefData::new_rc(Series::from(Some(1))))
         );
     }
 

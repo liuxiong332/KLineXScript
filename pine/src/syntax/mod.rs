@@ -634,12 +634,16 @@ impl<'a> SyntaxParser<'a> {
     }
 
     fn parse_varname(&mut self, varname: &mut RVVarName<'a>) -> ParseResult<'a> {
-        match downcast_ctx(self.context).get_var(varname.name.value) {
+        let name = varname.name.value;
+        match downcast_ctx(self.context).get_var(name) {
             None => Err(PineInputError::new(
                 PineErrorKind::VarNotDeclare,
                 varname.name.range,
             )),
-            Some(val) => Ok(ParseValue::new(val.clone(), varname.name.value)),
+            Some(val) => {
+                varname.var_index = downcast_ctx(self.context).get_var_index(name);
+                Ok(ParseValue::new(val.clone(), name))
+            }
         }
     }
 
@@ -1291,10 +1295,12 @@ mod tests {
     fn varname_test() {
         let mut parser = SyntaxParser::new();
         downcast_ctx(parser.context).declare_var("hello", INT_TYPE);
+        let mut varname = rvarname("hello");
         assert_eq!(
-            parser.parse_exp(&mut Exp::VarName(rvarname("hello"))),
+            parser.parse_varname(&mut varname),
             Ok(ParseValue::new(INT_TYPE, "hello"))
         );
+        assert_eq!(varname.var_index, VarIndex::new(0, 0));
     }
 
     #[test]

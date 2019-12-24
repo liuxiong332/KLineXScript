@@ -488,11 +488,17 @@ pub struct VarAssignment<'a> {
     pub name: VarName<'a>,
     pub val: Exp<'a>,
     pub range: StrRange,
+    pub var_index: VarIndex,
 }
 
 impl<'a> VarAssignment<'a> {
     pub fn new(name: VarName<'a>, val: Exp<'a>, range: StrRange) -> VarAssignment<'a> {
-        VarAssignment { name, val, range }
+        VarAssignment {
+            name,
+            val,
+            range,
+            var_index: VarIndex::new(0, 0),
+        }
     }
 
     pub fn new_no_input(name: VarName<'a>, val: Exp<'a>) -> VarAssignment<'a> {
@@ -500,6 +506,7 @@ impl<'a> VarAssignment<'a> {
             name,
             val,
             range: StrRange::new_empty(),
+            var_index: VarIndex::new(0, 0),
         }
     }
 }

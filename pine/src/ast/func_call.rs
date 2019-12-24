@@ -1,7 +1,7 @@
 use nom::{
     bytes::complete::tag,
     combinator::{map, opt},
-    sequence::{delimited, preceded, tuple},
+    sequence::{preceded, tuple},
     Err,
 };
 
@@ -123,7 +123,7 @@ pub fn func_call_ws<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Fu
 #[cfg(test)]
 mod tests {
     use super::super::input::Position;
-    use super::super::stat_expr_types::BoolNode;
+    use super::super::stat_expr_types::{BoolNode, RVVarName};
     use super::*;
     use crate::ast::stat_expr_types::PrefixExp;
     use std::convert::TryInto;
@@ -163,19 +163,19 @@ mod tests {
             "funa(arg1, arg2, a = true)",
             func_call_ws,
             FunctionCall::new_no_ctxid(
-                Exp::VarName(VarName::new(
+                Exp::VarName(RVVarName::new(VarName::new(
                     "funa",
                     StrRange::from_start("funa", Position::new(0, 0)),
-                )),
+                ))),
                 vec![
-                    Exp::VarName(VarName::new(
+                    Exp::VarName(RVVarName::new(VarName::new(
                         "arg1",
                         StrRange::from_start("arg1", Position::new(0, 5)),
-                    )),
-                    Exp::VarName(VarName::new(
+                    ))),
+                    Exp::VarName(RVVarName::new(VarName::new(
                         "arg2",
                         StrRange::from_start("arg2", Position::new(0, 11)),
-                    )),
+                    ))),
                 ],
                 vec![(
                     VarName::new("a", StrRange::from_start("a", Position::new(0, 17))),
@@ -192,10 +192,10 @@ mod tests {
             "funa()",
             func_call_ws,
             FunctionCall::new_no_ctxid(
-                Exp::VarName(VarName::new(
+                Exp::VarName(RVVarName::new(VarName::new(
                     "funa",
                     StrRange::from_start("funa", Position::new(0, 0)),
-                )),
+                ))),
                 vec![],
                 vec![],
                 StrRange::from_start("funa()", Position::new(0, 0)),
@@ -206,13 +206,13 @@ mod tests {
             "funa.funb()",
             func_call_ws,
             FunctionCall::new_no_ctxid(
-                Exp::PrefixExp(Box::new(PrefixExp {
-                    var_chain: vec![
+                Exp::PrefixExp(Box::new(PrefixExp::new(
+                    vec![
                         VarName::new("funa", StrRange::from_start("funa", Position::new(0, 0))),
                         VarName::new("funb", StrRange::from_start("funb", Position::new(0, 5))),
                     ],
-                    range: StrRange::from_start("funa.funb", Position::new(0, 0)),
-                })),
+                    StrRange::from_start("funa.funb", Position::new(0, 0)),
+                ))),
                 vec![],
                 vec![],
                 StrRange::from_start("funa.funb()", Position::new(0, 0)),
@@ -226,15 +226,15 @@ mod tests {
             "funa(funb())",
             func_call_ws,
             FunctionCall::new_no_ctxid(
-                Exp::VarName(VarName::new(
+                Exp::VarName(RVVarName::new(VarName::new(
                     "funa",
                     StrRange::from_start("funa", Position::new(0, 0)),
-                )),
+                ))),
                 vec![Exp::FuncCall(Box::new(FunctionCall::new_no_ctxid(
-                    Exp::VarName(VarName::new(
+                    Exp::VarName(RVVarName::new(VarName::new(
                         "funb",
                         StrRange::from_start("funb", Position::new(0, 5)),
-                    )),
+                    ))),
                     vec![],
                     vec![],
                     StrRange::from_start("funb()", Position::new(0, 5)),

@@ -98,7 +98,7 @@ mod tests {
     use super::*;
     use crate::ast::input::{Position, StrRange};
     use crate::ast::name::VarName;
-    use crate::ast::stat_expr_types::{Assignment, Exp, Statement};
+    use crate::ast::stat_expr_types::{Assignment, Exp, RVVarName, Statement};
 
     struct MyCallback;
     impl Callback for MyCallback {}
@@ -108,7 +108,7 @@ mod tests {
         let mut blk = Block::new(
             vec![Statement::Assignment(Box::new(Assignment::new(
                 vec![VarName::new_with_start("hello", Position::new(0, 0))],
-                Exp::VarName(VarName::new_with_start("close", Position::new(0, 6))),
+                Exp::VarName(RVVarName::new_with_start("close", Position::new(0, 6))),
                 false,
                 None,
                 StrRange::from_start("hello=close", Position::new(0, 0)),

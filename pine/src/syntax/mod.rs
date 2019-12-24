@@ -5,7 +5,8 @@ use crate::ast::num::Numeral;
 use crate::ast::op::{BinaryOp, UnaryOp};
 use crate::ast::stat_expr_types::{
     Assignment, BinaryExp, Block, Condition, DataType, Exp, ForRange, FunctionCall, FunctionDef,
-    IfThenElse, PrefixExp, RefCall, Statement, TupleNode, TypeCast, UnaryExp, VarAssignment,
+    IfThenElse, PrefixExp, RVVarName, RefCall, Statement, TupleNode, TypeCast, UnaryExp,
+    VarAssignment, VarIndex,
 };
 use crate::ast::state::PineInputError;
 use crate::ast::syntax_type::{FunctionTypes, SimpleSyntaxType, SyntaxType};
@@ -41,6 +42,12 @@ pub trait SyntaxCtx<'a> {
     fn declare_user_func(&mut self, name: String, t: SyntaxType<'a>);
 
     fn get_user_func(&self, name: &str) -> Option<&SyntaxType<'a>>;
+
+    fn gen_var_index(&mut self, name: &str) -> i32;
+
+    fn get_var_index(&mut self, name: &str) -> VarIndex;
+
+    fn gen_child_ctx_index(&mut self) -> i32;
 }
 
 pub struct SyntaxContext<'a> {
@@ -48,7 +55,16 @@ pub struct SyntaxContext<'a> {
     context_type: ContextType,
 
     vars: HashMap<&'a str, SyntaxType<'a>>,
+    // User defined function's type for the specific name, the name is like method_name@id
     user_func_types: HashMap<String, SyntaxType<'a>>,
+
+    // The variable name to index map that can transfer the map lookup to vector getter.
+    var_indexs: HashMap<String, i32>,
+    // The max index of the current context
+    max_var_index: i32,
+
+    // The max index of children context
+    max_child_ctx_index: i32,
 }
 
 pub fn downcast_ctx<'a>(item: *mut (dyn SyntaxCtx<'a> + 'a)) -> &mut SyntaxContext<'a> {
@@ -101,6 +117,31 @@ impl<'a> SyntaxCtx<'a> for SyntaxContext<'a> {
             None
         }
     }
+
+    fn gen_var_index(&mut self, name: &str) -> i32 {
+        self.max_var_index += 1;
+        debug_assert!(!self.var_indexs.contains_key(name));
+        self.var_indexs
+            .insert(String::from(name), self.max_var_index);
+        self.max_var_index
+    }
+
+    fn get_var_index(&mut self, name: &str) -> VarIndex {
+        if self.var_indexs.contains_key(name) {
+            VarIndex::new(self.var_indexs[name], 0)
+        } else if let Some(p) = self.parent {
+            let mut var_index = downcast_ctx(p).get_var_index(name);
+            var_index.rel_ctx += 1;
+            var_index
+        } else {
+            unreachable!();
+        }
+    }
+
+    fn gen_child_ctx_index(&mut self) -> i32 {
+        self.max_child_ctx_index += 1;
+        self.max_child_ctx_index
+    }
 }
 
 impl<'a> SyntaxContext<'a> {
@@ -113,6 +154,9 @@ impl<'a> SyntaxContext<'a> {
             context_type,
             user_func_types: HashMap::new(),
             vars: HashMap::new(),
+            var_indexs: HashMap::new(),
+            max_var_index: -1,
+            max_child_ctx_index: -1,
         }
     }
 
@@ -124,7 +168,10 @@ impl<'a> SyntaxContext<'a> {
 pub struct SyntaxParser<'a> {
     _root_ctx: Box<SyntaxContext<'a>>,
     context: *mut (dyn SyntaxCtx<'a> + 'a),
+
+    // user defined function name to function definition map
     user_funcs: HashMap<&'a str, *mut FunctionDef<'a>>,
+    // The types id generator that generate same id for the same types.
     types_id_gen: TypesIdGen<'a>,
     errors: Vec<PineInputError>,
 }
@@ -243,6 +290,10 @@ impl<'a> SyntaxParser<'a> {
             func_def = self.user_funcs[method_name].as_mut().unwrap();
         };
         let mut spec_def = func_def.gen_spec_def();
+
+        let varids: Vec<_> = names.iter().map(|n| sub_ctx.gen_var_index(n)).collect();
+        spec_def.varids = Some(varids);
+
         let parse_res = self.parse_blk(&mut spec_def.body)?;
         func_def.spec_defs.as_mut().unwrap().push(spec_def);
 
@@ -278,7 +329,10 @@ impl<'a> SyntaxParser<'a> {
             let typeid = self.types_id_gen.get(&pos_arg_type);
             let fun_name = format!("{}@{}", method_name, typeid);
 
-            match downcast_ctx(self.context).get_user_func(&fun_name) {
+            let context = downcast_ctx(self.context);
+            func_call.ctxid = context.gen_child_ctx_index();
+
+            match context.get_user_func(&fun_name) {
                 Some(SyntaxType::UserFunction(func_type)) => {
                     Ok(ParseValue::new_with_type(func_type.1.clone()))
                 }
@@ -378,15 +432,19 @@ impl<'a> SyntaxParser<'a> {
 
     fn parse_prefix(&mut self, prefix: &mut PrefixExp<'a>) -> ParseResult<'a> {
         let subkeys: Vec<_> = prefix.var_chain.iter().map(|s| s.value).collect();
-        match downcast_ctx(self.context).get_var(prefix.var_chain[0].value) {
+        let name = prefix.var_chain[0].value;
+        match downcast_ctx(self.context).get_var(name) {
             None => Err(PineInputError::new(
                 PineErrorKind::VarNotDeclare,
                 prefix.range,
             )),
-            Some(obj) => match Self::get_for_obj(obj, &subkeys[1..]) {
-                Ok(val_type) => Ok(ParseValue::new_with_type(val_type)),
-                Err(code) => Err(PineInputError::new(code, prefix.range)),
-            },
+            Some(obj) => {
+                prefix.var_index = downcast_ctx(self.context).get_var_index(name);
+                match Self::get_for_obj(obj, &subkeys[1..]) {
+                    Ok(val_type) => Ok(ParseValue::new_with_type(val_type)),
+                    Err(code) => Err(PineInputError::new(code, prefix.range)),
+                }
+            }
         }
     }
 
@@ -428,6 +486,7 @@ impl<'a> SyntaxParser<'a> {
     }
 
     fn parse_ifthenelse_then(&mut self, ite: &mut IfThenElse<'a>) -> ParseResult<'a> {
+        ite.then_ctxid = downcast_ctx(self.context).gen_child_ctx_index();
         // Create new context for if block
         let mut if_ctx = SyntaxContext::new(Some(self.context), ContextType::IfElseBlock);
         self.context = &mut if_ctx;
@@ -437,7 +496,12 @@ impl<'a> SyntaxParser<'a> {
         Ok(then_res)
     }
 
-    fn parse_ifthenelse_else(&mut self, else_blk: &mut Block<'a>) -> ParseResult<'a> {
+    fn parse_ifthenelse_else(
+        &mut self,
+        else_blk: &mut Block<'a>,
+        ctxid: &mut i32,
+    ) -> ParseResult<'a> {
+        *ctxid = downcast_ctx(self.context).gen_child_ctx_index();
         // Create new context for if block
         let mut else_ctx = SyntaxContext::new(Some(self.context), ContextType::IfElseBlock);
         self.context = &mut else_ctx;
@@ -465,7 +529,7 @@ impl<'a> SyntaxParser<'a> {
         }
         if let Some(else_blk) = &mut ite.else_blk {
             // Create new context for if block
-            let else_res = self.parse_ifthenelse_else(else_blk)?;
+            let else_res = self.parse_ifthenelse_else(else_blk, &mut ite.else_ctxid)?;
 
             if else_res.syntax_type.is_void() {
                 return Err(PineInputError::new(
@@ -499,7 +563,7 @@ impl<'a> SyntaxParser<'a> {
         self.parse_ifthenelse_cond(ite)?;
         self.parse_ifthenelse_then(ite)?;
         if let Some(else_blk) = &mut ite.else_blk {
-            self.parse_ifthenelse_else(else_blk)?;
+            self.parse_ifthenelse_else(else_blk, &mut ite.else_ctxid)?;
         }
         ite.result_type = SyntaxType::Void;
         Ok(ParseValue::new_with_type(SyntaxType::Void))
@@ -529,12 +593,15 @@ impl<'a> SyntaxParser<'a> {
                 ));
             }
         }
+        for_range.ctxid = downcast_ctx(self.context).gen_child_ctx_index();
+
         let mut for_ctx = SyntaxContext::new(Some(self.context), ContextType::ForRangeBlock);
         for_ctx.declare_var(
             for_range.var.value,
             SyntaxType::Simple(SimpleSyntaxType::Int),
         );
         self.context = &mut for_ctx;
+        for_range.varid = for_ctx.gen_var_index(for_range.var.value);
 
         let blk_res = self.parse_blk(&mut for_range.do_blk)?;
         self.context = for_ctx.parent.unwrap();
@@ -566,13 +633,13 @@ impl<'a> SyntaxParser<'a> {
         Ok(ParseValue::new_with_type(res_type))
     }
 
-    fn parse_varname(&mut self, varname: &mut VarName<'a>) -> ParseResult<'a> {
-        match downcast_ctx(self.context).get_var(varname.value) {
+    fn parse_varname(&mut self, varname: &mut RVVarName<'a>) -> ParseResult<'a> {
+        match downcast_ctx(self.context).get_var(varname.name.value) {
             None => Err(PineInputError::new(
                 PineErrorKind::VarNotDeclare,
-                varname.range,
+                varname.name.range,
             )),
-            Some(val) => Ok(ParseValue::new(val.clone(), varname.value)),
+            Some(val) => Ok(ParseValue::new(val.clone(), varname.name.value)),
         }
     }
 
@@ -758,6 +825,13 @@ impl<'a> SyntaxParser<'a> {
                             assign.range,
                         )?);
                     }
+                    let context = downcast_ctx(self.context);
+                    let varids = assign
+                        .names
+                        .iter()
+                        .map(|n| context.gen_var_index(n.value))
+                        .collect();
+                    assign.varids = Some(varids);
                     Ok(ParseValue::new_with_type(SyntaxType::Tuple(Rc::new(
                         ret_tuple,
                     ))))
@@ -775,6 +849,9 @@ impl<'a> SyntaxParser<'a> {
                 val_res.syntax_type,
                 assign.range,
             )?;
+            assign.varids = Some(vec![
+                downcast_ctx(self.context).gen_var_index(assign.names[0].value)
+            ]);
             Ok(ParseValue::new_with_type(rtype))
         }
     }
@@ -818,6 +895,7 @@ impl<'a> SyntaxParser<'a> {
         self.user_funcs.insert(name, func_def);
         let param_names: Vec<_> = func_def.params.iter().map(|v| v.value).collect();
         let name_type = SyntaxType::UserFunction(Rc::new((param_names, SyntaxType::Any)));
+        func_def.name_varid = context.gen_var_index(name);
         context.declare_var(name, name_type.clone());
         Ok(ParseValue::new_with_type(name_type))
     }
@@ -912,6 +990,10 @@ mod tests {
         VarName::new(n, StrRange::new_empty())
     }
 
+    fn rvarname(n: &str) -> RVVarName {
+        RVVarName::new(VarName::new(n, StrRange::new_empty()))
+    }
+
     #[test]
     fn func_def_test() {
         let mut parser = SyntaxParser::new();
@@ -927,6 +1009,7 @@ mod tests {
                 Rc::new((vec!["hello", "hello2"], SyntaxType::Any))
             )))
         );
+        assert_eq!(func_def.name_varid, 0);
         assert_eq!(parser.user_funcs["funa"], &mut func_def as *mut FunctionDef);
         assert_eq!(downcast_ctx(parser.context).vars.contains_key("funa"), true);
     }
@@ -943,7 +1026,7 @@ mod tests {
     }
 
     fn fun_nm<'a>() -> Exp<'a> {
-        Exp::VarName(varname("func"))
+        Exp::VarName(rvarname("func"))
     }
 
     #[test]
@@ -1036,7 +1119,7 @@ mod tests {
             vec![varname("a1"), varname("a2")],
             Block::new(
                 vec![],
-                Some(Exp::VarName(varname("a2"))),
+                Some(Exp::VarName(rvarname("a2"))),
                 StrRange::new_empty(),
             ),
             StrRange::new_empty(),
@@ -1044,7 +1127,7 @@ mod tests {
         assert!(parser.parse_func_def(&mut func_def).is_ok());
 
         let mut func_call = FunctionCall::new(
-            Exp::VarName(varname("fun")),
+            Exp::VarName(rvarname("fun")),
             vec![int_exp(1), float_exp(2f64)],
             vec![],
             1,
@@ -1055,15 +1138,16 @@ mod tests {
             Ok(ParseValue::new_with_type(FLOAT_TYPE))
         );
         assert_eq!(downcast_ctx(parser.context).parent, None);
+        assert_eq!(func_call.ctxid, 0);
     }
 
     #[test]
     fn multi_user_func_call_test() {
         let mut parser = SyntaxParser::new();
         let cond_exp = Condition::new_no_input(
-            Exp::VarName(varname("a1")),
-            Exp::VarName(varname("a1")),
-            Exp::VarName(varname("a2")),
+            Exp::VarName(rvarname("a1")),
+            Exp::VarName(rvarname("a1")),
+            Exp::VarName(rvarname("a2")),
         );
         let mut func_def = FunctionDef::new(
             varname("fun"),
@@ -1079,7 +1163,7 @@ mod tests {
 
         let run_funcall1 = |parser: &mut SyntaxParser, len| {
             let mut func_call = FunctionCall::new(
-                Exp::VarName(varname("fun")),
+                Exp::VarName(rvarname("fun")),
                 vec![int_exp(1), float_exp(2f64)],
                 vec![],
                 1,
@@ -1112,7 +1196,7 @@ mod tests {
 
         let run_funcall2 = |parser: &mut SyntaxParser| {
             let mut func_call = FunctionCall::new(
-                Exp::VarName(varname("fun")),
+                Exp::VarName(rvarname("fun")),
                 vec![int_exp(1), int_exp(2)],
                 vec![],
                 1,
@@ -1146,13 +1230,12 @@ mod tests {
         run_funcall1(&mut parser, 1);
         run_funcall2(&mut parser);
         run_funcall1(&mut parser, 2);
-        assert_eq!(
-            downcast_ctx(parser.context)
-                .user_func_types
-                .keys()
-                .collect::<Vec<_>>(),
-            vec![&String::from("fun@2"), &String::from("fun@1")]
-        );
+        let mut keys = downcast_ctx(parser.context)
+            .user_func_types
+            .keys()
+            .collect::<Vec<_>>();
+        keys.sort();
+        assert_eq!(keys, vec![&String::from("fun@1"), &String::from("fun@2")]);
     }
 
     #[test]
@@ -1209,7 +1292,7 @@ mod tests {
         let mut parser = SyntaxParser::new();
         downcast_ctx(parser.context).declare_var("hello", INT_TYPE);
         assert_eq!(
-            parser.parse_exp(&mut Exp::VarName(varname("hello"))),
+            parser.parse_exp(&mut Exp::VarName(rvarname("hello"))),
             Ok(ParseValue::new(INT_TYPE, "hello"))
         );
     }
@@ -1221,7 +1304,10 @@ mod tests {
         downcast_ctx(parser.context).declare_var("arg2", FLOAT_TYPE);
         assert_eq!(
             parser.parse_exp(&mut Exp::Tuple(Box::new(TupleNode::new(
-                vec![Exp::VarName(varname("arg1")), Exp::VarName(varname("arg2"))],
+                vec![
+                    Exp::VarName(rvarname("arg1")),
+                    Exp::VarName(rvarname("arg2"))
+                ],
                 StrRange::new_empty()
             )))),
             Ok(ParseValue::new_with_type(SyntaxType::Tuple(Rc::new(vec![
@@ -1239,7 +1325,7 @@ mod tests {
         assert_eq!(
             parser.parse_exp(&mut Exp::TypeCast(Box::new(TypeCast::new_no_input(
                 DataType::Int,
-                Exp::VarName(varname("arg1"))
+                Exp::VarName(rvarname("arg1"))
             )))),
             Ok(ParseValue::new_with_type(SyntaxType::Series(
                 SimpleSyntaxType::Int
@@ -1257,8 +1343,8 @@ mod tests {
 
         assert_eq!(
             parser.parse_exp(&mut Exp::RefCall(Box::new(RefCall::new_no_input(
-                Exp::VarName(varname("series")),
-                Exp::VarName(varname("arg"))
+                Exp::VarName(rvarname("series")),
+                Exp::VarName(rvarname("arg"))
             )))),
             Ok(ParseValue::new_with_type(SyntaxType::Series(
                 SimpleSyntaxType::Float
@@ -1268,8 +1354,8 @@ mod tests {
 
         assert_eq!(
             parser.parse_exp(&mut Exp::RefCall(Box::new(RefCall::new_no_input(
-                Exp::VarName(varname("simple")),
-                Exp::VarName(varname("arg"))
+                Exp::VarName(rvarname("simple")),
+                Exp::VarName(rvarname("arg"))
             )))),
             Ok(ParseValue::new_with_type(SyntaxType::Series(
                 SimpleSyntaxType::Float
@@ -1291,9 +1377,9 @@ mod tests {
 
         assert_eq!(
             parser.parse_exp(&mut Exp::Condition(Box::new(Condition::new_no_input(
-                Exp::VarName(varname("cond")),
-                Exp::VarName(varname("arg1")),
-                Exp::VarName(varname("arg2"))
+                Exp::VarName(rvarname("cond")),
+                Exp::VarName(rvarname("arg1")),
+                Exp::VarName(rvarname("arg2"))
             )))),
             Ok(ParseValue::new_with_type(SyntaxType::Series(
                 SimpleSyntaxType::Float
@@ -1330,6 +1416,8 @@ mod tests {
             )))
         );
         assert_eq!(exp.result_type, SyntaxType::Series(SimpleSyntaxType::Float));
+        assert_eq!(exp.then_ctxid, 0);
+        assert_eq!(exp.else_ctxid, 1);
 
         let input = Input::new_with_str("if 1\n    1\n");
         let mut exp = if_then_else_exp(0)(input, &AstState::new()).unwrap().1;
@@ -1340,6 +1428,7 @@ mod tests {
             )))
         );
         assert_eq!(exp.result_type, SyntaxType::Series(SimpleSyntaxType::Int));
+        assert_eq!(exp.then_ctxid, 2);
     }
 
     #[test]
@@ -1389,12 +1478,14 @@ mod tests {
         context.declare_var("var", SyntaxType::Simple(SimpleSyntaxType::Int));
 
         let input = Input::new_with_str("for i = 1 to 2\n    i");
+        let mut for_range = for_range_exp(0)(input, &AstState::new()).unwrap().1;
         assert_eq!(
-            parser.parse_forrange_exp(&mut for_range_exp(0)(input, &AstState::new()).unwrap().1),
+            parser.parse_forrange_exp(&mut for_range),
             Ok(ParseValue::new_with_type(SyntaxType::Series(
                 SimpleSyntaxType::Int
             )))
         );
+        assert_eq!(for_range.varid, 0);
     }
 
     #[test]
@@ -1415,7 +1506,7 @@ mod tests {
         context.declare_var("var", SyntaxType::Series(SimpleSyntaxType::Int));
         let mut series_plus_exp = UnaryExp::new(
             UnaryOp::Plus,
-            Exp::VarName(varname("var")),
+            Exp::VarName(rvarname("var")),
             StrRange::new_empty(),
         );
         assert_eq!(
@@ -1449,7 +1540,7 @@ mod tests {
         context.declare_var("var", SyntaxType::Series(SimpleSyntaxType::Int));
         let mut series_plus_exp = UnaryExp::new(
             UnaryOp::BoolNot,
-            Exp::VarName(varname("var")),
+            Exp::VarName(rvarname("var")),
             StrRange::new_empty(),
         );
         assert_eq!(
@@ -1488,8 +1579,8 @@ mod tests {
         context.declare_var("str2", SyntaxType::Series(SimpleSyntaxType::String));
         let mut sstr_add_exp = BinaryExp::new(
             BinaryOp::Plus,
-            Exp::VarName(varname("str1")),
-            Exp::VarName(varname("str2")),
+            Exp::VarName(rvarname("str1")),
+            Exp::VarName(rvarname("str2")),
             StrRange::new_empty(),
         );
         assert_eq!(
@@ -1524,7 +1615,7 @@ mod tests {
         let mut int_add_exp = BinaryExp::new(
             BinaryOp::Plus,
             int_exp(1),
-            Exp::VarName(varname("sint")),
+            Exp::VarName(rvarname("sint")),
             StrRange::new_empty(),
         );
         assert_eq!(
@@ -1563,7 +1654,7 @@ mod tests {
         let mut eq_exp = BinaryExp::new(
             BinaryOp::Eq,
             int_exp(1),
-            Exp::VarName(varname("sint")),
+            Exp::VarName(rvarname("sint")),
             StrRange::new_empty(),
         );
         assert_eq!(
@@ -1577,7 +1668,7 @@ mod tests {
         let mut eq_exp = BinaryExp::new(
             BinaryOp::Eq,
             float_exp(1f64),
-            Exp::VarName(varname("sint")),
+            Exp::VarName(rvarname("sint")),
             StrRange::new_empty(),
         );
         assert_eq!(
@@ -1647,7 +1738,7 @@ mod tests {
         let mut series_geq_exp = BinaryExp::new(
             BinaryOp::Geq,
             int_exp(1),
-            Exp::VarName(varname("sint")),
+            Exp::VarName(rvarname("sint")),
             StrRange::new_empty(),
         );
         assert_eq!(
@@ -1683,7 +1774,7 @@ mod tests {
         let mut bool_and_exp = BinaryExp::new(
             BinaryOp::BoolAnd,
             int_exp(1),
-            Exp::VarName(varname("var")),
+            Exp::VarName(rvarname("var")),
             StrRange::new_empty(),
         );
         assert_eq!(
@@ -1726,6 +1817,7 @@ mod tests {
             .cloned()
             .collect();
         context.declare_var("var", SyntaxType::Object(Rc::new(map1)));
+        context.gen_var_index("var");
 
         let mut prefix_exp =
             PrefixExp::new_no_input(vec![varname("var"), varname("key1"), varname("key2")]);
@@ -1735,6 +1827,7 @@ mod tests {
                 SimpleSyntaxType::Int
             )))
         );
+        assert_eq!(prefix_exp.var_index, VarIndex::new(0, 0));
 
         let mut prefix_exp = PrefixExp::new_no_input(vec![varname("var"), varname("nokey")]);
         assert_eq!(
@@ -1786,16 +1879,21 @@ mod tests {
 
         let input = Input::new_with_str("a = 1");
         let val_type = SyntaxType::Simple(SimpleSyntaxType::Int);
+        let mut assign = assign_with_indent(0)(input, &AstState::new()).unwrap().1;
         assert_eq!(
-            parser.parse_assign(&mut assign_with_indent(0)(input, &AstState::new()).unwrap().1),
+            parser.parse_assign(&mut assign),
             Ok(ParseValue::new_with_type(val_type.clone()))
         );
         assert_eq!(context.get_var_scope("a"), Some(&val_type));
+        assert_eq!(assign.varids, Some(vec![0]));
 
+        context.var_indexs = HashMap::new();
+        let mut assign = assign_with_indent(0)(input, &AstState::new()).unwrap().1;
         assert_eq!(
-            parser.parse_assign(&mut assign_with_indent(0)(input, &AstState::new()).unwrap().1),
+            parser.parse_assign(&mut assign),
             Ok(ParseValue::new_with_type(val_type.clone()))
         );
+        assert_eq!(assign.varids, Some(vec![1]));
         assert_eq!(
             parser.errors.last(),
             Some(&PineInputError::new(
@@ -1804,15 +1902,19 @@ mod tests {
             ))
         );
 
+        context.var_indexs = HashMap::new();
         let input = Input::new_with_str("[a1, a2] = [1, 2]");
+        let mut assign = assign_with_indent(0)(input, &AstState::new()).unwrap().1;
         assert_eq!(
-            parser.parse_assign(&mut assign_with_indent(0)(input, &AstState::new()).unwrap().1),
+            parser.parse_assign(&mut assign),
             Ok(ParseValue::new_with_type(SyntaxType::Tuple(Rc::new(vec![
                 val_type.clone(),
                 val_type.clone()
             ]))))
         );
+        assert_eq!(assign.varids, Some(vec![2, 3]));
 
+        context.var_indexs = HashMap::new();
         let input = Input::new_with_str("int [a1, a2] = [1.0, 2.0]");
         assert_eq!(
             parser.parse_assign(&mut assign_with_indent(0)(input, &AstState::new()).unwrap().1),

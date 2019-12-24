@@ -21,14 +21,14 @@ fn expr_test() {
                         BinaryOp::Plus,
                         Exp::BinaryExp(Box::new(BinaryExp::new(
                             BinaryOp::Plus,
-                            Exp::VarName(open),
-                            Exp::VarName(high),
+                            Exp::VarName(RVVarName::new(open)),
+                            Exp::VarName(RVVarName::new(high)),
                             StrRange::new(open.range.start, high.range.end),
                         ))),
-                        Exp::VarName(low),
+                        Exp::VarName(RVVarName::new(low)),
                         StrRange::new(open.range.start, low.range.end),
                     ))),
-                    Exp::VarName(close),
+                    Exp::VarName(RVVarName::new(close)),
                     StrRange::new(open.range.start, close.range.end),
                 ))),
                 false,
@@ -138,9 +138,9 @@ fn func_def_test() {
                             vec![VarName::new_with_start("isEqual", Position::new(2, 4))],
                             Exp::BinaryExp(Box::new(BinaryExp::new(
                                 BinaryOp::Eq,
-                                Exp::VarName(VarName::new_with_start("s", Position::new(2, 14))),
+                                Exp::VarName(RVVarName::new_with_start("s", Position::new(2, 14))),
                                 Exp::RefCall(Box::new(RefCall {
-                                    name: Exp::VarName(VarName::new_with_start(
+                                    name: Exp::VarName(RVVarName::new_with_start(
                                         "s",
                                         Position::new(2, 19)
                                     )),

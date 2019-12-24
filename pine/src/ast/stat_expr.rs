@@ -2,8 +2,8 @@ use super::color::color_lit;
 use super::error::{PineError, PineErrorKind, PineResult};
 use super::func_call::{func_call, func_call_ws};
 use super::input::{Input, StrRange};
-use super::name::{varname, varname_ws, VarName};
-use super::num::{int_lit_ws, num_lit_ws};
+use super::name::{varname, varname_ws};
+use super::num::num_lit_ws;
 use super::op::*;
 use super::stat_expr_types::*;
 use super::state::AstState;
@@ -131,7 +131,7 @@ pub fn callable_expr<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, E
             |s| prefix_exp(s, state),
             |exp| Exp::PrefixExp(Box::new(exp)),
         ), // match a.b.c
-        map(varname, Exp::VarName), // match a
+        map(varname, |name| Exp::VarName(RVVarName::new(name))), // match a
     ))(input)
 }
 
@@ -576,6 +576,7 @@ pub fn block<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Block<'a>
 #[cfg(test)]
 mod tests {
     use super::super::input::Position;
+    use super::super::name::VarName;
     use super::super::num::{FloatNode, IntNode, Numeral};
     use super::*;
     use std::fmt::Debug;
@@ -652,7 +653,7 @@ mod tests {
             tupledef,
             TupleNode::new(
                 vec![
-                    Exp::VarName(VarName::new_with_start("hello", Position::new(0, 3))),
+                    Exp::VarName(RVVarName::new_with_start("hello", Position::new(0, 3))),
                     Exp::Bool(BoolNode::new(
                         true,
                         StrRange::from_start("true", Position::new(0, 11)),
@@ -669,7 +670,7 @@ mod tests {
             "hello[true]",
             ref_call,
             RefCall::new(
-                Exp::VarName(VarName::new_with_start("hello", Position::new(0, 0))),
+                Exp::VarName(RVVarName::new_with_start("hello", Position::new(0, 0))),
                 Exp::Bool(BoolNode::new(
                     true,
                     StrRange::from_start("true", Position::new(0, 6)),
@@ -685,9 +686,9 @@ mod tests {
             "a ? b : c",
             condition,
             Condition::new(
-                Exp::VarName(VarName::new_with_start("a", Position::new(0, 0))),
-                Exp::VarName(VarName::new_with_start("b", Position::new(0, 4))),
-                Exp::VarName(VarName::new_with_start("c", Position::new(0, 8))),
+                Exp::VarName(RVVarName::new_with_start("a", Position::new(0, 0))),
+                Exp::VarName(RVVarName::new_with_start("b", Position::new(0, 4))),
+                Exp::VarName(RVVarName::new_with_start("c", Position::new(0, 8))),
                 StrRange::from_start("a ? b : c", Position::new(0, 0)),
             ),
         );
@@ -701,9 +702,9 @@ mod tests {
             Statement::Assignment(Box::new(Assignment::new(
                 vec![VarName::new_with_start("m", Position::new(0, 0))],
                 Exp::Condition(Box::new(Condition::new(
-                    Exp::VarName(VarName::new_with_start("a", Position::new(0, 4))),
-                    Exp::VarName(VarName::new_with_start("b", Position::new(0, 8))),
-                    Exp::VarName(VarName::new_with_start("c", Position::new(0, 12))),
+                    Exp::VarName(RVVarName::new_with_start("a", Position::new(0, 4))),
+                    Exp::VarName(RVVarName::new_with_start("b", Position::new(0, 8))),
+                    Exp::VarName(RVVarName::new_with_start("c", Position::new(0, 12))),
                     StrRange::from_start("a ? b : c", Position::new(0, 4)),
                 ))),
                 false,
@@ -737,7 +738,7 @@ mod tests {
             statement_with_indent(0),
             Statement::Assignment(Box::new(Assignment::new(
                 vec![VarName::new_with_start("a", Position::new(0, 0))],
-                Exp::VarName(VarName::new_with_start("b", Position::new(0, 4))),
+                Exp::VarName(RVVarName::new_with_start("b", Position::new(0, 4))),
                 false,
                 None,
                 StrRange::from_start("a = b", Position::new(0, 0)),
@@ -747,8 +748,8 @@ mod tests {
             "    a(arg1) \n",
             statement_with_indent(1),
             Statement::FuncCall(Box::new(FunctionCall::new_no_ctxid(
-                Exp::VarName(VarName::new_with_start("a", Position::new(0, 4))),
-                vec![Exp::VarName(VarName::new_with_start(
+                Exp::VarName(RVVarName::new_with_start("a", Position::new(0, 4))),
+                vec![Exp::VarName(RVVarName::new_with_start(
                     "arg1",
                     Position::new(0, 6),
                 ))],
@@ -764,7 +765,7 @@ mod tests {
                 vec![VarName::new_with_start("arg1", Position::new(0, 6))],
                 Block {
                     stmts: vec![],
-                    ret_stmt: Some(Exp::VarName(VarName::new_with_start(
+                    ret_stmt: Some(Exp::VarName(RVVarName::new_with_start(
                         "b",
                         Position::new(0, 15),
                     ))),
@@ -782,7 +783,7 @@ mod tests {
                 vec![VarName::new_with_start("arg1", Position::new(0, 6))],
                 Block {
                     stmts: vec![],
-                    ret_stmt: Some(Exp::VarName(VarName::new_with_start(
+                    ret_stmt: Some(Exp::VarName(RVVarName::new_with_start(
                         "b",
                         Position::new(1, 8),
                     ))),
@@ -810,7 +811,7 @@ mod tests {
             statement_with_indent(0),
             Statement::Assignment(Box::new(Assignment::new(
                 vec![VarName::new_with_start("a", Position::new(0, 0))],
-                Exp::VarName(VarName::new_with_start("close", Position::new(0, 4))),
+                Exp::VarName(RVVarName::new_with_start("close", Position::new(0, 4))),
                 false,
                 None,
                 StrRange::from_start("a = close", Position::new(0, 0)),
@@ -821,7 +822,7 @@ mod tests {
             statement_with_indent(0),
             Statement::VarAssignment(Box::new(VarAssignment::new(
                 VarName::new_with_start("a", Position::new(0, 0)),
-                Exp::VarName(VarName::new_with_start("close", Position::new(0, 5))),
+                Exp::VarName(RVVarName::new_with_start("close", Position::new(0, 5))),
                 StrRange::from_start("a := close", Position::new(0, 0)),
             ))),
         );
@@ -834,14 +835,14 @@ mod tests {
             statement_with_indent(0),
             Statement::Assignment(Box::new(Assignment::new(
                 vec![VarName::new_with_start("m", Position::new(0, 0))],
-                Exp::PrefixExp(Box::new(PrefixExp {
-                    var_chain: vec![
+                Exp::PrefixExp(Box::new(PrefixExp::new(
+                    vec![
                         VarName::new_with_start("a", Position::new(0, 4)),
                         VarName::new_with_start("b", Position::new(0, 6)),
                         VarName::new_with_start("c", Position::new(0, 8)),
                     ],
-                    range: StrRange::from_start("a.b.c", Position::new(0, 4)),
-                })),
+                    StrRange::from_start("a.b.c", Position::new(0, 4)),
+                ))),
                 false,
                 None,
                 StrRange::from_start("m = a.b.c", Position::new(0, 0)),
@@ -939,10 +940,10 @@ mod tests {
                 Block {
                     stmts: vec![],
                     ret_stmt: Some(Exp::Ite(Box::new(IfThenElse::new_no_ctxid(
-                        Exp::VarName(VarName::new_with_start("b", Position::new(1, 7))),
+                        Exp::VarName(RVVarName::new_with_start("b", Position::new(1, 7))),
                         Block::new(
                             vec![],
-                            Some(Exp::VarName(VarName::new_with_start(
+                            Some(Exp::VarName(RVVarName::new_with_start(
                                 "c",
                                 Position::new(2, 8),
                             ))),
@@ -964,14 +965,14 @@ mod tests {
             "if a \n    if b \n        c\n    else\n        d",
             if_then_else_exp(0),
             IfThenElse::new_no_ctxid(
-                Exp::VarName(VarName::new_with_start("a", Position::new(0, 3))),
+                Exp::VarName(RVVarName::new_with_start("a", Position::new(0, 3))),
                 Block {
                     stmts: vec![],
                     ret_stmt: Some(Exp::Ite(Box::new(IfThenElse::new_no_ctxid(
-                        Exp::VarName(VarName::new_with_start("b", Position::new(1, 7))),
+                        Exp::VarName(RVVarName::new_with_start("b", Position::new(1, 7))),
                         Block::new(
                             vec![],
-                            Some(Exp::VarName(VarName::new_with_start(
+                            Some(Exp::VarName(RVVarName::new_with_start(
                                 "c",
                                 Position::new(2, 8),
                             ))),
@@ -979,7 +980,7 @@ mod tests {
                         ),
                         Some(Block::new(
                             vec![],
-                            Some(Exp::VarName(VarName::new_with_start(
+                            Some(Exp::VarName(RVVarName::new_with_start(
                                 "d",
                                 Position::new(4, 8),
                             ))),
@@ -1028,7 +1029,7 @@ mod tests {
                                 None,
                                 Block::new(
                                     vec![],
-                                    Some(Exp::VarName(VarName::new_with_start(
+                                    Some(Exp::VarName(RVVarName::new_with_start(
                                         "i",
                                         Position::new(3, 12),
                                     ))),

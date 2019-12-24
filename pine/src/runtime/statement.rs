@@ -485,7 +485,7 @@ mod tests {
     use crate::ast::input::StrRange;
     use crate::ast::name::VarName;
     use crate::ast::num::Numeral;
-    use crate::ast::stat_expr_types::{BoolNode, TupleNode};
+    use crate::ast::stat_expr_types::{BoolNode, RVVarName, TupleNode};
     use crate::ast::syntax_type::{SimpleSyntaxType, SyntaxType};
     use crate::runtime::context::Context;
     use crate::runtime::exp::Exp;
@@ -536,7 +536,7 @@ mod tests {
     fn rv_assignment_test() {
         let assign = Statement::Assignment(Box::new(Assignment::new_no_input(
             vec![VarName::new_no_input("myvar")],
-            Exp::VarName(VarName::new_no_input("newvar")),
+            Exp::VarName(RVVarName::new_no_range("newvar")),
             false,
             None,
         )));
@@ -555,8 +555,8 @@ mod tests {
             vec![VarName::new_no_input("var1"), VarName::new_no_input("var2")],
             Exp::Tuple(Box::new(TupleNode::new(
                 vec![
-                    Exp::VarName(VarName::new_no_input("nv1")),
-                    Exp::VarName(VarName::new_no_input("nv2")),
+                    Exp::VarName(RVVarName::new_no_range("nv1")),
+                    Exp::VarName(RVVarName::new_no_range("nv2")),
                 ],
                 StrRange::new_empty(),
             ))),
@@ -591,7 +591,7 @@ mod tests {
     fn series_assignment_test() {
         let assign = Statement::Assignment(Box::new(Assignment::new_no_input(
             vec![VarName::new_no_input("myvar")],
-            Exp::VarName(VarName::new_no_input("newvar")),
+            Exp::VarName(RVVarName::new_no_range("newvar")),
             false,
             None,
         )));
@@ -626,7 +626,7 @@ mod tests {
         );
         let assign3 = VarAssignment::new_no_input(
             VarName::new_no_input("hello"),
-            Exp::VarName(VarName::new_no_input("newvar")),
+            Exp::VarName(RVVarName::new_no_range("newvar")),
         );
 
         let mut context = Context::new(None, ContextType::Normal);
@@ -653,11 +653,11 @@ mod tests {
     #[test]
     fn if_then_else_test() {
         let mut ite = IfThenElse::new_no_ctxid(
-            Exp::VarName(VarName::new_no_input("cond")),
-            Block::new_no_input(vec![], Some(Exp::VarName(VarName::new_no_input("then")))),
+            Exp::VarName(RVVarName::new_no_range("cond")),
+            Block::new_no_input(vec![], Some(Exp::VarName(RVVarName::new_no_range("then")))),
             Some(Block::new_no_input(
                 vec![],
-                Some(Exp::VarName(VarName::new_no_input("else"))),
+                Some(Exp::VarName(RVVarName::new_no_range("else"))),
             )),
             StrRange::new_empty(),
         );
@@ -733,9 +733,9 @@ mod tests {
         let block = Block::new_no_input(vec![assign], Some(Exp::Num(Numeral::from_i32(10))));
         let for_range = ForRange::new_no_ctxid(
             VarName::new_no_input("i"),
-            Exp::VarName(VarName::new_no_input("start")),
-            Exp::VarName(VarName::new_no_input("end")),
-            Some(Exp::VarName(VarName::new_no_input("step"))),
+            Exp::VarName(RVVarName::new_no_range("start")),
+            Exp::VarName(RVVarName::new_no_range("end")),
+            Some(Exp::VarName(RVVarName::new_no_range("step"))),
             block,
             StrRange::new_empty(),
         );
@@ -760,7 +760,7 @@ mod tests {
     fn func_call_exp_test() {
         use std::collections::HashMap;
         let exp = FunctionCall::new_no_ctxid(
-            Exp::VarName(VarName::new_no_input("name")),
+            Exp::VarName(RVVarName::new_no_range("name")),
             vec![Exp::Bool(BoolNode::new_no_range(true))],
             vec![],
             StrRange::new_empty(),
@@ -791,14 +791,14 @@ mod tests {
         use crate::ast::stat_expr_types::Exp;
 
         let exp = FunctionCall::new_no_ctxid(
-            Exp::VarName(VarName::new_no_input("name")),
+            Exp::VarName(RVVarName::new_no_range("name")),
             vec![Exp::Bool(BoolNode::new_no_range(true))],
             vec![],
             StrRange::new_empty(),
         );
         let series_exp = FunctionCall::new_no_ctxid(
-            Exp::VarName(VarName::new_no_input("name")),
-            vec![Exp::VarName(VarName::new_no_input("series"))],
+            Exp::VarName(RVVarName::new_no_range("name")),
+            vec![Exp::VarName(RVVarName::new_no_range("series"))],
             vec![],
             StrRange::new_empty(),
         );
@@ -807,7 +807,7 @@ mod tests {
             vec![VarName::new_no_input("arg")],
             Block {
                 stmts: vec![],
-                ret_stmt: Some(Exp::VarName(VarName::new_no_input("arg"))),
+                ret_stmt: Some(Exp::VarName(RVVarName::new_no_range("arg"))),
                 range: StrRange::new_empty(),
             },
             StrRange::new_empty(),
@@ -845,7 +845,7 @@ mod tests {
     fn for_range_break_test() {
         let block = Block::new_no_input(
             vec![Statement::Break(StrRange::new_empty())],
-            Some(Exp::VarName(VarName::new_no_input("i"))),
+            Some(Exp::VarName(RVVarName::new_no_range("i"))),
         );
         let for_range = ForRange::new_no_ctxid(
             VarName::new_no_input("i"),
@@ -873,7 +873,7 @@ mod tests {
     fn for_range_continue_test() {
         let block = Block::new_no_input(
             vec![Statement::Continue(StrRange::new_empty())],
-            Some(Exp::VarName(VarName::new_no_input("i"))),
+            Some(Exp::VarName(RVVarName::new_no_range("i"))),
         );
         let for_range = ForRange::new_no_ctxid(
             VarName::new_no_input("i"),

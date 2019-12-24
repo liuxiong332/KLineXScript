@@ -20,7 +20,7 @@ fn comment_test() {
             vec![
                 Statement::None(StrRange::from_start("//@version=4\n", Position::new(0, 0))),
                 Statement::FuncCall(Box::new(FunctionCall::new_no_ctxid(
-                    Exp::VarName(VarName::new_with_start("study", Position::new(1, 0))),
+                    Exp::VarName(RVVarName::new_with_start("study", Position::new(1, 0))),
                     vec![Exp::Str(StringNode::new(
                         String::from("Test"),
                         StrRange::from_start("Test", Position::new(1, 7))
@@ -34,14 +34,14 @@ fn comment_test() {
                 )),
                 Statement::Assignment(Box::new(Assignment::new(
                     vec![VarName::new_with_start("a", Position::new(3, 0))],
-                    Exp::VarName(VarName::new_with_start("close", Position::new(3, 4))),
+                    Exp::VarName(RVVarName::new_with_start("close", Position::new(3, 4))),
                     false,
                     None,
                     StrRange::from_start("a = close", Position::new(3, 0))
                 ))),
                 Statement::FuncCall(Box::new(FunctionCall::new_no_ctxid(
-                    Exp::VarName(VarName::new_with_start("plot", Position::new(4, 0))),
-                    vec![Exp::VarName(VarName::new_with_start(
+                    Exp::VarName(RVVarName::new_with_start("plot", Position::new(4, 0))),
+                    vec![Exp::VarName(RVVarName::new_with_start(
                         "a",
                         Position::new(4, 5)
                     ))],

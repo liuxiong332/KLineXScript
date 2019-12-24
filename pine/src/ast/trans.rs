@@ -1,7 +1,7 @@
 use super::input::StrRange;
 use super::op::{BinaryOp, BinaryOpNode, UnaryOp};
 use super::stat_expr_types::{
-    BinaryExp, Exp, Exp2, FlatExp, OpOrExp2, UnOpExp2, UnOrBinOp, UnaryExp,
+    BinaryExp, Exp, Exp2, FlatExp, OpOrExp2, RVVarName, UnOpExp2, UnOrBinOp, UnaryExp,
 };
 // pine language precedence table(The belower, the higher):
 //   conditional ?:
@@ -251,7 +251,7 @@ impl<'a> From<Exp2<'a>> for Exp<'a> {
             Exp2::Num(n) => Exp::Num(n),
             Exp2::Str(s) => Exp::Str(s),
             Exp2::Color(s) => Exp::Color(s),
-            Exp2::VarName(f) => Exp::VarName(f),
+            Exp2::VarName(f) => Exp::VarName(RVVarName::new(f)),
             // Exp2::RetTuple(p) => Exp::RetTuple(p),
             Exp2::Tuple(t) => Exp::Tuple(t),
             Exp2::TypeCast(t) => Exp::TypeCast(t),

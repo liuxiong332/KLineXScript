@@ -6,6 +6,18 @@ use super::op::{BinaryOp, BinaryOpNode, UnaryOp, UnaryOpNode};
 use super::string::StringNode;
 use super::syntax_type::{FunctionType, SyntaxType};
 
+#[derive(Clone, Debug, PartialEq, Copy)]
+pub struct VarIndex {
+    pub varid: i32,
+    pub rel_ctx: i32,
+}
+
+impl VarIndex {
+    pub fn new(varid: i32, rel_ctx: i32) -> VarIndex {
+        VarIndex { varid, rel_ctx }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct FunctionCall<'a> {
     pub method: Exp<'a>,
@@ -198,13 +210,49 @@ impl<'a> LVTupleNode<'a> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct RVVarName<'a> {
+    pub name: VarName<'a>,
+    pub var_index: VarIndex,
+}
+
+impl<'a> RVVarName<'a> {
+    pub fn new(name: VarName<'a>) -> RVVarName<'a> {
+        RVVarName {
+            name,
+            var_index: VarIndex::new(0, 0),
+        }
+    }
+
+    pub fn new_with_str(n: &'a str, range: StrRange) -> RVVarName<'a> {
+        RVVarName {
+            name: VarName::new(n, range),
+            var_index: VarIndex::new(0, 0),
+        }
+    }
+
+    pub fn new_with_start(value: &'a str, start: Position) -> RVVarName<'a> {
+        RVVarName {
+            name: VarName::new_with_start(value, start),
+            var_index: VarIndex::new(0, 0),
+        }
+    }
+
+    pub fn new_no_range(n: &'a str) -> RVVarName<'a> {
+        RVVarName {
+            name: VarName::new_no_input(n),
+            var_index: VarIndex::new(0, 0),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum Exp<'a> {
     Na(NaNode),
     Bool(BoolNode),
     Num(Numeral),
     Str(StringNode),
     Color(ColorNode<'a>),
-    VarName(VarName<'a>),
+    VarName(RVVarName<'a>),
     // RetTuple(Box<Vec<VarName<'a>>>),
     Tuple(Box<TupleNode<'a>>),
     TypeCast(Box<TypeCast<'a>>),
@@ -226,7 +274,7 @@ impl<'a> Exp<'a> {
             Exp::Num(node) => node.range(),
             Exp::Str(node) => node.range,
             Exp::Color(node) => node.range,
-            Exp::VarName(node) => node.range,
+            Exp::VarName(node) => node.name.range,
             Exp::Tuple(node) => node.range,
             Exp::TypeCast(node) => node.range,
             Exp::FuncCall(node) => node.range,
@@ -360,17 +408,23 @@ impl<'a> TypeCast<'a> {
 pub struct PrefixExp<'a> {
     pub var_chain: Vec<VarName<'a>>,
     pub range: StrRange,
+    pub var_index: VarIndex,
 }
 
 impl<'a> PrefixExp<'a> {
     pub fn new(var_chain: Vec<VarName<'a>>, range: StrRange) -> PrefixExp<'a> {
-        PrefixExp { var_chain, range }
+        PrefixExp {
+            var_chain,
+            range,
+            var_index: VarIndex::new(0, 0),
+        }
     }
 
     pub fn new_no_input(var_chain: Vec<VarName<'a>>) -> PrefixExp<'a> {
         PrefixExp {
             var_chain,
             range: StrRange::new_empty(),
+            var_index: VarIndex::new(0, 0),
         }
     }
 }
@@ -391,6 +445,7 @@ pub struct Assignment<'a> {
     pub var_type: Option<DataType>,
     pub var: bool,
     pub range: StrRange,
+    pub varids: Option<Vec<i32>>,
 }
 
 impl<'a> Assignment<'a> {
@@ -407,6 +462,7 @@ impl<'a> Assignment<'a> {
             var,
             var_type,
             range,
+            varids: None,
         }
     }
 
@@ -422,6 +478,7 @@ impl<'a> Assignment<'a> {
             var,
             var_type,
             range: StrRange::new_empty(),
+            varids: None,
         }
     }
 }
@@ -530,6 +587,7 @@ pub struct ForRange<'a> {
     pub step: Option<Exp<'a>>,
     pub do_blk: Block<'a>,
     pub ctxid: i32,
+    pub varid: i32,
     pub range: StrRange,
     pub result_type: SyntaxType<'a>,
 }
@@ -551,6 +609,7 @@ impl<'a> ForRange<'a> {
             step,
             do_blk,
             ctxid,
+            varid: 0,
             range,
             result_type: SyntaxType::Any,
         }
@@ -571,6 +630,7 @@ impl<'a> ForRange<'a> {
             step,
             do_blk,
             ctxid: 0,
+            varid: 0,
             range,
             result_type: SyntaxType::Any,
         }
@@ -583,6 +643,10 @@ pub struct FunctionDef<'a> {
     pub params: Vec<VarName<'a>>,
     pub body: Block<'a>,
     pub range: StrRange,
+    // The index in global name context
+    pub name_varid: i32,
+    // The argument indexs for this function definition
+    pub varids: Option<Vec<i32>>,
     // The function definition with specific types.
     pub spec_defs: Option<Box<Vec<FunctionDef<'a>>>>,
 }
@@ -599,6 +663,8 @@ impl<'a> FunctionDef<'a> {
             params,
             body,
             range,
+            name_varid: 0,
+            varids: None,
             spec_defs: Some(Box::new(vec![])),
         }
     }
@@ -609,6 +675,8 @@ impl<'a> FunctionDef<'a> {
             params: self.params.clone(),
             body: self.body.clone(),
             range: self.range.clone(),
+            name_varid: 0,
+            varids: None,
             spec_defs: None,
         }
     }

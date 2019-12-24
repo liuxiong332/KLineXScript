@@ -260,10 +260,8 @@ pub fn binary_op_run<'a, 'b>(
 mod tests {
     use super::*;
     use crate::ast::input::StrRange;
-    use crate::ast::name::VarName;
     use crate::ast::num::Numeral;
-    use crate::ast::stat_expr_types::BoolNode;
-    use crate::ast::stat_expr_types::Exp;
+    use crate::ast::stat_expr_types::{BoolNode, Exp, RVVarName};
     use crate::ast::string::StringNode;
     use crate::runtime::context::{Context, ContextType, VarOperate};
     use crate::syntax::SyntaxParser;
@@ -507,7 +505,7 @@ mod tests {
     }
 
     fn var_exp<'a>(var: &'a str) -> Exp<'a> {
-        Exp::VarName(VarName::new_no_input(var))
+        Exp::VarName(RVVarName::new_no_range(var))
     }
 
     #[test]

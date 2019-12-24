@@ -81,7 +81,7 @@ mod tests {
     use super::*;
     use crate::ast::input::StrRange;
     use crate::ast::name::VarName;
-    use crate::ast::stat_expr_types::{Block, Exp};
+    use crate::ast::stat_expr_types::{Block, Exp, RVVarName};
     use crate::runtime::context::{Context, ContextType};
     use crate::types::series::Series;
 
@@ -90,7 +90,7 @@ mod tests {
         let func_def = FunctionDef::new(
             VarName::new_no_input("hello"),
             vec![VarName::new_no_input("arg1")],
-            Block::new_no_input(vec![], Some(Exp::VarName(VarName::new_no_input("arg1")))),
+            Block::new_no_input(vec![], Some(Exp::VarName(RVVarName::new_no_range("arg1")))),
             StrRange::new_empty(),
         );
         let func = Function::new(&func_def);

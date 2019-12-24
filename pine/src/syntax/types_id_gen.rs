@@ -25,3 +25,33 @@ impl<'a> TypesIdGen<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ast::syntax_type::SimpleSyntaxType;
+
+    #[test]
+    fn types_id_gen_test() {
+        let mut types_id_gen = TypesIdGen::new();
+        assert_eq!(
+            types_id_gen.get(&vec![SyntaxType::Series(SimpleSyntaxType::Int)]),
+            1
+        );
+        assert_eq!(
+            types_id_gen.get(&vec![SyntaxType::Series(SimpleSyntaxType::Float)]),
+            2
+        );
+        assert_eq!(
+            types_id_gen.get(&vec![
+                SyntaxType::Series(SimpleSyntaxType::Int),
+                SyntaxType::Series(SimpleSyntaxType::Float)
+            ],),
+            3
+        );
+        assert_eq!(
+            types_id_gen.get(&vec![SyntaxType::Series(SimpleSyntaxType::Int)]),
+            1
+        );
+    }
+}

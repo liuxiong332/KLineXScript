@@ -37,6 +37,10 @@ pub trait SyntaxCtx<'a> {
     fn get_var(&self, name: &'a str) -> Option<&SyntaxType<'a>>;
 
     fn get_var_scope(&self, name: &'a str) -> Option<&SyntaxType<'a>>;
+
+    fn declare_user_func(&mut self, name: String, t: SyntaxType<'a>);
+
+    fn get_user_func(&self, name: &str) -> Option<&SyntaxType<'a>>;
 }
 
 pub struct SyntaxContext<'a> {
@@ -82,6 +86,20 @@ impl<'a> SyntaxCtx<'a> for SyntaxContext<'a> {
 
     fn get_var_scope(&self, name: &'a str) -> Option<&SyntaxType<'a>> {
         self.vars.get(name)
+    }
+
+    fn declare_user_func(&mut self, name: String, t: SyntaxType<'a>) {
+        self.user_func_types.insert(name, t);
+    }
+
+    fn get_user_func(&self, name: &str) -> Option<&SyntaxType<'a>> {
+        if self.user_func_types.contains_key(name) {
+            self.user_func_types.get(name)
+        } else if let Some(p) = self.parent {
+            downcast_ctx(p).get_user_func(name)
+        } else {
+            None
+        }
     }
 }
 
@@ -229,7 +247,7 @@ impl<'a> SyntaxParser<'a> {
         func_def.spec_defs.as_mut().unwrap().push(spec_def);
 
         self.context = sub_ctx.parent.unwrap();
-        downcast_ctx(self.context).user_func_types.insert(
+        downcast_ctx(self.context).declare_user_func(
             func_name,
             SyntaxType::UserFunction(Rc::new((names.clone(), parse_res.syntax_type.clone()))),
         );
@@ -260,7 +278,7 @@ impl<'a> SyntaxParser<'a> {
             let typeid = self.types_id_gen.get(&pos_arg_type);
             let fun_name = format!("{}@{}", method_name, typeid);
 
-            match downcast_ctx(self.context).user_func_types.get(&fun_name) {
+            match downcast_ctx(self.context).get_user_func(&fun_name) {
                 Some(SyntaxType::UserFunction(func_type)) => {
                     Ok(ParseValue::new_with_type(func_type.1.clone()))
                 }
@@ -1037,6 +1055,104 @@ mod tests {
             Ok(ParseValue::new_with_type(FLOAT_TYPE))
         );
         assert_eq!(downcast_ctx(parser.context).parent, None);
+    }
+
+    #[test]
+    fn multi_user_func_call_test() {
+        let mut parser = SyntaxParser::new();
+        let cond_exp = Condition::new_no_input(
+            Exp::VarName(varname("a1")),
+            Exp::VarName(varname("a1")),
+            Exp::VarName(varname("a2")),
+        );
+        let mut func_def = FunctionDef::new(
+            varname("fun"),
+            vec![varname("a1"), varname("a2")],
+            Block::new(
+                vec![],
+                Some(Exp::Condition(Box::new(cond_exp.clone()))),
+                StrRange::new_empty(),
+            ),
+            StrRange::new_empty(),
+        );
+        assert!(parser.parse_func_def(&mut func_def).is_ok());
+
+        let run_funcall1 = |parser: &mut SyntaxParser, len| {
+            let mut func_call = FunctionCall::new(
+                Exp::VarName(varname("fun")),
+                vec![int_exp(1), float_exp(2f64)],
+                vec![],
+                1,
+                StrRange::new_empty(),
+            );
+            assert_eq!(
+                parser.parse_func_call(&mut func_call),
+                Ok(ParseValue::new_with_type(SyntaxType::Series(
+                    SimpleSyntaxType::Float
+                )))
+            );
+            assert_eq!(
+                downcast_ctx(parser.context).get_user_func("fun@1"),
+                Some(&SyntaxType::UserFunction(Rc::new((
+                    vec!["a1", "a2"],
+                    SyntaxType::Series(SimpleSyntaxType::Float)
+                ))))
+            );
+            assert_eq!(func_def.spec_defs.as_ref().unwrap().len(), len);
+            let mut cond_exp1 = cond_exp.clone();
+            cond_exp1.result_type = SyntaxType::Series(SimpleSyntaxType::Float);
+            let def_cond_exp = func_def
+                .spec_defs
+                .as_ref()
+                .and_then(|v| v.get(0))
+                .and_then(|f| f.body.ret_stmt.as_ref())
+                .unwrap();
+            assert_eq!(def_cond_exp, &Exp::Condition(Box::new(cond_exp1)));
+        };
+
+        let run_funcall2 = |parser: &mut SyntaxParser| {
+            let mut func_call = FunctionCall::new(
+                Exp::VarName(varname("fun")),
+                vec![int_exp(1), int_exp(2)],
+                vec![],
+                1,
+                StrRange::new_empty(),
+            );
+            assert_eq!(
+                parser.parse_func_call(&mut func_call),
+                Ok(ParseValue::new_with_type(SyntaxType::Series(
+                    SimpleSyntaxType::Int
+                )))
+            );
+            assert_eq!(
+                downcast_ctx(parser.context).get_user_func("fun@2"),
+                Some(&SyntaxType::UserFunction(Rc::new((
+                    vec!["a1", "a2"],
+                    SyntaxType::Series(SimpleSyntaxType::Int)
+                ))))
+            );
+            assert_eq!(func_def.spec_defs.as_ref().unwrap().len(), 2);
+            let mut cond_exp2 = cond_exp.clone();
+            cond_exp2.result_type = SyntaxType::Series(SimpleSyntaxType::Int);
+            let def_cond_exp = func_def
+                .spec_defs
+                .as_ref()
+                .and_then(|v| v.get(1))
+                .and_then(|f| f.body.ret_stmt.as_ref())
+                .unwrap();
+            assert_eq!(def_cond_exp, &Exp::Condition(Box::new(cond_exp2)));
+        };
+
+        run_funcall1(&mut parser, 1);
+        run_funcall2(&mut parser);
+        run_funcall1(&mut parser, 2);
+        assert_eq!(
+            downcast_ctx(parser.context)
+                .user_func_types
+                .keys()
+                .collect::<Vec<_>>(),
+            vec![&String::from("fun@2"), &String::from("fun@1")]
+        );
     }
 
     #[test]

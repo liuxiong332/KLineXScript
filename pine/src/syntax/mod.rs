@@ -8,7 +8,7 @@ use crate::ast::stat_expr_types::{
     IfThenElse, PrefixExp, RefCall, Statement, TupleNode, TypeCast, UnaryExp, VarAssignment,
 };
 use crate::ast::state::PineInputError;
-use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
+use crate::ast::syntax_type::{FunctionTypes, SimpleSyntaxType, SyntaxType};
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -100,7 +100,7 @@ impl<'a> SyntaxContext<'a> {
 }
 
 pub struct SyntaxParser<'a> {
-    ctxs: HashMap<i32, Box<dyn SyntaxCtx<'a> + 'a>>,
+    _root_ctx: Box<SyntaxContext<'a>>,
     context: *mut (dyn SyntaxCtx<'a> + 'a),
     user_funcs: HashMap<&'a str, *mut FunctionDef<'a>>,
     errors: Vec<PineInputError>,
@@ -131,26 +131,22 @@ type ParseResult<'a> = Result<ParseValue<'a>, PineInputError>;
 
 impl<'a> SyntaxParser<'a> {
     pub fn new() -> SyntaxParser<'a> {
-        let mut ctxs: HashMap<i32, Box<dyn SyntaxCtx<'a> + 'a>> = HashMap::new();
-        let top_ctx: Box<dyn SyntaxCtx<'a> + 'a> =
-            Box::new(SyntaxContext::new(None, ContextType::Normal));
-        ctxs.insert(0, top_ctx);
+        let mut _root_ctx = Box::new(SyntaxContext::new(None, ContextType::Normal));
+
         SyntaxParser {
-            context: &mut **ctxs.get_mut(&0).unwrap(),
-            ctxs,
+            context: &mut *_root_ctx,
+            _root_ctx,
             user_funcs: HashMap::new(),
             errors: vec![],
         }
     }
 
     pub fn new_with_vars(vars: HashMap<&'a str, SyntaxType<'a>>) -> SyntaxParser<'a> {
-        let mut ctxs: HashMap<i32, Box<dyn SyntaxCtx<'a> + 'a>> = HashMap::new();
-        let mut context = SyntaxContext::new(None, ContextType::Normal);
-        context.vars = vars;
-        ctxs.insert(0, Box::new(context));
+        let mut _root_ctx = Box::new(SyntaxContext::new(None, ContextType::Normal));
+        _root_ctx.vars = vars;
         SyntaxParser {
-            context: &mut **ctxs.get_mut(&0).unwrap(),
-            ctxs,
+            context: &mut *_root_ctx,
+            _root_ctx,
             user_funcs: HashMap::new(),
             errors: vec![],
         }
@@ -225,15 +221,12 @@ impl<'a> SyntaxParser<'a> {
             for arg in func_call.pos_args.iter_mut() {
                 pos_arg_type.push(self.parse_exp(arg)?);
             }
-            let mut sub_ctx = Box::new(SyntaxContext::new(
-                Some(self.context),
-                ContextType::FuncDefBlock,
-            ));
+            let mut sub_ctx = SyntaxContext::new(Some(self.context), ContextType::FuncDefBlock);
             names
                 .iter()
                 .zip(pos_arg_type.iter())
                 .for_each(|(&n, t)| sub_ctx.declare_var(n, t.syntax_type.clone()));
-            self.context = &mut *sub_ctx;
+            self.context = &mut sub_ctx;
 
             let body;
             unsafe {
@@ -242,7 +235,6 @@ impl<'a> SyntaxParser<'a> {
             let parse_res = self.parse_blk(body)?;
 
             self.context = sub_ctx.parent.unwrap();
-            self.ctxs.insert(func_call.ctxid, sub_ctx);
             Ok(ParseValue::new_with_type(parse_res.syntax_type))
         }
     }
@@ -388,29 +380,21 @@ impl<'a> SyntaxParser<'a> {
 
     fn parse_ifthenelse_then(&mut self, ite: &mut IfThenElse<'a>) -> ParseResult<'a> {
         // Create new context for if block
-        let mut if_ctx = Box::new(SyntaxContext::new(
-            Some(self.context),
-            ContextType::IfElseBlock,
-        ));
-        self.context = &mut *if_ctx;
+        let mut if_ctx = SyntaxContext::new(Some(self.context), ContextType::IfElseBlock);
+        self.context = &mut if_ctx;
 
         let then_res = self.parse_blk(&mut ite.then_blk)?;
         self.context = if_ctx.parent.unwrap();
-        self.ctxs.insert(ite.then_ctxid, if_ctx);
         Ok(then_res)
     }
 
-    fn parse_ifthenelse_else(&mut self, else_blk: &mut Block<'a>, ctxid: i32) -> ParseResult<'a> {
+    fn parse_ifthenelse_else(&mut self, else_blk: &mut Block<'a>) -> ParseResult<'a> {
         // Create new context for if block
-        let mut else_ctx = Box::new(SyntaxContext::new(
-            Some(self.context),
-            ContextType::IfElseBlock,
-        ));
-        self.context = &mut *else_ctx;
+        let mut else_ctx = SyntaxContext::new(Some(self.context), ContextType::IfElseBlock);
+        self.context = &mut else_ctx;
 
         let else_res = self.parse_blk(else_blk)?;
         self.context = else_ctx.parent.unwrap();
-        self.ctxs.insert(ctxid, else_ctx);
         Ok(else_res)
     }
 
@@ -432,7 +416,7 @@ impl<'a> SyntaxParser<'a> {
         }
         if let Some(else_blk) = &mut ite.else_blk {
             // Create new context for if block
-            let else_res = self.parse_ifthenelse_else(else_blk, ite.else_ctxid)?;
+            let else_res = self.parse_ifthenelse_else(else_blk)?;
 
             if else_res.syntax_type.is_void() {
                 return Err(PineInputError::new(
@@ -466,7 +450,7 @@ impl<'a> SyntaxParser<'a> {
         self.parse_ifthenelse_cond(ite)?;
         self.parse_ifthenelse_then(ite)?;
         if let Some(else_blk) = &mut ite.else_blk {
-            self.parse_ifthenelse_else(else_blk, ite.else_ctxid)?;
+            self.parse_ifthenelse_else(else_blk)?;
         }
         ite.result_type = SyntaxType::Void;
         Ok(ParseValue::new_with_type(SyntaxType::Void))
@@ -496,19 +480,15 @@ impl<'a> SyntaxParser<'a> {
                 ));
             }
         }
-        let mut for_ctx = Box::new(SyntaxContext::new(
-            Some(self.context),
-            ContextType::ForRangeBlock,
-        ));
+        let mut for_ctx = SyntaxContext::new(Some(self.context), ContextType::ForRangeBlock);
         for_ctx.declare_var(
             for_range.var.value,
             SyntaxType::Simple(SimpleSyntaxType::Int),
         );
-        self.context = &mut *for_ctx;
+        self.context = &mut for_ctx;
 
         let blk_res = self.parse_blk(&mut for_range.do_blk)?;
         self.context = for_ctx.parent.unwrap();
-        self.ctxs.insert(for_range.ctxid, for_ctx);
         Ok(blk_res)
     }
 
@@ -877,6 +857,7 @@ mod tests {
     use crate::ast::name::VarName;
     use crate::ast::stat_expr_types::{BoolNode, DataType, NaNode, RefCall, TypeCast};
     use crate::ast::string::StringNode;
+    use crate::ast::syntax_type::FunctionType;
 
     fn varname(n: &str) -> VarName {
         VarName::new(n, StrRange::new_empty())
@@ -1025,12 +1006,6 @@ mod tests {
             Ok(ParseValue::new_with_type(FLOAT_TYPE))
         );
         assert_eq!(downcast_ctx(parser.context).parent, None);
-        assert_eq!(
-            downcast_ctx(&mut **parser.ctxs.get_mut(&1).unwrap())
-                .vars
-                .contains_key("a1"),
-            true
-        );
     }
 
     #[test]

@@ -11,7 +11,7 @@ use crate::ast::stat_expr_types::{
 };
 use crate::types::{
     downcast_pf, Bool, Callable, Color, DataType as FirstType, Float, Int, PineFrom, PineRef,
-    PineStaticType, PineType, RefData, RuntimeErr, SecondType, Series, Tuple, NA,
+    PineStaticType, PineType, RuntimeErr, SecondType, Series, Tuple, NA,
 };
 use std::fmt::Debug;
 
@@ -486,8 +486,11 @@ mod tests {
     use crate::ast::name::VarName;
     use crate::ast::num::Numeral;
     use crate::ast::stat_expr_types::{BoolNode, TupleNode};
+    use crate::ast::syntax_type::{SimpleSyntaxType, SyntaxType};
     use crate::runtime::context::Context;
     use crate::runtime::exp::Exp;
+    use crate::syntax::SyntaxParser;
+    use crate::types::RefData;
 
     #[test]
     fn assignment_test() {
@@ -649,9 +652,6 @@ mod tests {
 
     #[test]
     fn if_then_else_test() {
-        use crate::ast::syntax_type::{SimpleSyntaxType, SyntaxType};
-        use crate::syntax::SyntaxParser;
-
         let mut ite = IfThenElse::new_no_ctxid(
             Exp::VarName(VarName::new_no_input("cond")),
             Block::new_no_input(vec![], Some(Exp::VarName(VarName::new_no_input("then")))),

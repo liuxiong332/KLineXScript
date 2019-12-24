@@ -275,15 +275,15 @@ mod tests {
 
     #[test]
     fn func_def_test() {
-        let mut def = Statement::FuncDef(Box::new(FunctionDef {
-            name: VarName::new_no_input("fr"),
-            params: vec![VarName::new_no_input("arg1")],
-            body: Block::new_no_input(
+        let mut def = Statement::FuncDef(Box::new(FunctionDef::new(
+            VarName::new_no_input("fr"),
+            vec![VarName::new_no_input("arg1")],
+            Block::new_no_input(
                 vec![func_call_stmt(name("e1"), vec![], vec![])],
                 Some(func_call(name("else"), vec![], vec![])),
             ),
-            range: StrRange::new_empty(),
-        }));
+            StrRange::new_empty(),
+        )));
         let mut parser = CtxIdParser::new();
         parser.parse_stmt(&mut def);
         assert_eq!(parser.ctxid, 2);

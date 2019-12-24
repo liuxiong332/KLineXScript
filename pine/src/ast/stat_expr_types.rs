@@ -583,6 +583,35 @@ pub struct FunctionDef<'a> {
     pub params: Vec<VarName<'a>>,
     pub body: Block<'a>,
     pub range: StrRange,
+    // The function definition with specific types.
+    pub spec_defs: Option<Box<Vec<FunctionDef<'a>>>>,
+}
+
+impl<'a> FunctionDef<'a> {
+    pub fn new(
+        name: VarName<'a>,
+        params: Vec<VarName<'a>>,
+        body: Block<'a>,
+        range: StrRange,
+    ) -> FunctionDef<'a> {
+        FunctionDef {
+            name,
+            params,
+            body,
+            range,
+            spec_defs: Some(Box::new(vec![])),
+        }
+    }
+
+    pub fn gen_spec_def(&self) -> FunctionDef<'a> {
+        FunctionDef {
+            name: self.name.clone(),
+            params: self.params.clone(),
+            body: self.body.clone(),
+            range: self.range.clone(),
+            spec_defs: None,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

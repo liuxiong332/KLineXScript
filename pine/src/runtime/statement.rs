@@ -802,16 +802,16 @@ mod tests {
             vec![],
             StrRange::new_empty(),
         );
-        let def_exp = FunctionDef {
-            name: VarName::new_no_input("name"),
-            params: vec![VarName::new_no_input("arg")],
-            body: Block {
+        let def_exp = FunctionDef::new(
+            VarName::new_no_input("name"),
+            vec![VarName::new_no_input("arg")],
+            Block {
                 stmts: vec![],
                 ret_stmt: Some(Exp::VarName(VarName::new_no_input("arg"))),
                 range: StrRange::new_empty(),
             },
-            range: StrRange::new_empty(),
-        };
+            StrRange::new_empty(),
+        );
         let mut context = Context::new(None, ContextType::Normal);
         context.create_var("name", PineRef::new_rc(Function::new(&def_exp)));
 

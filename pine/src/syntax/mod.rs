@@ -15,9 +15,11 @@ use std::rc::Rc;
 mod convert;
 pub mod ctxid_parser;
 mod type_cast;
+pub mod types_id_gen;
 
 use convert::{common_type, implicity_convert, similar_type, simple_to_series};
 use type_cast::{explicity_type_cast, implicity_type_cast};
+use types_id_gen::TypesIdGen;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum ContextType {
@@ -42,6 +44,7 @@ pub struct SyntaxContext<'a> {
     context_type: ContextType,
 
     vars: HashMap<&'a str, SyntaxType<'a>>,
+    user_func_types: HashMap<String, SyntaxType<'a>>,
 }
 
 pub fn downcast_ctx<'a>(item: *mut (dyn SyntaxCtx<'a> + 'a)) -> &mut SyntaxContext<'a> {
@@ -90,6 +93,7 @@ impl<'a> SyntaxContext<'a> {
         SyntaxContext {
             parent,
             context_type,
+            user_func_types: HashMap::new(),
             vars: HashMap::new(),
         }
     }
@@ -103,6 +107,7 @@ pub struct SyntaxParser<'a> {
     _root_ctx: Box<SyntaxContext<'a>>,
     context: *mut (dyn SyntaxCtx<'a> + 'a),
     user_funcs: HashMap<&'a str, *mut FunctionDef<'a>>,
+    types_id_gen: TypesIdGen<'a>,
     errors: Vec<PineInputError>,
 }
 
@@ -132,11 +137,11 @@ type ParseResult<'a> = Result<ParseValue<'a>, PineInputError>;
 impl<'a> SyntaxParser<'a> {
     pub fn new() -> SyntaxParser<'a> {
         let mut _root_ctx = Box::new(SyntaxContext::new(None, ContextType::Normal));
-
         SyntaxParser {
             context: &mut *_root_ctx,
             _root_ctx,
             user_funcs: HashMap::new(),
+            types_id_gen: TypesIdGen::new(),
             errors: vec![],
         }
     }
@@ -148,6 +153,7 @@ impl<'a> SyntaxParser<'a> {
             context: &mut *_root_ctx,
             _root_ctx,
             user_funcs: HashMap::new(),
+            types_id_gen: TypesIdGen::new(),
             errors: vec![],
         }
     }
@@ -200,10 +206,40 @@ impl<'a> SyntaxParser<'a> {
         }
     }
 
+    fn gen_new_func_def(
+        &mut self,
+        names: &Vec<&'a str>,
+        arg_types: Vec<SyntaxType<'a>>,
+        method_name: &'a str,
+        func_name: String,
+    ) -> ParseResult<'a> {
+        let mut sub_ctx = SyntaxContext::new(Some(self.context), ContextType::FuncDefBlock);
+        names
+            .iter()
+            .zip(arg_types.iter())
+            .for_each(|(&n, t)| sub_ctx.declare_var(n, t.clone()));
+        self.context = &mut sub_ctx;
+
+        let func_def;
+        unsafe {
+            func_def = self.user_funcs[method_name].as_mut().unwrap();
+        };
+        let mut spec_def = func_def.gen_spec_def();
+        let parse_res = self.parse_blk(&mut spec_def.body)?;
+        func_def.spec_defs.as_mut().unwrap().push(spec_def);
+
+        self.context = sub_ctx.parent.unwrap();
+        downcast_ctx(self.context).user_func_types.insert(
+            func_name,
+            SyntaxType::UserFunction(Rc::new((names.clone(), parse_res.syntax_type.clone()))),
+        );
+        Ok(ParseValue::new_with_type(parse_res.syntax_type))
+    }
+
     fn parse_user_func_call(
         &mut self,
         func_call: &mut FunctionCall<'a>,
-        names: &Rc<Vec<&'a str>>,
+        names: &Vec<&'a str>,
         method_name: &'a str,
     ) -> ParseResult<'a> {
         if func_call.dict_args.len() > 0 {
@@ -219,23 +255,18 @@ impl<'a> SyntaxParser<'a> {
         } else {
             let mut pos_arg_type = vec![];
             for arg in func_call.pos_args.iter_mut() {
-                pos_arg_type.push(self.parse_exp(arg)?);
+                pos_arg_type.push(self.parse_exp(arg)?.syntax_type);
             }
-            let mut sub_ctx = SyntaxContext::new(Some(self.context), ContextType::FuncDefBlock);
-            names
-                .iter()
-                .zip(pos_arg_type.iter())
-                .for_each(|(&n, t)| sub_ctx.declare_var(n, t.syntax_type.clone()));
-            self.context = &mut sub_ctx;
+            let typeid = self.types_id_gen.get(&pos_arg_type);
+            let fun_name = format!("{}@{}", method_name, typeid);
 
-            let body;
-            unsafe {
-                body = &mut self.user_funcs[method_name].as_mut().unwrap().body;
-            };
-            let parse_res = self.parse_blk(body)?;
-
-            self.context = sub_ctx.parent.unwrap();
-            Ok(ParseValue::new_with_type(parse_res.syntax_type))
+            match downcast_ctx(self.context).user_func_types.get(&fun_name) {
+                Some(SyntaxType::UserFunction(func_type)) => {
+                    Ok(ParseValue::new_with_type(func_type.1.clone()))
+                }
+                None => self.gen_new_func_def(names, pos_arg_type, method_name, fun_name),
+                Some(_) => unreachable!(),
+            }
         }
     }
 
@@ -244,7 +275,7 @@ impl<'a> SyntaxParser<'a> {
         if let SyntaxType::Function(fun_type) = method_type.syntax_type {
             self.parse_std_func_call(func_call, &fun_type)
         } else if let SyntaxType::UserFunction(names) = method_type.syntax_type {
-            self.parse_user_func_call(func_call, &names, method_type.varname.unwrap())
+            self.parse_user_func_call(func_call, &names.0, method_type.varname.unwrap())
         } else {
             Err(PineInputError::new(
                 PineErrorKind::VarNotCallable,
@@ -768,7 +799,7 @@ impl<'a> SyntaxParser<'a> {
 
         self.user_funcs.insert(name, func_def);
         let param_names: Vec<_> = func_def.params.iter().map(|v| v.value).collect();
-        let name_type = SyntaxType::UserFunction(Rc::new(param_names));
+        let name_type = SyntaxType::UserFunction(Rc::new((param_names, SyntaxType::Any)));
         context.declare_var(name, name_type.clone());
         Ok(ParseValue::new_with_type(name_type))
     }
@@ -866,16 +897,16 @@ mod tests {
     #[test]
     fn func_def_test() {
         let mut parser = SyntaxParser::new();
-        let mut func_def = FunctionDef {
-            name: varname("funa"),
-            params: vec![varname("hello"), varname("hello2")],
-            body: Block::new(vec![], None, StrRange::new_empty()),
-            range: StrRange::new_empty(),
-        };
+        let mut func_def = FunctionDef::new(
+            varname("funa"),
+            vec![varname("hello"), varname("hello2")],
+            Block::new(vec![], None, StrRange::new_empty()),
+            StrRange::new_empty(),
+        );
         assert_eq!(
             parser.parse_func_def(&mut func_def),
             Ok(ParseValue::new_with_type(SyntaxType::UserFunction(
-                Rc::new(vec!["hello", "hello2"])
+                Rc::new((vec!["hello", "hello2"], SyntaxType::Any))
             )))
         );
         assert_eq!(parser.user_funcs["funa"], &mut func_def as *mut FunctionDef);
@@ -982,16 +1013,16 @@ mod tests {
     #[test]
     fn user_func_call_test() {
         let mut parser = SyntaxParser::new();
-        let mut func_def = FunctionDef {
-            name: varname("fun"),
-            params: vec![varname("a1"), varname("a2")],
-            body: Block::new(
+        let mut func_def = FunctionDef::new(
+            varname("fun"),
+            vec![varname("a1"), varname("a2")],
+            Block::new(
                 vec![],
                 Some(Exp::VarName(varname("a2"))),
                 StrRange::new_empty(),
             ),
-            range: StrRange::new_empty(),
-        };
+            StrRange::new_empty(),
+        );
         assert!(parser.parse_func_def(&mut func_def).is_ok());
 
         let mut func_call = FunctionCall::new(
@@ -1565,14 +1596,16 @@ mod tests {
 
     #[test]
     fn prefix_exp_test() {
+        use std::collections::BTreeMap;
+
         let mut parser = SyntaxParser::new();
         let context = downcast_ctx(parser.context);
 
-        let map2: HashMap<_, _> = [("key2", SyntaxType::Simple(SimpleSyntaxType::Int))]
+        let map2: BTreeMap<_, _> = [("key2", SyntaxType::Simple(SimpleSyntaxType::Int))]
             .iter()
             .cloned()
             .collect();
-        let map1: HashMap<_, _> = [("key1", SyntaxType::Object(Rc::new(map2)))]
+        let map1: BTreeMap<_, _> = [("key1", SyntaxType::Object(Rc::new(map2)))]
             .iter()
             .cloned()
             .collect();

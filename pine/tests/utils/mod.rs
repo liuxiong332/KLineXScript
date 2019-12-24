@@ -62,12 +62,7 @@ pub fn gen_func_def<'a>(
     body: Block<'a>,
     range: StrRange,
 ) -> Statement<'a> {
-    Statement::FuncDef(Box::new(FunctionDef {
-        name,
-        params,
-        body: body,
-        range,
-    }))
+    Statement::FuncDef(Box::new(FunctionDef::new(name, params, body, range)))
 }
 
 pub fn gen_func_call_stmt<'a>(

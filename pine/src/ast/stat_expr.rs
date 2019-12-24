@@ -309,15 +309,7 @@ pub fn function_def_with_indent<'a>(
         ))(input)?;
 
         let range = StrRange::new(name.range.start, body.range.end);
-        Ok((
-            input,
-            FunctionDef {
-                name,
-                params,
-                body,
-                range,
-            },
-        ))
+        Ok((input, FunctionDef::new(name, params, body, range)))
     }
 }
 
@@ -767,10 +759,10 @@ mod tests {
         check_res(
             "    a(arg1) => b \n",
             statement_with_indent(1),
-            Statement::FuncDef(Box::new(FunctionDef {
-                name: VarName::new_with_start("a", Position::new(0, 4)),
-                params: vec![VarName::new_with_start("arg1", Position::new(0, 6))],
-                body: Block {
+            Statement::FuncDef(Box::new(FunctionDef::new(
+                VarName::new_with_start("a", Position::new(0, 4)),
+                vec![VarName::new_with_start("arg1", Position::new(0, 6))],
+                Block {
                     stmts: vec![],
                     ret_stmt: Some(Exp::VarName(VarName::new_with_start(
                         "b",
@@ -778,17 +770,17 @@ mod tests {
                     ))),
                     range: StrRange::from_start("b", Position::new(0, 15)),
                 },
-                range: StrRange::from_start("a(arg1) => b", Position::new(0, 4)),
-            })),
+                StrRange::from_start("a(arg1) => b", Position::new(0, 4)),
+            ))),
         );
 
         check_res(
             "    a(arg1) => \n        b \n",
             statement_with_indent(1),
-            Statement::FuncDef(Box::new(FunctionDef {
-                name: VarName::new_with_start("a", Position::new(0, 4)),
-                params: vec![VarName::new_with_start("arg1", Position::new(0, 6))],
-                body: Block {
+            Statement::FuncDef(Box::new(FunctionDef::new(
+                VarName::new_with_start("a", Position::new(0, 4)),
+                vec![VarName::new_with_start("arg1", Position::new(0, 6))],
+                Block {
                     stmts: vec![],
                     ret_stmt: Some(Exp::VarName(VarName::new_with_start(
                         "b",
@@ -796,8 +788,8 @@ mod tests {
                     ))),
                     range: StrRange::from_start("b", Position::new(1, 8)),
                 },
-                range: StrRange::from_start("a(arg1) => \n        b", Position::new(0, 4)),
-            })),
+                StrRange::from_start("a(arg1) => \n        b", Position::new(0, 4)),
+            ))),
         );
 
         check_res_input(
@@ -941,10 +933,10 @@ mod tests {
         check_res(
             "a(arg1) => \n    if b\n        c \n",
             function_def_with_indent(0),
-            FunctionDef {
-                name: VarName::new_with_start("a", Position::new(0, 0)),
-                params: vec![VarName::new_with_start("arg1", Position::new(0, 2))],
-                body: Block {
+            FunctionDef::new(
+                VarName::new_with_start("a", Position::new(0, 0)),
+                vec![VarName::new_with_start("arg1", Position::new(0, 2))],
+                Block {
                     stmts: vec![],
                     ret_stmt: Some(Exp::Ite(Box::new(IfThenElse::new_no_ctxid(
                         Exp::VarName(VarName::new_with_start("b", Position::new(1, 7))),
@@ -961,8 +953,8 @@ mod tests {
                     )))),
                     range: StrRange::new(Position::new(1, 4), Position::new(2, 9)),
                 },
-                range: StrRange::new(Position::new(0, 0), Position::new(2, 9)),
-            },
+                StrRange::new(Position::new(0, 0), Position::new(2, 9)),
+            ),
         );
     }
 

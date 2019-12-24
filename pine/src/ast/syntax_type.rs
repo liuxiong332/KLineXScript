@@ -1,13 +1,13 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::rc::Rc;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct FunctionType<'a>(pub (Vec<(&'a str, SyntaxType<'a>)>, SyntaxType<'a>));
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct FunctionTypes<'a>(pub Vec<FunctionType<'a>>);
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub enum SimpleSyntaxType {
     Int,
     Float,
@@ -17,15 +17,15 @@ pub enum SimpleSyntaxType {
     Color,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub enum SyntaxType<'a> {
     Void,
     Simple(SimpleSyntaxType),
     Series(SimpleSyntaxType),
     Tuple(Rc<Vec<SyntaxType<'a>>>),
-    Object(Rc<HashMap<&'a str, SyntaxType<'a>>>),
+    Object(Rc<BTreeMap<&'a str, SyntaxType<'a>>>),
     Function(Rc<FunctionTypes<'a>>),
-    UserFunction(Rc<Vec<&'a str>>),
+    UserFunction(Rc<(Vec<&'a str>, SyntaxType<'a>)>),
     Any,
 }
 

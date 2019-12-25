@@ -33,6 +33,8 @@ pub enum ContextType {
 pub trait SyntaxCtx<'a> {
     fn declare_var(&mut self, name: &'a str, t: SyntaxType<'a>);
 
+    fn declare_var_with_index(&mut self, name: &'a str, t: SyntaxType<'a>);
+
     fn update_var(&mut self, name: &'a str, t: SyntaxType<'a>);
 
     fn get_var(&self, name: &'a str) -> Option<&SyntaxType<'a>>;
@@ -116,6 +118,11 @@ impl<'a> SyntaxCtx<'a> for SyntaxContext<'a> {
         } else {
             None
         }
+    }
+
+    fn declare_var_with_index(&mut self, name: &'a str, t: SyntaxType<'a>) {
+        self.declare_var(name, t);
+        self.gen_var_index(name);
     }
 
     fn gen_var_index(&mut self, name: &str) -> i32 {
@@ -213,6 +220,9 @@ impl<'a> SyntaxParser<'a> {
 
     pub fn new_with_vars(vars: HashMap<&'a str, SyntaxType<'a>>) -> SyntaxParser<'a> {
         let mut _root_ctx = Box::new(SyntaxContext::new(None, ContextType::Normal));
+        for (k, _v) in vars.iter() {
+            _root_ctx.gen_var_index(k);
+        }
         _root_ctx.vars = vars;
         SyntaxParser {
             context: &mut *_root_ctx,
@@ -868,6 +878,7 @@ impl<'a> SyntaxParser<'a> {
                 assign.range,
             )),
             Some(cur_type) => {
+                assign.var_index = downcast_ctx(self.context).get_var_index(assign.name.value);
                 let last_type = simple_to_series(cur_type.clone());
                 let val_res = self.parse_exp(&mut assign.val)?;
                 if implicity_convert(&val_res.syntax_type, &last_type) {
@@ -998,6 +1009,12 @@ mod tests {
         RVVarName::new(VarName::new(n, StrRange::new_empty()))
     }
 
+    fn rvarname_index(n: &str, index: VarIndex) -> RVVarName {
+        let mut name = RVVarName::new(VarName::new(n, StrRange::new_empty()));
+        name.var_index = index;
+        name
+    }
+
     #[test]
     fn func_def_test() {
         let mut parser = SyntaxParser::new();
@@ -1036,7 +1053,7 @@ mod tests {
     #[test]
     fn func_call_test() {
         let mut parser = SyntaxParser::new();
-        downcast_ctx(parser.context).declare_var(
+        downcast_ctx(parser.context).declare_var_with_index(
             "func",
             SyntaxType::Function(Rc::new(FunctionTypes(vec![
                 FunctionType((vec![("arg1", INT_TYPE), ("arg2", INT_TYPE)], INT_TYPE)),
@@ -1150,8 +1167,8 @@ mod tests {
         let mut parser = SyntaxParser::new();
         let cond_exp = Condition::new_no_input(
             Exp::VarName(rvarname("a1")),
-            Exp::VarName(rvarname("a1")),
-            Exp::VarName(rvarname("a2")),
+            Exp::VarName(rvarname_index("a1", VarIndex::new(0, 0))),
+            Exp::VarName(rvarname_index("a2", VarIndex::new(1, 0))),
         );
         let mut func_def = FunctionDef::new(
             varname("fun"),
@@ -1294,7 +1311,7 @@ mod tests {
     #[test]
     fn varname_test() {
         let mut parser = SyntaxParser::new();
-        downcast_ctx(parser.context).declare_var("hello", INT_TYPE);
+        downcast_ctx(parser.context).declare_var_with_index("hello", INT_TYPE);
         let mut varname = rvarname("hello");
         assert_eq!(
             parser.parse_varname(&mut varname),
@@ -1306,8 +1323,8 @@ mod tests {
     #[test]
     fn tuple_test() {
         let mut parser = SyntaxParser::new();
-        downcast_ctx(parser.context).declare_var("arg1", INT_TYPE);
-        downcast_ctx(parser.context).declare_var("arg2", FLOAT_TYPE);
+        downcast_ctx(parser.context).declare_var_with_index("arg1", INT_TYPE);
+        downcast_ctx(parser.context).declare_var_with_index("arg2", FLOAT_TYPE);
         assert_eq!(
             parser.parse_exp(&mut Exp::Tuple(Box::new(TupleNode::new(
                 vec![
@@ -1326,7 +1343,7 @@ mod tests {
     fn tuple_type_cast() {
         let mut parser = SyntaxParser::new();
         downcast_ctx(parser.context)
-            .declare_var("arg1", SyntaxType::Series(SimpleSyntaxType::Float));
+            .declare_var_with_index("arg1", SyntaxType::Series(SimpleSyntaxType::Float));
 
         assert_eq!(
             parser.parse_exp(&mut Exp::TypeCast(Box::new(TypeCast::new_no_input(
@@ -1343,9 +1360,9 @@ mod tests {
     fn ref_call_cast() {
         let mut parser = SyntaxParser::new();
         let context = downcast_ctx(parser.context);
-        context.declare_var("series", SyntaxType::Series(SimpleSyntaxType::Float));
-        context.declare_var("simple", SyntaxType::Simple(SimpleSyntaxType::Float));
-        context.declare_var("arg", SyntaxType::Series(SimpleSyntaxType::Float));
+        context.declare_var_with_index("series", SyntaxType::Series(SimpleSyntaxType::Float));
+        context.declare_var_with_index("simple", SyntaxType::Simple(SimpleSyntaxType::Float));
+        context.declare_var_with_index("arg", SyntaxType::Series(SimpleSyntaxType::Float));
 
         assert_eq!(
             parser.parse_exp(&mut Exp::RefCall(Box::new(RefCall::new_no_input(
@@ -1377,9 +1394,9 @@ mod tests {
     fn condition_test() {
         let mut parser = SyntaxParser::new();
         let context = downcast_ctx(parser.context);
-        context.declare_var("cond", SyntaxType::Series(SimpleSyntaxType::Float));
-        context.declare_var("arg1", SyntaxType::Series(SimpleSyntaxType::Float));
-        context.declare_var("arg2", SyntaxType::Series(SimpleSyntaxType::Int));
+        context.declare_var_with_index("cond", SyntaxType::Series(SimpleSyntaxType::Float));
+        context.declare_var_with_index("arg1", SyntaxType::Series(SimpleSyntaxType::Float));
+        context.declare_var_with_index("arg2", SyntaxType::Series(SimpleSyntaxType::Int));
 
         assert_eq!(
             parser.parse_exp(&mut Exp::Condition(Box::new(Condition::new_no_input(
@@ -1411,7 +1428,7 @@ mod tests {
 
         let mut parser = SyntaxParser::new();
         let context = downcast_ctx(parser.context);
-        context.declare_var("var", SyntaxType::Simple(SimpleSyntaxType::Int));
+        context.declare_var_with_index("var", SyntaxType::Simple(SimpleSyntaxType::Int));
 
         let input = Input::new_with_str("if var\n    1\nelse\n    1.0");
         let mut exp = if_then_else_exp(0)(input, &AstState::new()).unwrap().1;
@@ -1444,7 +1461,7 @@ mod tests {
 
         let mut parser = SyntaxParser::new();
         let context = downcast_ctx(parser.context);
-        context.declare_var("var", SyntaxType::Simple(SimpleSyntaxType::Int));
+        context.declare_var_with_index("var", SyntaxType::Simple(SimpleSyntaxType::Int));
 
         let input = Input::new_with_str("if var\n    1\n");
         let mut exp = if_then_else_exp(0)(input, &AstState::new()).unwrap().1;
@@ -1463,7 +1480,7 @@ mod tests {
 
         let mut parser = SyntaxParser::new();
         let context = downcast_ctx(parser.context);
-        context.declare_var("var", SyntaxType::Simple(SimpleSyntaxType::Int));
+        context.declare_var_with_index("var", SyntaxType::Simple(SimpleSyntaxType::Int));
         let input = Input::new_with_str("if var\n    var = 1\n    var\nelse\n    var=1.0\n    var");
         assert_eq!(
             parser
@@ -1481,7 +1498,7 @@ mod tests {
 
         let mut parser = SyntaxParser::new();
         let context = downcast_ctx(parser.context);
-        context.declare_var("var", SyntaxType::Simple(SimpleSyntaxType::Int));
+        context.declare_var_with_index("var", SyntaxType::Simple(SimpleSyntaxType::Int));
 
         let input = Input::new_with_str("for i = 1 to 2\n    i");
         let mut for_range = for_range_exp(0)(input, &AstState::new()).unwrap().1;
@@ -1509,7 +1526,7 @@ mod tests {
             )))
         );
 
-        context.declare_var("var", SyntaxType::Series(SimpleSyntaxType::Int));
+        context.declare_var_with_index("var", SyntaxType::Series(SimpleSyntaxType::Int));
         let mut series_plus_exp = UnaryExp::new(
             UnaryOp::Plus,
             Exp::VarName(rvarname("var")),
@@ -1543,7 +1560,7 @@ mod tests {
             )))
         );
 
-        context.declare_var("var", SyntaxType::Series(SimpleSyntaxType::Int));
+        // context.declare_var_with_index("var", SyntaxType::Series(SimpleSyntaxType::Int));
         let mut series_plus_exp = UnaryExp::new(
             UnaryOp::BoolNot,
             Exp::VarName(rvarname("var")),
@@ -1581,8 +1598,8 @@ mod tests {
             SyntaxType::Simple(SimpleSyntaxType::String)
         );
 
-        context.declare_var("str1", SyntaxType::Series(SimpleSyntaxType::String));
-        context.declare_var("str2", SyntaxType::Series(SimpleSyntaxType::String));
+        context.declare_var_with_index("str1", SyntaxType::Series(SimpleSyntaxType::String));
+        context.declare_var_with_index("str2", SyntaxType::Series(SimpleSyntaxType::String));
         let mut sstr_add_exp = BinaryExp::new(
             BinaryOp::Plus,
             Exp::VarName(rvarname("str1")),
@@ -1617,7 +1634,7 @@ mod tests {
             SyntaxType::Simple(SimpleSyntaxType::Int)
         );
 
-        context.declare_var("sint", SyntaxType::Series(SimpleSyntaxType::Int));
+        context.declare_var_with_index("sint", SyntaxType::Series(SimpleSyntaxType::Int));
         let mut int_add_exp = BinaryExp::new(
             BinaryOp::Plus,
             int_exp(1),
@@ -1655,7 +1672,7 @@ mod tests {
     fn eq_exp_test() {
         let mut parser = SyntaxParser::new();
         let context = downcast_ctx(parser.context);
-        context.declare_var("sint", SyntaxType::Series(SimpleSyntaxType::Int));
+        context.declare_var_with_index("sint", SyntaxType::Series(SimpleSyntaxType::Int));
 
         let mut eq_exp = BinaryExp::new(
             BinaryOp::Eq,
@@ -1727,7 +1744,7 @@ mod tests {
         let context = downcast_ctx(parser.context);
 
         // Geq
-        context.declare_var("sint", SyntaxType::Series(SimpleSyntaxType::Int));
+        context.declare_var_with_index("sint", SyntaxType::Series(SimpleSyntaxType::Int));
         let mut geq_exp =
             BinaryExp::new(BinaryOp::Geq, int_exp(1), int_exp(2), StrRange::new_empty());
         assert_eq!(
@@ -1776,7 +1793,7 @@ mod tests {
         );
 
         // BoolAnd
-        context.declare_var("var", SyntaxType::Series(SimpleSyntaxType::Int));
+        context.declare_var_with_index("var", SyntaxType::Series(SimpleSyntaxType::Int));
         let mut bool_and_exp = BinaryExp::new(
             BinaryOp::BoolAnd,
             int_exp(1),
@@ -1822,8 +1839,7 @@ mod tests {
             .iter()
             .cloned()
             .collect();
-        context.declare_var("var", SyntaxType::Object(Rc::new(map1)));
-        context.gen_var_index("var");
+        context.declare_var_with_index("var", SyntaxType::Object(Rc::new(map1)));
 
         let mut prefix_exp =
             PrefixExp::new_no_input(vec![varname("var"), varname("key1"), varname("key2")]);
@@ -1861,7 +1877,7 @@ mod tests {
 
         let mut parser = SyntaxParser::new();
         let context = downcast_ctx(parser.context);
-        context.declare_var("var", SyntaxType::Simple(SimpleSyntaxType::Int));
+        context.declare_var_with_index("var", SyntaxType::Simple(SimpleSyntaxType::Int));
 
         let input = Input::new_with_str("if var\n    1\nelse\n    na");
         assert_eq!(
@@ -1881,7 +1897,7 @@ mod tests {
 
         let mut parser = SyntaxParser::new();
         let context = downcast_ctx(parser.context);
-        context.declare_var("var", SyntaxType::Simple(SimpleSyntaxType::Int));
+        context.declare_var_with_index("var", SyntaxType::Simple(SimpleSyntaxType::Int));
 
         let input = Input::new_with_str("a = 1");
         let val_type = SyntaxType::Simple(SimpleSyntaxType::Int);
@@ -1891,7 +1907,7 @@ mod tests {
             Ok(ParseValue::new_with_type(val_type.clone()))
         );
         assert_eq!(context.get_var_scope("a"), Some(&val_type));
-        assert_eq!(assign.varids, Some(vec![0]));
+        assert_eq!(assign.varids, Some(vec![1]));
 
         context.var_indexs = HashMap::new();
         let mut assign = assign_with_indent(0)(input, &AstState::new()).unwrap().1;
@@ -1899,7 +1915,7 @@ mod tests {
             parser.parse_assign(&mut assign),
             Ok(ParseValue::new_with_type(val_type.clone()))
         );
-        assert_eq!(assign.varids, Some(vec![1]));
+        assert_eq!(assign.varids, Some(vec![2]));
         assert_eq!(
             parser.errors.last(),
             Some(&PineInputError::new(
@@ -1918,7 +1934,7 @@ mod tests {
                 val_type.clone()
             ]))))
         );
-        assert_eq!(assign.varids, Some(vec![2, 3]));
+        assert_eq!(assign.varids, Some(vec![3, 4]));
 
         context.var_indexs = HashMap::new();
         let input = Input::new_with_str("int [a1, a2] = [1.0, 2.0]");
@@ -1945,7 +1961,7 @@ mod tests {
 
         let mut parser = SyntaxParser::new();
         let context = downcast_ctx(parser.context);
-        context.declare_var("a", SyntaxType::Simple(SimpleSyntaxType::Float));
+        context.declare_var_with_index("a", SyntaxType::Simple(SimpleSyntaxType::Float));
 
         let input = Input::new_with_str("a := 1");
         let val_type = SyntaxType::Series(SimpleSyntaxType::Float);
@@ -1965,5 +1981,6 @@ mod tests {
                 StrRange::from_start("a := 1", Position::new(0, 0))
             ))
         );
+        assert_eq!(assign.var_index, VarIndex::new(0, 0));
     }
 }

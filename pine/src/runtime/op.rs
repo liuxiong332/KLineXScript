@@ -329,8 +329,10 @@ mod tests {
             .unwrap();
 
         let mut context = Context::new(None, ContextType::Normal);
-        context.create_var("series_int", PineRef::new(Series::from(Some(1))));
-        context.create_var("series_bool", PineRef::new(Series::from(true)));
+        context.init_vars(vec![
+            Some(PineRef::new(Series::from(Some(1)))),
+            Some(PineRef::new(Series::from(true))),
+        ]);
         downcast_pf::<D>(binary_op_run(&exp, &mut context).unwrap())
     }
 
@@ -469,8 +471,10 @@ mod tests {
         v2: Exp<'a>,
     ) -> Result<RefData<D>, RuntimeErr> {
         let mut context = Context::new(None, ContextType::Normal);
-        context.create_var("arg1", PineRef::new_box(Some(4)));
-        context.create_var("arg2", PineRef::new_box(Some(2)));
+        context.init_vars(vec![
+            Some(PineRef::new_box(Some(4))),
+            Some(PineRef::new_box(Some(2))),
+        ]);
 
         downcast_pf::<D>(
             binary_op_run(
@@ -499,8 +503,10 @@ mod tests {
             .unwrap();
 
         let mut context = Context::new(None, ContextType::Normal);
-        context.create_var("arg1", PineRef::new_box(Some(4)));
-        context.create_var("arg2", PineRef::new_box(Some(2)));
+        context.init_vars(vec![
+            Some(PineRef::new_box(Some(4))),
+            Some(PineRef::new_box(Some(2))),
+        ]);
         downcast_pf::<D>(binary_op_run(&exp, &mut context).unwrap())
     }
 

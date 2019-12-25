@@ -127,7 +127,7 @@ pub const VAR_NAME: &'static str = "print";
 pub fn declare_var<'a>() -> PineRef<'a> {
     PineRef::new(Callable::new(
         None,
-        Some(Box::new(ParamCollectCall::new(pine_print))),
+        Some(Box::new(ParamCollectCall::new(pine_print, &vec!["item"]))),
         vec!["item"],
     ))
 }

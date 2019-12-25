@@ -26,7 +26,7 @@ impl IntoTarget<bool> for Bool {
     fn into(&self) -> bool {
         *self
     }
-} 
+}
 
 // fn plot_series<'a, D, T>(item_val: PineRef<'a>, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr>
 // where
@@ -48,10 +48,9 @@ impl IntoTarget<bool> for Bool {
 //         .collect();
 //     context.get_callback().unwrap().plot(s);
 //     Ok(())
-// } 
+// }
 
-fn plot_series<'a>(item_val: PineRef<'a>, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr>
-{
+fn plot_series<'a>(item_val: PineRef<'a>, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
     let items: RefData<Series<Float>> = Series::implicity_from(item_val).unwrap();
     let s: Vec<f64> = items
         .get_history()
@@ -60,7 +59,7 @@ fn plot_series<'a>(item_val: PineRef<'a>, context: &mut dyn Ctx<'a>) -> Result<(
         .collect();
     context.get_callback().unwrap().plot(s);
     Ok(())
-} 
+}
 
 fn plot_val<'a>(item_val: PineRef<'a>, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
     println!("print val type {:?}", item_val.get_type());
@@ -93,11 +92,10 @@ pub const VAR_NAME: &'static str = "plot";
 pub fn declare_var<'a>() -> PineRef<'a> {
     PineRef::new(Callable::new(
         None,
-        Some(Box::new(ParamCollectCall::new(pine_plot))),
+        Some(Box::new(ParamCollectCall::new(pine_plot, &vec!["item"]))),
         vec!["item"],
     ))
 }
 
 #[cfg(test)]
-mod tests {
-}
+mod tests {}

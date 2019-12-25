@@ -44,11 +44,11 @@ impl<'a> Runner<'a> for Exp<'a> {
 impl<'a> RVRunner<'a> for Exp<'a> {
     fn rv_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
         match self {
-            Exp::VarName(name) => match context.move_var(name.name.value) {
+            Exp::VarName(name) => match context.move_var(name.var_index) {
                 None => Err(PineRuntimeError::new(RuntimeErr::VarNotFound, self.range())),
                 Some(s) => {
                     let ret = s.copy();
-                    context.update_var(name.name.value, s);
+                    context.update_var(name.var_index, s);
                     Ok(ret)
                 }
             },
@@ -118,7 +118,7 @@ impl<'a> Runner<'a> for TypeCast<'a> {
 impl<'a> Runner<'a> for PrefixExp<'a> {
     fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
         let varname = self.var_chain[0].value;
-        let var = context.move_var(varname).unwrap();
+        let var = context.move_var(self.var_index).unwrap();
         if var.get_type() != (FirstType::Object, SecondType::Simple) {
             return Err(PineRuntimeError::new(
                 RuntimeErr::InvalidVarType(format!(
@@ -144,7 +144,7 @@ impl<'a> Runner<'a> for PrefixExp<'a> {
                 }
             }
         }
-        context.update_var(varname, object.into_pf());
+        context.update_var(self.var_index, object.into_pf());
         Ok(subobj)
     }
 }
@@ -221,7 +221,7 @@ mod tests {
     use crate::ast::input::StrRange;
     use crate::ast::name::VarName;
     use crate::ast::num::Numeral;
-    use crate::ast::stat_expr_types::{BoolNode, NaNode, RVVarName, TupleNode};
+    use crate::ast::stat_expr_types::{BoolNode, NaNode, RVVarName, TupleNode, VarIndex};
     use crate::ast::string::StringNode;
     use crate::runtime::context::{Context, ContextType, VarOperate};
     use crate::types::PineClass;
@@ -248,14 +248,15 @@ mod tests {
             }
         }
 
-        let exp = PrefixExp::new_no_input(vec![
+        let mut exp = PrefixExp::new_no_input(vec![
             VarName::new_no_input("obja"),
             VarName::new_no_input("object"),
             VarName::new_no_input("int"),
         ]);
+        exp.var_index = VarIndex::new(0, 0);
 
         let mut context = Context::new(None, ContextType::Normal);
-        context.create_var("obja", PineRef::new_rc(Object::new(Box::new(A))));
+        context.init_vars(vec![Some(PineRef::new_rc(Object::new(Box::new(A))))]);
 
         assert_eq!(
             downcast_pf::<Int>(exp.run(&mut context).unwrap()),
@@ -305,9 +306,11 @@ mod tests {
         .parse_condition(&mut cond_exp)
         .unwrap();
         let mut context = Context::new(None, ContextType::Normal);
-        context.create_var("cond", PineRef::new_box(true));
-        context.create_var("exp1", PineRef::new_box(Some(1)));
-        context.create_var("exp2", PineRef::new_box(Some(2)));
+        context.init_vars(vec![
+            Some(PineRef::new_box(true)),
+            Some(PineRef::new_box(Some(1))),
+            Some(PineRef::new_box(Some(2))),
+        ]);
 
         assert_eq!(
             downcast_pf::<Series<Int>>(cond_exp.run(&mut context).unwrap()),
@@ -317,16 +320,15 @@ mod tests {
 
     #[test]
     fn ref_call_test() {
-        let exp = RefCall::new_no_input(
-            Exp::VarName(RVVarName::new_no_range("hello")),
-            Exp::Num(Numeral::from_i32(1)),
-        );
+        let mut hello_name = RVVarName::new_no_range("hello");
+        hello_name.var_index = VarIndex::new(0, 0);
+        let exp = RefCall::new_no_input(Exp::VarName(hello_name), Exp::Num(Numeral::from_i32(1)));
 
         let mut context = Context::new(None, ContextType::Normal);
         let mut series: Series<Int> = Series::from(Some(1));
         series.commit();
         series.update(Some(2));
-        context.create_var("hello", PineRef::new_rc(series));
+        context.init_vars(vec![Some(PineRef::new_rc(series))]);
 
         assert_eq!(
             downcast_pf::<Series<Int>>(exp.run(&mut context).unwrap()),
@@ -336,9 +338,9 @@ mod tests {
 
     #[test]
     fn var_rv_test() {
-        let exp = Exp::VarName(RVVarName::new_no_range("hello"));
+        let exp = Exp::VarName(RVVarName::new_with_index("hello", VarIndex::new(0, 0)));
         let mut context = Context::new(None, ContextType::Normal);
-        context.create_var("hello", PineRef::new_box(Some(1)));
+        context.init_vars(vec![Some(PineRef::new_box(Some(1)))]);
 
         assert_eq!(
             downcast_pf::<Int>(exp.rv_run(&mut context).unwrap()),
@@ -392,8 +394,10 @@ mod tests {
         D: PineStaticType + PartialEq + Debug + PineType<'a> + 'a,
     {
         let mut context = Context::new(None, ContextType::Normal);
-        context.create_var("name", PineRef::new_box(Some(1)));
-        context.create_var("series", PineRef::new(Series::from(Some(1))));
+        context.init_vars(vec![
+            Some(PineRef::new_box(Some(1))),
+            Some(PineRef::new(Series::from(Some(1)))),
+        ]);
         assert_eq!(
             downcast_pf::<D>(exp.rv_run(&mut context).unwrap()),
             Ok(RefData::new(v))
@@ -417,11 +421,15 @@ mod tests {
             String::from("hello"),
         );
         simple_rv_exp(Exp::Color(ColorNode::from_str("#12")), Color("#12"));
-        simple_rv_exp(Exp::VarName(RVVarName::new_no_range("name")), Some(1));
+
+        let mut name = RVVarName::new_no_range("name");
+        name.var_index = VarIndex::new(0, 0);
+
+        simple_rv_exp(Exp::VarName(name.clone()), Some(1));
         simple_rv_exp(
             Exp::TypeCast(Box::new(TypeCast::new_no_input(
                 DataType::Float,
-                Exp::VarName(RVVarName::new_no_range("name")),
+                Exp::VarName(name.clone()),
             ))),
             Some(1f64),
         );
@@ -496,11 +504,14 @@ mod tests {
     #[test]
     fn rv_tuple_exp_test() {
         let exp = Exp::Tuple(Box::new(TupleNode::new(
-            vec![Exp::VarName(RVVarName::new_no_range("name"))],
+            vec![Exp::VarName(RVVarName::new_with_index(
+                "name",
+                VarIndex::new(0, 0),
+            ))],
             StrRange::new_empty(),
         )));
         let mut context = Context::new(None, ContextType::Normal);
-        context.create_var("name", PineRef::new_box(Some(1)));
+        context.init_vars(vec![Some(PineRef::new_box(Some(1)))]);
 
         let tuple_res = downcast_pf::<Tuple>(exp.rv_run(&mut context).unwrap()).unwrap();
         let vec_res: Vec<RefData<Int>> = tuple_res

@@ -1,38 +1,41 @@
 use super::data_src::Callback;
 use crate::ast::input::{Position, StrRange};
+use crate::ast::stat_expr_types::VarIndex;
 use crate::types::{
     Bool, Callable, Color, DataType, Float, Int, PineFrom, PineRef, PineStaticType, PineType,
     RefData, RuntimeErr, SecondType, Series, NA,
 };
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fmt::Debug;
 use std::mem;
 
 pub trait VarOperate<'a> {
-    fn create_var(&mut self, name: &'a str, val: PineRef<'a>) -> Option<PineRef<'a>>;
+    fn create_var(&mut self, index: i32, val: PineRef<'a>) -> Option<PineRef<'a>>;
 
-    fn update_var(&mut self, name: &'a str, val: PineRef<'a>);
+    fn update_var(&mut self, index: VarIndex, val: PineRef<'a>);
 
-    fn move_var(&mut self, name: &'a str) -> Option<PineRef<'a>>;
+    fn move_var(&mut self, index: VarIndex) -> Option<PineRef<'a>>;
 
-    fn get_var_keys(&self) -> Vec<&'a str>;
+    fn var_len(&self) -> i32;
 }
 
 // lifetime 'a is the lifetime of Exp, 'c is the lifetime of Ctx Self's lifetime
 pub trait Ctx<'a>: VarOperate<'a> {
-    fn contains_var(&self, name: &'a str) -> bool;
+    fn contains_var(&self, index: VarIndex) -> bool;
+
+    fn contains_var_scope(&self, index: i32) -> bool;
 
     fn create_callable(&mut self, call: RefData<Callable<'a>>);
 
-    fn create_declare(&mut self, name: &'a str);
+    // fn create_declare(&mut self, name: &'a str);
 
-    fn contains_declare(&self, name: &'a str) -> bool;
+    // fn contains_declare(&self, name: &'a str) -> bool;
 
-    fn contains_declare_scope(&self, name: &'a str) -> bool;
+    // fn contains_declare_scope(&self, name: &'a str) -> bool;
 
-    fn clear_declare(&mut self);
+    // fn clear_declare(&mut self);
 
-    fn any_declare(&self) -> bool;
+    // fn any_declare(&self) -> bool;
 
     fn set_is_run(&mut self, is_run: bool);
 
@@ -60,28 +63,33 @@ pub struct Context<'a, 'b, 'c> {
     context_type: ContextType,
 
     // Child contexts that with parent self lifetime 'c
-    sub_contexts: HashMap<String, Box<dyn 'c + Ctx<'a>>>,
+    sub_contexts: Vec<Option<Box<dyn 'c + Ctx<'a>>>>,
 
     // variable map that defined by user and library.
-    vars: HashMap<&'a str, PineRef<'a>>,
+    vars: Vec<Option<PineRef<'a>>>,
     // All the Series type variable name
     _series: Vec<&'a str>,
     callables: Vec<RefData<Callable<'a>>>,
-    declare_vars: HashSet<&'a str>,
-
+    // declare_vars: HashSet<&'a str>,
     callback: Option<&'a dyn Callback>,
     first_commit: bool,
 
     is_run: bool,
 }
 
-pub fn downcast_ctx<'a, 'b, 'c>(
-    item: &'c mut (dyn Ctx<'a> + 'c),
-) -> Result<&'c mut Context<'a, 'b, 'c>, RuntimeErr> {
+pub fn downcast_ctx<'a, 'b, 'c>(item: &'c mut (dyn Ctx<'a> + 'c)) -> &'c mut Context<'a, 'b, 'c> {
     unsafe {
         let raw: *mut dyn Ctx<'a> = item;
         let t = raw as *mut Context<'a, 'b, 'c>;
-        Ok(t.as_mut().unwrap())
+        t.as_mut().unwrap()
+    }
+}
+
+pub fn downcast_ctx_const<'a, 'b, 'c>(item: &'c (dyn Ctx<'a> + 'c)) -> &'c Context<'a, 'b, 'c> {
+    unsafe {
+        let raw: *const dyn Ctx<'a> = item;
+        let t = raw as *const Context<'a, 'b, 'c>;
+        t.as_ref().unwrap()
     }
 }
 
@@ -95,11 +103,12 @@ where
 }
 
 pub fn commit_series_for_operator<'a>(operator: &mut dyn VarOperate<'a>) {
-    let keys: Vec<&'a str> = operator.get_var_keys();
+    let len: i32 = operator.var_len();
     // The committed set used to make sure only one instance of series commmit.
     let mut commited: HashSet<*const (dyn PineType<'a> + 'a)> = HashSet::new();
-    for k in keys {
-        let val = operator.move_var(k).unwrap();
+    for k in 0..len {
+        let index = VarIndex::new(k, 0);
+        let val = operator.move_var(index).unwrap();
         if commited.contains(&val.as_ptr()) {
             continue;
         }
@@ -111,7 +120,7 @@ pub fn commit_series_for_operator<'a>(operator: &mut dyn VarOperate<'a>) {
             (DataType::Bool, SecondType::Series) => commit_series::<Bool>(val),
             _ => val,
         };
-        operator.update_var(k, ret_val);
+        operator.update_var(index, ret_val);
     }
 }
 
@@ -129,11 +138,11 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
         Context {
             parent,
             context_type: t,
-            sub_contexts: HashMap::new(),
-            vars: HashMap::new(),
+            sub_contexts: Vec::new(),
+            vars: Vec::new(),
             _series: vec![],
             callables: vec![],
-            declare_vars: HashSet::new(),
+            // declare_vars: HashSet::new(),
             callback: None,
             first_commit: false,
             is_run: false,
@@ -144,20 +153,28 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
         Context {
             parent: None,
             context_type: ContextType::Normal,
-            sub_contexts: HashMap::new(),
-            vars: HashMap::new(),
+            sub_contexts: Vec::new(),
+            vars: Vec::new(),
             _series: vec![],
             callables: vec![],
-            declare_vars: HashSet::new(),
+            // declare_vars: HashSet::new(),
             callback: Some(callback),
             first_commit: false,
             is_run: false,
         }
     }
 
+    pub fn init_vars(&mut self, vars: Vec<Option<PineRef<'a>>>) {
+        self.vars = vars;
+    }
+
+    pub fn init_sub_contexts(&mut self, sub_contexts: Vec<Option<Box<dyn 'c + Ctx<'a>>>>) {
+        self.sub_contexts = sub_contexts;
+    }
+
     pub fn create_sub_context(
         &'c mut self,
-        name: String,
+        index: i32,
         t: ContextType,
     ) -> &mut Box<dyn Ctx<'a> + 'c>
     where
@@ -181,70 +198,41 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             // .insert(name.clone(), subctx);
             let ptr: *mut Context<'a, 'b, 'c> = self;
             subctx.parent = Some(ptr.as_mut().unwrap());
-            ptr.as_mut()
-                .unwrap()
-                .sub_contexts
-                .insert(name.clone(), subctx);
+            let context = ptr.as_mut().unwrap();
+            context.sub_contexts[index as usize] = Some(subctx);
+            // &mut context.sub_contexts[index as usize].unwrap()
         }
-        self.get_sub_context(&name).unwrap()
+        self.get_sub_context(index).unwrap()
     }
 
-    pub fn create_move_sub_context(
-        &'c mut self,
-        name: String,
-        t: ContextType,
-    ) -> Box<dyn Ctx<'a> + 'c>
-    where
-        'a: 'c,
-        'b: 'c,
-    {
-        let mut subctx = Box::new(Context::new(None, t));
-        unsafe {
-            // Force the &Context to &mut Context to prevent the rust's borrow checker
-            // When the sub context borrow the parent context, the parent context should not
-            // use by the rust's borrow rules.
-            subctx.parent = Some(mem::transmute::<usize, &mut Context<'a, 'b, 'c>>(
-                mem::transmute::<&Context<'a, 'b, 'c>, usize>(self),
-            ));
-            mem::transmute::<usize, &mut Context<'a, 'b, 'c>>(mem::transmute::<
-                &Context<'a, 'b, 'c>,
-                usize,
-            >(self))
-            .sub_contexts
-            .insert(name.clone(), subctx);
-        }
-        self.move_sub_context(&name).unwrap()
-    }
-
-    pub fn map_var<F>(&mut self, name: &'a str, f: F)
+    pub fn map_var<F>(&mut self, index: VarIndex, f: F)
     where
         F: Fn(Option<PineRef<'a>>) -> Option<PineRef<'a>>,
     {
-        // Find in  current context
-        let val = self.vars.remove(name);
-        if let Some(_) = val {
-            if let Some(ret_val) = f(val) {
-                self.vars.insert(name, ret_val);
-            }
-            return ();
+        let mut dest_ctx: &mut dyn Ctx<'a> = self;
+        let mut rel_ctx = index.rel_ctx;
+        debug_assert!(rel_ctx >= 0);
+        while rel_ctx > 0 {
+            dest_ctx = *downcast_ctx(dest_ctx).parent.as_mut().unwrap();
+            rel_ctx -= 1;
         }
-        // Find in parent context if this context don't has this var
-        if let Some(ref mut parent) = self.parent {
-            let val = parent.move_var(name);
-            if let Some(ret_val) = f(val) {
-                parent.create_var(name, ret_val);
-            }
+        let context = downcast_ctx(dest_ctx);
+        let val = mem::replace(&mut context.vars[index.varid as usize], None);
+        if let Some(ret_val) = f(val) {
+            context.vars[index.varid as usize] = Some(ret_val);
         }
     }
 
     pub fn commit(&mut self) {
         commit_series_for_operator(self);
         // Commit the Series for all of the sub context.
-        for (_, ctx) in self.sub_contexts.iter_mut() {
+        for ctx in self.sub_contexts.iter_mut() {
             // If this context does not declare variables, so this context is not run,
             // we need not commit the series.
-            if ctx.get_is_run() {
-                downcast_ctx(&mut **ctx).unwrap().commit();
+            if let Some(ctx) = ctx {
+                if ctx.get_is_run() {
+                    downcast_ctx(&mut **ctx).commit();
+                }
             }
         }
 
@@ -254,9 +242,10 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
     }
 
     pub fn roll_back(&mut self) -> Result<(), PineRuntimeError> {
-        let keys: Vec<&'a str> = self.vars.keys().cloned().collect();
-        for k in keys {
-            let val = self.move_var(k).unwrap();
+        let len = self.vars.len() as i32;
+        for k in 0..len {
+            let index = VarIndex::new(k, 0);
+            let val = self.move_var(index).unwrap();
             let ret_val = match val.get_type() {
                 (DataType::Float, SecondType::Series) => roll_back_series::<Float>(val),
                 (DataType::Int, SecondType::Series) => roll_back_series::<Int>(val),
@@ -264,7 +253,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
                 (DataType::Bool, SecondType::Series) => roll_back_series::<Bool>(val),
                 _ => val,
             };
-            self.update_var(k, ret_val);
+            self.update_var(index, ret_val);
         }
         let callables = mem::replace(&mut self.callables, vec![]);
         for callable in callables.iter() {
@@ -285,72 +274,74 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
         Ok(())
     }
 
-    pub fn contains_sub_context(&self, name: &String) -> bool {
-        self.sub_contexts.contains_key(name)
+    pub fn contains_sub_context(&self, index: i32) -> bool {
+        self.sub_contexts[index as usize].is_some()
     }
 
-    pub fn get_sub_context(&mut self, name: &String) -> Option<&mut Box<dyn Ctx<'a> + 'c>> {
-        self.sub_contexts.get_mut(name)
+    pub fn get_sub_context(&mut self, index: i32) -> Option<&mut Box<dyn Ctx<'a> + 'c>> {
+        match &mut self.sub_contexts[index as usize] {
+            Some(v) => Some(v),
+            None => None,
+        }
     }
 
-    pub fn set_sub_context(&mut self, name: String, sub_context: Box<dyn Ctx<'a> + 'c>) {
-        self.sub_contexts.insert(name, sub_context);
+    pub fn set_sub_context(&mut self, index: i32, sub_context: Box<dyn Ctx<'a> + 'c>) {
+        self.sub_contexts[index as usize] = Some(sub_context);
     }
 
-    pub fn move_sub_context(&mut self, name: &String) -> Option<Box<dyn Ctx<'a> + 'c>> {
-        self.sub_contexts.remove(name)
-    }
-
-    pub fn update_sub_context(&mut self, name: String, subctx: Box<dyn Ctx<'a> + 'c>) {
-        self.sub_contexts.insert(name, subctx);
+    pub fn update_sub_context(&mut self, index: i32, subctx: Box<dyn Ctx<'a> + 'c>) {
+        self.sub_contexts[index as usize] = Some(subctx);
     }
 }
 
 impl<'a, 'b, 'c> VarOperate<'a> for Context<'a, 'b, 'c> {
-    fn create_var(&mut self, name: &'a str, val: PineRef<'a>) -> Option<PineRef<'a>> {
-        self.vars.insert(name, val)
+    fn create_var(&mut self, index: i32, val: PineRef<'a>) -> Option<PineRef<'a>> {
+        mem::replace(&mut self.vars[index as usize], Some(val))
     }
 
-    fn update_var(&mut self, name: &'a str, val: PineRef<'a>) {
-        if self.vars.contains_key(name) {
-            self.vars.insert(name, val);
-        } else if let Some(ref mut parent) = self.parent {
-            if parent.contains_var(name) {
-                parent.update_var(name, val);
-            } else {
-                self.vars.insert(name, val);
-            }
-        } else {
-            self.vars.insert(name, val);
+    fn update_var(&mut self, index: VarIndex, val: PineRef<'a>) {
+        let mut dest_ctx: &mut dyn Ctx<'a> = self;
+        let mut rel_ctx = index.rel_ctx;
+        debug_assert!(rel_ctx >= 0);
+        while rel_ctx > 0 {
+            dest_ctx = *downcast_ctx(dest_ctx).parent.as_mut().unwrap();
+            rel_ctx -= 1;
         }
+        downcast_ctx(dest_ctx).vars[index.varid as usize] = Some(val);
     }
 
     // Move the value for the specific name from this context or the parent context.
-    fn move_var(&mut self, name: &'a str) -> Option<PineRef<'a>> {
+    fn move_var(&mut self, index: VarIndex) -> Option<PineRef<'a>> {
         // Insert the temporary NA into the name and move the original value out.
-        if self.vars.contains_key(name) {
-            self.vars.insert(name, PineRef::new_box(NA))
-        } else if let Some(ref mut parent) = self.parent {
-            parent.move_var(name)
-        } else {
-            None
+        let mut dest_ctx: &mut dyn Ctx<'a> = self;
+        let mut rel_ctx = index.rel_ctx;
+        debug_assert!(rel_ctx >= 0);
+        while rel_ctx > 0 {
+            dest_ctx = *downcast_ctx(dest_ctx).parent.as_mut().unwrap();
+            rel_ctx -= 1;
         }
+        mem::replace(&mut self.vars[index.varid as usize], None)
     }
 
-    fn get_var_keys(&self) -> Vec<&'a str> {
-        self.vars.keys().cloned().collect()
+    fn var_len(&self) -> i32 {
+        self.vars.len() as i32
     }
 }
 
 impl<'a, 'b, 'c> Ctx<'a> for Context<'a, 'b, 'c> {
-    fn contains_var(&self, name: &'a str) -> bool {
-        if self.vars.contains_key(name) {
-            true
-        } else if let Some(ref parent) = self.parent {
-            parent.contains_var(name)
-        } else {
-            false
+    fn contains_var_scope(&self, index: i32) -> bool {
+        self.vars[index as usize].is_some()
+    }
+
+    fn contains_var(&self, index: VarIndex) -> bool {
+        let mut dest_ctx: &dyn Ctx<'a> = self;
+        let mut rel_ctx = index.rel_ctx;
+        debug_assert!(rel_ctx >= 0);
+        while rel_ctx > 0 {
+            dest_ctx = *downcast_ctx_const(dest_ctx).parent.as_ref().unwrap();
+            rel_ctx -= 1;
         }
+        downcast_ctx_const(dest_ctx).vars[index.varid as usize].is_some()
     }
 
     fn create_callable(&mut self, call: RefData<Callable<'a>>) {
@@ -359,35 +350,6 @@ impl<'a, 'b, 'c> Ctx<'a> for Context<'a, 'b, 'c> {
         } else if !self.first_commit {
             self.callables.push(call);
         }
-    }
-
-    fn create_declare(&mut self, name: &'a str) {
-        self.declare_vars.insert(name);
-    }
-
-    fn contains_declare(&self, name: &'a str) -> bool {
-        if self.declare_vars.contains(name) {
-            true
-        } else if let Some(parent) = &self.parent {
-            parent.contains_declare(name)
-        } else {
-            false
-        }
-    }
-
-    fn contains_declare_scope(&self, name: &'a str) -> bool {
-        self.declare_vars.contains(name)
-    }
-
-    fn clear_declare(&mut self) {
-        self.declare_vars.clear();
-        for (_, v) in self.sub_contexts.iter_mut() {
-            v.clear_declare();
-        }
-    }
-
-    fn any_declare(&self) -> bool {
-        !self.declare_vars.is_empty()
     }
 
     fn set_is_run(&mut self, is_run: bool) {
@@ -400,8 +362,10 @@ impl<'a, 'b, 'c> Ctx<'a> for Context<'a, 'b, 'c> {
 
     fn clear_is_run(&mut self) {
         self.is_run = false;
-        for (_, subctx) in self.sub_contexts.iter_mut() {
-            subctx.clear_is_run();
+        for subctx in self.sub_contexts.iter_mut() {
+            if let Some(subctx) = subctx {
+                subctx.clear_is_run();
+            }
         }
     }
 
@@ -454,28 +418,29 @@ mod tests {
     #[test]
     fn context_test() {
         let mut context1 = Context::new(None, ContextType::Normal);
-        context1.create_declare("hello");
-        assert!(context1.contains_declare("hello"));
+        context1.init_vars(vec![Some(PineRef::new(Some(1)))]);
+        // context1.create_declare("hello");
+        // assert!(context1.contains_declare("hello"));
 
-        context1.clear_declare();
-        assert!(!context1.contains_declare("hello"));
+        // context1.clear_declare();
+        // assert!(!context1.contains_declare("hello"));
 
-        context1.create_var("hello", PineRef::new_box(Some(1)));
+        context1.create_var(0, PineRef::new_box(Some(1)));
         assert_eq!(
-            Int::implicity_from(context1.move_var("hello").unwrap()),
+            Int::implicity_from(context1.move_var(VarIndex::new(0, 0)).unwrap()),
             Ok(RefData::new_box(Some(1)))
         );
 
-        context1.update_var("hello", PineRef::new_box(Some(10)));
+        context1.update_var(VarIndex::new(0, 0), PineRef::new_box(Some(10)));
         assert_eq!(
-            Int::implicity_from(context1.move_var("hello").unwrap()),
+            Int::implicity_from(context1.move_var(VarIndex::new(0, 0)).unwrap()),
             Ok(RefData::new_box(Some(10)))
         );
-        assert!(context1.contains_var("hello"));
+        // assert!(context1.contains_var("hello"));
 
-        context1.map_var("hello", |_| Some(PineRef::new_box(Some(100))));
+        context1.map_var(VarIndex::new(0, 0), |_| Some(PineRef::new_box(Some(100))));
         assert_eq!(
-            Int::implicity_from(context1.move_var("hello").unwrap()),
+            Int::implicity_from(context1.move_var(VarIndex::new(0, 0)).unwrap()),
             Ok(RefData::new_box(Some(100)))
         );
     }
@@ -513,36 +478,36 @@ mod tests {
     fn derive_context_test() {
         // hello is owned by context1, hello2 is owned by context2, hello3 is not owned by both context
         let mut context1 = Context::new(None, ContextType::Normal);
-        context1.create_var("hello", PineRef::new_box(Some(1)));
+        context1.init_vars(vec![Some(PineRef::new_box(Some(1)))]);
 
         let mut context2 = Context::new(Some(&mut context1), ContextType::Normal);
-        context2.create_var("hello2", PineRef::new_box(Some(2)));
+        context2.init_vars(vec![Some(PineRef::new_box(Some(2)))]);
 
-        assert_eq!(context2.contains_var("hello"), true);
-        let mov_res1 = context2.move_var("hello").unwrap();
+        assert_eq!(context2.contains_var(VarIndex::new(0, 1)), true);
+        let mov_res1 = context2.move_var(VarIndex::new(0, 1)).unwrap();
         assert_eq!(mov_res1, PineRef::new(Some(1)));
 
-        assert_eq!(context2.contains_var("hello2"), true);
-        let mov_res2 = context2.move_var("hello2").unwrap();
+        assert_eq!(context2.contains_var(VarIndex::new(0, 0)), true);
+        let mov_res2 = context2.move_var(VarIndex::new(0, 0)).unwrap();
         assert_eq!(mov_res2, PineRef::new(Some(2)));
 
-        assert_eq!(context2.contains_var("hello3"), false);
-        assert_eq!(context2.move_var("hello3"), None);
+        // assert_eq!(context2.contains_var("hello3"), false);
+        // assert_eq!(context2.move_var("hello3"), None);
 
-        context2.update_var("hello", mov_res1);
-        assert!(context2.vars.get("hello").is_none());
-        {
-            let parent = context2.parent.as_mut().unwrap();
-            assert!(parent.move_var("hello").is_some());
-        }
+        // context2.update_var(VarIndex::new(0, 1), mov_res1);
+        // assert!(context2.vars.get(VarIndex).is_none());
+        // {
+        //     let parent = context2.parent.as_mut().unwrap();
+        //     assert!(parent.move_var("hello").is_some());
+        // }
 
-        context2.update_var("hello2", mov_res2);
-        assert!(context2.vars.get("hello2").is_some());
+        // context2.update_var("hello2", mov_res2);
+        // assert!(context2.vars.get("hello2").is_some());
 
-        context2.update_var("hello3", PineRef::new(Some(10)));
-        assert!(context2.vars.get("hello3").is_some());
+        // context2.update_var("hello3", PineRef::new(Some(10)));
+        // assert!(context2.vars.get("hello3").is_some());
 
-        assert!(context2.contains_var("hello"));
-        assert!(context2.contains_var("hello2"));
+        // assert!(context2.contains_var("hello"));
+        // assert!(context2.contains_var("hello2"));
     }
 }

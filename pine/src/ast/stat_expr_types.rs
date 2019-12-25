@@ -243,6 +243,13 @@ impl<'a> RVVarName<'a> {
             var_index: VarIndex::new(0, 0),
         }
     }
+
+    pub fn new_with_index(n: &'a str, index: VarIndex) -> RVVarName<'a> {
+        RVVarName {
+            name: VarName::new_no_input(n),
+            var_index: index,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

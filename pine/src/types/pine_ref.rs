@@ -10,6 +10,15 @@ pub enum PineRef<'a> {
     Rc(Rc<RefCell<dyn PineType<'a> + 'a>>),
 }
 
+impl<'a> Clone for PineRef<'a> {
+    fn clone(&self) -> Self {
+        match *self {
+            PineRef::Box(ref item) => item.copy(),
+            PineRef::Rc(ref item) => PineRef::Rc(Rc::clone(item)),
+        }
+    }
+}
+
 impl<'a> PartialEq for PineRef<'a> {
     fn eq(&self, other: &PineRef<'a>) -> bool {
         match (self, other) {

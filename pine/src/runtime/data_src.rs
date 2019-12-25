@@ -1,7 +1,7 @@
 use super::context::{Context, ContextType, Ctx, PineRuntimeError, Runner, VarOperate};
 // use super::ctxid_parser::CtxIdParser;
 use crate::ast::input::{Position, StrRange};
-use crate::ast::stat_expr_types::Block;
+use crate::ast::stat_expr_types::{Block, VarIndex};
 use crate::types::{Float, PineFrom, PineRef, PineType, RefData, RuntimeErr, Series};
 use std::collections::HashMap;
 
@@ -33,13 +33,21 @@ fn get_len(data: &HashMap<&'static str, Vec<Float>>) -> Result<usize, PineRuntim
 impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
     pub fn new(
         blk: &'a mut Block<'a>,
-        vars: HashMap<&'a str, PineRef<'a>>,
+        lib_vars: HashMap<&'a str, PineRef<'a>>,
         callback: &'a dyn Callback,
     ) -> DataSrc<'a, 'b, 'c> {
-        // CtxIdParser::new().parse_blk(blk);
         let mut context = Context::new_with_callback(callback);
-        for (k, v) in vars.into_iter() {
-            context.create_var(k, v);
+        let mut vars: Vec<Option<PineRef<'a>>> = Vec::with_capacity(blk.var_count as usize);
+        vars.resize(blk.var_count as usize, None);
+        context.init_vars(vars);
+
+        let ctx_count = blk.subctx_count as usize;
+        let mut ctxs: Vec<Option<Box<dyn 'c + Ctx<'a>>>> = Vec::with_capacity(ctx_count);
+        ctxs.resize_with(ctx_count, || None);
+        context.init_sub_contexts(ctxs);
+
+        for (i, (_k, v)) in lib_vars.into_iter().enumerate() {
+            context.create_var(i as i32, v);
         }
         DataSrc {
             blk,
@@ -55,15 +63,16 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
     ) -> Result<(), PineRuntimeError> {
         for i in 0..len {
             // Extract data into context
-            for (k, v) in data.iter() {
-                let series = self.context.move_var(k).unwrap();
+            for (i, (_k, v)) in data.iter().enumerate() {
+                let index = VarIndex::new(i as i32, 0);
+                let series = self.context.move_var(index).unwrap();
                 let mut float_s: RefData<Series<Float>> = Series::implicity_from(series).unwrap();
                 float_s.update(v[i]);
-                self.context.update_var(k, float_s.into_pf());
+                self.context.update_var(index, float_s.into_pf());
             }
             self.blk.run(&mut self.context)?;
             self.context.commit();
-            self.context.clear_declare();
+            // self.context.clear_declare();
             self.context.clear_is_run();
         }
         match self.context.run_callbacks() {
@@ -76,9 +85,9 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
         let len = get_len(&data)?;
 
         // Create variable from the hash map
-        for (k, _) in data.iter() {
+        for (i, (k, _)) in data.iter().enumerate() {
             let s: Series<Float> = Series::new();
-            self.context.create_var(k, PineRef::new_rc(s));
+            self.context.create_var(i as i32, PineRef::new_rc(s));
         }
         self.run_data(data, len)
     }
@@ -99,6 +108,8 @@ mod tests {
     use crate::ast::input::{Position, StrRange};
     use crate::ast::name::VarName;
     use crate::ast::stat_expr_types::{Assignment, Exp, RVVarName, Statement};
+    use crate::ast::syntax_type::{SimpleSyntaxType, SyntaxType};
+    use crate::syntax::SyntaxParser;
 
     struct MyCallback;
     impl Callback for MyCallback {}
@@ -116,13 +127,17 @@ mod tests {
             None,
             StrRange::from_start("hello=close", Position::new(0, 0)),
         );
+        let mut typemap: HashMap<&str, SyntaxType> = HashMap::new();
+        typemap.insert("close", SyntaxType::Series(SimpleSyntaxType::Float));
+        SyntaxParser::new_with_vars(typemap);
+
         let mut datasrc = DataSrc::new(&mut blk, HashMap::new(), &MyCallback);
 
         let mut data = HashMap::new();
         data.insert("close", vec![Some(10f64), Some(100f64)]);
 
         assert_eq!(datasrc.run(data), Ok(()));
-        datasrc.context.map_var("hello", |hv| match hv {
+        datasrc.context.map_var(VarIndex::new(1, 0), |hv| match hv {
             None => None,
             Some(v) => {
                 let ser: RefData<Series<Float>> = Series::implicity_from(v).unwrap();

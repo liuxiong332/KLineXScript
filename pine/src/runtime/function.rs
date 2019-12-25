@@ -52,23 +52,23 @@ impl<'a> Function<'a> {
             return Err(PineRuntimeError::new(RuntimeErr::NotValidParam, range));
         }
 
-        let mut all_args: HashMap<&'a str, PineRef<'a>> = HashMap::new();
-        for (i, val) in pos_args.into_iter().enumerate() {
-            let name = self.def.params[i].value;
-            all_args.insert(name, val);
-        }
-        for (name, val) in dict_args.into_iter() {
-            match self.def.params.iter().any(|&v| name == v.value) {
-                false => return Err(PineRuntimeError::new(RuntimeErr::NotValidParam, range)),
-                true => {
-                    all_args.insert(name, val);
-                }
-            }
-        }
+        // let mut all_args: HashMap<&'a str, PineRef<'a>> = HashMap::new();
+        // for (i, val) in pos_args.into_iter().enumerate() {
+        //     let name = self.def.params[i].value;
+        //     all_args.insert(name, val);
+        // }
+        // for (name, val) in dict_args.into_iter() {
+        //     match self.def.params.iter().any(|&v| name == v.value) {
+        //         false => return Err(PineRuntimeError::new(RuntimeErr::NotValidParam, range)),
+        //         true => {
+        //             all_args.insert(name, val);
+        //         }
+        //     }
+        // }
         // let mut new_context = Context::new(Some(context), ContextType::FuncDefBlock);
-        for (k, v) in all_args {
+        for (i, v) in pos_args.into_iter().enumerate() {
             // context.create_var(k, v);
-            if let Err(err) = process_assign_val(v, downcast_ctx(context).unwrap(), k) {
+            if let Err(err) = process_assign_val(v, downcast_ctx(context), i as i32) {
                 return Err(PineRuntimeError::new(err, range));
             }
         }

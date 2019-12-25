@@ -805,11 +805,11 @@ mod tests {
         let def_exp = FunctionDef::new(
             VarName::new_no_input("name"),
             vec![VarName::new_no_input("arg")],
-            Block {
-                stmts: vec![],
-                ret_stmt: Some(Exp::VarName(RVVarName::new_no_range("arg"))),
-                range: StrRange::new_empty(),
-            },
+            Block::new(
+                vec![],
+                Some(Exp::VarName(RVVarName::new_no_range("arg"))),
+                StrRange::new_empty(),
+            ),
             StrRange::new_empty(),
         );
         let mut context = Context::new(None, ContextType::Normal);

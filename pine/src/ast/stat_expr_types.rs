@@ -516,6 +516,8 @@ pub struct Block<'a> {
     pub stmts: Vec<Statement<'a>>,
     pub ret_stmt: Option<Exp<'a>>,
     pub range: StrRange,
+    pub var_count: i32,
+    pub subctx_count: i32,
 }
 
 impl<'a> Block<'a> {
@@ -524,6 +526,8 @@ impl<'a> Block<'a> {
             stmts,
             ret_stmt,
             range,
+            var_count: 0,
+            subctx_count: 0,
         }
     }
 
@@ -532,6 +536,8 @@ impl<'a> Block<'a> {
             stmts,
             ret_stmt,
             range: StrRange::new_empty(),
+            var_count: 0,
+            subctx_count: 0,
         }
     }
 }

@@ -300,10 +300,9 @@ pub fn function_def_with_indent<'a>(
                 preceded(statement_end, |s| {
                     block_ret_with_indent(indent + 1)(s, state)
                 }),
-                map(terminated(|s| exp(s, state), statement_end), |s| Block {
-                    stmts: vec![],
-                    range: s.range(),
-                    ret_stmt: Some(s),
+                map(terminated(|s| exp(s, state), statement_end), |s| {
+                    let range = s.range();
+                    Block::new(vec![], Some(s), range)
                 }),
             )),
         ))(input)?;
@@ -763,14 +762,14 @@ mod tests {
             Statement::FuncDef(Box::new(FunctionDef::new(
                 VarName::new_with_start("a", Position::new(0, 4)),
                 vec![VarName::new_with_start("arg1", Position::new(0, 6))],
-                Block {
-                    stmts: vec![],
-                    ret_stmt: Some(Exp::VarName(RVVarName::new_with_start(
+                Block::new(
+                    vec![],
+                    Some(Exp::VarName(RVVarName::new_with_start(
                         "b",
                         Position::new(0, 15),
                     ))),
-                    range: StrRange::from_start("b", Position::new(0, 15)),
-                },
+                    StrRange::from_start("b", Position::new(0, 15)),
+                ),
                 StrRange::from_start("a(arg1) => b", Position::new(0, 4)),
             ))),
         );
@@ -781,14 +780,14 @@ mod tests {
             Statement::FuncDef(Box::new(FunctionDef::new(
                 VarName::new_with_start("a", Position::new(0, 4)),
                 vec![VarName::new_with_start("arg1", Position::new(0, 6))],
-                Block {
-                    stmts: vec![],
-                    ret_stmt: Some(Exp::VarName(RVVarName::new_with_start(
+                Block::new(
+                    vec![],
+                    Some(Exp::VarName(RVVarName::new_with_start(
                         "b",
                         Position::new(1, 8),
                     ))),
-                    range: StrRange::from_start("b", Position::new(1, 8)),
-                },
+                    StrRange::from_start("b", Position::new(1, 8)),
+                ),
                 StrRange::from_start("a(arg1) => \n        b", Position::new(0, 4)),
             ))),
         );
@@ -937,9 +936,9 @@ mod tests {
             FunctionDef::new(
                 VarName::new_with_start("a", Position::new(0, 0)),
                 vec![VarName::new_with_start("arg1", Position::new(0, 2))],
-                Block {
-                    stmts: vec![],
-                    ret_stmt: Some(Exp::Ite(Box::new(IfThenElse::new_no_ctxid(
+                Block::new(
+                    vec![],
+                    Some(Exp::Ite(Box::new(IfThenElse::new_no_ctxid(
                         Exp::VarName(RVVarName::new_with_start("b", Position::new(1, 7))),
                         Block::new(
                             vec![],
@@ -952,8 +951,8 @@ mod tests {
                         None,
                         StrRange::new(Position::new(1, 4), Position::new(2, 9)),
                     )))),
-                    range: StrRange::new(Position::new(1, 4), Position::new(2, 9)),
-                },
+                    StrRange::new(Position::new(1, 4), Position::new(2, 9)),
+                ),
                 StrRange::new(Position::new(0, 0), Position::new(2, 9)),
             ),
         );
@@ -966,9 +965,9 @@ mod tests {
             if_then_else_exp(0),
             IfThenElse::new_no_ctxid(
                 Exp::VarName(RVVarName::new_with_start("a", Position::new(0, 3))),
-                Block {
-                    stmts: vec![],
-                    ret_stmt: Some(Exp::Ite(Box::new(IfThenElse::new_no_ctxid(
+                Block::new(
+                    vec![],
+                    Some(Exp::Ite(Box::new(IfThenElse::new_no_ctxid(
                         Exp::VarName(RVVarName::new_with_start("b", Position::new(1, 7))),
                         Block::new(
                             vec![],
@@ -988,8 +987,8 @@ mod tests {
                         )),
                         StrRange::new(Position::new(1, 4), Position::new(4, 9)),
                     )))),
-                    range: StrRange::new(Position::new(1, 4), Position::new(4, 9)),
-                },
+                    StrRange::new(Position::new(1, 4), Position::new(4, 9)),
+                ),
                 None,
                 StrRange::new(Position::new(0, 0), Position::new(4, 9)),
             ),
@@ -1013,9 +1012,9 @@ mod tests {
                 int_exp(1, 0, 8),
                 int_exp(2, 0, 13),
                 None,
-                Block {
-                    stmts: vec![],
-                    ret_stmt: Some(Exp::ForRange(Box::new(ForRange::new_no_ctxid(
+                Block::new(
+                    vec![],
+                    Some(Exp::ForRange(Box::new(ForRange::new_no_ctxid(
                         VarName::new_with_start("i", Position::new(1, 8)),
                         int_exp(1, 1, 12),
                         int_exp(2, 1, 17),
@@ -1044,8 +1043,8 @@ mod tests {
                         ),
                         StrRange::new(Position::new(1, 4), Position::new(3, 13)),
                     )))),
-                    range: StrRange::new(Position::new(1, 4), Position::new(3, 13)),
-                },
+                    StrRange::new(Position::new(1, 4), Position::new(3, 13)),
+                ),
                 StrRange::new(Position::new(0, 0), Position::new(3, 13)),
             ),
         );

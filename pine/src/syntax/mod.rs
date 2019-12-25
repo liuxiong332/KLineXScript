@@ -983,11 +983,15 @@ impl<'a> SyntaxParser<'a> {
         for stmt in blk.stmts.iter_mut() {
             self.parse_stmt(stmt)?;
         }
-        if let Some(ref mut exp) = blk.ret_stmt {
+        let result = if let Some(ref mut exp) = blk.ret_stmt {
             self.parse_exp(exp)
         } else {
             Ok(ParseValue::new_with_type(SyntaxType::Void))
-        }
+        };
+        let context = downcast_ctx(self.context);
+        blk.var_count = context.max_var_index + 1;
+        blk.subctx_count = context.max_child_ctx_index + 1;
+        result
     }
 }
 
@@ -1982,5 +1986,24 @@ mod tests {
             ))
         );
         assert_eq!(assign.var_index, VarIndex::new(0, 0));
+    }
+
+    const BLOCK: &str = "a = if 1\n    2\nelse\n    4\nb = for i = 1 to 2\n    i\nmyfun(x, y) => x + y\nmyfun(1, 2)\nmyfun(1, 2)";
+
+    #[test]
+    fn block_test() {
+        use crate::ast::stat_expr::block;
+        use crate::ast::state::AstState;
+
+        let mut parser = SyntaxParser::new();
+
+        let input = Input::new_with_str(BLOCK);
+        let mut blk = block(input, &AstState::new()).unwrap().1;
+        assert_eq!(
+            parser.parse_blk(&mut blk),
+            Ok(ParseValue::new_with_type(SyntaxType::Void))
+        );
+        assert_eq!(blk.var_count, 3);
+        assert_eq!(blk.subctx_count, 5);
     }
 }

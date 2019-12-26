@@ -436,7 +436,8 @@ impl<'a> Runner<'a> for FunctionCall<'a> {
             (FirstType::Callable, SecondType::Simple) => {
                 let callable = downcast_pf::<Callable>(result).unwrap();
                 let ctx_ref = create_sub_ctx(context, self.ctxid, ContextType::FuncDefBlock, 0, 0);
-                let result = callable.call(ctx_ref, pos_args, dict_args);
+                let func_type = self.func_type.as_ref().unwrap().clone();
+                let result = callable.call(ctx_ref, pos_args, dict_args, func_type);
                 ctx_ref.set_is_run(true);
                 context.create_callable(callable);
                 result
@@ -809,17 +810,22 @@ mod tests {
 
     #[test]
     fn func_call_exp_test() {
-        let exp = FunctionCall::new_no_ctxid(
+        use crate::ast::syntax_type::FunctionType;
+
+        let mut exp = FunctionCall::new_no_ctxid(
             Exp::VarName(RVVarName::new_with_index("name", VarIndex::new(0, 0))),
             vec![Exp::Bool(BoolNode::new_no_range(true))],
             vec![],
             StrRange::new_empty(),
         );
+        let bool_type = SyntaxType::Simple(SimpleSyntaxType::Bool);
+        exp.func_type = Some(FunctionType((vec![("arg", bool_type.clone())], bool_type)));
         let mut context = Context::new(None, ContextType::Normal);
 
         fn test_func<'a>(
             _context: &mut dyn Ctx<'a>,
             h: Vec<Option<PineRef<'a>>>,
+            _type: FunctionType<'a>,
         ) -> Result<PineRef<'a>, RuntimeErr> {
             match &h[0] {
                 None => Err(RuntimeErr::NotValidParam),

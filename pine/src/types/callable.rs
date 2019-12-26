@@ -3,6 +3,7 @@ use super::{
     RefData, RuntimeErr, SecondType, NA,
 };
 use crate::ast::stat_expr_types::VarIndex;
+use crate::ast::syntax_type::{FunctionType, SyntaxType};
 use crate::runtime::context::{commit_series_for_operator, Ctx, VarOperate};
 use crate::runtime::statement::process_assign_val;
 use std::cell::{Cell, RefCell};
@@ -14,6 +15,7 @@ pub trait SeriesCall<'a> {
         &self,
         _context: &mut dyn Ctx<'a>,
         _p: Vec<Option<PineRef<'a>>>,
+        _func_type: FunctionType<'a>,
     ) -> Result<PineRef<'a>, RuntimeErr> {
         Ok(PineRef::Box(Box::new(NA)))
     }
@@ -42,9 +44,13 @@ impl<'a> fmt::Debug for dyn SeriesCall<'a> {
 }
 
 pub struct ParamCollectCall<'a> {
-    func:
-        fn(context: &mut dyn Ctx<'a>, Vec<Option<PineRef<'a>>>) -> Result<PineRef<'a>, RuntimeErr>,
+    func: fn(
+        context: &mut dyn Ctx<'a>,
+        Vec<Option<PineRef<'a>>>,
+        FunctionType<'a>,
+    ) -> Result<PineRef<'a>, RuntimeErr>,
     params: RefCell<Vec<Option<PineRef<'a>>>>,
+    func_type: Cell<Option<FunctionType<'a>>>,
 }
 
 impl<'a> fmt::Debug for ParamCollectCall<'a> {
@@ -60,6 +66,7 @@ impl<'a> ParamCollectCall<'a> {
         func: fn(
             context: &mut dyn Ctx<'a>,
             Vec<Option<PineRef<'a>>>,
+            FunctionType<'a>,
         ) -> Result<PineRef<'a>, RuntimeErr>,
         param_names: &Vec<&'static str>,
     ) -> ParamCollectCall<'a> {
@@ -68,6 +75,7 @@ impl<'a> ParamCollectCall<'a> {
         ParamCollectCall {
             params: RefCell::new(params),
             func,
+            func_type: Cell::new(None),
         }
     }
 }
@@ -96,6 +104,7 @@ impl<'a> SeriesCall<'a> for ParamCollectCall<'a> {
         &self,
         _context: &mut dyn Ctx<'a>,
         pmap: Vec<Option<PineRef<'a>>>,
+        func_type: FunctionType<'a>,
     ) -> Result<PineRef<'a>, RuntimeErr> {
         // self.params.set(map);
         for (i, v) in pmap.into_iter().enumerate() {
@@ -106,12 +115,13 @@ impl<'a> SeriesCall<'a> for ParamCollectCall<'a> {
         }
         // Commit all of the series variables.
         commit_series_for_operator(&mut *self.params.borrow_mut());
+        self.func_type.replace(Some(func_type));
         Ok(PineRef::Box(Box::new(NA)))
     }
 
     fn run(&self, _context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
         let val = self.params.replace(vec![]);
-        (self.func)(_context, val)?;
+        (self.func)(_context, val, self.func_type.take().unwrap())?;
         Ok(())
     }
 
@@ -125,9 +135,12 @@ impl<'a> SeriesCall<'a> for ParamCollectCall<'a> {
             })
             .collect();
         // self.params.set(map);
+        let func_type = self.func_type.take();
+        self.func_type.replace(func_type.clone());
         Box::new(ParamCollectCall {
             params: RefCell::new(new_map),
             func: self.func,
+            func_type: Cell::new(func_type),
         })
     }
 }
@@ -135,7 +148,11 @@ impl<'a> SeriesCall<'a> for ParamCollectCall<'a> {
 // pine callable type
 pub struct Callable<'a> {
     func: Option<
-        fn(context: &mut dyn Ctx<'a>, Vec<Option<PineRef<'a>>>) -> Result<PineRef<'a>, RuntimeErr>,
+        fn(
+            context: &mut dyn Ctx<'a>,
+            Vec<Option<PineRef<'a>>>,
+            FunctionType<'a>,
+        ) -> Result<PineRef<'a>, RuntimeErr>,
     >,
     caller: Option<Box<dyn SeriesCall<'a> + 'a>>,
     param_names: Vec<&'static str>,
@@ -195,6 +212,7 @@ impl<'a> Callable<'a> {
             fn(
                 context: &mut dyn Ctx<'a>,
                 Vec<Option<PineRef<'a>>>,
+                FunctionType<'a>,
             ) -> Result<PineRef<'a>, RuntimeErr>,
         >,
         caller: Option<Box<dyn SeriesCall<'a> + 'a>>,
@@ -212,6 +230,7 @@ impl<'a> Callable<'a> {
         context: &mut dyn Ctx<'a>,
         pos_args: Vec<PineRef<'a>>,
         dict_args: Vec<(&'a str, PineRef<'a>)>,
+        func_type: FunctionType<'a>,
     ) -> Result<PineRef<'a>, RuntimeErr> {
         if pos_args.len() > self.param_names.len() {
             return Err(RuntimeErr::NotValidParam);
@@ -231,9 +250,9 @@ impl<'a> Callable<'a> {
             }
         }
         if let Some(func) = self.func {
-            func(context, all_args)
+            func(context, all_args, func_type)
         } else if let Some(ref caller) = self.caller {
-            caller.step(context, all_args)
+            caller.step(context, all_args, func_type)
         } else {
             Ok(PineRef::Box(Box::new(NA)))
         }
@@ -261,110 +280,135 @@ mod tests {
     use super::super::primitive::Int;
     use super::super::Arithmetic;
     use super::*;
+    use crate::ast::syntax_type::{SimpleSyntaxType, SyntaxType};
     use crate::runtime::context::{Context, ContextType};
     use crate::types::{downcast, downcast_pf, Series};
 
-    // fn test_func<'a>(
-    //     _context: &mut dyn Ctx<'a>,
-    //     mut args: HashMap<&'a str, PineRef<'a>>,
-    // ) -> Result<PineRef<'a>, RuntimeErr> {
-    //     let (arg1, arg2) = (args.remove("arg1").unwrap(), args.remove("arg2").unwrap());
-    //     match (arg1, arg2) {
-    //         (PineRef::Box(a1), PineRef::Box(a2)) => {
-    //             let s: Int = Some(
-    //                 downcast::<Int>(a1).unwrap().unwrap() + downcast::<Int>(a2).unwrap().unwrap(),
-    //             );
-    //             Ok(PineRef::Box(Box::new(s) as Box<dyn PineType>))
-    //         }
-    //         _ => Err(RuntimeErr::NotSupportOperator),
-    //     }
-    // }
+    fn test_func<'a>(
+        _context: &mut dyn Ctx<'a>,
+        mut args: Vec<Option<PineRef<'a>>>,
+        _func_type: FunctionType<'a>,
+    ) -> Result<PineRef<'a>, RuntimeErr> {
+        let (arg1, arg2) = (
+            mem::replace(&mut args[0], None),
+            mem::replace(&mut args[1], None),
+        );
+        match (arg1, arg2) {
+            (Some(PineRef::Box(a1)), Some(PineRef::Box(a2))) => {
+                let s: Int = Some(
+                    downcast::<Int>(a1).unwrap().unwrap() + downcast::<Int>(a2).unwrap().unwrap(),
+                );
+                Ok(PineRef::Box(Box::new(s) as Box<dyn PineType>))
+            }
+            _ => Err(RuntimeErr::NotSupportOperator),
+        }
+    }
 
-    // #[test]
-    // fn callable_test() {
-    //     let callable = Callable::new(Some(test_func), None, vec!["arg1", "arg2"]);
-    //     let mut context = Context::new(None, ContextType::Normal);
+    const INT_TYPE: SyntaxType = SyntaxType::Simple(SimpleSyntaxType::Int);
 
-    //     let call_res = callable.call(
-    //         &mut context,
-    //         vec![
-    //             PineRef::Box(Box::new(Some(1)) as Box<dyn PineType>),
-    //             PineRef::Box(Box::new(Some(2)) as Box<dyn PineType>),
-    //         ],
-    //         vec![],
-    //     );
+    #[test]
+    fn callable_test() {
+        let callable = Callable::new(Some(test_func), None, vec!["arg1", "arg2"]);
+        let mut context = Context::new(None, ContextType::Normal);
 
-    //     let val = downcast_pf::<Int>(call_res.unwrap()).unwrap();
-    //     assert_eq!(val.into_inner(), Some(3));
-    // }
+        let call_res = callable.call(
+            &mut context,
+            vec![
+                PineRef::Box(Box::new(Some(1)) as Box<dyn PineType>),
+                PineRef::Box(Box::new(Some(2)) as Box<dyn PineType>),
+            ],
+            vec![],
+            FunctionType((vec![("arg1", INT_TYPE), ("arg2", INT_TYPE)], INT_TYPE)),
+        );
 
-    // fn add_test_func<'a>(
-    //     _context: &mut dyn Ctx<'a>,
-    //     mut args: HashMap<&'a str, PineRef<'a>>,
-    // ) -> Result<PineRef<'a>, RuntimeErr> {
-    //     println!("Get args {:?}", args);
-    //     let (arg1, arg2) = (args.remove("arg1").unwrap(), args.remove("arg2").unwrap());
-    //     let arg1_val = downcast_pf::<Series<Int>>(arg1).unwrap();
-    //     let arg2_val = downcast_pf::<Series<Int>>(arg2).unwrap();
-    //     assert_eq!(arg1_val.get_history(), &vec![Some(1), Some(3)]);
-    //     assert_eq!(arg2_val.get_history(), &vec![Some(2), Some(4)]);
-    //     Ok(PineRef::new(NA))
-    // }
+        let val = downcast_pf::<Int>(call_res.unwrap()).unwrap();
+        assert_eq!(val.into_inner(), Some(3));
+    }
 
-    // #[test]
-    // fn series_call_test() {
-    //     let callable = Callable::new(
-    //         None,
-    //         Some(Box::new(ParamCollectCall::new(add_test_func))),
-    //         vec!["arg1", "arg2"],
-    //     );
-    //     let gen_params = |val1, val2| {
-    //         vec![
-    //             PineRef::new(Series::from(Some(val1))),
-    //             PineRef::new(Series::from(Some(val2))),
-    //         ]
-    //     };
+    fn add_test_func<'a>(
+        _context: &mut dyn Ctx<'a>,
+        mut args: Vec<Option<PineRef<'a>>>,
+        _func_type: FunctionType<'a>,
+    ) -> Result<PineRef<'a>, RuntimeErr> {
+        println!("Get args {:?}", args);
+        let (arg1, arg2) = (
+            mem::replace(&mut args[0], None),
+            mem::replace(&mut args[1], None),
+        );
+        let arg1_val = downcast_pf::<Series<Int>>(arg1.unwrap()).unwrap();
+        let arg2_val = downcast_pf::<Series<Int>>(arg2.unwrap()).unwrap();
+        assert_eq!(arg1_val.get_history(), &vec![Some(1), Some(3)]);
+        assert_eq!(arg2_val.get_history(), &vec![Some(2), Some(4)]);
+        Ok(PineRef::new(NA))
+    }
 
-    //     let mut context = Context::new(None, ContextType::Normal);
+    #[test]
+    fn series_call_test() {
+        let callable = Callable::new(
+            None,
+            Some(Box::new(ParamCollectCall::new(
+                add_test_func,
+                &vec!["arg1", "arg2"],
+            ))),
+            vec!["arg1", "arg2"],
+        );
+        let gen_params = |val1, val2| {
+            vec![
+                PineRef::new(Series::from(Some(val1))),
+                PineRef::new(Series::from(Some(val2))),
+            ]
+        };
 
-    //     let call_res = callable
-    //         .call(&mut context, gen_params(1, 2), vec![])
-    //         .unwrap();
-    //     assert_eq!(call_res.get_type(), (DataType::NA, SecondType::Simple));
+        let mut context = Context::new(None, ContextType::Normal);
+        let func_type = FunctionType((vec![("arg1", INT_TYPE), ("arg2", INT_TYPE)], INT_TYPE));
 
-    //     callable
-    //         .call(&mut context, gen_params(3, 4), vec![])
-    //         .unwrap();
-    //     callable.back(&mut context).unwrap();
-    //     callable.run(&mut context).unwrap();
-    // }
+        let call_res = callable
+            .call(&mut context, gen_params(1, 2), vec![], func_type.clone())
+            .unwrap();
+        assert_eq!(call_res.get_type(), (DataType::NA, SecondType::Simple));
+
+        callable
+            .call(&mut context, gen_params(3, 4), vec![], func_type.clone())
+            .unwrap();
+        callable.back(&mut context).unwrap();
+        callable.run(&mut context).unwrap();
+    }
 
     // This test case is not used! If the callable receive simple int, that must be const!.
 
-    // #[test]
-    // fn series_array_test() {
-    //     fn test_func<'a>(
-    //         _context: &mut dyn Ctx<'a>,
-    //         mut args: HashMap<&'a str, PineRef<'a>>,
-    //     ) -> Result<PineRef<'a>, RuntimeErr> {
-    //         println!("args {:?}", args);
-    //         let arg1 = args.remove("arg").unwrap();
-    //         let arg1_val = downcast_pf::<Vec<Int>>(arg1).unwrap();
-    //         assert_eq!(arg1_val.into_inner(), vec![Some(100), Some(10)]);
-    //         Ok(PineRef::new_box(NA))
-    //     }
+    #[test]
+    fn series_array_test() {
+        fn test_func<'a>(
+            _context: &mut dyn Ctx<'a>,
+            mut args: Vec<Option<PineRef<'a>>>,
+            _func_type: FunctionType<'a>,
+        ) -> Result<PineRef<'a>, RuntimeErr> {
+            println!("args {:?}", args);
+            let arg1 = mem::replace(&mut args[0], None).unwrap();
+            let arg1_val = downcast_pf::<Series<Int>>(arg1).unwrap();
+            assert_eq!(arg1_val.get_history(), &vec![Some(100), Some(10)]);
+            Ok(PineRef::new_box(NA))
+        }
+        let func_type = FunctionType((vec![("arg1", INT_TYPE)], INT_TYPE));
 
-    //     let call = ParamCollectCall::new(test_func);
-    //     let mut context = Context::new(None, ContextType::Normal);
+        let call = ParamCollectCall::new(test_func, &vec!["arg"]);
+        let mut context = Context::new(None, ContextType::Normal);
 
-    //     let mut map = HashMap::new();
-    //     map.insert("arg", PineRef::new_box(Some(100)));
-    //     assert!(call.step(&mut context, map).is_ok());
+        assert!(call
+            .step(
+                &mut context,
+                vec![Some(PineRef::new_rc(Series::from(Some(100))))],
+                func_type.clone()
+            )
+            .is_ok());
+        assert!(call
+            .step(
+                &mut context,
+                vec![Some(PineRef::new_rc(Series::from(Some(10))))],
+                func_type.clone()
+            )
+            .is_ok());
 
-    //     let mut map = HashMap::new();
-    //     map.insert("arg", PineRef::new_box(Some(10)));
-    //     assert!(call.step(&mut context, map).is_ok());
-
-    //     assert_eq!(call.run(&mut context), Ok(()));
-    // }
+        assert_eq!(call.run(&mut context), Ok(()));
+    }
 }

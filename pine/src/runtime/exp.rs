@@ -445,10 +445,11 @@ mod tests {
             ))),
             Some(1),
         );
+        let series_var = RVVarName::new_with_index("series", VarIndex::new(1, 0));
         simple_rv_exp(
             Exp::TypeCast(Box::new(TypeCast::new_no_input(
                 DataType::Int,
-                Exp::VarName(RVVarName::new_no_range("series")),
+                Exp::VarName(series_var.clone()),
             ))),
             Series::from(Some(1)),
         );
@@ -463,7 +464,7 @@ mod tests {
         simple_rv_exp(
             Exp::TypeCast(Box::new(TypeCast::new_no_input(
                 DataType::Float,
-                Exp::VarName(RVVarName::new_no_range("series")),
+                Exp::VarName(series_var.clone()),
             ))),
             Series::from(Some(1.0)),
         );
@@ -478,7 +479,7 @@ mod tests {
         simple_rv_exp(
             Exp::TypeCast(Box::new(TypeCast::new_no_input(
                 DataType::Bool,
-                Exp::VarName(RVVarName::new_no_range("series")),
+                Exp::VarName(series_var.clone()),
             ))),
             Series::from(true),
         );
@@ -487,7 +488,10 @@ mod tests {
     #[test]
     fn tuple_exp_test() {
         let exp = Exp::Tuple(Box::new(TupleNode::new(
-            vec![Exp::VarName(RVVarName::new_no_range("name"))],
+            vec![Exp::VarName(RVVarName::new_with_index(
+                "name",
+                VarIndex::new(0, 0),
+            ))],
             StrRange::new_empty(),
         )));
         let mut context = Context::new(None, ContextType::Normal);

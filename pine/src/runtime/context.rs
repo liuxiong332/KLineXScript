@@ -108,19 +108,20 @@ pub fn commit_series_for_operator<'a>(operator: &mut dyn VarOperate<'a>) {
     let mut commited: HashSet<*const (dyn PineType<'a> + 'a)> = HashSet::new();
     for k in 0..len {
         let index = VarIndex::new(k, 0);
-        let val = operator.move_var(index).unwrap();
-        if commited.contains(&val.as_ptr()) {
-            continue;
+        if let Some(val) = operator.move_var(index) {
+            if commited.contains(&val.as_ptr()) {
+                continue;
+            }
+            commited.insert(val.as_ptr());
+            let ret_val = match val.get_type() {
+                (DataType::Float, SecondType::Series) => commit_series::<Float>(val),
+                (DataType::Int, SecondType::Series) => commit_series::<Int>(val),
+                (DataType::Color, SecondType::Series) => commit_series::<Color>(val),
+                (DataType::Bool, SecondType::Series) => commit_series::<Bool>(val),
+                _ => val,
+            };
+            operator.update_var(index, ret_val);
         }
-        commited.insert(val.as_ptr());
-        let ret_val = match val.get_type() {
-            (DataType::Float, SecondType::Series) => commit_series::<Float>(val),
-            (DataType::Int, SecondType::Series) => commit_series::<Int>(val),
-            (DataType::Color, SecondType::Series) => commit_series::<Color>(val),
-            (DataType::Bool, SecondType::Series) => commit_series::<Bool>(val),
-            _ => val,
-        };
-        operator.update_var(index, ret_val);
     }
 }
 

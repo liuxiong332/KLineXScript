@@ -89,20 +89,29 @@ mod tests {
     use super::*;
     use crate::ast::input::StrRange;
     use crate::ast::name::VarName;
-    use crate::ast::stat_expr_types::{Block, Exp, RVVarName};
+    use crate::ast::stat_expr_types::{Block, Exp, RVVarName, VarIndex};
     use crate::runtime::context::{Context, ContextType};
     use crate::types::series::Series;
 
     #[test]
     fn func_test() {
-        let func_def = FunctionDef::new(
+        let mut blk =
+            Block::new_no_input(vec![], Some(Exp::VarName(RVVarName::new_no_range("arg1"))));
+        blk.var_count = 1;
+        blk.subctx_count = 0;
+
+        let mut func_def = FunctionDef::new(
             VarName::new_no_input("hello"),
             vec![VarName::new_no_input("arg1")],
-            Block::new_no_input(vec![], Some(Exp::VarName(RVVarName::new_no_range("arg1")))),
+            blk,
             StrRange::new_empty(),
         );
+        func_def.name_varid = 0;
+        func_def.varids = Some(vec![0]);
         let func = Function::new(&func_def);
         let mut ctx = Context::new(None, ContextType::FuncDefBlock);
+        ctx.init(func_def.get_var_count(), func_def.get_subctx_count());
+
         assert_eq!(
             func.call(
                 &mut ctx,

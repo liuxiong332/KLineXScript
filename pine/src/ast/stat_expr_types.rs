@@ -488,6 +488,23 @@ impl<'a> Assignment<'a> {
             varids: None,
         }
     }
+
+    pub fn new_with_varids(
+        names: Vec<VarName<'a>>,
+        val: Exp<'a>,
+        var: bool,
+        var_type: Option<DataType>,
+        varids: Vec<i32>,
+    ) -> Assignment<'a> {
+        Assignment {
+            names,
+            val,
+            var,
+            var_type,
+            range: StrRange::new_empty(),
+            varids: Some(varids),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -514,6 +531,19 @@ impl<'a> VarAssignment<'a> {
             val,
             range: StrRange::new_empty(),
             var_index: VarIndex::new(0, 0),
+        }
+    }
+
+    pub fn new_with_index(
+        name: VarName<'a>,
+        val: Exp<'a>,
+        var_index: VarIndex,
+    ) -> VarAssignment<'a> {
+        VarAssignment {
+            name,
+            val,
+            range: StrRange::new_empty(),
+            var_index,
         }
     }
 }
@@ -545,6 +575,21 @@ impl<'a> Block<'a> {
             range: StrRange::new_empty(),
             var_count: 0,
             subctx_count: 0,
+        }
+    }
+
+    pub fn new_with_count(
+        stmts: Vec<Statement<'a>>,
+        ret_stmt: Option<Exp<'a>>,
+        var_count: i32,
+        subctx_count: i32,
+    ) -> Block<'a> {
+        Block {
+            stmts,
+            ret_stmt,
+            range: StrRange::new_empty(),
+            var_count,
+            subctx_count,
         }
     }
 }
@@ -669,6 +714,29 @@ impl<'a> ForRange<'a> {
             varid: 0,
             range,
             result_type: SyntaxType::Any,
+        }
+    }
+
+    pub fn new_with_ctxid(
+        var: VarName<'a>,
+        start: Exp<'a>,
+        end: Exp<'a>,
+        step: Option<Exp<'a>>,
+        do_blk: Block<'a>,
+        range: StrRange,
+        ctxid: i32,
+        result_type: SyntaxType<'a>,
+    ) -> Self {
+        ForRange {
+            var,
+            start,
+            end,
+            step,
+            do_blk,
+            ctxid,
+            varid: 0,
+            range,
+            result_type,
         }
     }
 

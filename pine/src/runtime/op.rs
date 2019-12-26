@@ -261,7 +261,7 @@ mod tests {
     use super::*;
     use crate::ast::input::StrRange;
     use crate::ast::num::Numeral;
-    use crate::ast::stat_expr_types::{BoolNode, Exp, RVVarName};
+    use crate::ast::stat_expr_types::{BoolNode, Exp, RVVarName, VarIndex};
     use crate::ast::string::StringNode;
     use crate::runtime::context::{Context, ContextType, VarOperate};
     use crate::syntax::SyntaxParser;
@@ -407,11 +407,11 @@ mod tests {
             Ok(RefData::new_box(false))
         );
         assert_eq!(
-            biop_runner_type(BinaryOp::Eq, int_exp(2), var_exp("series_int"),),
+            biop_runner_type(BinaryOp::Eq, int_exp(2), var_exp("series_int", 0),),
             Ok(RefData::new_rc(Series::from(false)))
         );
         assert_eq!(
-            biop_runner_type(BinaryOp::Eq, float_exp(1f64), var_exp("series_int"),),
+            biop_runner_type(BinaryOp::Eq, float_exp(1f64), var_exp("series_int", 0),),
             Ok(RefData::new_rc(Series::from(true)))
         );
         assert_eq!(
@@ -451,7 +451,7 @@ mod tests {
             biop_runner_type(
                 BinaryOp::BoolAnd,
                 gen_bool_exp(false),
-                var_exp("series_bool")
+                var_exp("series_bool", 1)
             ),
             Ok(RefData::new_rc(Series::from(false)))
         );
@@ -510,63 +510,63 @@ mod tests {
         downcast_pf::<D>(binary_op_run(&exp, &mut context).unwrap())
     }
 
-    fn var_exp<'a>(var: &'a str) -> Exp<'a> {
-        Exp::VarName(RVVarName::new_no_range(var))
+    fn var_exp<'a>(var: &'a str, index: i32) -> Exp<'a> {
+        Exp::VarName(RVVarName::new_with_index(var, VarIndex::new(index, 0)))
     }
 
     #[test]
     fn rv_op_test() {
         assert_eq!(
-            biop_rv_runner(BinaryOp::Plus, var_exp("arg1"), var_exp("arg2")),
+            biop_rv_runner(BinaryOp::Plus, var_exp("arg1", 0), var_exp("arg2", 1)),
             Ok(RefData::new_box(Some(6)))
         );
         assert_eq!(
-            biop_rv_runner(BinaryOp::Minus, var_exp("arg1"), var_exp("arg2")),
+            biop_rv_runner(BinaryOp::Minus, var_exp("arg1", 0), var_exp("arg2", 1)),
             Ok(RefData::new_box(Some(2)))
         );
         assert_eq!(
-            biop_rv_runner(BinaryOp::Mul, var_exp("arg1"), var_exp("arg2")),
+            biop_rv_runner(BinaryOp::Mul, var_exp("arg1", 0), var_exp("arg2", 1)),
             Ok(RefData::new_box(Some(8)))
         );
         assert_eq!(
-            biop_rv_runner(BinaryOp::Div, var_exp("arg1"), var_exp("arg2")),
+            biop_rv_runner(BinaryOp::Div, var_exp("arg1", 0), var_exp("arg2", 1)),
             Ok(RefData::new_box(Some(2)))
         );
         assert_eq!(
-            biop_rv_runner(BinaryOp::Mod, var_exp("arg1"), var_exp("arg2")),
+            biop_rv_runner(BinaryOp::Mod, var_exp("arg1", 0), var_exp("arg2", 1)),
             Ok(RefData::new_box(Some(0)))
         );
 
         assert_eq!(
-            biop_rv_runner_type(BinaryOp::Eq, var_exp("arg1"), var_exp("arg2"),),
+            biop_rv_runner_type(BinaryOp::Eq, var_exp("arg1", 0), var_exp("arg2", 1),),
             Ok(RefData::new_box(false))
         );
         assert_eq!(
-            biop_rv_runner_type(BinaryOp::Neq, var_exp("arg1"), var_exp("arg2"),),
+            biop_rv_runner_type(BinaryOp::Neq, var_exp("arg1", 0), var_exp("arg2", 1),),
             Ok(RefData::new_box(true))
         );
         assert_eq!(
-            biop_rv_runner(BinaryOp::Lt, var_exp("arg1"), var_exp("arg2")),
+            biop_rv_runner(BinaryOp::Lt, var_exp("arg1", 0), var_exp("arg2", 1)),
             Ok(RefData::new_box(false))
         );
         assert_eq!(
-            biop_rv_runner(BinaryOp::Leq, var_exp("arg1"), var_exp("arg2")),
+            biop_rv_runner(BinaryOp::Leq, var_exp("arg1", 0), var_exp("arg2", 1)),
             Ok(RefData::new_box(false))
         );
         assert_eq!(
-            biop_rv_runner(BinaryOp::Gt, var_exp("arg1"), var_exp("arg2")),
+            biop_rv_runner(BinaryOp::Gt, var_exp("arg1", 0), var_exp("arg2", 1)),
             Ok(RefData::new_box(true))
         );
         assert_eq!(
-            biop_rv_runner(BinaryOp::Geq, var_exp("arg1"), var_exp("arg2")),
+            biop_rv_runner(BinaryOp::Geq, var_exp("arg1", 0), var_exp("arg2", 1)),
             Ok(RefData::new_box(true))
         );
         assert_eq!(
-            biop_rv_runner_type(BinaryOp::BoolAnd, var_exp("arg1"), var_exp("arg2"),),
+            biop_rv_runner_type(BinaryOp::BoolAnd, var_exp("arg1", 0), var_exp("arg2", 1),),
             Ok(RefData::new_box(true))
         );
         assert_eq!(
-            biop_rv_runner_type(BinaryOp::BoolOr, var_exp("arg1"), var_exp("arg2"),),
+            biop_rv_runner_type(BinaryOp::BoolOr, var_exp("arg1", 0), var_exp("arg2", 1),),
             Ok(RefData::new_box(true))
         );
     }

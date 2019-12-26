@@ -2,6 +2,7 @@ use crate::ast::syntax_type::{SimpleSyntaxType, SyntaxType};
 use crate::types::{Bool, Color, Float, Int, PineFrom, PineRef, RefData, Series, NA};
 
 pub fn convert<'a>(val: PineRef<'a>, dest_type: &SyntaxType<'a>) -> PineRef<'a> {
+    println!("dest type {:?}", dest_type);
     match dest_type {
         SyntaxType::Series(SimpleSyntaxType::Bool) => {
             let s: RefData<Series<Bool>> = Series::implicity_from(val).unwrap();

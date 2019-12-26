@@ -157,7 +157,7 @@ impl<'a> RunnerForName<'a> for Assignment<'a> {
         // context.create_declare(name);
 
         // For variable declare with var type, it only need initialize once.
-        if self.var && !context.contains_var_scope(varid) {
+        if self.var && context.contains_var_scope(varid) {
             return Ok(());
         }
         // let val = self.val.rv_run(context)?;
@@ -506,408 +506,470 @@ mod tests {
     use crate::syntax::SyntaxParser;
     use crate::types::RefData;
 
-    // #[test]
-    // fn assignment_test() {
-    //     let test_val = |context: &mut Context, int_val| {
-    //         let val = Int::explicity_from(context.move_var("hello").unwrap());
-    //         assert_eq!(val, Ok(RefData::new_box(Some(int_val))));
-    //         context.update_var("hello", val.unwrap().into_pf());
-    //     };
-    //     let assign1 = Statement::Assignment(Box::new(Assignment::new_no_input(
-    //         vec![VarName::new_no_input("hello")],
-    //         Exp::Num(Numeral::from_i32(12)),
-    //         false,
-    //         None,
-    //     )));
-    //     let assign2 = Statement::Assignment(Box::new(Assignment::new_no_input(
-    //         vec![VarName::new_no_input("hello")],
-    //         Exp::Num(Numeral::from_i32(23)),
-    //         true,
-    //         None,
-    //     )));
-    //     let assign3 = Statement::Assignment(Box::new(Assignment::new_no_input(
-    //         vec![VarName::new_no_input("hello")],
-    //         Exp::Num(Numeral::from_i32(23)),
-    //         false,
-    //         Some(DataType::Int),
-    //     )));
-    //     let mut context = Context::new(None, ContextType::Normal);
-    //     context.create_var("newvar", PineRef::new_box(Some(100)));
+    #[test]
+    fn assignment_test() {
+        let test_val = |context: &mut Context, int_val| {
+            let val = Int::explicity_from(context.move_var(VarIndex::new(1, 0)).unwrap());
+            assert_eq!(val, Ok(RefData::new_box(Some(int_val))));
+            context.update_var(VarIndex::new(1, 0), val.unwrap().into_pf());
+        };
+        let assign1 = Statement::Assignment(Box::new(Assignment::new_with_varids(
+            vec![VarName::new_no_input("hello")],
+            Exp::Num(Numeral::from_i32(12)),
+            false,
+            None,
+            vec![1],
+        )));
+        let assign2 = Statement::Assignment(Box::new(Assignment::new_with_varids(
+            vec![VarName::new_no_input("hello")],
+            Exp::Num(Numeral::from_i32(23)),
+            true,
+            None,
+            vec![1],
+        )));
+        let assign3 = Statement::Assignment(Box::new(Assignment::new_with_varids(
+            vec![VarName::new_no_input("hello")],
+            Exp::Num(Numeral::from_i32(23)),
+            false,
+            Some(DataType::Int),
+            vec![1],
+        )));
+        let mut context = Context::new(None, ContextType::Normal);
+        context.init_vars(vec![
+            Some(PineRef::new_box(Some(100))),
+            Some(PineRef::new_box(Some(1))),
+        ]);
 
-    //     assert_eq!(assign1.st_run(&mut context), Ok(()));
-    //     test_val(&mut context, 12);
+        assert_eq!(assign1.st_run(&mut context), Ok(()));
+        test_val(&mut context, 12);
 
-    //     context.clear_declare();
-    //     assert_eq!(assign2.st_run(&mut context), Ok(()));
-    //     test_val(&mut context, 12);
+        assert_eq!(assign2.st_run(&mut context), Ok(()));
+        test_val(&mut context, 12);
 
-    //     context.clear_declare();
-    //     assert_eq!(assign3.st_run(&mut context), Ok(()));
-    //     test_val(&mut context, 23);
-    // }
+        assert_eq!(assign3.st_run(&mut context), Ok(()));
+        test_val(&mut context, 23);
+    }
 
-    // #[test]
-    // fn rv_assignment_test() {
-    //     let assign = Statement::Assignment(Box::new(Assignment::new_no_input(
-    //         vec![VarName::new_no_input("myvar")],
-    //         Exp::VarName(RVVarName::new_no_range("newvar")),
-    //         false,
-    //         None,
-    //     )));
-    //     let mut context = Context::new(None, ContextType::Normal);
-    //     context.create_var("newvar", PineRef::new_box(Some(100)));
+    #[test]
+    fn rv_assignment_test() {
+        let myvar_index = VarIndex::new(1, 0);
+        let newvar_index = VarIndex::new(0, 0);
+        let assign = Statement::Assignment(Box::new(Assignment::new_with_varids(
+            vec![VarName::new_no_input("myvar")],
+            Exp::VarName(RVVarName::new_with_index("newvar", newvar_index)),
+            false,
+            None,
+            vec![myvar_index.varid],
+        )));
+        let mut context = Context::new(None, ContextType::Normal);
+        context.init_vars(vec![
+            Some(PineRef::new_box(Some(100))), // newvar
+            Some(PineRef::new(Some(1))),       // myvar
+        ]);
 
-    //     assert_eq!(assign.st_run(&mut context), Ok(()));
-    //     let val = Int::explicity_from(context.move_var("myvar").unwrap());
-    //     assert_eq!(val, Ok(RefData::new_box(Some(100))));
-    //     context.update_var("myvar", val.unwrap().into_pf());
-    // }
+        assert_eq!(assign.st_run(&mut context), Ok(()));
+        let val = Int::explicity_from(context.move_var(myvar_index).unwrap());
+        assert_eq!(val, Ok(RefData::new_box(Some(100))));
+        context.update_var(myvar_index, val.unwrap().into_pf());
+    }
 
-    // #[test]
-    // fn tuple_assignment_test() {
-    //     let assign = Statement::Assignment(Box::new(Assignment::new_no_input(
-    //         vec![VarName::new_no_input("var1"), VarName::new_no_input("var2")],
-    //         Exp::Tuple(Box::new(TupleNode::new(
-    //             vec![
-    //                 Exp::VarName(RVVarName::new_no_range("nv1")),
-    //                 Exp::VarName(RVVarName::new_no_range("nv2")),
-    //             ],
-    //             StrRange::new_empty(),
-    //         ))),
-    //         false,
-    //         None,
-    //     )));
-    //     let mut context = Context::new(None, ContextType::Normal);
-    //     context.create_var("nv1", PineRef::new_box(Some(100)));
-    //     context.create_var("nv2", PineRef::new_box(Some(200)));
+    #[test]
+    fn tuple_assignment_test() {
+        let var1_index = VarIndex::new(0, 0);
+        let var2_index = VarIndex::new(1, 0);
+        let nv1_index = VarIndex::new(2, 0);
+        let nv2_index = VarIndex::new(3, 0);
+        let assign = Statement::Assignment(Box::new(Assignment::new_with_varids(
+            vec![VarName::new_no_input("var1"), VarName::new_no_input("var2")],
+            Exp::Tuple(Box::new(TupleNode::new(
+                vec![
+                    Exp::VarName(RVVarName::new_with_index("nv1", nv1_index)),
+                    Exp::VarName(RVVarName::new_with_index("nv2", nv2_index)),
+                ],
+                StrRange::new_empty(),
+            ))),
+            false,
+            None,
+            vec![var1_index.varid, var2_index.varid],
+        )));
+        let mut context = Context::new(None, ContextType::Normal);
+        context.init(4, 0);
+        context.create_var(nv1_index.varid, PineRef::new_box(Some(100)));
+        context.create_var(nv2_index.varid, PineRef::new_box(Some(200)));
 
-    //     assert_eq!(assign.st_run(&mut context), Ok(()));
-    //     assert_eq!(
-    //         Int::explicity_from(context.move_var("var1").unwrap()),
-    //         Ok(RefData::new_box(Some(100)))
-    //     );
-    //     assert_eq!(
-    //         Int::explicity_from(context.move_var("var2").unwrap()),
-    //         Ok(RefData::new_box(Some(200)))
-    //     );
-    // }
+        assert_eq!(assign.st_run(&mut context), Ok(()));
+        assert_eq!(
+            Int::explicity_from(context.move_var(var1_index).unwrap()),
+            Ok(RefData::new_box(Some(100)))
+        );
+        assert_eq!(
+            Int::explicity_from(context.move_var(var2_index).unwrap()),
+            Ok(RefData::new_box(Some(200)))
+        );
+    }
 
-    // fn check_val<'a>(context: &mut dyn Ctx<'a>, varname: &'static str, val: Int) {
-    //     let res: RefData<Series<Int>> =
-    //         Series::explicity_from(context.move_var(varname).unwrap()).unwrap();
-    //     let series: Series<Int> = Series::from(val);
-    //     let expect_val: RefData<Series<Int>> = RefData::new_rc(series);
-    //     assert_eq!(res, expect_val);
-    //     context.update_var("myvar", res.into_pf());
-    // }
+    fn check_val<'a>(context: &mut dyn Ctx<'a>, var_index: VarIndex, val: Int) {
+        let res: RefData<Series<Int>> =
+            Series::explicity_from(context.move_var(var_index).unwrap()).unwrap();
+        let series: Series<Int> = Series::from(val);
+        let expect_val: RefData<Series<Int>> = RefData::new_rc(series);
+        assert_eq!(res, expect_val);
+        context.update_var(var_index, res.into_pf());
+    }
 
-    // #[test]
-    // fn series_assignment_test() {
-    //     let assign = Statement::Assignment(Box::new(Assignment::new_no_input(
-    //         vec![VarName::new_no_input("myvar")],
-    //         Exp::VarName(RVVarName::new_no_range("newvar")),
-    //         false,
-    //         None,
-    //     )));
-    //     let mut context = Context::new(None, ContextType::Normal);
-    //     context.create_var("newvar", PineRef::new_rc(Series::from(Some(100))));
+    #[test]
+    fn series_assignment_test() {
+        let myvar_index = VarIndex::new(0, 0);
+        let newvar_index = VarIndex::new(1, 0);
+        let assign = Statement::Assignment(Box::new(Assignment::new_with_varids(
+            vec![VarName::new_no_input("myvar")],
+            Exp::VarName(RVVarName::new_with_index("newvar", newvar_index)),
+            false,
+            None,
+            vec![myvar_index.varid],
+        )));
+        let mut context = Context::new(None, ContextType::Normal);
+        context.init(2, 0);
+        context.create_var(newvar_index.varid, PineRef::new_rc(Series::from(Some(100))));
 
-    //     assert_eq!(assign.st_run(&mut context), Ok(()));
-    //     check_val(&mut context, "myvar", Some(100));
-    //     context.commit();
+        assert_eq!(assign.st_run(&mut context), Ok(()));
+        check_val(&mut context, myvar_index, Some(100));
+        context.commit();
 
-    //     context.clear_declare();
-    //     context.create_var("newvar", PineRef::new_rc(Series::from(Some(100))));
-    //     assert_eq!(assign.st_run(&mut context), Ok(()));
+        context.create_var(newvar_index.varid, PineRef::new_rc(Series::from(Some(100))));
+        assert_eq!(assign.st_run(&mut context), Ok(()));
 
-    //     let val: RefData<Series<Int>> =
-    //         Series::explicity_from(context.move_var("myvar").unwrap()).unwrap();
-    //     let mut dest_s = RefData::new_rc(Series::from_vec(vec![Some(100)]));
-    //     dest_s.update(Some(100));
-    //     assert_eq!(val, dest_s);
-    //     context.update_var("myvar", val.into_pf());
-    // }
+        let val: RefData<Series<Int>> =
+            Series::explicity_from(context.move_var(myvar_index).unwrap()).unwrap();
+        let mut dest_s = RefData::new_rc(Series::from_vec(vec![Some(100)]));
+        dest_s.update(Some(100));
+        assert_eq!(val, dest_s);
+        context.update_var(myvar_index, val.into_pf());
+    }
 
-    // #[test]
-    // fn var_assignment_test() {
-    //     let assign1 = VarAssignment::new_no_input(
-    //         VarName::new_no_input("hello"),
-    //         Exp::Num(Numeral::from_i32(24)),
-    //     );
-    //     let assign2 = VarAssignment::new_no_input(
-    //         VarName::new_no_input("hello"),
-    //         Exp::Num(Numeral::from_i32(36)),
-    //     );
-    //     let assign3 = VarAssignment::new_no_input(
-    //         VarName::new_no_input("hello"),
-    //         Exp::VarName(RVVarName::new_no_range("newvar")),
-    //     );
+    #[test]
+    fn var_assignment_test() {
+        let hello_index = VarIndex::new(0, 0);
+        let newvar_index = VarIndex::new(1, 0);
+        let assign1 = VarAssignment::new_with_index(
+            VarName::new_no_input("hello"),
+            Exp::Num(Numeral::from_i32(24)),
+            hello_index,
+        );
+        let assign2 = VarAssignment::new_with_index(
+            VarName::new_no_input("hello"),
+            Exp::Num(Numeral::from_i32(36)),
+            hello_index,
+        );
+        let assign3 = VarAssignment::new_with_index(
+            VarName::new_no_input("hello"),
+            Exp::VarName(RVVarName::new_with_index("newvar", newvar_index)),
+            hello_index,
+        );
 
-    //     let mut context = Context::new(None, ContextType::Normal);
-    //     context.create_var("hello", PineRef::new_box(Some(12)));
-    //     context.create_var("newvar", PineRef::new_box(Some(100)));
-    //     context.create_declare("hello");
+        let mut context = Context::new(None, ContextType::Normal);
+        context.init_vars(vec![
+            Some(PineRef::new_box(Some(12))),
+            Some(PineRef::new_box(Some(100))),
+        ]);
 
-    //     let test_val = |context: &mut Context, int_val| {
-    //         let s: RefData<Series<Int>> =
-    //             Series::implicity_from(context.move_var("hello").unwrap()).unwrap();
-    //         assert_eq!(s, RefData::new_rc(Series::from(Some(int_val))));
-    //         context.update_var("hello", s.into_pf());
-    //     };
-    //     assert_eq!(assign1.st_run(&mut context), Ok(()));
-    //     test_val(&mut context, 24);
+        let test_val = |context: &mut Context, int_val| {
+            let s: RefData<Series<Int>> =
+                Series::implicity_from(context.move_var(hello_index).unwrap()).unwrap();
+            assert_eq!(s, RefData::new_rc(Series::from(Some(int_val))));
+            context.update_var(hello_index, s.into_pf());
+        };
+        assert_eq!(assign1.st_run(&mut context), Ok(()));
+        test_val(&mut context, 24);
 
-    //     assert_eq!(assign2.st_run(&mut context), Ok(()));
-    //     test_val(&mut context, 36);
+        assert_eq!(assign2.st_run(&mut context), Ok(()));
+        test_val(&mut context, 36);
 
-    //     assert_eq!(assign3.st_run(&mut context), Ok(()));
-    //     test_val(&mut context, 100);
-    // }
+        assert_eq!(assign3.st_run(&mut context), Ok(()));
+        test_val(&mut context, 100);
+    }
 
-    // #[test]
-    // fn if_then_else_test() {
-    //     let mut ite = IfThenElse::new_no_ctxid(
-    //         Exp::VarName(RVVarName::new_no_range("cond")),
-    //         Block::new_no_input(vec![], Some(Exp::VarName(RVVarName::new_no_range("then")))),
-    //         Some(Block::new_no_input(
-    //             vec![],
-    //             Some(Exp::VarName(RVVarName::new_no_range("else"))),
-    //         )),
-    //         StrRange::new_empty(),
-    //     );
-    //     // ite.result_type = SyntaxType::Series(SimpleSyntaxType::Int);
-    //     SyntaxParser::new_with_vars(
-    //         [
-    //             ("cond", SyntaxType::Simple(SimpleSyntaxType::Bool)),
-    //             ("then", SyntaxType::Simple(SimpleSyntaxType::Int)),
-    //             ("else", SyntaxType::Simple(SimpleSyntaxType::Int)),
-    //         ]
-    //         .iter()
-    //         .cloned()
-    //         .collect(),
-    //     )
-    //     .parse_ifthenelse_exp(&mut ite)
-    //     .unwrap();
-    //     let mut context = Context::new(None, ContextType::Normal);
-    //     context.create_var("cond", PineRef::new_box(true));
-    //     context.create_var("then", PineRef::new_box(Some(2)));
-    //     context.create_var("else", PineRef::new_box(Some(4)));
+    #[test]
+    fn if_then_else_test() {
+        let mut ite = IfThenElse::new_no_ctxid(
+            Exp::VarName(RVVarName::new_no_range("cond")),
+            Block::new_no_input(vec![], Some(Exp::VarName(RVVarName::new_no_range("then")))),
+            Some(Block::new_no_input(
+                vec![],
+                Some(Exp::VarName(RVVarName::new_no_range("else"))),
+            )),
+            StrRange::new_empty(),
+        );
+        // ite.result_type = SyntaxType::Series(SimpleSyntaxType::Int);
+        SyntaxParser::new_with_vars(
+            [
+                ("cond", SyntaxType::Simple(SimpleSyntaxType::Bool)),
+                ("then", SyntaxType::Simple(SimpleSyntaxType::Int)),
+                ("else", SyntaxType::Simple(SimpleSyntaxType::Int)),
+            ]
+            .iter()
+            .cloned()
+            .collect(),
+        )
+        .parse_ifthenelse_exp(&mut ite)
+        .unwrap();
+        let mut context = Context::new(None, ContextType::Normal);
+        context.init_vars(vec![
+            Some(PineRef::new_box(true)),
+            Some(PineRef::new_box(Some(2))),
+            Some(PineRef::new_box(Some(4))),
+        ]);
+        context.init_sub_contexts(vec![None, None]);
 
-    //     assert_eq!(
-    //         downcast_pf::<Series<Int>>(ite.run(&mut context).unwrap()),
-    //         Ok(RefData::new_rc(Series::from(Some(2))))
-    //     );
-    //     // If-Then-Else Run as statement
-    //     assert_eq!(ite.st_run(&mut context), Ok(()));
-    // }
+        assert_eq!(
+            downcast_pf::<Series<Int>>(ite.run(&mut context).unwrap()),
+            Ok(RefData::new_rc(Series::from(Some(2))))
+        );
+        // If-Then-Else Run as statement
+        assert_eq!(ite.st_run(&mut context), Ok(()));
+    }
 
-    // #[test]
-    // fn for_range_test() {
-    //     use crate::syntax::SyntaxParser;
+    #[test]
+    fn for_range_test() {
+        use crate::syntax::SyntaxParser;
 
-    //     let assign = Statement::Assignment(Box::new(Assignment::new_no_input(
-    //         vec![VarName::new_no_input("a")],
-    //         Exp::Num(Numeral::from_i32(1)),
-    //         false,
-    //         None,
-    //     )));
-    //     let block = Block::new_no_input(vec![assign], Some(Exp::Num(Numeral::from_i32(10))));
-    //     let mut for_range = ForRange::new_no_ctxid(
-    //         VarName::new_no_input("i"),
-    //         Exp::Num(Numeral::from_i32(1)),
-    //         Exp::Num(Numeral::from_i32(10)),
-    //         None,
-    //         block,
-    //         StrRange::new_empty(),
-    //     );
-    //     SyntaxParser::new()
-    //         .parse_forrange_exp(&mut for_range)
-    //         .unwrap();
+        let assign = Statement::Assignment(Box::new(Assignment::new_no_input(
+            vec![VarName::new_no_input("a")],
+            Exp::Num(Numeral::from_i32(1)),
+            false,
+            None,
+        )));
+        let block = Block::new_no_input(vec![assign], Some(Exp::Num(Numeral::from_i32(10))));
+        let mut for_range = ForRange::new_no_ctxid(
+            VarName::new_no_input("i"),
+            Exp::Num(Numeral::from_i32(1)),
+            Exp::Num(Numeral::from_i32(10)),
+            None,
+            block,
+            StrRange::new_empty(),
+        );
+        SyntaxParser::new()
+            .parse_forrange_exp(&mut for_range)
+            .unwrap();
 
-    //     let mut context = Context::new(None, ContextType::Normal);
+        let mut context = Context::new(None, ContextType::Normal);
+        context.init(0, 1);
 
-    //     let result = Runner::run(&for_range, &mut context);
-    //     assert!(result.is_ok());
+        let result = Runner::run(&for_range, &mut context);
+        assert!(result.is_ok());
 
-    //     assert_eq!(
-    //         downcast_pf::<Series<Int>>(result.unwrap()),
-    //         Ok(RefData::new_rc(Series::from(Some(10))))
-    //     );
-    //     assert!(context.move_var("a").is_none());
-    // }
+        assert_eq!(
+            downcast_pf::<Series<Int>>(result.unwrap()),
+            Ok(RefData::new_rc(Series::from(Some(10))))
+        );
+        // assert!(context.move_var(VarIndex::new(1, 0)).is_none());
+    }
 
-    // #[test]
-    // fn for_range_exp_test() {
-    //     let assign = Statement::Assignment(Box::new(Assignment::new_no_input(
-    //         vec![VarName::new_no_input("a")],
-    //         Exp::Num(Numeral::from_i32(1)),
-    //         false,
-    //         None,
-    //     )));
-    //     let block = Block::new_no_input(vec![assign], Some(Exp::Num(Numeral::from_i32(10))));
-    //     let for_range = ForRange::new_no_ctxid(
-    //         VarName::new_no_input("i"),
-    //         Exp::VarName(RVVarName::new_no_range("start")),
-    //         Exp::VarName(RVVarName::new_no_range("end")),
-    //         Some(Exp::VarName(RVVarName::new_no_range("step"))),
-    //         block,
-    //         StrRange::new_empty(),
-    //     );
+    #[test]
+    fn for_range_exp_test() {
+        let assign = Statement::Assignment(Box::new(Assignment::new_with_varids(
+            vec![VarName::new_no_input("a")],
+            Exp::Num(Numeral::from_i32(1)),
+            false,
+            None,
+            vec![1],
+        )));
+        let block =
+            Block::new_with_count(vec![assign], Some(Exp::Num(Numeral::from_i32(10))), 2, 0);
+        let for_range = ForRange::new_with_ctxid(
+            VarName::new_no_input("i"),
+            Exp::VarName(RVVarName::new_with_index("start", VarIndex::new(0, 0))),
+            Exp::VarName(RVVarName::new_with_index("end", VarIndex::new(1, 0))),
+            Some(Exp::VarName(RVVarName::new_with_index(
+                "step",
+                VarIndex::new(2, 0),
+            ))),
+            block,
+            StrRange::new_empty(),
+            0,
+            SyntaxType::Simple(SimpleSyntaxType::Int),
+        );
 
-    //     let mut context = Context::new(None, ContextType::Normal);
-    //     context.create_var("start", PineRef::new(Some(1)));
-    //     context.create_var("end", PineRef::new(Some(10)));
-    //     context.create_var("step", PineRef::new(Some(5)));
+        let mut context = Context::new(None, ContextType::Normal);
+        context.init(3, 1);
+        context.create_var(0, PineRef::new(Some(1)));
+        context.create_var(1, PineRef::new(Some(10)));
+        context.create_var(2, PineRef::new(Some(5)));
 
-    //     let result = Runner::run(&for_range, &mut context);
-    //     assert!(result.is_ok());
+        let result = Runner::run(&for_range, &mut context);
+        assert!(result.is_ok());
 
-    //     assert_eq!(
-    //         Int::implicity_from(result.unwrap()),
-    //         Ok(RefData::new_box(Some(10)))
-    //     );
+        assert_eq!(
+            Int::implicity_from(result.unwrap()),
+            Ok(RefData::new_box(Some(10)))
+        );
 
-    //     assert!(context.move_var("a").is_none());
-    // }
+        // assert!(context.move_var("a").is_none());
+    }
 
-    // #[test]
-    // fn func_call_exp_test() {
-    //     use std::collections::HashMap;
-    //     let exp = FunctionCall::new_no_ctxid(
-    //         Exp::VarName(RVVarName::new_no_range("name")),
-    //         vec![Exp::Bool(BoolNode::new_no_range(true))],
-    //         vec![],
-    //         StrRange::new_empty(),
-    //     );
-    //     let mut context = Context::new(None, ContextType::Normal);
+    #[test]
+    fn func_call_exp_test() {
+        let exp = FunctionCall::new_no_ctxid(
+            Exp::VarName(RVVarName::new_with_index("name", VarIndex::new(0, 0))),
+            vec![Exp::Bool(BoolNode::new_no_range(true))],
+            vec![],
+            StrRange::new_empty(),
+        );
+        let mut context = Context::new(None, ContextType::Normal);
 
-    //     fn test_func<'a>(
-    //         _context: &mut dyn Ctx<'a>,
-    //         mut h: HashMap<&'a str, PineRef<'a>>,
-    //     ) -> Result<PineRef<'a>, RuntimeErr> {
-    //         match h.remove("arg") {
-    //             None => Err(RuntimeErr::NotValidParam),
-    //             Some(arg) => Ok(arg),
-    //         }
-    //     }
+        fn test_func<'a>(
+            _context: &mut dyn Ctx<'a>,
+            h: Vec<Option<PineRef<'a>>>,
+        ) -> Result<PineRef<'a>, RuntimeErr> {
+            match &h[0] {
+                None => Err(RuntimeErr::NotValidParam),
+                Some(arg) => Ok(arg.clone()),
+            }
+        }
 
-    //     context.create_var(
-    //         "name",
-    //         PineRef::new_rc(Callable::new(Some(test_func), None, vec!["arg"])),
-    //     );
+        context.init(1, 1);
+        context.init_vars(vec![Some(PineRef::new_rc(Callable::new(
+            Some(test_func),
+            None,
+            vec!["arg"],
+        )))]);
 
-    //     let res = downcast_pf::<Bool>(exp.run(&mut context).unwrap()).unwrap();
-    //     assert_eq!(res, RefData::new_box(true));
-    // }
+        let res = downcast_pf::<Bool>(exp.run(&mut context).unwrap()).unwrap();
+        assert_eq!(res, RefData::new_box(true));
+    }
 
-    // #[test]
-    // fn func_call_exp2_test() {
-    //     use crate::ast::stat_expr_types::Exp;
+    #[test]
+    fn func_call_exp2_test() {
+        use crate::ast::stat_expr_types::Exp;
+        let name_index = VarIndex::new(0, 0);
+        let series_index = VarIndex::new(1, 0);
 
-    //     let exp = FunctionCall::new_no_ctxid(
-    //         Exp::VarName(RVVarName::new_no_range("name")),
-    //         vec![Exp::Bool(BoolNode::new_no_range(true))],
-    //         vec![],
-    //         StrRange::new_empty(),
-    //     );
-    //     let series_exp = FunctionCall::new_no_ctxid(
-    //         Exp::VarName(RVVarName::new_no_range("name")),
-    //         vec![Exp::VarName(RVVarName::new_no_range("series"))],
-    //         vec![],
-    //         StrRange::new_empty(),
-    //     );
-    //     let def_exp = FunctionDef::new(
-    //         VarName::new_no_input("name"),
-    //         vec![VarName::new_no_input("arg")],
-    //         Block::new(
-    //             vec![],
-    //             Some(Exp::VarName(RVVarName::new_no_range("arg"))),
-    //             StrRange::new_empty(),
-    //         ),
-    //         StrRange::new_empty(),
-    //     );
-    //     let mut context = Context::new(None, ContextType::Normal);
-    //     context.create_var("name", PineRef::new_rc(Function::new(&def_exp)));
+        let exp = FunctionCall::new_no_ctxid(
+            Exp::VarName(RVVarName::new_with_index("name", name_index)),
+            vec![Exp::Bool(BoolNode::new_no_range(true))],
+            vec![],
+            StrRange::new_empty(),
+        );
+        let series_exp = FunctionCall::new_no_ctxid(
+            Exp::VarName(RVVarName::new_with_index("name", name_index)),
+            vec![Exp::VarName(RVVarName::new_with_index(
+                "series",
+                series_index,
+            ))],
+            vec![],
+            StrRange::new_empty(),
+        );
+        let def_exp = FunctionDef::new(
+            VarName::new_no_input("name"),
+            vec![VarName::new_no_input("arg")],
+            Block::new_with_count(
+                vec![],
+                Some(Exp::VarName(RVVarName::new_with_index(
+                    "arg",
+                    VarIndex::new(0, 0),
+                ))),
+                2,
+                0,
+            ),
+            StrRange::new_empty(),
+        );
+        let mut context = Context::new(None, ContextType::Normal);
+        context.init(2, 2);
+        context.create_var(name_index.varid, PineRef::new_rc(Function::new(&def_exp)));
 
-    //     let res = downcast_pf::<Bool>(exp.run(&mut context).unwrap()).unwrap();
-    //     assert_eq!(res, RefData::new_box(true));
+        let res = downcast_pf::<Bool>(exp.run(&mut context).unwrap()).unwrap();
+        assert_eq!(res, RefData::new_box(true));
 
-    //     let subctx = context
-    //         .get_sub_context(&(String::from("@") + &exp.ctxid.to_string()))
-    //         .unwrap();
-    //     assert_eq!(
-    //         downcast_ctx(&mut **subctx).unwrap().move_var("arg"),
-    //         Some(PineRef::new_box(true))
-    //     );
+        let subctx = context.get_sub_context(0).unwrap();
+        assert_eq!(
+            downcast_ctx(&mut **subctx).move_var(VarIndex::new(0, 0)),
+            Some(PineRef::new_box(true))
+        );
 
-    //     context.create_var("series", PineRef::new_rc(Series::from(Some(10))));
-    //     // println!("{:?}", context.move_var("series"));
-    //     assert_eq!(
-    //         series_exp.run(&mut context).unwrap(),
-    //         PineRef::new(Series::from(Some(10)))
-    //     );
-    //     context.commit();
-    //     context.update_var("series", PineRef::new_rc(Series::from(Some(100))));
+        context.create_var(series_index.varid, PineRef::new_rc(Series::from(Some(10))));
+        // println!("{:?}", context.move_var("series"));
+        assert_eq!(
+            series_exp.run(&mut context).unwrap(),
+            PineRef::new(Series::from(Some(10)))
+        );
+        context.commit();
+        context.update_var(series_index, PineRef::new_rc(Series::from(Some(100))));
 
-    //     assert_eq!(
-    //         series_exp.run(&mut context).unwrap(),
-    //         PineRef::new(Series::from_cur_history(Some(100), vec![Some(10)]))
-    //     );
-    // }
+        assert_eq!(
+            series_exp.run(&mut context).unwrap(),
+            PineRef::new(Series::from_cur_history(Some(100), vec![Some(10)]))
+        );
+    }
 
-    // #[test]
-    // fn for_range_break_test() {
-    //     let block = Block::new_no_input(
-    //         vec![Statement::Break(StrRange::new_empty())],
-    //         Some(Exp::VarName(RVVarName::new_no_range("i"))),
-    //     );
-    //     let for_range = ForRange::new_no_ctxid(
-    //         VarName::new_no_input("i"),
-    //         Exp::Num(Numeral::from_i32(1)),
-    //         Exp::Num(Numeral::from_i32(10)),
-    //         None,
-    //         block,
-    //         StrRange::new_empty(),
-    //     );
+    #[test]
+    fn for_range_break_test() {
+        let block = Block::new_with_count(
+            vec![Statement::Break(StrRange::new_empty())],
+            Some(Exp::VarName(RVVarName::new_with_index(
+                "i",
+                VarIndex::new(0, 0),
+            ))),
+            1,
+            0,
+        );
+        let for_range = ForRange::new_with_ctxid(
+            VarName::new_no_input("i"),
+            Exp::Num(Numeral::from_i32(1)),
+            Exp::Num(Numeral::from_i32(10)),
+            None,
+            block,
+            StrRange::new_empty(),
+            0,
+            SyntaxType::Simple(SimpleSyntaxType::Int),
+        );
 
-    //     let mut context = Context::new(None, ContextType::Normal);
+        let mut context = Context::new(None, ContextType::Normal);
+        context.init(0, 1);
 
-    //     let result = Runner::run(&for_range, &mut context);
-    //     assert!(result.is_ok());
+        let result = Runner::run(&for_range, &mut context);
+        assert!(result.is_ok());
 
-    //     assert_eq!(
-    //         Int::implicity_from(result.unwrap()),
-    //         Ok(RefData::new_box(Some(1)))
-    //     );
+        assert_eq!(
+            Int::implicity_from(result.unwrap()),
+            Ok(RefData::new_box(Some(1)))
+        );
 
-    //     assert!(context.move_var("a").is_none());
-    // }
+        // assert!(context.move_var("a").is_none());
+    }
 
-    // #[test]
-    // fn for_range_continue_test() {
-    //     let block = Block::new_no_input(
-    //         vec![Statement::Continue(StrRange::new_empty())],
-    //         Some(Exp::VarName(RVVarName::new_no_range("i"))),
-    //     );
-    //     let for_range = ForRange::new_no_ctxid(
-    //         VarName::new_no_input("i"),
-    //         Exp::Num(Numeral::from_i32(1)),
-    //         Exp::Num(Numeral::from_i32(10)),
-    //         None,
-    //         block,
-    //         StrRange::new_empty(),
-    //     );
+    #[test]
+    fn for_range_continue_test() {
+        let block = Block::new_with_count(
+            vec![Statement::Continue(StrRange::new_empty())],
+            Some(Exp::VarName(RVVarName::new_with_index(
+                "i",
+                VarIndex::new(0, 0),
+            ))),
+            1,
+            0,
+        );
+        let for_range = ForRange::new_with_ctxid(
+            VarName::new_no_input("i"),
+            Exp::Num(Numeral::from_i32(1)),
+            Exp::Num(Numeral::from_i32(10)),
+            None,
+            block,
+            StrRange::new_empty(),
+            0,
+            SyntaxType::Simple(SimpleSyntaxType::Int),
+        );
 
-    //     let mut context = Context::new(None, ContextType::Normal);
+        let mut context = Context::new(None, ContextType::Normal);
+        context.init(0, 1);
 
-    //     let result = Runner::run(&for_range, &mut context);
-    //     assert!(result.is_ok());
+        let result = Runner::run(&for_range, &mut context);
+        assert!(result.is_ok());
 
-    //     assert_eq!(
-    //         Int::implicity_from(result.unwrap()),
-    //         Ok(RefData::new_box(Some(9)))
-    //     );
+        assert_eq!(
+            Int::implicity_from(result.unwrap()),
+            Ok(RefData::new_box(Some(9)))
+        );
 
-    //     assert!(context.move_var("a").is_none());
-    // }
+        // assert!(context.move_var("a").is_none());
+    }
 }

@@ -172,16 +172,30 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
         self.sub_contexts = sub_contexts;
     }
 
+    pub fn init(&mut self, var_count: i32, subctx_count: i32) {
+        let mut vars: Vec<Option<PineRef<'a>>> = Vec::with_capacity(var_count as usize);
+        vars.resize(var_count as usize, None);
+        self.init_vars(vars);
+
+        let ctx_count = subctx_count as usize;
+        let mut ctxs: Vec<Option<Box<dyn 'c + Ctx<'a>>>> = Vec::with_capacity(ctx_count);
+        ctxs.resize_with(ctx_count, || None);
+        self.init_sub_contexts(ctxs);
+    }
+
     pub fn create_sub_context(
         &'c mut self,
         index: i32,
         t: ContextType,
+        var_count: i32,
+        subctx_count: i32,
     ) -> &mut Box<dyn Ctx<'a> + 'c>
     where
         'a: 'c,
         'b: 'c,
     {
         let mut subctx = Box::new(Context::new(None, t));
+        subctx.init(var_count, subctx_count);
         unsafe {
             // Force the &Context to &mut Context to prevent the rust's borrow checker
             // When the sub context borrow the parent context, the parent context should not
@@ -209,14 +223,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
     where
         F: Fn(Option<PineRef<'a>>) -> Option<PineRef<'a>>,
     {
-        let mut dest_ctx: &mut dyn Ctx<'a> = self;
-        let mut rel_ctx = index.rel_ctx;
-        debug_assert!(rel_ctx >= 0);
-        while rel_ctx > 0 {
-            dest_ctx = *downcast_ctx(dest_ctx).parent.as_mut().unwrap();
-            rel_ctx -= 1;
-        }
-        let context = downcast_ctx(dest_ctx);
+        let context = downcast_ctx(self.get_subctx_mut(index));
         let val = mem::replace(&mut context.vars[index.varid as usize], None);
         if let Some(ret_val) = f(val) {
             context.vars[index.varid as usize] = Some(ret_val);
@@ -292,6 +299,28 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
     pub fn update_sub_context(&mut self, index: i32, subctx: Box<dyn Ctx<'a> + 'c>) {
         self.sub_contexts[index as usize] = Some(subctx);
     }
+
+    pub fn get_subctx_mut(&mut self, index: VarIndex) -> &mut dyn Ctx<'a> {
+        let mut dest_ctx: &mut dyn Ctx<'a> = self;
+        let mut rel_ctx = index.rel_ctx;
+        debug_assert!(rel_ctx >= 0);
+        while rel_ctx > 0 {
+            dest_ctx = *downcast_ctx(dest_ctx).parent.as_mut().unwrap();
+            rel_ctx -= 1;
+        }
+        dest_ctx
+    }
+
+    pub fn get_subctx(&self, index: VarIndex) -> &dyn Ctx<'a> {
+        let mut dest_ctx: &dyn Ctx<'a> = self;
+        let mut rel_ctx = index.rel_ctx;
+        debug_assert!(rel_ctx >= 0);
+        while rel_ctx > 0 {
+            dest_ctx = *downcast_ctx_const(dest_ctx).parent.as_ref().unwrap();
+            rel_ctx -= 1;
+        }
+        dest_ctx
+    }
 }
 
 impl<'a, 'b, 'c> VarOperate<'a> for Context<'a, 'b, 'c> {
@@ -300,27 +329,15 @@ impl<'a, 'b, 'c> VarOperate<'a> for Context<'a, 'b, 'c> {
     }
 
     fn update_var(&mut self, index: VarIndex, val: PineRef<'a>) {
-        let mut dest_ctx: &mut dyn Ctx<'a> = self;
-        let mut rel_ctx = index.rel_ctx;
-        debug_assert!(rel_ctx >= 0);
-        while rel_ctx > 0 {
-            dest_ctx = *downcast_ctx(dest_ctx).parent.as_mut().unwrap();
-            rel_ctx -= 1;
-        }
+        let dest_ctx = downcast_ctx(self.get_subctx_mut(index));
         downcast_ctx(dest_ctx).vars[index.varid as usize] = Some(val);
     }
 
     // Move the value for the specific name from this context or the parent context.
     fn move_var(&mut self, index: VarIndex) -> Option<PineRef<'a>> {
         // Insert the temporary NA into the name and move the original value out.
-        let mut dest_ctx: &mut dyn Ctx<'a> = self;
-        let mut rel_ctx = index.rel_ctx;
-        debug_assert!(rel_ctx >= 0);
-        while rel_ctx > 0 {
-            dest_ctx = *downcast_ctx(dest_ctx).parent.as_mut().unwrap();
-            rel_ctx -= 1;
-        }
-        mem::replace(&mut self.vars[index.varid as usize], None)
+        let dest_ctx = downcast_ctx(self.get_subctx_mut(index));
+        mem::replace(&mut dest_ctx.vars[index.varid as usize], None)
     }
 
     fn var_len(&self) -> i32 {
@@ -334,13 +351,7 @@ impl<'a, 'b, 'c> Ctx<'a> for Context<'a, 'b, 'c> {
     }
 
     fn contains_var(&self, index: VarIndex) -> bool {
-        let mut dest_ctx: &dyn Ctx<'a> = self;
-        let mut rel_ctx = index.rel_ctx;
-        debug_assert!(rel_ctx >= 0);
-        while rel_ctx > 0 {
-            dest_ctx = *downcast_ctx_const(dest_ctx).parent.as_ref().unwrap();
-            rel_ctx -= 1;
-        }
+        let dest_ctx = self.get_subctx(index);
         downcast_ctx_const(dest_ctx).vars[index.varid as usize].is_some()
     }
 

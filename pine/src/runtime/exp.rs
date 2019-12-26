@@ -305,6 +305,7 @@ mod tests {
         )
         .parse_condition(&mut cond_exp)
         .unwrap();
+        println!("cond exp {:?}", cond_exp);
         let mut context = Context::new(None, ContextType::Normal);
         context.init_vars(vec![
             Some(PineRef::new_box(true)),

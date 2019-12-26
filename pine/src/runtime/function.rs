@@ -74,6 +74,14 @@ impl<'a> Function<'a> {
         }
         self.def.body.run(context)
     }
+
+    pub fn get_var_count(&self) -> i32 {
+        self.def.get_var_count()
+    }
+
+    pub fn get_subctx_count(&self) -> i32 {
+        self.def.get_subctx_count()
+    }
 }
 
 #[cfg(test)]

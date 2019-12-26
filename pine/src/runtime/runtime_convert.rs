@@ -39,7 +39,6 @@ pub fn convert<'a>(val: PineRef<'a>, dest_type: &SyntaxType<'a>) -> PineRef<'a> 
         SyntaxType::Simple(SimpleSyntaxType::String) => {
             String::implicity_from(val).unwrap().into_pf()
         }
-        // _ => unreachable!()
-        _ => val,
+        _ => unreachable!(), // _ => val,
     }
 }

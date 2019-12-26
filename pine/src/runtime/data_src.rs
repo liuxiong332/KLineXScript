@@ -8,7 +8,7 @@ use std::collections::HashMap;
 pub trait Callback {
     fn print(&self, _str: String) {}
 
-    fn plot(&self, floats: Vec<f64>) {}
+    fn plot(&self, _floats: Vec<f64>) {}
 }
 
 pub struct DataSrc<'a, 'b, 'c> {
@@ -37,14 +37,7 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
         callback: &'a dyn Callback,
     ) -> DataSrc<'a, 'b, 'c> {
         let mut context = Context::new_with_callback(callback);
-        let mut vars: Vec<Option<PineRef<'a>>> = Vec::with_capacity(blk.var_count as usize);
-        vars.resize(blk.var_count as usize, None);
-        context.init_vars(vars);
-
-        let ctx_count = blk.subctx_count as usize;
-        let mut ctxs: Vec<Option<Box<dyn 'c + Ctx<'a>>>> = Vec::with_capacity(ctx_count);
-        ctxs.resize_with(ctx_count, || None);
-        context.init_sub_contexts(ctxs);
+        context.init(blk.var_count, blk.subctx_count);
 
         for (i, (_k, v)) in lib_vars.into_iter().enumerate() {
             context.create_var(i as i32, v);
@@ -63,12 +56,12 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
     ) -> Result<(), PineRuntimeError> {
         for i in 0..len {
             // Extract data into context
-            for (i, (_k, v)) in data.iter().enumerate() {
-                let index = VarIndex::new(i as i32, 0);
-                let series = self.context.move_var(index).unwrap();
+            for (index, (_k, v)) in data.iter().enumerate() {
+                let var_index = VarIndex::new(index as i32, 0);
+                let series = self.context.move_var(var_index).unwrap();
                 let mut float_s: RefData<Series<Float>> = Series::implicity_from(series).unwrap();
                 float_s.update(v[i]);
-                self.context.update_var(index, float_s.into_pf());
+                self.context.update_var(var_index, float_s.into_pf());
             }
             self.blk.run(&mut self.context)?;
             self.context.commit();
@@ -85,7 +78,7 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
         let len = get_len(&data)?;
 
         // Create variable from the hash map
-        for (i, (k, _)) in data.iter().enumerate() {
+        for (i, (_, _)) in data.iter().enumerate() {
             let s: Series<Float> = Series::new();
             self.context.create_var(i as i32, PineRef::new_rc(s));
         }
@@ -109,7 +102,7 @@ mod tests {
     use crate::ast::name::VarName;
     use crate::ast::stat_expr_types::{Assignment, Exp, RVVarName, Statement};
     use crate::ast::syntax_type::{SimpleSyntaxType, SyntaxType};
-    use crate::syntax::SyntaxParser;
+    use crate::syntax::{ParseValue, SyntaxParser};
 
     struct MyCallback;
     impl Callback for MyCallback {}
@@ -127,11 +120,16 @@ mod tests {
             None,
             StrRange::from_start("hello=close", Position::new(0, 0)),
         );
-        let mut typemap: HashMap<&str, SyntaxType> = HashMap::new();
-        typemap.insert("close", SyntaxType::Series(SimpleSyntaxType::Float));
-        SyntaxParser::new_with_vars(typemap);
+        let mut typemap = vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))];
+        assert_eq!(
+            SyntaxParser::new_with_vars(typemap).parse_blk(&mut blk),
+            Ok(ParseValue::new_with_type(SyntaxType::Void))
+        );
+        assert_eq!(blk.var_count, 2);
+        assert_eq!(blk.subctx_count, 0);
 
         let mut datasrc = DataSrc::new(&mut blk, HashMap::new(), &MyCallback);
+        assert_eq!(datasrc.context.var_len(), 2);
 
         let mut data = HashMap::new();
         data.insert("close", vec![Some(10f64), Some(100f64)]);

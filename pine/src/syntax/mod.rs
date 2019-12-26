@@ -218,12 +218,12 @@ impl<'a> SyntaxParser<'a> {
         }
     }
 
-    pub fn new_with_vars(vars: HashMap<&'a str, SyntaxType<'a>>) -> SyntaxParser<'a> {
+    pub fn new_with_vars(vars: Vec<(&'a str, SyntaxType<'a>)>) -> SyntaxParser<'a> {
         let mut _root_ctx = Box::new(SyntaxContext::new(None, ContextType::Normal));
         for (k, _v) in vars.iter() {
             _root_ctx.gen_var_index(k);
         }
-        _root_ctx.vars = vars;
+        _root_ctx.vars = vars.into_iter().collect();
         SyntaxParser {
             context: &mut *_root_ctx,
             _root_ctx,

@@ -597,6 +597,22 @@ impl<'a> IfThenElse<'a> {
             result_type: SyntaxType::Any,
         }
     }
+
+    pub fn get_then_var_count(&self) -> i32 {
+        self.then_blk.var_count
+    }
+
+    pub fn get_then_subctx_count(&self) -> i32 {
+        self.then_blk.subctx_count
+    }
+
+    pub fn get_else_var_count(&self) -> i32 {
+        self.else_blk.as_ref().unwrap().var_count
+    }
+
+    pub fn get_else_subctx_count(&self) -> i32 {
+        self.else_blk.as_ref().unwrap().subctx_count
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -655,6 +671,14 @@ impl<'a> ForRange<'a> {
             result_type: SyntaxType::Any,
         }
     }
+
+    pub fn get_var_count(&self) -> i32 {
+        self.do_blk.var_count
+    }
+
+    pub fn get_subctx_count(&self) -> i32 {
+        self.do_blk.subctx_count
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -699,6 +723,14 @@ impl<'a> FunctionDef<'a> {
             varids: None,
             spec_defs: None,
         }
+    }
+
+    pub fn get_var_count(&self) -> i32 {
+        self.body.var_count
+    }
+
+    pub fn get_subctx_count(&self) -> i32 {
+        self.body.subctx_count
     }
 }
 

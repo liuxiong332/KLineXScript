@@ -317,7 +317,7 @@ mod tests {
         v2: Exp<'a>,
     ) -> Result<RefData<D>, RuntimeErr> {
         let mut exp = BinaryExp::new(op, v1, v2, StrRange::new_empty());
-        let var_types: HashMap<_, _> = [
+        let var_types: Vec<_> = [
             ("series_int", SyntaxType::Series(SimpleSyntaxType::Int)),
             ("series_bool", SyntaxType::Series(SimpleSyntaxType::Bool)),
         ]
@@ -491,7 +491,7 @@ mod tests {
         v2: Exp<'a>,
     ) -> Result<RefData<D>, RuntimeErr> {
         let mut exp = BinaryExp::new(op, v1, v2, StrRange::new_empty());
-        let var_types: HashMap<_, _> = [
+        let var_types: Vec<_> = [
             ("arg1", SyntaxType::Simple(SimpleSyntaxType::Int)),
             ("arg2", SyntaxType::Simple(SimpleSyntaxType::Int)),
         ]

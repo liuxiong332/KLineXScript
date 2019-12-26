@@ -255,12 +255,24 @@ impl<'a> Runner<'a> for IfThenElse<'a> {
         let cond = self.cond.rv_run(context)?;
         let cond_bool = Bool::implicity_from(cond).unwrap();
         if *cond_bool {
-            let subctx = create_sub_ctx(context, self.then_ctxid, ContextType::IfElseBlock);
+            let subctx = create_sub_ctx(
+                context,
+                self.then_ctxid,
+                ContextType::IfElseBlock,
+                self.get_then_var_count(),
+                self.get_then_subctx_count(),
+            );
             let result = self.then_blk.run(subctx);
             subctx.set_is_run(true);
             Ok(convert(result?, &self.result_type))
         } else if let Some(ref else_blk) = self.else_blk {
-            let subctx = create_sub_ctx(context, self.else_ctxid, ContextType::IfElseBlock);
+            let subctx = create_sub_ctx(
+                context,
+                self.else_ctxid,
+                ContextType::IfElseBlock,
+                self.get_else_var_count(),
+                self.get_else_subctx_count(),
+            );
             let result = else_blk.run(subctx);
             subctx.set_is_run(true);
             Ok(convert(result?, &self.result_type))
@@ -288,7 +300,6 @@ fn extract_int(val: Int, range: StrRange) -> Result<i32, PineRuntimeError> {
 
 impl<'a> Runner<'a> for ForRange<'a> {
     fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
-        let iter_name = self.var.value;
         let start = extract_int(
             *Int::implicity_from(self.start.rv_run(context)?).unwrap(),
             self.range,
@@ -309,7 +320,13 @@ impl<'a> Runner<'a> for ForRange<'a> {
         };
         let mut iter = start;
         let mut ret_val: PineRef<'a> = PineRef::new_box(NA);
-        let subctx = create_sub_ctx(context, self.ctxid, ContextType::ForRangeBlock);
+        let subctx = create_sub_ctx(
+            context,
+            self.ctxid,
+            ContextType::ForRangeBlock,
+            self.get_var_count(),
+            self.get_subctx_count(),
+        );
         while (step > 0 && iter < end) || (step < 0 && iter > end) {
             subctx.create_var(self.varid, PineRef::new_box(Some(iter)));
 
@@ -375,12 +392,14 @@ pub fn create_sub_ctx<'a, 'b, 'c>(
     context: &'c mut (dyn Ctx<'a> + 'c),
     ctxid: i32,
     ctx_type: ContextType,
+    var_count: i32,
+    subctx_count: i32,
 ) -> &'c mut (dyn Ctx<'a> + 'c) {
     let ctx_instance = downcast_ctx(context);
     let sub_context;
     // Get or create sub context for the function call context.
     if !ctx_instance.contains_sub_context(ctxid) {
-        sub_context = ctx_instance.create_sub_context(ctxid, ctx_type);
+        sub_context = ctx_instance.create_sub_context(ctxid, ctx_type, var_count, subctx_count);
     } else {
         sub_context = ctx_instance.get_sub_context(ctxid).unwrap();
     }
@@ -412,11 +431,11 @@ impl<'a> Runner<'a> for FunctionCall<'a> {
         let result = self.method.rv_run(context)?;
 
         let (pos_args, dict_args) = extract_args(context, self)?;
-        let ctx_ref = create_sub_ctx(context, self.ctxid, ContextType::FuncDefBlock);
 
         let result = match result.get_type() {
             (FirstType::Callable, SecondType::Simple) => {
                 let callable = downcast_pf::<Callable>(result).unwrap();
+                let ctx_ref = create_sub_ctx(context, self.ctxid, ContextType::FuncDefBlock, 0, 0);
                 let result = callable.call(ctx_ref, pos_args, dict_args);
                 ctx_ref.set_is_run(true);
                 context.create_callable(callable);
@@ -424,6 +443,13 @@ impl<'a> Runner<'a> for FunctionCall<'a> {
             }
             (FirstType::Function, SecondType::Simple) => {
                 let callable = downcast_pf::<Function>(result).unwrap();
+                let ctx_ref = create_sub_ctx(
+                    context,
+                    self.ctxid,
+                    ContextType::FuncDefBlock,
+                    callable.get_var_count(),
+                    callable.get_subctx_count(),
+                );
                 let result = callable.call(ctx_ref, pos_args, dict_args, self.range);
                 ctx_ref.set_is_run(true);
                 return result;

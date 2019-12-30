@@ -41,6 +41,8 @@ pub enum PineErrorKind {
     VarHasDeclare,                // The variable in assignment has declared before.
     BreakNotInForStmt,            // Use break in non for-range statement.
     ContinueNotInForStmt,         // Use break in non for-range statement.
+    NonRecongnizeStmt,            // This statement is not recongnized.
+    UnknownErr,                   // Unknown error.
 }
 
 #[derive(Debug, PartialEq)]

@@ -11,6 +11,7 @@ use crate::ast::stat_expr_types::{
 use crate::ast::state::PineInputError;
 use crate::ast::syntax_type::{FunctionTypes, SimpleSyntaxType, SyntaxType};
 use std::collections::HashMap;
+use std::mem;
 use std::rc::Rc;
 
 mod convert;
@@ -218,12 +219,12 @@ impl<'a> SyntaxParser<'a> {
         }
     }
 
-    pub fn new_with_vars(vars: Vec<(&'a str, SyntaxType<'a>)>) -> SyntaxParser<'a> {
+    pub fn new_with_vars(vars: &Vec<(&'a str, SyntaxType<'a>)>) -> SyntaxParser<'a> {
         let mut _root_ctx = Box::new(SyntaxContext::new(None, ContextType::Normal));
         for (k, _v) in vars.iter() {
             _root_ctx.gen_var_index(k);
         }
-        _root_ctx.vars = vars.into_iter().collect();
+        _root_ctx.vars = vars.iter().cloned().collect();
         SyntaxParser {
             context: &mut *_root_ctx,
             _root_ctx,
@@ -235,6 +236,14 @@ impl<'a> SyntaxParser<'a> {
 
     pub fn catch(&mut self, err: PineInputError) {
         self.errors.push(err)
+    }
+
+    pub fn is_ok(&self) -> bool {
+        self.errors.is_empty()
+    }
+
+    pub fn move_errors(&mut self) -> Vec<PineInputError> {
+        mem::replace(&mut self.errors, vec![])
     }
 
     fn parse_std_func_call(

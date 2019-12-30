@@ -324,7 +324,7 @@ mod tests {
         .iter()
         .cloned()
         .collect();
-        SyntaxParser::new_with_vars(var_types)
+        SyntaxParser::new_with_vars(&var_types)
             .parse_binary(&mut exp)
             .unwrap();
 
@@ -498,7 +498,7 @@ mod tests {
         .iter()
         .cloned()
         .collect();
-        SyntaxParser::new_with_vars(var_types)
+        SyntaxParser::new_with_vars(&var_types)
             .parse_binary(&mut exp)
             .unwrap();
 

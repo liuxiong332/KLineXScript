@@ -703,7 +703,7 @@ mod tests {
         );
         // ite.result_type = SyntaxType::Series(SimpleSyntaxType::Int);
         SyntaxParser::new_with_vars(
-            [
+            &[
                 ("cond", SyntaxType::Simple(SimpleSyntaxType::Bool)),
                 ("then", SyntaxType::Simple(SimpleSyntaxType::Int)),
                 ("else", SyntaxType::Simple(SimpleSyntaxType::Int)),

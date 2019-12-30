@@ -294,7 +294,7 @@ mod tests {
             Exp::VarName(RVVarName::new_no_range("exp2")),
         );
         SyntaxParser::new_with_vars(
-            [
+            &[
                 ("cond", SyntaxType::Simple(SimpleSyntaxType::Bool)),
                 ("exp1", SyntaxType::Simple(SimpleSyntaxType::Int)),
                 ("exp2", SyntaxType::Simple(SimpleSyntaxType::Int)),

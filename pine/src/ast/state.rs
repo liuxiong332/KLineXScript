@@ -1,5 +1,5 @@
-use super::error::PineErrorKind;
-use super::input::StrRange;
+use super::error::{PineError, PineErrorKind};
+use super::input::{Input, StrRange};
 // use std::marker::PhantomData;
 use std::cell::RefCell;
 
@@ -28,7 +28,32 @@ impl AstState {
         }
     }
 
+    pub fn merge_pine_error(&self, mut err: PineError<Input>) {
+        match err.errors.pop() {
+            None => (),
+            Some((input, kind)) => match kind {
+                PineErrorKind::Nom(_) | PineErrorKind::Char(_) | PineErrorKind::Context(_) => self
+                    .catch(PineInputError::new(
+                        PineErrorKind::NonRecongnizeStmt,
+                        StrRange::new(input.start, input.end),
+                    )),
+                _ => self.catch(PineInputError::new(
+                    kind,
+                    StrRange::new(input.start, input.end),
+                )),
+            },
+        }
+    }
+
     pub fn catch(&self, err: PineInputError) {
         self.errors.borrow_mut().push(err);
+    }
+
+    pub fn is_ok(&self) -> bool {
+        self.errors.borrow().is_empty()
+    }
+
+    pub fn into_inner(&self) -> Vec<PineInputError> {
+        self.errors.replace(vec![])
     }
 }

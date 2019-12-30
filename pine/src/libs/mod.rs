@@ -1,11 +1,44 @@
-// pub mod plot;
+pub mod plot;
 // pub mod print;
+use crate::ast::syntax_type::SyntaxType;
 use crate::types::PineRef;
-use std::collections::HashMap;
+use std::collections::HashSet;
 
-pub fn declare_vars<'a>() -> HashMap<&'static str, PineRef<'a>> {
-    let mut map = HashMap::new();
+pub struct VarResult<'a> {
+    pub value: PineRef<'a>,
+    pub syntax_type: SyntaxType<'a>,
+    pub name: &'static str,
+}
+
+impl<'a> VarResult<'a> {
+    pub fn new(
+        value: PineRef<'a>,
+        syntax_type: SyntaxType<'a>,
+        name: &'static str,
+    ) -> VarResult<'a> {
+        VarResult {
+            value,
+            syntax_type,
+            name,
+        }
+    }
+}
+
+fn check_names<'a>(vars: &Vec<VarResult<'a>>) -> bool {
+    let mut set = HashSet::new();
+    for v in vars {
+        if set.contains(v.name) {
+            return false;
+        }
+        set.insert(v.name);
+    }
+    return true;
+}
+
+pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
+    let list = vec![plot::declare_var()];
+    debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());
     // map.insert(plot::VAR_NAME, plot::declare_var());
-    map
+    list
 }

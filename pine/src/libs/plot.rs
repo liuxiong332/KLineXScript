@@ -1,10 +1,11 @@
+use super::VarResult;
+use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
 use crate::runtime::context::Ctx;
 use crate::types::{
-    Bool, Callable, DataType, Float, Int, ParamCollectCall, PineFrom, PineRef, PineStaticType,
-    PineType, RefData, RuntimeErr, SecondType, Series, NA,
+    Bool, Callable, DataType, Float, Int, ParamCollectCall, PineFrom, PineRef, PineType, RefData,
+    RuntimeErr, SecondType, Series, NA,
 };
-use std::collections::HashMap;
-use std::fmt::Debug;
+use std::rc::Rc;
 
 trait IntoTarget<D> {
     fn into(&self) -> D;
@@ -76,25 +77,31 @@ fn plot_val<'a>(item_val: PineRef<'a>, context: &mut dyn Ctx<'a>) -> Result<(), 
 
 fn pine_plot<'a>(
     context: &mut dyn Ctx<'a>,
-    mut param: HashMap<&'a str, PineRef<'a>>,
+    mut param: Vec<Option<PineRef<'a>>>,
+    _func_type: FunctionType<'a>,
 ) -> Result<PineRef<'a>, RuntimeErr> {
-    match param.remove("item") {
-        None => Err(RuntimeErr::NotSupportOperator),
+    match param.remove(0) {
         Some(item_val) => {
             plot_val(item_val, context)?;
             Ok(PineRef::new_box(NA))
         }
+        _ => Err(RuntimeErr::NotSupportOperator),
     }
 }
 
 pub const VAR_NAME: &'static str = "plot";
 
-pub fn declare_var<'a>() -> PineRef<'a> {
-    PineRef::new(Callable::new(
+pub fn declare_var<'a>() -> VarResult<'a> {
+    let value = PineRef::new(Callable::new(
         None,
         Some(Box::new(ParamCollectCall::new(pine_plot, &vec!["item"]))),
         vec!["item"],
-    ))
+    ));
+    let syntax_type = SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType((
+        vec![("item", SyntaxType::Series(SimpleSyntaxType::Float))],
+        SyntaxType::Void,
+    ))])));
+    VarResult::new(value, syntax_type, VAR_NAME)
 }
 
 #[cfg(test)]

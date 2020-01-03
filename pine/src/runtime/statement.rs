@@ -79,9 +79,17 @@ pub fn process_assign_val<'a>(
             | (_, (FirstType::Int, SecondType::Series)) => {
                 update_series::<Int>(context, index, current_val, true_val)
             }
+            ((FirstType::Color, SecondType::Series), _)
+            | (_, (FirstType::Color, SecondType::Series)) => {
+                update_series::<Color>(context, index, current_val, true_val)
+            }
+            ((FirstType::String, SecondType::Series), _)
+            | (_, (FirstType::String, SecondType::Series)) => {
+                update_series::<String>(context, index, current_val, true_val)
+            }
             ((_, SecondType::Series), _) | (_, (_, SecondType::Series)) => {
                 Err(RuntimeErr::TypeMismatch(format!(
-                    "Series type can only be Int, Float and Bool, but get {:?}",
+                    "Series type can only be Int, Float, Bool, Color, String, but get {:?}",
                     current_val.get_type()
                 )))
             }
@@ -100,9 +108,19 @@ pub fn process_assign_val<'a>(
                 context.create_var(varid, Int::implicity_from(true_val)?.into_pf());
                 Ok(())
             }
+            ((FirstType::Color, SecondType::Simple), _)
+            | (_, (FirstType::Color, SecondType::Simple)) => {
+                context.create_var(varid, Color::implicity_from(true_val)?.into_pf());
+                Ok(())
+            }
+            ((FirstType::String, SecondType::Simple), _)
+            | (_, (FirstType::String, SecondType::Simple)) => {
+                context.create_var(varid, String::implicity_from(true_val)?.into_pf());
+                Ok(())
+            }
             _ => {
                 return Err(RuntimeErr::TypeMismatch(format!(
-                    "Variable type can only be Int, Float and Bool, but get {:?}",
+                    "Variable type can only be Int, Float, Bool, Color, String, but get {:?}",
                     true_val.get_type()
                 )))
             }
@@ -150,7 +168,7 @@ impl<'a> RunnerForName<'a> for Assignment<'a> {
         val: PineRef<'a>,
         varid: i32,
     ) -> Result<(), RuntimeErr> {
-        let name = vn.value;
+        // let name = vn.value;
         // if context.contains_declare_scope(name) {
         //     return Err(RuntimeErr::NameDeclared);
         // }
@@ -163,12 +181,26 @@ impl<'a> RunnerForName<'a> for Assignment<'a> {
         // let val = self.val.rv_run(context)?;
         let true_val: PineRef<'a> = match self.var_type {
             None => val,
-            Some(DataType::Int) => Int::explicity_from(val)?.into_pf(),
-            Some(DataType::Bool) => Bool::explicity_from(val)?.into_pf(),
-            Some(DataType::Float) => Float::explicity_from(val)?.into_pf(),
-            Some(DataType::Color) => Color::explicity_from(val)?.into_pf(),
-            Some(DataType::String) => String::explicity_from(val)?.into_pf(),
-            _ => return Err(RuntimeErr::InvalidTypeCast),
+            Some(DataType::Int) => match val.get_type().1 {
+                SecondType::Series => Series::<Int>::implicity_from(val)?.into_pf(),
+                _ => Int::implicity_from(val)?.into_pf(),
+            },
+            Some(DataType::Bool) => match val.get_type().1 {
+                SecondType::Series => Series::<Bool>::implicity_from(val)?.into_pf(),
+                _ => Bool::implicity_from(val)?.into_pf(),
+            },
+            Some(DataType::Float) => match val.get_type().1 {
+                SecondType::Series => Series::<Float>::implicity_from(val)?.into_pf(),
+                _ => Float::implicity_from(val)?.into_pf(),
+            },
+            Some(DataType::Color) => match val.get_type().1 {
+                SecondType::Series => Series::<Color>::implicity_from(val)?.into_pf(),
+                _ => Color::implicity_from(val)?.into_pf(),
+            },
+            Some(DataType::String) => match val.get_type().1 {
+                SecondType::Series => Series::<String>::implicity_from(val)?.into_pf(),
+                _ => String::implicity_from(val)?.into_pf(),
+            },
         };
         if let (FirstType::NA, _) = true_val.get_type() {
             return Err(RuntimeErr::InvalidNADeclarer);
@@ -214,7 +246,7 @@ impl<'a> StmtRunner<'a> for Assignment<'a> {
 
 impl<'a> StmtRunner<'a> for VarAssignment<'a> {
     fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), PineRuntimeError> {
-        let name = self.name.value;
+        // let name = self.name.value;
         // if !context.contains_declare(name) {
         //     return Err(PineRuntimeError::new(
         //         RuntimeErr::NameNotDeclard,

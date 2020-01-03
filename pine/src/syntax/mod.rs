@@ -965,6 +965,8 @@ impl<'a> SyntaxParser<'a> {
             Exp::Condition(condition) => self.parse_condition(condition),
             Exp::Ite(ite) => self.parse_ifthenelse_exp(ite),
             Exp::ForRange(fr) => self.parse_forrange_exp(fr),
+            Exp::Assignment(assign) => self.parse_assign(assign),
+            Exp::VarAssignment(var_assign) => self.parse_var_assign(var_assign),
             Exp::UnaryExp(node) => self.parse_unary(node),
             Exp::BinaryExp(node) => self.parse_binary(node),
         }

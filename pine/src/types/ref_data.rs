@@ -62,6 +62,13 @@ impl<T: PartialEq + Debug + Clone> RefData<T> {
             RefData::Rc(ref item) => item.borrow().clone(),
         }
     }
+
+    pub fn clone_inner(&self) -> T {
+        match self {
+            RefData::Box(item) => (&**item).clone(),
+            RefData::Rc(item) => item.borrow().clone(),
+        }
+    }
 }
 
 impl<'a, T: PartialEq + Debug + PineType<'a> + 'a> RefData<T> {

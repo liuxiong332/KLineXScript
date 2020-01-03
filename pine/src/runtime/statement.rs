@@ -11,7 +11,7 @@ use crate::ast::stat_expr_types::{
 };
 use crate::types::{
     downcast_pf, Bool, Callable, Color, DataType as FirstType, Float, Int, PineFrom, PineRef,
-    PineStaticType, PineType, RuntimeErr, SecondType, Series, Tuple, NA,
+    PineStaticType, PineType, RefData, RuntimeErr, SecondType, Series, Tuple, NA,
 };
 use std::fmt::Debug;
 
@@ -38,7 +38,7 @@ trait RunnerForName<'a> {
         name: &VarName<'a>,
         val: PineRef<'a>,
         varid: i32,
-    ) -> Result<(), RuntimeErr>;
+    ) -> Result<PineRef<'a>, RuntimeErr>;
 }
 
 // fn from_series<'a, D>(
@@ -57,14 +57,14 @@ pub fn process_assign_val<'a>(
     true_val: PineRef<'a>,
     context: &mut dyn VarOperate<'a>,
     varid: i32,
-) -> Result<(), RuntimeErr> {
+) -> Result<PineRef<'a>, RuntimeErr> {
     let index = VarIndex::new(varid, 0);
     match context.move_var(index) {
         None => {
             // When assignment, must copy new variable.
             let true_val = true_val.copy_inner();
-            context.create_var(varid, true_val);
-            Ok(())
+            context.create_var(varid, true_val.clone());
+            Ok(true_val)
         }
         Some(current_val) => match (current_val.get_type(), true_val.get_type()) {
             ((FirstType::Bool, SecondType::Series), _)
@@ -95,28 +95,33 @@ pub fn process_assign_val<'a>(
             }
             ((FirstType::Bool, SecondType::Simple), _)
             | (_, (FirstType::Bool, SecondType::Simple)) => {
-                context.create_var(varid, Bool::implicity_from(true_val)?.into_pf());
-                Ok(())
+                let val = Bool::implicity_from(true_val)?.into_pf();
+                context.create_var(varid, val.clone());
+                Ok(val)
             }
             ((FirstType::Float, SecondType::Simple), _)
             | (_, (FirstType::Float, SecondType::Simple)) => {
-                context.create_var(varid, Float::implicity_from(true_val)?.into_pf());
-                Ok(())
+                let val = Float::implicity_from(true_val)?.into_pf();
+                context.create_var(varid, val.clone());
+                Ok(val)
             }
             ((FirstType::Int, SecondType::Simple), _)
             | (_, (FirstType::Int, SecondType::Simple)) => {
-                context.create_var(varid, Int::implicity_from(true_val)?.into_pf());
-                Ok(())
+                let val = Int::implicity_from(true_val)?.into_pf();
+                context.create_var(varid, val.clone());
+                Ok(val)
             }
             ((FirstType::Color, SecondType::Simple), _)
             | (_, (FirstType::Color, SecondType::Simple)) => {
-                context.create_var(varid, Color::implicity_from(true_val)?.into_pf());
-                Ok(())
+                let val = Color::implicity_from(true_val)?.into_pf();
+                context.create_var(varid, val.clone());
+                Ok(val)
             }
             ((FirstType::String, SecondType::Simple), _)
             | (_, (FirstType::String, SecondType::Simple)) => {
-                context.create_var(varid, String::implicity_from(true_val)?.into_pf());
-                Ok(())
+                let val = String::implicity_from(true_val)?.into_pf();
+                context.create_var(varid, val.clone());
+                Ok(val)
             }
             _ => {
                 return Err(RuntimeErr::TypeMismatch(format!(
@@ -133,15 +138,15 @@ fn update_series<'a, 'b, D>(
     var_index: VarIndex,
     exist_val: PineRef<'a>,
     val: PineRef<'a>,
-) -> Result<(), RuntimeErr>
+) -> Result<PineRef<'a>, RuntimeErr>
 where
     D: Default + PineType<'a> + PineStaticType + 'a + PineFrom<'a, D> + Clone + PartialEq + Debug,
 {
     let mut s = Series::implicity_from(exist_val)?;
     let v = D::implicity_from(val)?;
-    s.update(v.into_inner());
+    s.update(v.clone_inner());
     context.update_var(var_index, s.into_pf());
-    Ok(())
+    Ok(v.into_pf())
 }
 
 fn update_series_range<'a, 'b, D>(
@@ -150,12 +155,12 @@ fn update_series_range<'a, 'b, D>(
     exist_val: PineRef<'a>,
     val: PineRef<'a>,
     range: StrRange,
-) -> Result<(), PineRuntimeError>
+) -> Result<PineRef<'a>, PineRuntimeError>
 where
     D: Default + PineType<'a> + PineStaticType + 'a + PineFrom<'a, D> + Clone + PartialEq + Debug,
 {
     match update_series::<D>(context, var_index, exist_val, val) {
-        Ok(_) => Ok(()),
+        Ok(val) => Ok(val),
         Err(code) => Err(PineRuntimeError::new(code, range)),
     }
 }
@@ -167,7 +172,7 @@ impl<'a> RunnerForName<'a> for Assignment<'a> {
         vn: &VarName<'a>,
         val: PineRef<'a>,
         varid: i32,
-    ) -> Result<(), RuntimeErr> {
+    ) -> Result<PineRef<'a>, RuntimeErr> {
         // let name = vn.value;
         // if context.contains_declare_scope(name) {
         //     return Err(RuntimeErr::NameDeclared);
@@ -176,7 +181,11 @@ impl<'a> RunnerForName<'a> for Assignment<'a> {
 
         // For variable declare with var type, it only need initialize once.
         if self.var && context.contains_var_scope(varid) {
-            return Ok(());
+            return Ok(context
+                .get_var(VarIndex::new(varid, 0))
+                .as_ref()
+                .unwrap()
+                .clone());
         }
         // let val = self.val.rv_run(context)?;
         let true_val: PineRef<'a> = match self.var_type {
@@ -210,14 +219,14 @@ impl<'a> RunnerForName<'a> for Assignment<'a> {
     }
 }
 
-impl<'a> StmtRunner<'a> for Assignment<'a> {
-    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), PineRuntimeError> {
+impl<'a> Runner<'a> for Assignment<'a> {
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
         let val = self.val.rv_run(context)?;
         if self.names.len() == 1 {
             let varid = self.varids.as_ref().unwrap()[0];
             return match self.run_name(context, &self.names[0], val, varid) {
                 Err(code) => Err(PineRuntimeError::new(code, self.range)),
-                Ok(_) => Ok(()),
+                Ok(val) => Ok(val),
             };
         }
         match val.get_type() {
@@ -229,12 +238,16 @@ impl<'a> StmtRunner<'a> for Assignment<'a> {
                 }
 
                 let varids = self.varids.as_ref().unwrap().iter();
+                let mut ret_val = vec![];
                 for (n, varid) in self.names.iter().zip(varids).rev() {
-                    if let Err(code) = self.run_name(context, n, tuple.0.pop().unwrap(), *varid) {
-                        return Err(PineRuntimeError::new(code, self.range));
+                    match self.run_name(context, n, tuple.0.pop().unwrap(), *varid) {
+                        Err(code) => {
+                            return Err(PineRuntimeError::new(code, self.range));
+                        }
+                        Ok(val) => ret_val.push(val),
                     }
                 }
-                Ok(())
+                Ok(PineRef::new_box(Tuple(ret_val)))
             }
             _ => Err(PineRuntimeError::new(
                 RuntimeErr::NotSupportOperator,
@@ -244,15 +257,15 @@ impl<'a> StmtRunner<'a> for Assignment<'a> {
     }
 }
 
-impl<'a> StmtRunner<'a> for VarAssignment<'a> {
+impl<'a> StmtRunner<'a> for Assignment<'a> {
     fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), PineRuntimeError> {
-        // let name = self.name.value;
-        // if !context.contains_declare(name) {
-        //     return Err(PineRuntimeError::new(
-        //         RuntimeErr::NameNotDeclard,
-        //         self.range,
-        //     ));
-        // }
+        self.run(context)?;
+        Ok(())
+    }
+}
+
+impl<'a> Runner<'a> for VarAssignment<'a> {
+    fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
         let val = self.val.rv_run(context)?;
 
         let index = self.var_index;
@@ -279,6 +292,13 @@ impl<'a> StmtRunner<'a> for VarAssignment<'a> {
                 self.range,
             )),
         }
+    }
+}
+
+impl<'a> StmtRunner<'a> for VarAssignment<'a> {
+    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), PineRuntimeError> {
+        self.run(context)?;
+        Ok(())
     }
 }
 

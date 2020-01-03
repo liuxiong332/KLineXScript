@@ -36,6 +36,8 @@ impl<'a> Runner<'a> for Exp<'a> {
             Exp::Condition(ref cond) => cond.run(_context),
             Exp::Ite(ref ite) => ite.run(_context),
             Exp::ForRange(ref for_range) => for_range.run(_context),
+            Exp::Assignment(ref assign) => assign.run(_context),
+            Exp::VarAssignment(ref assign) => assign.run(_context),
             Exp::UnaryExp(ref node) => unary_op_run(&node, _context),
             Exp::BinaryExp(ref node) => binary_op_run(&node, _context),
         }

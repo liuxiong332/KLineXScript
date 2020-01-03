@@ -273,6 +273,8 @@ pub enum Exp<'a> {
     Condition(Box<Condition<'a>>),
     Ite(Box<IfThenElse<'a>>),
     ForRange(Box<ForRange<'a>>),
+    Assignment(Box<Assignment<'a>>),
+    VarAssignment(Box<VarAssignment<'a>>),
     UnaryExp(Box<UnaryExp<'a>>),
     BinaryExp(Box<BinaryExp<'a>>),
 }
@@ -294,6 +296,8 @@ impl<'a> Exp<'a> {
             Exp::Condition(node) => node.range,
             Exp::Ite(node) => node.range,
             Exp::ForRange(node) => node.range,
+            Exp::Assignment(node) => node.range,
+            Exp::VarAssignment(node) => node.range,
             Exp::UnaryExp(node) => node.range,
             Exp::BinaryExp(node) => node.range,
         }

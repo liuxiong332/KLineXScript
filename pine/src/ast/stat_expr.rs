@@ -75,7 +75,7 @@ pub fn exp<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Exp<'a>> {
 }
 
 // The left return tuple of expression `[a, b] = [1, 2]` that contain variable name between square brackets
-fn rettupledef<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, LVTupleNode<'a>> {
+fn rettupledef<'a>(input: Input<'a>, _state: &AstState) -> PineResult<'a, LVTupleNode<'a>> {
     let (input, (paren_l, names, paren_r)) = eat_sep(tuple((
         eat_sep(tag("[")),
         separated_list(eat_sep(tag(",")), varname_ws),
@@ -361,6 +361,12 @@ pub fn exp_with_indent<'a>(
             }),
             map(eat_sep(|s| for_range_exp(indent)(s, state)), |s| {
                 Exp::ForRange(Box::new(s))
+            }),
+            map(eat_sep(|s| assign_with_indent(indent)(s, state)), |s| {
+                Exp::Assignment(Box::new(s))
+            }),
+            map(eat_sep(|s| var_assign_with_indent(indent)(s, state)), |s| {
+                Exp::VarAssignment(Box::new(s))
             }),
         ))(input)
     }

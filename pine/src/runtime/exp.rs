@@ -6,8 +6,9 @@ pub use crate::ast::stat_expr_types::{
     Condition, DataType, Exp, FunctionCall, PrefixExp, RefCall, Statement, TypeCast,
 };
 use crate::types::{
-    downcast_pf, Bool, Color, DataType as FirstType, Float, Int, Object, PineFrom, PineRef,
-    PineStaticType, PineType, PineVar, RefData, RuntimeErr, SecondType, Series, Tuple, NA,
+    downcast_pf, downcast_pf_ref, Bool, Color, DataType as FirstType, Evaluate, Float, Int, Object,
+    PineFrom, PineRef, PineStaticType, PineType, PineVar, RefData, RuntimeErr, SecondType, Series,
+    Tuple, NA,
 };
 use std::fmt::Debug;
 
@@ -47,9 +48,14 @@ impl<'a> RVRunner<'a> for Exp<'a> {
             Exp::VarName(name) => match context.move_var(name.var_index) {
                 None => Err(PineRuntimeError::new(RuntimeErr::VarNotFound, self.range())),
                 Some(s) => {
-                    let ret = s.copy();
+                    let ret = match s.get_type() {
+                        (FirstType::Evaluate, SecondType::Simple) => {
+                            downcast_pf_ref::<Evaluate>(&s).unwrap().run(context)
+                        }
+                        _ => Ok(s.copy()),
+                    };
                     context.update_var(name.var_index, s);
-                    Ok(ret)
+                    ret
                 }
             },
             Exp::Tuple(tuple) => {

@@ -26,6 +26,19 @@ where
     }
 }
 
+pub fn downcast_pf_mut<'a, 'b, T>(item: &'b mut PineRef<'a>) -> Result<&'b mut T, RuntimeErr>
+where
+    T: PineStaticType + PartialEq + Debug + 'a,
+{
+    match *item {
+        PineRef::Box(ref mut item) => downcast_mut(&mut **item),
+        PineRef::Rc(ref item) => unsafe {
+            let ptr = item.as_ptr() as *mut T;
+            Ok(ptr.as_mut().unwrap())
+        },
+    }
+}
+
 fn downcast_err<'a, T: PineStaticType + 'a>(item: &(dyn PineType<'a> + 'a)) -> RuntimeErr {
     RuntimeErr::NotCompatible(format!(
         "downcast from {:?} to {:?} is not allowed",

@@ -94,6 +94,10 @@ impl<'a> VarOperate<'a> for Vec<Option<PineRef<'a>>> {
         mem::replace(&mut self[index.varid as usize], None)
     }
 
+    fn get_var(&self, index: VarIndex) -> &Option<PineRef<'a>> {
+        &self[index.varid as usize]
+    }
+
     fn var_len(&self) -> i32 {
         self.len() as i32
     }

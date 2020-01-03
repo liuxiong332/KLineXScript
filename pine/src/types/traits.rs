@@ -27,6 +27,7 @@ pub enum DataType {
     Callable,
     Function,
     Object,
+    Evaluate, // The variable need lazy evaluate.
 }
 
 #[derive(Debug, PartialEq)]

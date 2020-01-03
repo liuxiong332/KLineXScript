@@ -16,6 +16,8 @@ pub trait VarOperate<'a> {
 
     fn move_var(&mut self, index: VarIndex) -> Option<PineRef<'a>>;
 
+    fn get_var(&self, index: VarIndex) -> &Option<PineRef<'a>>;
+
     fn var_len(&self) -> i32;
 }
 
@@ -339,6 +341,11 @@ impl<'a, 'b, 'c> VarOperate<'a> for Context<'a, 'b, 'c> {
         // Insert the temporary NA into the name and move the original value out.
         let dest_ctx = downcast_ctx(self.get_subctx_mut(index));
         mem::replace(&mut dest_ctx.vars[index.varid as usize], None)
+    }
+
+    fn get_var(&self, index: VarIndex) -> &Option<PineRef<'a>> {
+        let dest_ctx = downcast_ctx_const(self.get_subctx(index));
+        &dest_ctx.vars[index.varid as usize]
     }
 
     fn var_len(&self) -> i32 {

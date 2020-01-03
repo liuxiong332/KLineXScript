@@ -18,7 +18,6 @@ pub struct Series<'a, D: Clone + Debug + 'a> {
     current: D,
     history: Vec<D>,
     phantom: PhantomData<&'a D>,
-    na_val: D,
 }
 
 impl<'a, D: Default + Clone + Debug + 'a> Clone for Series<'a, D> {
@@ -27,7 +26,6 @@ impl<'a, D: Default + Clone + Debug + 'a> Clone for Series<'a, D> {
             current: self.current.clone(),
             history: vec![],
             phantom: PhantomData,
-            na_val: D::default(),
         }
     }
 }
@@ -38,7 +36,6 @@ impl<'a, D: Default + Clone + Debug + 'a> From<D> for Series<'a, D> {
             current: input,
             history: vec![],
             phantom: PhantomData,
-            na_val: D::default(),
         }
     }
 }
@@ -55,7 +52,6 @@ impl<'a, D: Default + PineType<'a> + Clone + Debug + 'a> Series<'a, D> {
             current: D::default(),
             history: vec![],
             phantom: PhantomData,
-            na_val: D::default(),
         }
     }
 
@@ -64,7 +60,6 @@ impl<'a, D: Default + PineType<'a> + Clone + Debug + 'a> Series<'a, D> {
             current: D::default(),
             history,
             phantom: PhantomData,
-            na_val: D::default(),
         }
     }
 
@@ -73,7 +68,6 @@ impl<'a, D: Default + PineType<'a> + Clone + Debug + 'a> Series<'a, D> {
             current,
             history,
             phantom: PhantomData,
-            na_val: D::default(),
         }
     }
 
@@ -83,7 +77,7 @@ impl<'a, D: Default + PineType<'a> + Clone + Debug + 'a> Series<'a, D> {
             // m if m < 0 => Err(SeriesErr::Negative),
             0 => self.current.clone(),
             m if m >= 1 && m <= len => self.history[(len - i) as usize].clone(),
-            _ => self.na_val.clone(),
+            _ => D::default(),
         };
         Ok(Series::from(val))
     }
@@ -144,7 +138,6 @@ where
                 current: downcast_pf::<D>(t).unwrap().into_inner(),
                 history: vec![],
                 phantom: PhantomData,
-                na_val: D::default(),
             })),
             (DataType::Int, SecondType::Series) => {
                 let series: RefData<Series<Int>> = Series::explicity_from(t)?;
@@ -205,7 +198,6 @@ where
                 current: downcast_pf::<D>(t).unwrap().into_inner(),
                 history: vec![],
                 phantom: PhantomData,
-                na_val: D::default(),
             })),
             (DataType::Int, SecondType::Series) => {
                 let series: RefData<Series<Int>> = Series::implicity_from(t)?;

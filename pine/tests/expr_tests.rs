@@ -12,7 +12,7 @@ pub use utils::*;
 #[test]
 fn expression_test() {
     assert_eq!(
-        pine::parse_all("m = (high + low + close) / 3\n"),
+        pine::parse_ast("m = (high + low + close) / 3\n"),
         Ok(Block::new(
             vec![gen_assign(
                 VarName::new_with_start("m", Position::new(0, 0)),
@@ -45,7 +45,7 @@ fn expression_test() {
         Position::new(0, 0),
     );
     assert_eq!(
-        pine::parse_all("m = sma(high - low, 10) + sma(close, 20)\n"),
+        pine::parse_ast("m = sma(high - low, 10) + sma(close, 20)\n"),
         Ok(Block::new(
             vec![gen_assign(
                 VarName::new_with_start("m", Position::new(0, 0)),
@@ -96,7 +96,7 @@ plot(price)
 #[test]
 fn var_assign_test() {
     assert_eq!(
-        pine::parse_all(VAR_ASSIGN),
+        pine::parse_ast(VAR_ASSIGN),
         Ok(Block::new(
             vec![
                 gen_assign(
@@ -161,7 +161,7 @@ fn variable_declare_test() {
     };
 
     assert_eq!(
-        pine::parse_all(VAR_DECLARATION),
+        pine::parse_ast(VAR_DECLARATION),
         Ok(Block::new(
             vec![
                 gen_assign("m = true", false, None, 0, 0, 4),
@@ -196,7 +196,7 @@ else
 #[test]
 fn if_stats_test() {
     assert_eq!(
-        pine::parse_all(IF_STATES),
+        pine::parse_ast(IF_STATES),
         Ok(Block::new(
             vec![
                 Statement::None(StrRange::from_start(
@@ -239,7 +239,7 @@ fn if_stats_test() {
     );
 
     assert_eq!(
-        pine::parse_all(IF_NEST_STATS),
+        pine::parse_ast(IF_NEST_STATS),
         Ok(Block::new(
             vec![
                 Statement::None(StrRange::from_start("\n", Position::new(0, 0))),
@@ -348,7 +348,7 @@ fn gen_dot_func_call<'a>(
 #[test]
 fn if_expr_test() {
     assert_eq!(
-        pine::parse_all(IF_EXPR),
+        pine::parse_ast(IF_EXPR),
         Ok(Block::new(
             vec![
                 Statement::None(StrRange::from_start("\n", Position::new(0, 0))),

@@ -161,7 +161,7 @@ mod tests {
         assert_eq!(blk.var_count, 2);
         assert_eq!(blk.subctx_count, 0);
 
-        let mut datasrc = DataSrc::new(&blk, vec![], vec![], &MyCallback);
+        let mut datasrc = DataSrc::new(&blk, vec![], vec!["close"], &MyCallback);
         assert_eq!(datasrc.context.var_len(), 2);
 
         let data = vec![("close", vec![Some(10f64), Some(100f64)])];

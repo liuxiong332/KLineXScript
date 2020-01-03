@@ -1,8 +1,7 @@
 extern crate pine;
-use pine::libs;
+use pine::ast::syntax_type::{SimpleSyntaxType, SyntaxType};
+use pine::libs::print;
 use pine::runtime::data_src::{Callback, DataSrc};
-use pine::syntax::ctxid_parser::CtxIdParser;
-use std::collections::HashMap;
 
 const MA_SCRIPT: &str = "
 N = 5
@@ -23,20 +22,17 @@ fn datasrc_test() {
         }
     }
 
-    let mut ma_block = pine::parse_all(MA_SCRIPT).unwrap();
-    CtxIdParser::new().parse_blk(&mut ma_block);
-
-    let inner_vars = libs::declare_vars();
-    let mut datasrc = DataSrc::new(&mut ma_block, inner_vars, &MyCallback);
-
-    let mut data = HashMap::new();
-    data.insert(
+    let lib_info = pine::LibInfo::new(
+        vec![print::declare_var()],
+        vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, &MyCallback);
+    parser.parse_src(MA_SCRIPT).unwrap();
+    let data = vec![(
         "close",
         vec![Some(1f64), Some(2f64), Some(3f64), Some(4f64), Some(5f64)],
-        // vec![Some(1f64)],
-    );
-
-    assert_eq!(datasrc.run(data), Ok(()));
+    )];
+    assert_eq!(parser.run(data), Ok(()));
 }
 
 const FUNC_SCRIPT: &str = "
@@ -56,26 +52,24 @@ fn func_call_test() {
         }
     }
 
-    let mut func_block = pine::parse_all(FUNC_SCRIPT).unwrap();
-    CtxIdParser::new().parse_blk(&mut func_block);
-
-    let inner_vars = libs::declare_vars();
-    let mut datasrc = DataSrc::new(&mut func_block, inner_vars, &MyCallback);
-
-    let mut data = HashMap::new();
-    data.insert(
+    let lib_info = pine::LibInfo::new(
+        vec![print::declare_var()],
+        vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, &MyCallback);
+    parser.parse_src(FUNC_SCRIPT).unwrap();
+    let data = vec![(
         "close",
         vec![Some(2f64), Some(4f64), Some(8f64), Some(16f64), Some(32f64)],
-    );
-
-    assert_eq!(datasrc.run(data), Ok(()));
+    )];
+    assert_eq!(parser.run(data), Ok(()));
 }
 
 const IF_ELSE_SCRIPT: &str = "
 m = if close > open
     s = close
     s[1]
-else 
+else
     t = open
     t[1]
 print(m)
@@ -90,23 +84,26 @@ fn if_else_test() {
         }
     }
 
-    let mut func_block = pine::parse_all(IF_ELSE_SCRIPT).unwrap();
-    CtxIdParser::new().parse_blk(&mut func_block);
-
-    let inner_vars = libs::declare_vars();
-    let mut datasrc = DataSrc::new(&mut func_block, inner_vars, &MyCallback);
-
-    let mut data = HashMap::new();
-    data.insert(
-        "close",
-        vec![Some(1f64), Some(3f64), Some(5f64), Some(7f64), Some(9f64)],
+    let lib_info = pine::LibInfo::new(
+        vec![print::declare_var()],
+        vec![
+            ("close", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("open", SyntaxType::Series(SimpleSyntaxType::Float)),
+        ],
     );
-    data.insert(
-        "open",
-        vec![Some(0f64), Some(4f64), Some(4f64), Some(8f64), Some(8f64)],
-    );
-
-    assert_eq!(datasrc.run(data), Ok(()));
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, &MyCallback);
+    parser.parse_src(IF_ELSE_SCRIPT).unwrap();
+    let data = vec![
+        (
+            "close",
+            vec![Some(1f64), Some(3f64), Some(5f64), Some(7f64), Some(9f64)],
+        ),
+        (
+            "open",
+            vec![Some(0f64), Some(4f64), Some(4f64), Some(8f64), Some(8f64)],
+        ),
+    ];
+    assert_eq!(parser.run(data), Ok(()));
 }
 
 const FOR_RANGE_SCRIPT: &str = "
@@ -127,16 +124,14 @@ fn for_range_test() {
         }
     }
 
-    let mut func_block = pine::parse_all(FOR_RANGE_SCRIPT).unwrap();
-    CtxIdParser::new().parse_blk(&mut func_block);
-
-    let inner_vars = libs::declare_vars();
-    let mut datasrc = DataSrc::new(&mut func_block, inner_vars, &MyCallback);
-
-    let mut data = HashMap::new();
-    data.insert("close", vec![Some(1f64), Some(3f64)]);
-
-    assert_eq!(datasrc.run(data), Ok(()));
+    let lib_info = pine::LibInfo::new(
+        vec![print::declare_var()],
+        vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, &MyCallback);
+    parser.parse_src(FOR_RANGE_SCRIPT).unwrap();
+    let data = vec![("close", vec![Some(1f64), Some(3f64)])];
+    assert_eq!(parser.run(data), Ok(()));
 }
 
 const EMA_SCRIPT: &str = "
@@ -157,16 +152,15 @@ fn ema_test() {
         }
     }
 
-    let mut func_block = pine::parse_all(EMA_SCRIPT).unwrap();
-    CtxIdParser::new().parse_blk(&mut func_block);
+    let lib_info = pine::LibInfo::new(
+        vec![print::declare_var()],
+        vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, &MyCallback);
+    parser.parse_src(EMA_SCRIPT).unwrap();
+    let data = vec![("close", vec![Some(2f64), Some(4f64)])];
 
-    let inner_vars = libs::declare_vars();
-    let mut datasrc = DataSrc::new(&mut func_block, inner_vars, &MyCallback);
-
-    let mut data = HashMap::new();
-    data.insert("close", vec![Some(2f64), Some(4f64)]);
-
-    assert_eq!(datasrc.run(data), Ok(()));
+    assert_eq!(parser.run(data), Ok(()));
 }
 
 const MACD_SCRIPT: &str = "
@@ -176,7 +170,7 @@ pine_ema(x, y) =>
     sum := alpha * x + (1 - alpha) * (sum[1] ? sum[1] : 0)
     sum
 
-pine_macd() => 
+pine_macd() =>
     // DIF=EMA_{{(close,12)}}-EMA_{{(close,26)}}
     dif = pine_ema(close, 12.0) - pine_ema(close, 26.0)
     // DEM=EMA_{{(DIF,9)}}
@@ -197,14 +191,13 @@ fn macd_test() {
         }
     }
 
-    let mut func_block = pine::parse_all(MACD_SCRIPT).unwrap();
-    CtxIdParser::new().parse_blk(&mut func_block);
+    let lib_info = pine::LibInfo::new(
+        vec![print::declare_var()],
+        vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, &MyCallback);
+    parser.parse_src(MACD_SCRIPT).unwrap();
+    let data = vec![("close", vec![Some(200f64), Some(400f64)])];
 
-    let inner_vars = libs::declare_vars();
-    let mut datasrc = DataSrc::new(&mut func_block, inner_vars, &MyCallback);
-
-    let mut data = HashMap::new();
-    data.insert("close", vec![Some(200f64), Some(400f64)]);
-
-    assert_eq!(datasrc.run(data), Ok(()));
+    assert_eq!(parser.run(data), Ok(()));
 }

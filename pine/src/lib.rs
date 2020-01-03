@@ -29,6 +29,7 @@ use runtime::data_src::{Callback, DataSrc};
 use std::mem;
 use types::{Float, PineRef};
 
+#[derive(Debug, Clone)]
 pub struct LibInfo<'a> {
     var_types: Vec<(&'a str, SyntaxType<'a>)>,
     var_values: Vec<(&'a str, PineRef<'a>)>,
@@ -41,6 +42,7 @@ impl<'a> LibInfo<'a> {
         input_vars: Vec<(&'static str, SyntaxType<'a>)>,
     ) -> LibInfo<'a> {
         let (types, values, input_names) = extract_vars(lib_vars, input_vars);
+        println!("now input names {:?}", input_names);
         LibInfo {
             var_types: types,
             var_values: values,
@@ -49,19 +51,22 @@ impl<'a> LibInfo<'a> {
     }
 }
 
-pub struct PineParser<'a> {
+pub struct PineParser<'a, 'b> {
     src: &'a str,
-    lib_info: &'a LibInfo<'a>,
+    var_types: &'b Vec<(&'a str, SyntaxType<'a>)>,
 }
 
-impl<'a> PineParser<'a> {
-    pub fn new(src: &'a str, lib_info: &'a LibInfo<'a>) -> PineParser<'a> {
-        PineParser { src, lib_info }
+impl<'a, 'b> PineParser<'a, 'b> {
+    pub fn new(src: &'a str, lib_info: &'b LibInfo<'a>) -> PineParser<'a, 'b> {
+        PineParser {
+            src,
+            var_types: &lib_info.var_types,
+        }
     }
 
     pub fn parse(&mut self) -> Result<Block<'a>, Vec<PineInputError>> {
         let mut blk = parse_ast(self.src)?;
-        parse_syntax(&mut blk, &self.lib_info.var_types)?;
+        parse_syntax(&mut blk, &self.var_types)?;
         Ok(blk)
     }
 }
@@ -87,9 +92,9 @@ impl<'a, 'b, 'c> PineRunner<'a, 'b, 'c> {
     }
 }
 
-pub struct PineScript<'p, 'li, 'ra, 'rb, 'rc> {
+pub struct PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
     lib_info: LibInfo<'li>,
-    blk: Block<'p>,
+    blk: Block<'pa>,
     callback: &'ra dyn Callback,
     runner: Option<PineRunner<'ra, 'rb, 'rc>>,
 }
@@ -97,8 +102,8 @@ pub struct PineScript<'p, 'li, 'ra, 'rb, 'rc> {
 const SERIES_FLOAT: SyntaxType = SyntaxType::Series(SimpleSyntaxType::Float);
 const SERIES_INT: SyntaxType = SyntaxType::Series(SimpleSyntaxType::Int);
 
-impl<'p, 'li, 'ra, 'rb, 'rc> PineScript<'p, 'li, 'ra, 'rb, 'rc> {
-    pub fn new(callback: &'ra dyn Callback) -> PineScript<'p, 'li, 'ra, 'rb, 'rc> {
+impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
+    pub fn new(callback: &'ra dyn Callback) -> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
         PineScript {
             lib_info: LibInfo::new(
                 declare_vars(),
@@ -116,40 +121,52 @@ impl<'p, 'li, 'ra, 'rb, 'rc> PineScript<'p, 'li, 'ra, 'rb, 'rc> {
         }
     }
 
-    pub fn parse_src<'a, 's>(&'s mut self, src: &'a str) -> Result<(), Vec<PineInputError>>
+    pub fn new_with_libinfo(
+        lib_info: LibInfo<'li>,
+        callback: &'ra dyn Callback,
+    ) -> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
+        PineScript {
+            lib_info,
+            blk: Block::new_no_input(vec![], None),
+            callback,
+            runner: None,
+        }
+    }
+
+    pub fn parse_src<'s, 'a, 'pb>(&'s mut self, src: &'a str) -> Result<(), Vec<PineInputError>>
     where
-        'li: 'p,
-        's: 'p,
-        'a: 'p,
+        's: 'pb,
+        'li: 'pa,
+        'a: 'pa,
     {
-        let mut parser: PineParser<'p>;
+        let mut parser: PineParser<'pa, 'pb>;
         unsafe {
-            let lib_ref = mem::transmute::<&LibInfo<'li>, &'p LibInfo<'p>>(&self.lib_info);
-            // let src_ref = mem::transmute::<&'a str, &'p str>(src);
-            parser = PineParser::new(src, lib_ref);
+            let lib_ref = mem::transmute::<&LibInfo<'li>, &'pb LibInfo<'pa>>(&self.lib_info);
+            let src_ref = mem::transmute::<&'a str, &'pa str>(src);
+            parser = PineParser::new(src_ref, lib_ref);
         }
         // parser = PineParser::new(src, &self.lib_info);
         let blk = parser.parse()?;
         self.blk = blk;
+        self.runner = None;
         Ok(())
     }
 
-    pub fn run<'s>(
-        &'s mut self,
-        data: Vec<(&'static str, Vec<Float>)>,
-    ) -> Result<(), PineRuntimeError>
+    pub fn run(&mut self, data: Vec<(&'static str, Vec<Float>)>) -> Result<(), PineRuntimeError>
     where
-        's: 'ra,
         'li: 'ra,
-        'p: 'ra,
+        'pa: 'ra,
     {
-        let runner: PineRunner<'ra, 'rb, 'rc>;
-        unsafe {
-            let blk_ref: &'ra Block<'ra> = mem::transmute::<&Block<'p>, &'ra Block<'ra>>(&self.blk);
-            let lib_ref = mem::transmute::<&LibInfo<'li>, &LibInfo<'ra>>(&self.lib_info);
-            runner = PineRunner::new(lib_ref, blk_ref, self.callback);
+        if self.runner.is_none() {
+            let runner: PineRunner<'ra, 'rb, 'rc>;
+            unsafe {
+                let blk_ref: &'ra Block<'ra> =
+                    mem::transmute::<&Block<'pa>, &'ra Block<'ra>>(&self.blk);
+                let lib_ref = mem::transmute::<&LibInfo<'li>, &LibInfo<'ra>>(&self.lib_info);
+                runner = PineRunner::new(lib_ref, blk_ref, self.callback);
+            }
+            self.runner = Some(runner);
         }
-        self.runner = Some(runner);
         self.runner.as_mut().unwrap().run(data)
     }
 }

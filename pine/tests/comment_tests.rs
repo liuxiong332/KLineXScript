@@ -15,7 +15,7 @@ plot(a)
 #[test]
 fn comment_test() {
     assert_eq!(
-        pine::parse_all(TEXT_WITH_COMMENT),
+        pine::parse_ast(TEXT_WITH_COMMENT),
         Ok(Block::new(
             vec![
                 Statement::None(StrRange::from_start("//@version=4\n", Position::new(0, 0))),

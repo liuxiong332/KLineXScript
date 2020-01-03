@@ -1,3 +1,5 @@
+use super::VarResult;
+use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
 use crate::runtime::context::Ctx;
 use crate::types::{
     Bool, Callable, DataType, Float, Int, ParamCollectCall, PineFrom, PineRef, PineStaticType,
@@ -5,6 +7,7 @@ use crate::types::{
 };
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::rc::Rc;
 
 trait Format {
     fn fmt(&self) -> String;
@@ -110,10 +113,11 @@ fn print_val<'a>(item_val: PineRef<'a>, context: &mut dyn Ctx<'a>) -> Result<(),
 
 fn pine_print<'a>(
     context: &mut dyn Ctx<'a>,
-    mut param: HashMap<&'a str, PineRef<'a>>,
+    mut param: Vec<Option<PineRef<'a>>>,
+    _func_type: FunctionType<'a>,
 ) -> Result<PineRef<'a>, RuntimeErr> {
-    println!("pine print Series run, {:?}", param.get("item"));
-    match param.remove("item") {
+    // println!("pine print Series run, {:?}", param.get("item"));
+    match param.remove(0) {
         None => Err(RuntimeErr::NotSupportOperator),
         Some(item_val) => {
             print_val(item_val, context)?;
@@ -124,12 +128,17 @@ fn pine_print<'a>(
 
 pub const VAR_NAME: &'static str = "print";
 
-pub fn declare_var<'a>() -> PineRef<'a> {
-    PineRef::new(Callable::new(
+pub fn declare_var<'a>() -> VarResult<'a> {
+    let value = PineRef::new(Callable::new(
         None,
         Some(Box::new(ParamCollectCall::new(pine_print, &vec!["item"]))),
         vec!["item"],
-    ))
+    ));
+    let syntax_type = SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType((
+        vec![("item", SyntaxType::Series(SimpleSyntaxType::Float))],
+        SyntaxType::Void,
+    ))])));
+    VarResult::new(value, syntax_type, VAR_NAME)
 }
 
 #[cfg(test)]
@@ -138,6 +147,13 @@ mod tests {
     use crate::runtime::context::Context;
     use crate::runtime::data_src::Callback;
     use crate::types::{downcast_pf, PineRef};
+
+    fn new_func_type<'a>() -> FunctionType<'a> {
+        FunctionType((
+            vec![("item", SyntaxType::Series(SimpleSyntaxType::Float))],
+            SyntaxType::Void,
+        ))
+    }
 
     #[test]
     fn print_test() {
@@ -148,22 +164,31 @@ mod tests {
             }
         }
 
-        let callable = downcast_pf::<Callable>(declare_var()).unwrap();
+        let callable = downcast_pf::<Callable>(declare_var().value).unwrap();
         let mut ctx = Context::new_with_callback(&MyCallback);
         callable
-            .call(&mut ctx, vec![PineRef::new(Some(1f64))], vec![])
+            .call(
+                &mut ctx,
+                vec![PineRef::new(Some(1f64))],
+                vec![],
+                new_func_type(),
+            )
             .unwrap();
         callable
-            .call(&mut ctx, vec![PineRef::new(Some(2f64))], vec![])
+            .call(
+                &mut ctx,
+                vec![PineRef::new(Some(2f64))],
+                vec![],
+                new_func_type(),
+            )
             .unwrap();
         callable.run(&mut ctx).unwrap();
     }
 
     fn run_call<'a>(val: PineRef<'a>, callback: &'a dyn Callback) {
         let mut ctx = Context::new_with_callback(callback);
-        let mut map = HashMap::new();
-        map.insert("item", val);
-        assert!(pine_print(&mut ctx, map).is_ok());
+        let mut map = vec![Some(val)];
+        assert!(pine_print(&mut ctx, map, new_func_type()).is_ok());
     }
 
     #[test]

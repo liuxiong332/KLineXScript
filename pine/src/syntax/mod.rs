@@ -42,9 +42,9 @@ pub trait SyntaxCtx<'a> {
 
     fn get_var_scope(&self, name: &'a str) -> Option<&SyntaxType<'a>>;
 
-    fn declare_user_func(&mut self, name: String, t: SyntaxType<'a>);
+    fn declare_user_func(&mut self, name: String, t: SyntaxType<'a>, index: i32);
 
-    fn get_user_func(&self, name: &str) -> Option<&SyntaxType<'a>>;
+    fn get_user_func(&self, name: &str) -> Option<&(SyntaxType<'a>, i32)>;
 
     fn gen_var_index(&mut self, name: &str) -> i32;
 
@@ -59,7 +59,7 @@ pub struct SyntaxContext<'a> {
 
     vars: HashMap<&'a str, SyntaxType<'a>>,
     // User defined function's type for the specific name, the name is like method_name@id
-    user_func_types: HashMap<String, SyntaxType<'a>>,
+    user_func_types: HashMap<String, (SyntaxType<'a>, i32)>,
 
     // The variable name to index map that can transfer the map lookup to vector getter.
     var_indexs: HashMap<String, i32>,
@@ -107,11 +107,11 @@ impl<'a> SyntaxCtx<'a> for SyntaxContext<'a> {
         self.vars.get(name)
     }
 
-    fn declare_user_func(&mut self, name: String, t: SyntaxType<'a>) {
-        self.user_func_types.insert(name, t);
+    fn declare_user_func(&mut self, name: String, t: SyntaxType<'a>, index: i32) {
+        self.user_func_types.insert(name, (t, index));
     }
 
-    fn get_user_func(&self, name: &str) -> Option<&SyntaxType<'a>> {
+    fn get_user_func(&self, name: &str) -> Option<&(SyntaxType<'a>, i32)> {
         if self.user_func_types.contains_key(name) {
             self.user_func_types.get(name)
         } else if let Some(p) = self.parent {
@@ -292,6 +292,7 @@ impl<'a> SyntaxParser<'a> {
 
     fn gen_new_func_def(
         &mut self,
+        func_call: &mut FunctionCall<'a>,
         names: &Vec<&'a str>,
         arg_types: Vec<SyntaxType<'a>>,
         method_name: &'a str,
@@ -302,25 +303,32 @@ impl<'a> SyntaxParser<'a> {
             .iter()
             .zip(arg_types.iter())
             .for_each(|(&n, t)| sub_ctx.declare_var(n, t.clone()));
-        self.context = &mut sub_ctx;
 
         let func_def;
         unsafe {
             func_def = self.user_funcs[method_name].as_mut().unwrap();
         };
+        // Create specific function definition from the origin function type.
+        // The specific function definition contain the type information.
         let mut spec_def = func_def.gen_spec_def();
 
         let varids: Vec<_> = names.iter().map(|n| sub_ctx.gen_var_index(n)).collect();
         spec_def.varids = Some(varids);
 
+        self.context = &mut sub_ctx;
         let parse_res = self.parse_blk(&mut spec_def.body)?;
+
+        // Push the specific function definition to spec_defs.
         func_def.spec_defs.as_mut().unwrap().push(spec_def);
+        let spec_index = func_def.spec_defs.as_ref().unwrap().len() as i32 - 1;
 
         self.context = sub_ctx.parent.unwrap();
         downcast_ctx(self.context).declare_user_func(
             func_name,
             SyntaxType::UserFunction(Rc::new((names.clone(), parse_res.syntax_type.clone()))),
+            spec_index,
         );
+        func_call.spec_index = spec_index;
         Ok(ParseValue::new_with_type(parse_res.syntax_type))
     }
 
@@ -346,16 +354,20 @@ impl<'a> SyntaxParser<'a> {
                 pos_arg_type.push(self.parse_exp(arg)?.syntax_type);
             }
             let typeid = self.types_id_gen.get(&pos_arg_type);
+            // Generate name by the argument types.
             let fun_name = format!("{}@{}", method_name, typeid);
 
             let context = downcast_ctx(self.context);
             func_call.ctxid = context.gen_child_ctx_index();
 
             match context.get_user_func(&fun_name) {
-                Some(SyntaxType::UserFunction(func_type)) => {
+                Some((SyntaxType::UserFunction(func_type), index)) => {
+                    func_call.spec_index = *index;
                     Ok(ParseValue::new_with_type(func_type.1.clone()))
                 }
-                None => self.gen_new_func_def(names, pos_arg_type, method_name, fun_name),
+                None => {
+                    self.gen_new_func_def(func_call, names, pos_arg_type, method_name, fun_name)
+                }
                 Some(_) => unreachable!(),
             }
         }
@@ -1209,12 +1221,16 @@ mod tests {
                     SimpleSyntaxType::Float
                 )))
             );
+            assert_eq!(func_call.spec_index, 0);
             assert_eq!(
                 downcast_ctx(parser.context).get_user_func("fun@1"),
-                Some(&SyntaxType::UserFunction(Rc::new((
-                    vec!["a1", "a2"],
-                    SyntaxType::Series(SimpleSyntaxType::Float)
-                ))))
+                Some(&(
+                    SyntaxType::UserFunction(Rc::new((
+                        vec!["a1", "a2"],
+                        SyntaxType::Series(SimpleSyntaxType::Float)
+                    ))),
+                    0
+                ))
             );
             assert_eq!(func_def.spec_defs.as_ref().unwrap().len(), len);
             let mut cond_exp1 = cond_exp.clone();
@@ -1242,12 +1258,16 @@ mod tests {
                     SimpleSyntaxType::Int
                 )))
             );
+            assert_eq!(func_call.spec_index, 1);
             assert_eq!(
                 downcast_ctx(parser.context).get_user_func("fun@2"),
-                Some(&SyntaxType::UserFunction(Rc::new((
-                    vec!["a1", "a2"],
-                    SyntaxType::Series(SimpleSyntaxType::Int)
-                ))))
+                Some(&(
+                    SyntaxType::UserFunction(Rc::new((
+                        vec!["a1", "a2"],
+                        SyntaxType::Series(SimpleSyntaxType::Int)
+                    ))),
+                    1
+                ))
             );
             assert_eq!(func_def.spec_defs.as_ref().unwrap().len(), 2);
             let mut cond_exp2 = cond_exp.clone();

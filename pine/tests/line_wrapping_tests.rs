@@ -40,7 +40,7 @@ fn expr_test() {
         )
     };
     assert_eq!(
-        pine::parse_all("a = open + high + low + close\n"),
+        pine::parse_ast("a = open + high + low + close\n"),
         Ok(add_expr(
             StrRange::new(Position::new(0, 0), Position::new(0, 29)),
             VarName::new_with_start("open", Position::new(0, 4)),
@@ -50,7 +50,7 @@ fn expr_test() {
         ))
     );
     assert_eq!(
-        pine::parse_all("a = open + \n high + \n low + \n  close\n"),
+        pine::parse_ast("a = open + \n high + \n low + \n  close\n"),
         Ok(add_expr(
             StrRange::new(Position::new(0, 0), Position::new(3, 7)),
             VarName::new_with_start("open", Position::new(0, 4)),
@@ -70,7 +70,7 @@ transp=40)
 #[test]
 fn func_call_test() {
     assert_eq!(
-        pine::parse_all(FUNC_CALL_STAT),
+        pine::parse_ast(FUNC_CALL_STAT),
         Ok(Block::new(
             vec![gen_func_call_stmt(
                 VarName::new_with_start("plot", Position::new(0, 0)),
@@ -126,7 +126,7 @@ updown(s) =>
 #[test]
 fn func_def_test() {
     assert_eq!(
-        pine::parse_all(FUNC_DEF),
+        pine::parse_ast(FUNC_DEF),
         Ok(Block::new(
             vec![
                 Statement::None(StrRange::from_start("\n", Position::new(0, 0))),
@@ -199,7 +199,7 @@ fn cond_expr_test() {
     };
 
     assert_eq!(
-        pine::parse_all("m = nz(ud[1])\n"),
+        pine::parse_ast("m = nz(ud[1])\n"),
         Ok(Block::new(
             vec![gen_assign(
                 VarName::new_with_start("m", Position::new(0, 0)),
@@ -212,7 +212,7 @@ fn cond_expr_test() {
     );
 
     assert_eq!(
-        pine::parse_all("m = (nz(ud[1]) >= 0)\n"),
+        pine::parse_ast("m = (nz(ud[1]) >= 0)\n"),
         Ok(Block::new(
             vec![gen_assign(
                 VarName::new_with_start("m", Position::new(0, 0)),
@@ -230,7 +230,7 @@ fn cond_expr_test() {
     );
 
     assert_eq!(
-        pine::parse_all("m = (1 >= 0 ? 1 : 2)\n"),
+        pine::parse_ast("m = (1 >= 0 ? 1 : 2)\n"),
         Ok(Block::new(
             vec![gen_assign(
                 VarName::new_with_start("m", Position::new(0, 0)),
@@ -253,7 +253,7 @@ fn cond_expr_test() {
     );
 
     assert_eq!(
-        pine::parse_all(FUNC_DEF2),
+        pine::parse_ast(FUNC_DEF2),
         Ok(Block::new(
             vec![gen_func_def(
                 VarName::new_with_start("updown", Position::new(0, 0)),
@@ -388,7 +388,7 @@ bgcolor(c)
 #[test]
 fn expr_comment_test() {
     assert_eq!(
-        pine::parse_all(EXPR_COMMENT),
+        pine::parse_ast(EXPR_COMMENT),
         Ok(Block::new(
             vec![
                 gen_assign(

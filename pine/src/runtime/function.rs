@@ -82,6 +82,10 @@ impl<'a> Function<'a> {
     pub fn get_subctx_count(&self) -> i32 {
         self.def.get_subctx_count()
     }
+
+    pub fn get_def(&self) -> &'a FunctionDef<'a> {
+        self.def
+    }
 }
 
 #[cfg(test)]

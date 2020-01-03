@@ -26,6 +26,8 @@ pub struct FunctionCall<'a> {
     pub ctxid: i32,
     pub range: StrRange,
     pub func_type: Option<FunctionType<'a>>,
+    // The index in function definition's specfic definitions
+    pub spec_index: i32,
 }
 
 impl<'a> FunctionCall<'a> {
@@ -44,6 +46,7 @@ impl<'a> FunctionCall<'a> {
             ctxid,
             range,
             func_type: None,
+            spec_index: 0,
         }
     }
 
@@ -60,6 +63,7 @@ impl<'a> FunctionCall<'a> {
             ctxid: 0,
             range,
             func_type: None,
+            spec_index: 0,
         }
     }
 }

@@ -435,23 +435,26 @@ impl<'a> Runner<'a> for FunctionCall<'a> {
         let result = match result.get_type() {
             (FirstType::Callable, SecondType::Simple) => {
                 let callable = downcast_pf::<Callable>(result).unwrap();
-                let ctx_ref = create_sub_ctx(context, self.ctxid, ContextType::FuncDefBlock, 0, 0);
+                // let ctx_ref = create_sub_ctx(context, self.ctxid, ContextType::FuncDefBlock, 0, 0);
                 let func_type = self.func_type.as_ref().unwrap().clone();
-                let result = callable.call(ctx_ref, pos_args, dict_args, func_type);
-                ctx_ref.set_is_run(true);
+                let result = callable.call(context, pos_args, dict_args, func_type);
+                // ctx_ref.set_is_run(true);
                 context.create_callable(callable);
                 result
             }
             (FirstType::Function, SecondType::Simple) => {
                 let callable = downcast_pf::<Function>(result).unwrap();
+                let def = callable.get_def();
+                let true_def = &def.spec_defs.as_ref().unwrap()[self.spec_index as usize];
+                let function = Function::new(true_def);
                 let ctx_ref = create_sub_ctx(
                     context,
                     self.ctxid,
                     ContextType::FuncDefBlock,
-                    callable.get_var_count(),
-                    callable.get_subctx_count(),
+                    function.get_var_count(),
+                    function.get_subctx_count(),
                 );
-                let result = callable.call(ctx_ref, pos_args, dict_args, self.range);
+                let result = function.call(ctx_ref, pos_args, dict_args, self.range);
                 ctx_ref.set_is_run(true);
                 return result;
             }
@@ -879,9 +882,14 @@ mod tests {
             ),
             StrRange::new_empty(),
         );
+        let mut parent_def = def_exp.clone();
+        parent_def.spec_defs.as_mut().unwrap().push(def_exp);
         let mut context = Context::new(None, ContextType::Normal);
         context.init(2, 2);
-        context.create_var(name_index.varid, PineRef::new_rc(Function::new(&def_exp)));
+        context.create_var(
+            name_index.varid,
+            PineRef::new_rc(Function::new(&parent_def)),
+        );
 
         let res = downcast_pf::<Bool>(exp.run(&mut context).unwrap()).unwrap();
         assert_eq!(res, RefData::new_box(true));

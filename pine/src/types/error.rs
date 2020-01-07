@@ -1,6 +1,5 @@
 #[derive(Debug, PartialEq, Clone)]
 pub enum RuntimeErr {
-    NotCompatible(String),
     NotValidParam,
     NotSupportOperator,
     NotImplement(String),
@@ -9,13 +8,11 @@ pub enum RuntimeErr {
     InvalidTypeCast,
     InvalidNADeclarer,
 
-    VarNotFound,            // The variable not found in context
-    InvalidVarType(String), // The variable type is invalid.
-    NameNotDeclard,
+    VarNotFound, // The variable not found in context
 
-    TypeMismatch(String), // The derised type is not the same as the real type.
-    TupleMismatch,        // count of Left and Right side of assignment is not the same
-
+    UnknownRuntimeErr,
+    // TypeMismatch(String), // The derised type is not the same as the real type.
+    // TupleMismatch, // count of Left and Right side of assignment is not the same
     Continue,
     Break,
 

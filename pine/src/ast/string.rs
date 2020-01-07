@@ -8,7 +8,7 @@ use nom::{
     Err,
 };
 
-const ESCAPE_CODE: &'static str = "\'\"\\\n0123456789abfnrtuvxz";
+const ESCAPE_CODE: &'static str = "\'\"\\\n0123456789abfnrtv";
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StringNode {
@@ -33,6 +33,9 @@ fn control_char_lookup(b: u8) -> Option<ControlChar> {
         b'\'' => Some(ControlChar::Byte(b'\'')),
         b'\"' => Some(ControlChar::Byte(b'\"')),
         b'\n' => Some(ControlChar::Byte(b'\n')),
+        b'0' | b'1' | b'2' | b'3' | b'4' | b'5' | b'6' | b'7' | b'8' | b'9' => {
+            Some(ControlChar::Byte(b - '0' as u8))
+        }
         b'a' => Some(ControlChar::Byte(0x07)),  // bell
         b'b' => Some(ControlChar::Byte(0x08)),  // backspace
         b'f' => Some(ControlChar::Byte(0x0c)),  // form feed
@@ -44,7 +47,7 @@ fn control_char_lookup(b: u8) -> Option<ControlChar> {
     }
 }
 
-pub fn unescape(buf: &str) -> Result<String, &'static str> {
+pub fn unescape(buf: &str) -> Result<String, PineErrorKind> {
     if buf.len() == 0 {
         return Ok(String::from(""));
     }
@@ -59,11 +62,11 @@ pub fn unescape(buf: &str) -> Result<String, &'static str> {
                     unescape(&buf[2..])?.as_ref(),
                 ]
                 .concat()),
-                None => Err("Invalid  control character was accepted!"),
+                None => Err(PineErrorKind::InvalidCtrlInStrLiteral),
             }
         }
         Err(Err::Error(PineError { errors: _ })) => Ok(String::from(buf)),
-        _ => Err("unescape unexpected Incomplete character"),
+        _ => Err(PineErrorKind::InvalidStrLiteral),
     }
 }
 
@@ -80,10 +83,7 @@ fn gen_quote_str(quote_char: &'static str) -> impl Fn(Input) -> PineResult<Strin
                 next_input,
                 StringNode::new(res_str, StrRange::from_input(&out)),
             )),
-            Err(err_str) => Err(Err::Error(PineError::from_pine_kind(
-                input,
-                PineErrorKind::InvalidStrLiteral(err_str),
-            ))),
+            Err(err_str) => Err(Err::Error(PineError::from_pine_kind(input, err_str))),
         }
     }
 }

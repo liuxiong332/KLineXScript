@@ -102,10 +102,7 @@ impl<'a> PineFrom<'a, Int> for Int {
                 };
                 Ok(RefData::new_box(i))
             }
-            _ => Err(RuntimeErr::NotCompatible(format!(
-                "Cannot force convert from {:?} to int",
-                t.get_type().0
-            ))),
+            _ => Err(RuntimeErr::UnknownRuntimeErr),
         }
     }
 
@@ -121,10 +118,7 @@ impl<'a> PineFrom<'a, Int> for Int {
                 let i: Int = None;
                 Ok(RefData::new_box(i))
             }
-            _ => Err(RuntimeErr::NotCompatible(format!(
-                "Cannot convert from {:?} to int",
-                t.get_type().0
-            ))),
+            _ => Err(RuntimeErr::UnknownRuntimeErr),
         }
     }
 }
@@ -228,10 +222,7 @@ impl<'a> PineFrom<'a, Float> for Float {
                 let s = downcast_pf::<Series<Int>>(t).unwrap();
                 Ok(RefData::new_box(int2float(s.get_current())))
             }
-            _ => Err(RuntimeErr::NotCompatible(format!(
-                "Cannot convert from {:?} to float",
-                t.get_type().0
-            ))),
+            _ => Err(RuntimeErr::UnknownRuntimeErr),
         }
     }
 }
@@ -304,10 +295,7 @@ impl<'a> PineFrom<'a, Bool> for Bool {
                 };
                 Ok(RefData::new_box(b))
             }
-            _ => Err(RuntimeErr::NotCompatible(format!(
-                "Cannot convert from {:?} to bool",
-                t.get_type().0
-            ))),
+            _ => Err(RuntimeErr::UnknownRuntimeErr),
         }
     }
 }
@@ -341,10 +329,7 @@ impl<'a> PineFrom<'a, Color<'a>> for Color<'a> {
                 Ok(RefData::new_box(f.get_current()))
             }
             (DataType::NA, _) => Ok(RefData::new_box(Color(""))),
-            _ => Err(RuntimeErr::NotCompatible(format!(
-                "Cannot convert from {:?} to color",
-                t.get_type().0
-            ))),
+            _ => Err(RuntimeErr::UnknownRuntimeErr),
         }
     }
 }
@@ -374,10 +359,7 @@ impl<'a> PineFrom<'a, NA> for NA {
     fn implicity_from(t: PineRef<'a>) -> Result<RefData<NA>, RuntimeErr> {
         match t.get_type() {
             (DataType::NA, _) => Ok(RefData::new_box(NA)),
-            _ => Err(RuntimeErr::NotCompatible(format!(
-                "Cannot convert from {:?} to color",
-                t.get_type().0
-            ))),
+            _ => Err(RuntimeErr::UnknownRuntimeErr),
         }
     }
 }

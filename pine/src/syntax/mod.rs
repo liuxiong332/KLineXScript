@@ -11,6 +11,7 @@ use crate::ast::stat_expr_types::{
 use crate::ast::state::PineInputError;
 use crate::ast::syntax_type::{FunctionTypes, SimpleSyntaxType, SyntaxType};
 use std::collections::HashMap;
+use std::convert::From;
 use std::mem;
 use std::rc::Rc;
 
@@ -684,8 +685,8 @@ impl<'a> SyntaxParser<'a> {
         if is_cast_err {
             self.catch(PineInputError::new(
                 PineErrorKind::InvalidTypeCast {
-                    origin: format!("{:?}", origin_type),
-                    cast: format!("{:?}", type_cast.data_type),
+                    origin: SimpleSyntaxType::from(origin_type),
+                    cast: SimpleSyntaxType::from(type_cast.data_type.clone()),
                 },
                 type_cast.range,
             ));
@@ -827,8 +828,8 @@ impl<'a> SyntaxParser<'a> {
             if is_cast_err {
                 self.catch(PineInputError::new(
                     PineErrorKind::InvalidTypeCast {
-                        origin: format!("{:?}", val),
-                        cast: format!("{:?}", data_type),
+                        origin: SimpleSyntaxType::from(val),
+                        cast: SimpleSyntaxType::from(data_type.clone()),
                     },
                     range,
                 ));
@@ -907,8 +908,8 @@ impl<'a> SyntaxParser<'a> {
                 } else {
                     self.catch(PineInputError::new(
                         PineErrorKind::InvalidTypeCast {
-                            origin: format!("{:?}", val_res.syntax_type),
-                            cast: format!("{:?}", last_type),
+                            origin: SimpleSyntaxType::from(val_res.syntax_type),
+                            cast: SimpleSyntaxType::from(last_type.clone()),
                         },
                         assign.range,
                     ));

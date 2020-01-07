@@ -40,11 +40,7 @@ where
 }
 
 fn downcast_err<'a, T: PineStaticType + 'a>(item: &(dyn PineType<'a> + 'a)) -> RuntimeErr {
-    RuntimeErr::NotCompatible(format!(
-        "downcast from {:?} to {:?} is not allowed",
-        item.get_type(),
-        T::static_type()
-    ))
+    unreachable!()
 }
 
 pub fn downcast<'a, T: PineStaticType + 'a>(

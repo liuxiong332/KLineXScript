@@ -8,7 +8,6 @@ pub mod primitive;
 pub mod ref_data;
 pub mod series;
 pub mod traits;
-pub mod util;
 
 pub use callable::*;
 pub use downcast::*;

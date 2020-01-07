@@ -1,4 +1,6 @@
+use super::stat_expr_types::DataType;
 use std::collections::BTreeMap;
+use std::convert::From;
 use std::rc::Rc;
 
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]
@@ -15,6 +17,28 @@ pub enum SimpleSyntaxType {
     Na,
     String,
     Color,
+}
+
+impl From<DataType> for SimpleSyntaxType {
+    fn from(data_type: DataType) -> Self {
+        match data_type {
+            DataType::Bool => SimpleSyntaxType::Bool,
+            DataType::Int => SimpleSyntaxType::Int,
+            DataType::Float => SimpleSyntaxType::Float,
+            DataType::String => SimpleSyntaxType::String,
+            DataType::Color => SimpleSyntaxType::Color,
+        }
+    }
+}
+
+impl<'a> From<SyntaxType<'a>> for SimpleSyntaxType {
+    fn from(syntax_type: SyntaxType<'a>) -> Self {
+        match syntax_type {
+            SyntaxType::Simple(simple_type) => simple_type,
+            SyntaxType::Series(simple_type) => simple_type,
+            _ => unreachable!(),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]

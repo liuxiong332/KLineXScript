@@ -88,10 +88,11 @@ pub fn process_assign_val<'a>(
                 update_series::<String>(context, index, current_val, true_val)
             }
             ((_, SecondType::Series), _) | (_, (_, SecondType::Series)) => {
-                Err(RuntimeErr::TypeMismatch(format!(
-                    "Series type can only be Int, Float, Bool, Color, String, but get {:?}",
-                    current_val.get_type()
-                )))
+                // Err(RuntimeErr::TypeMismatch(format!(
+                //     "Series type can only be Int, Float, Bool, Color, String, but get {:?}",
+                //     current_val.get_type()
+                // )))
+                Err(RuntimeErr::UnknownRuntimeErr)
             }
             ((FirstType::Bool, SecondType::Simple), _)
             | (_, (FirstType::Bool, SecondType::Simple)) => {
@@ -124,10 +125,11 @@ pub fn process_assign_val<'a>(
                 Ok(val)
             }
             _ => {
-                return Err(RuntimeErr::TypeMismatch(format!(
-                    "Variable type can only be Int, Float, Bool, Color, String, but get {:?}",
-                    true_val.get_type()
-                )))
+                // return Err(RuntimeErr::TypeMismatch(format!(
+                //     "Variable type can only be Int, Float, Bool, Color, String, but get {:?}",
+                //     true_val.get_type()
+                // )))
+                Err(RuntimeErr::UnknownRuntimeErr)
             }
         },
     }
@@ -234,7 +236,11 @@ impl<'a> Runner<'a> for Assignment<'a> {
                 let mut tuple = downcast_pf::<Tuple>(val).unwrap();
 
                 if tuple.0.len() != self.names.len() {
-                    return Err(PineRuntimeError::new(RuntimeErr::TupleMismatch, self.range));
+                    return Err(PineRuntimeError::new(
+                        RuntimeErr::UnknownRuntimeErr,
+                        self.range,
+                    ));
+                    // return Err(PineRuntimeError::new(RuntimeErr::TupleMismatch, self.range));
                 }
 
                 let varids = self.varids.as_ref().unwrap().iter();

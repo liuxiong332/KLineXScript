@@ -47,10 +47,7 @@ where
                 Ok(RefData::new_rc(vec![val]))
             }
             (_, SecondType::Array) => downcast_pf::<Vec<D>>(t),
-            _ => Err(RuntimeErr::NotCompatible(format!(
-                "Cannot convert from {:?} to the specific type",
-                t.get_type().0
-            ))),
+            _ => Err(RuntimeErr::UnknownRuntimeErr),
         }
     }
 }

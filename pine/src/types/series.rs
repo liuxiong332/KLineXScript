@@ -182,11 +182,7 @@ where
             (DataType::String, SecondType::Simple) => Ok(RefData::new_rc(Series::from(
                 D::explicity_from(t)?.into_inner(),
             ))),
-            _ => Err(RuntimeErr::NotCompatible(format!(
-                "Cannot convert from {:?} to {:?} series",
-                t.get_type(),
-                D::static_type()
-            ))),
+            _ => Err(RuntimeErr::UnknownRuntimeErr),
         }
     }
 
@@ -242,11 +238,7 @@ where
             (DataType::String, SecondType::Simple) => Ok(RefData::new_rc(Series::from(
                 D::implicity_from(t)?.into_inner(),
             ))),
-            _ => Err(RuntimeErr::NotCompatible(format!(
-                "Cannot convert from {:?} to {:?} series",
-                t.get_type(),
-                D::static_type()
-            ))),
+            _ => Err(RuntimeErr::UnknownRuntimeErr),
         }
     }
 }

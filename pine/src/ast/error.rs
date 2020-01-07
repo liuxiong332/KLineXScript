@@ -1,7 +1,9 @@
 use super::input::Input;
+use super::syntax_type::SimpleSyntaxType;
 use nom::error::{ErrorKind, ParseError};
 use nom::Err;
 use nom::IResult;
+use std::fmt;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum PineErrorKind {
@@ -9,19 +11,23 @@ pub enum PineErrorKind {
     Char(char),
     Context(&'static str),
     ReservedVarName,
-    InvalidIdentifier(&'static str), // The identifier is not invalid
+    InvalidIdentifier, // The identifier is not invalid, The identifier must start with alphabetic or _
     InvalidDecimal,
-    InvalidStrLiteral(&'static str),
+    InvalidCtrlInStrLiteral, // Invalid  control character was accepted!
+    InvalidStrLiteral,
     InvalidColorLiteral,
-    InvalidFuncCallArgs(&'static str),
+    InvalidFuncCallArgs, // Position argument must appear before the dict argument
     IncorrectIndent,
     CannotInferType,
-    NotEndOfInput,                                    // expect end of input, but not
+    NotEndOfInput,         // expect end of input, but not
     PrefixNoNamesAfterDot, // Prefix expressions don't contain names after dot
     LVTupleNoNames,        // left value tuple don't contain names
     BlockNoStmts,          // Block don't contain statements.
     VarNotDeclare,         // The variable not declare before used
-    InvalidTypeCast { origin: String, cast: String }, // This type cast is not valid
+    InvalidTypeCast {
+        origin: SimpleSyntaxType,
+        cast: SimpleSyntaxType,
+    }, // This type cast is not valid
     VarNotCallable,
     FuncCallSignatureNotMatch,
     ForbiddenDictArgsForUserFunc, // cannot call user defined function with dict arguments.

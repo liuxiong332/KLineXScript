@@ -162,7 +162,7 @@ fn condition<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Condition
     Ok((input, Condition::new(cond, exp1, exp2, range)))
 }
 
-fn prefix_exp<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, PrefixExp<'a>> {
+fn prefix_exp<'a>(input: Input<'a>, _state: &AstState) -> PineResult<'a, PrefixExp<'a>> {
     let (input, (prefix, _, names)) =
         tuple((varname, tag("."), separated_list(tag("."), varname)))(input)?;
 
@@ -555,7 +555,7 @@ pub fn block<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Block<'a>
 mod tests {
     use super::super::input::Position;
     use super::super::name::VarName;
-    use super::super::num::{FloatNode, IntNode, Numeral};
+    use super::super::num::{IntNode, Numeral};
     use super::*;
     use std::fmt::Debug;
 
@@ -808,6 +808,23 @@ mod tests {
                 false,
                 None,
                 StrRange::from_start("a = close", Position::new(0, 0)),
+            ))),
+        );
+        check_res(
+            "a = b = close // This is also a comment\n",
+            statement_with_indent,
+            Statement::Assignment(Box::new(Assignment::new(
+                vec![VarName::new_with_start("a", Position::new(0, 0))],
+                Exp::Assignment(Box::new(Assignment::new(
+                    vec![VarName::new_with_start("b", Position::new(0, 4))],
+                    Exp::VarName(RVVarName::new_with_start("close", Position::new(0, 8))),
+                    false,
+                    None,
+                    StrRange::from_start("b = close", Position::new(0, 4)),
+                ))),
+                false,
+                None,
+                StrRange::from_start("a = b = close", Position::new(0, 0)),
             ))),
         );
         check_res(

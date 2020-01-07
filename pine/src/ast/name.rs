@@ -61,7 +61,7 @@ fn alpha_or_underscore(input: Input) -> PineResult {
         Some((_, true)) => Ok(input.take_split(1)),
         _ => Err(Err::Error(PineError::from_pine_kind(
             input,
-            PineErrorKind::InvalidIdentifier("The identifier must start with alphabetic or _"),
+            PineErrorKind::InvalidIdentifier,
         ))),
     }
     // alt((alpha0, tag("_")))(input)

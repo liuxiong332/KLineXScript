@@ -112,11 +112,7 @@ impl<'a> Runner<'a> for TypeCast<'a> {
                 Ok(s.into_pf())
             }
             _t => Err(PineRuntimeError::new(
-                RuntimeErr::NotCompatible(format!(
-                    "Cannot convert {:?} to {:?}",
-                    result.get_type(),
-                    _t
-                )),
+                RuntimeErr::UnknownRuntimeErr,
                 self.range,
             )),
         }
@@ -129,10 +125,7 @@ impl<'a> Runner<'a> for PrefixExp<'a> {
         let var = context.move_var(self.var_index).unwrap();
         if var.get_type() != (FirstType::Object, SecondType::Simple) {
             return Err(PineRuntimeError::new(
-                RuntimeErr::InvalidVarType(format!(
-                    "Expect Object type, but get {:?}",
-                    var.get_type().0
-                )),
+                RuntimeErr::UnknownRuntimeErr,
                 self.range,
             ));
         }
@@ -181,10 +174,7 @@ where
     let arg_type = arg.get_type();
     let i = Int::implicity_from(arg)?;
     match *i {
-        None => Err(RuntimeErr::InvalidVarType(format!(
-            "Expect simple int, but get {:?}",
-            arg_type
-        ))),
+        None => Err(RuntimeErr::UnknownRuntimeErr),
         Some(i) => {
             let res = PineRef::new_rc(s.index(i as usize)?);
             // context.update_var(name, s.into_pf());

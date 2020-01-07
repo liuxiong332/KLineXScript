@@ -82,9 +82,7 @@ fn func_call_args<'a>(
                 if is_dict_args {
                     return Err(Err::Error(PineError::from_pine_kind(
                         input,
-                        PineErrorKind::InvalidFuncCallArgs(
-                            "Position argument must appear before the dict argument",
-                        ),
+                        PineErrorKind::InvalidFuncCallArgs,
                     )));
                 }
                 pos_args.push(arg.arg);

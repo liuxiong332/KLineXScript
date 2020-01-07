@@ -41,10 +41,6 @@ pub trait PineStaticType {
 }
 
 pub trait PineType<'a> {
-    // convert this type to another type by (data_type, second_type)
-    // fn into(self: Box<Self>, pri_type: &DataType) -> Result<Box<dyn PineType<'a>>, RuntimeErr> {
-    //     Err(RuntimeErr::NotCompatible)
-    // }
     fn get_type(&self) -> (DataType, SecondType);
 
     fn category(&self) -> Category {
@@ -141,10 +137,7 @@ pub trait PineFrom<'a, D: 'a + PartialEq + fmt::Debug> {
 
     // Create this type from the source type for auto cast
     fn implicity_from(_t: PineRef<'a>) -> Result<RefData<D>, RuntimeErr> {
-        Err(RuntimeErr::NotCompatible(format!(
-            "Cannot convert from {:?} to the specific type",
-            _t.get_type().0
-        )))
+        unimplemented!()
     }
 }
 

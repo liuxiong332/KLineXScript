@@ -1,5 +1,6 @@
 pub mod context;
 pub mod data_src;
+pub mod error_format;
 pub mod exp;
 pub mod function;
 pub mod op;

@@ -26,8 +26,8 @@ use syntax::SyntaxParser;
 use libs::{declare_vars, VarResult};
 use runtime::context::PineRuntimeError;
 use runtime::data_src::{Callback, DataSrc};
+use runtime::error_format::{ErrorFormater, PineFormatError};
 use std::mem;
-use types::error_format::{ErrorFormater, PineFormatError};
 use types::{Float, PineRef};
 
 #[derive(Debug, Clone)]

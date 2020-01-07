@@ -1,7 +1,6 @@
 use super::error::{PineError, PineErrorKind};
 use super::input::{Input, StrRange};
-// use std::marker::PhantomData;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct PineInputError {
@@ -17,15 +16,28 @@ impl PineInputError {
 
 pub struct AstState {
     errors: RefCell<Vec<PineInputError>>,
-    // phantom: PhantomData<&'a str>,
+    indent: Cell<usize>,
 }
 
 impl AstState {
     pub fn new() -> AstState {
         AstState {
             errors: RefCell::new(vec![]),
-            // phantom: PhantomData,
+            indent: Cell::new(0),
         }
+    }
+
+    pub fn enter_scope(&self) {
+        self.indent.replace(self.indent.get() + 1);
+    }
+
+    pub fn exit_scope(&self) {
+        debug_assert!(self.indent.get() > 0);
+        self.indent.replace(self.indent.get() - 1);
+    }
+
+    pub fn get_indent(&self) -> usize {
+        self.indent.get()
     }
 
     pub fn merge_pine_error(&self, mut err: PineError<Input>) {

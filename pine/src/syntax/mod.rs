@@ -1466,7 +1466,7 @@ mod tests {
         context.declare_var_with_index("var", SyntaxType::Simple(SimpleSyntaxType::Int));
 
         let input = Input::new_with_str("if var\n    1\nelse\n    1.0");
-        let mut exp = if_then_else_exp(0)(input, &AstState::new()).unwrap().1;
+        let mut exp = if_then_else_exp(input, &AstState::new()).unwrap().1;
         assert_eq!(
             parser.parse_ifthenelse_exp(&mut exp),
             Ok(ParseValue::new_with_type(SyntaxType::Series(
@@ -1478,7 +1478,7 @@ mod tests {
         assert_eq!(exp.else_ctxid, 1);
 
         let input = Input::new_with_str("if 1\n    1\n");
-        let mut exp = if_then_else_exp(0)(input, &AstState::new()).unwrap().1;
+        let mut exp = if_then_else_exp(input, &AstState::new()).unwrap().1;
         assert_eq!(
             parser.parse_ifthenelse_exp(&mut exp),
             Ok(ParseValue::new_with_type(SyntaxType::Series(
@@ -1499,7 +1499,7 @@ mod tests {
         context.declare_var_with_index("var", SyntaxType::Simple(SimpleSyntaxType::Int));
 
         let input = Input::new_with_str("if var\n    1\n");
-        let mut exp = if_then_else_exp(0)(input, &AstState::new()).unwrap().1;
+        let mut exp = if_then_else_exp(input, &AstState::new()).unwrap().1;
         assert_eq!(
             parser.parse_ifthenelse_exp(&mut exp),
             Ok(ParseValue::new_with_type(SyntaxType::Series(
@@ -1518,8 +1518,7 @@ mod tests {
         context.declare_var_with_index("var", SyntaxType::Simple(SimpleSyntaxType::Int));
         let input = Input::new_with_str("if var\n    var = 1\n    var\nelse\n    var=1.0\n    var");
         assert_eq!(
-            parser
-                .parse_ifthenelse_exp(&mut if_then_else_exp(0)(input, &AstState::new()).unwrap().1),
+            parser.parse_ifthenelse_exp(&mut if_then_else_exp(input, &AstState::new()).unwrap().1),
             Ok(ParseValue::new_with_type(SyntaxType::Series(
                 SimpleSyntaxType::Float
             )))
@@ -1536,7 +1535,7 @@ mod tests {
         context.declare_var_with_index("var", SyntaxType::Simple(SimpleSyntaxType::Int));
 
         let input = Input::new_with_str("for i = 1 to 2\n    i");
-        let mut for_range = for_range_exp(0)(input, &AstState::new()).unwrap().1;
+        let mut for_range = for_range_exp(input, &AstState::new()).unwrap().1;
         assert_eq!(
             parser.parse_forrange_exp(&mut for_range),
             Ok(ParseValue::new_with_type(SyntaxType::Series(
@@ -1917,9 +1916,7 @@ mod tests {
         let input = Input::new_with_str("if var\n    1\nelse\n    na");
         assert_eq!(
             parser.parse_ifthenelse_stmt(
-                &mut if_then_else_with_indent(0)(input, &AstState::new())
-                    .unwrap()
-                    .1
+                &mut if_then_else_with_indent(input, &AstState::new()).unwrap().1
             ),
             Ok(ParseValue::new_with_type(SyntaxType::Void))
         );
@@ -1936,7 +1933,7 @@ mod tests {
 
         let input = Input::new_with_str("a = 1");
         let val_type = SyntaxType::Simple(SimpleSyntaxType::Int);
-        let mut assign = assign_with_indent(0)(input, &AstState::new()).unwrap().1;
+        let mut assign = assign_with_indent(input, &AstState::new()).unwrap().1;
         assert_eq!(
             parser.parse_assign(&mut assign),
             Ok(ParseValue::new_with_type(val_type.clone()))
@@ -1945,7 +1942,7 @@ mod tests {
         assert_eq!(assign.varids, Some(vec![1]));
 
         context.var_indexs = HashMap::new();
-        let mut assign = assign_with_indent(0)(input, &AstState::new()).unwrap().1;
+        let mut assign = assign_with_indent(input, &AstState::new()).unwrap().1;
         assert_eq!(
             parser.parse_assign(&mut assign),
             Ok(ParseValue::new_with_type(val_type.clone()))
@@ -1961,7 +1958,7 @@ mod tests {
 
         context.var_indexs = HashMap::new();
         let input = Input::new_with_str("[a1, a2] = [1, 2]");
-        let mut assign = assign_with_indent(0)(input, &AstState::new()).unwrap().1;
+        let mut assign = assign_with_indent(input, &AstState::new()).unwrap().1;
         assert_eq!(
             parser.parse_assign(&mut assign),
             Ok(ParseValue::new_with_type(SyntaxType::Tuple(Rc::new(vec![
@@ -1974,7 +1971,7 @@ mod tests {
         context.var_indexs = HashMap::new();
         let input = Input::new_with_str("int [a1, a2] = [1.0, 2.0]");
         assert_eq!(
-            parser.parse_assign(&mut assign_with_indent(0)(input, &AstState::new()).unwrap().1),
+            parser.parse_assign(&mut assign_with_indent(input, &AstState::new()).unwrap().1),
             Ok(ParseValue::new_with_type(SyntaxType::Tuple(Rc::new(vec![
                 val_type.clone(),
                 val_type.clone()
@@ -2000,9 +1997,7 @@ mod tests {
 
         let input = Input::new_with_str("a := 1");
         let val_type = SyntaxType::Series(SimpleSyntaxType::Float);
-        let mut assign = var_assign_with_indent(0)(input, &AstState::new())
-            .unwrap()
-            .1;
+        let mut assign = var_assign_with_indent(input, &AstState::new()).unwrap().1;
         assert_eq!(
             parser.parse_var_assign(&mut assign),
             Ok(ParseValue::new_with_type(val_type.clone()))

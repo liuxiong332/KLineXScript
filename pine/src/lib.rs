@@ -27,6 +27,7 @@ use libs::{declare_vars, VarResult};
 use runtime::context::PineRuntimeError;
 use runtime::data_src::{Callback, DataSrc};
 use std::mem;
+use types::error_format::{ErrorFormater, PineFormatError};
 use types::{Float, PineRef};
 
 #[derive(Debug, Clone)]
@@ -97,6 +98,7 @@ pub struct PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
     blk: Block<'pa>,
     callback: &'ra dyn Callback,
     runner: Option<PineRunner<'ra, 'rb, 'rc>>,
+    error_format: ErrorFormater,
 }
 
 const SERIES_FLOAT: SyntaxType = SyntaxType::Series(SimpleSyntaxType::Float);
@@ -118,6 +120,7 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
             blk: Block::new_no_input(vec![], None),
             callback,
             runner: None,
+            error_format: ErrorFormater::new(),
         }
     }
 
@@ -130,10 +133,11 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
             blk: Block::new_no_input(vec![], None),
             callback,
             runner: None,
+            error_format: ErrorFormater::new(),
         }
     }
 
-    pub fn parse_src<'s, 'a, 'pb>(&'s mut self, src: &'a str) -> Result<(), Vec<PineInputError>>
+    pub fn parse_src<'s, 'a, 'pb>(&'s mut self, src: &'a str) -> Result<(), Vec<PineFormatError>>
     where
         's: 'pb,
         'li: 'pa,
@@ -146,13 +150,20 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
             parser = PineParser::new(src_ref, lib_ref);
         }
         // parser = PineParser::new(src, &self.lib_info);
-        let blk = parser.parse()?;
-        self.blk = blk;
-        self.runner = None;
-        Ok(())
+        match parser.parse() {
+            Ok(blk) => {
+                self.blk = blk;
+                self.runner = None;
+                Ok(())
+            }
+            Err(errs) => Err(errs
+                .into_iter()
+                .map(|err| PineFormatError::from_input_error(&self.error_format, err))
+                .collect()),
+        }
     }
 
-    pub fn run(&mut self, data: Vec<(&'static str, Vec<Float>)>) -> Result<(), PineRuntimeError>
+    pub fn run(&mut self, data: Vec<(&'static str, Vec<Float>)>) -> Result<(), PineFormatError>
     where
         'li: 'ra,
         'pa: 'ra,
@@ -167,7 +178,10 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
             }
             self.runner = Some(runner);
         }
-        self.runner.as_mut().unwrap().run(data)
+        match self.runner.as_mut().unwrap().run(data) {
+            Ok(val) => Ok(val),
+            Err(err) => Err(PineFormatError::from_runtime_error(&self.error_format, err)),
+        }
     }
 }
 

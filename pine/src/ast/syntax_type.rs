@@ -2,6 +2,7 @@ use super::stat_expr_types::DataType;
 use std::collections::BTreeMap;
 use std::convert::From;
 use std::rc::Rc;
+use std::string::ToString;
 
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct FunctionType<'a>(pub (Vec<(&'a str, SyntaxType<'a>)>, SyntaxType<'a>));
@@ -37,6 +38,19 @@ impl<'a> From<SyntaxType<'a>> for SimpleSyntaxType {
             SyntaxType::Simple(simple_type) => simple_type,
             SyntaxType::Series(simple_type) => simple_type,
             _ => unreachable!(),
+        }
+    }
+}
+
+impl ToString for SimpleSyntaxType {
+    fn to_string(&self) -> String {
+        match self {
+            SimpleSyntaxType::Int => String::from("int"),
+            SimpleSyntaxType::Float => String::from("float"),
+            SimpleSyntaxType::Bool => String::from("bool"),
+            SimpleSyntaxType::Na => String::from("na"),
+            SimpleSyntaxType::String => String::from("string"),
+            SimpleSyntaxType::Color => String::from("color"),
         }
     }
 }

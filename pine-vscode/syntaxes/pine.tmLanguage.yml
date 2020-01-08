@@ -3,20 +3,156 @@ name: Pine
 scopeName: source.pine
 
 patterns:
-    - include: '#keywords'
-    - include: '#strings'
-    - include: '#comment'
-    - include: '#function-call'
+    - include: '#statement'
+    - include: '#expression'
 
 repository:
+    statement:
+        patterns:
+            - include: '#function-declaration'
+
+    expression:
+        patterns: 
+            - include: '#keywords'
+            - include: '#strings'
+            - include: '#comment'
+            - include: '#number'
+            - include: '#color'
+            - include: '#literal'
+            - include: '#assignment-operator'
+            - include: '#operator'
+            - include: '#variable'
+            - include: '#function-call'
+            - include: '#array'
+            - include: '#round-braces'
+            - include: 'builtin-types'
+
+    builtin-types:
+        name: support.type.python
+        match: |
+            (?x)
+            (?<!\.) \b(
+                bool | na | int | float | string | color
+            )\b
+
     keywords:
         patterns:
-            - name: keyword.control.pine
-              match: \b(if|while|for|return)\b
+            - name: storage.type.pine
+              match: \b(var)\b
+            - name: keyword.control.conditional.pine
+              match: \b(if|else)\b
+            - name: keyword.control.loop.pine
+              match: \b(for|to)\b
+            - name: keyword.control.flow.pine
+              match: \b(return|break|continue)\b
+
+    literal:
+        patterns:
+            - name: constant.language.pine
+              match: \b(true|false|na)\b
+
+            - include: '#number'
+
+    number:
+        name: constant.numeric.pine
+        patterns:
+            - include: '#number-float'
+            - include: '#number-dec'
+            - name: invalid.illegal.name.pine
+              match: \b[0-9]+\w+
+
+    number-float:
+        name: constant.numeric.float.pine
+        match: |
+            (?x)
+            (?<! \w)(?:
+                (?:
+                \.[0-9](?: _?[0-9] )*
+                |
+                [0-9](?: _?[0-9] )* \. [0-9](?: _?[0-9] )*
+                |
+                [0-9](?: _?[0-9] )* \.
+                ) (?: [eE][+-]?[0-9](?: _?[0-9] )* )?
+                |
+                [0-9](?: _?[0-9] )* (?: [eE][+-]?[0-9](?: _?[0-9] )* )
+            )([jJ])?\b
+        captures:
+            '1': {name: storage.type.imaginary.number.pine}
+
+    number-dec:
+        name: constant.numeric.dec.pine
+        match: |
+            (?x)
+            (?<![\w\.])(?:
+                [1-9](?: _?[0-9] )*
+                |
+                0+
+                |
+                [0-9](?: _?[0-9] )* ([jJ])
+                |
+                0 ([0-9]+)(?![eE\.])
+            )\b
+        captures:
+            '1': {name: storage.type.imaginary.number.pine}
+            '2': {name: invalid.illegal.dec.pine}
+            '3': {name: invalid.illegal.dec.pine}
+               
+    color: 
+        name: constant.other.rgb-value.pine
+        match: (\#[0-9a-fA-F]+)
+        
+    assignment-operator:
+        name: keyword.operator.assignment.python
+        match: |
+            (?x)
+                =(?!=) | :=
+
+    operator:
+        match: |
+            (?x)
+                \b(?<!\.)
+                (?:
+                    (and | or | not )                           (?# 1)
+                    |
+                    (for | if | else )                          (?# 2)
+                )
+                \b
+    
+                | ( \* | \+ | - | % | / )                        (?# 3)
+    
+                | (!= | == | >= | <= | < | >)                    (?# 4)
+
+                | (\? | :)                                       (?# 5)
+    
+        captures:
+            '1': {name: keyword.operator.logical.pine}
+            '2': {name: keyword.control.flow.pine}
+            '3': {name: keyword.operator.arithmetic.pine}
+            '4': {name: keyword.operator.comparison.pine}
+            '5': {name: keyword.operator.ternary.pine}
+
+    variable:
+        patterns:
+            - name: variable.other.readwrite.pine
+              match: |
+                (?x)
+                    \b ([[:alpha:]_]\w*) \b
+
+    array:
+        name: meta.array.literal.pine
+        begin: (\[)
+        end: (\])
+        beginCaptures: 
+            '1': {name: meta.brace.square.pine}
+        endCaptures:
+            '1': {name: meta.brace.square.pine}
+        patterns:
+            - include: '#number'
+    
     strings: 
         name: string.quoted.double.pine
-        begin: "\""
-        end: "\""
+        begin: (\'|\")
+        end: (\1)|(\n)
         patterns:
             - name: constant.character.escape.pine
               match: \\.
@@ -25,6 +161,16 @@ repository:
         begin: "//"
         end: (?:$|(?=//))
     
+    round-braces:
+        begin: \(
+        end: \)
+        beginCaptures:
+            '0': {name: meta.brace.round.pine}
+        endCaptures:
+            '0': {name: meta.brace.round.pine}
+        patterns:
+            - include: '#expression'
+
     function-call:
         name: meta.function-call.pine
         begin: |
@@ -54,4 +200,38 @@ repository:
     
             - name: keyword.operator.assignment.pine
               match: =(?!=)
-            - include: '#strings'
+            - include: '#expression'
+
+    function-declaration:
+        name: meta.function.pine
+        begin: >
+            (?x)
+            \s* \b([[:alpha:]_][[:word:]]+) \s* (?=\()
+              
+        end: (=>)
+        beginCaptures:
+            '1': {name: entity.name.function.pine}
+        endCaptures:
+            '1': {name: storage.type.function.pine}
+        patterns: 
+            - include: '#parameters'
+    
+    parameters:
+        name: meta.function.parameters.pine
+        begin: (\()
+        end: (\))
+        beginCaptures:
+            '1': {name: meta.brace.round.pine}
+        endCaptures:
+            '1': {name: meta.brace.round.pine}
+    
+        patterns:
+            - match: |
+                (?x)
+                ([[:alpha:]_]\w*)
+                    \s* (?: (,) | (?=[)\n]))
+              captures:
+                '1': {name: variable.parameter.pine}
+                '2': {name: punctuation.separator.parameter.pine}
+    
+        

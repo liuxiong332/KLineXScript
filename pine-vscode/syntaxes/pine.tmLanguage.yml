@@ -5,6 +5,8 @@ scopeName: source.pine
 patterns:
     - include: '#keywords'
     - include: '#strings'
+    - include: '#comment'
+    - include: '#function-call'
 
 repository:
     keywords:
@@ -18,3 +20,38 @@ repository:
         patterns:
             - name: constant.character.escape.pine
               match: \\.
+    comment: 
+        name: comment.line.double-slash.pine
+        begin: "//"
+        end: (?:$|(?=//))
+    
+    function-call:
+        name: meta.function-call.pine
+        begin: |
+            (?x)
+            \b ([[:alpha:]_]\w*) \s* (?=\()
+        end: (\))
+        beginCaptures:
+            '1': {name: entity.name.function.pine}
+        endCaptures:
+            '1': {name: meta.brace.round.pine}
+        patterns:
+            - include: '#function-arguments'
+
+    function-arguments:
+        begin: (\()
+        end: (?=\))(?!\)\s*\()
+        contentName: meta.function-call.arguments.pine
+        beginCaptures: 
+            '1': {name: meta.brace.round.pine}
+        patterns:
+            - name: punctuation.separator.comma.pine
+              match: (,)
+            - match: '\b([[:alpha:]_]\w*)\s*(=)(?!=)'
+              captures:
+                '1': {name: variable.parameter.function-call.pine}
+                '2': {name: keyword.operator.assignment.pine}
+    
+            - name: keyword.operator.assignment.pine
+              match: =(?!=)
+            - include: '#strings'

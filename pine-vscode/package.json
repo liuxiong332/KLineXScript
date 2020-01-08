@@ -1,0 +1,43 @@
+{
+    "name": "pine",
+    "displayName": "pine",
+    "description": "The pine language extension",
+    "version": "0.0.1",
+    "scripts": {
+        "watch": "yaml-watch ./syntaxes -o ./dist -m"
+    },
+    "engines": {
+        "vscode": "^1.41.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "contributes": {
+        "languages": [
+            {
+                "id": "pine",
+                "aliases": [
+                    "Pine",
+                    "pine"
+                ],
+                "extensions": [
+                    ".pine"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "pine",
+                "scopeName": "source.pine",
+                "path": "./dist/pine.tmLanguage.json"
+            }
+        ]
+    },
+    "devDependencies": {
+        "gulp": "^4.0.2",
+        "gulp-yaml": "^2.0.4",
+        "js-yaml": "^3.13.1",
+        "yaml-watch": "^0.1.0"
+    }
+}

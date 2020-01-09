@@ -1,0 +1,198 @@
+N = 5
+ma = close
+// ma = (close + close[1] + close[2] + close[3] + close[4]) / 5
+for i = 1 to N
+    ma := ma + close[i] 
+ma := ma / N
+print(ma)
+
+//@version=4
+study("My Script")
+plot(close)
+
+//@version=4
+strategy("My Strategy", overlay=true)
+
+longCondition = crossover(sma(close, 14), sma(close, 28))
+if (longCondition)
+    strategy.entry("My Long Entry Id", strategy.long)
+
+shortCondition = crossunder(sma(close, 14), sma(close, 28))
+if (shortCondition)
+    strategy.entry("My Short Entry Id", strategy.short)
+
+
+//@version=4
+study("Test")
+// This line is a comment
+a = close // This is also a comment
+plot(a)
+
+myVar
+_myVar
+my123Var
+MAX_LEN
+max_len
+
+a = open + high + low + close
+
+plot(correlation(src, ovr, length),
+   color=color.purple,
+   style=plot.style_area,
+   transp=40)
+
+mn(x, y) => 
+    
+updown(s, m) =>
+    isEqual = s == s[1]
+    isGrowing = s > s[1]
+    ud = isEqual ?
+            0 :
+            isGrowing ?
+                (nz(ud[1]) <= 0 ?
+                        1 :
+                    nz(ud[1])+1) :
+                (nz(ud[1]) >= 0 ?
+                    -1 :
+                    nz(ud[1])-1)
+        
+
+helloworld(x, y) =>
+    x + y
+
+helloworld("Myscript", "hello world")
+
+//@version=4
+study("My Script")
+c = open > close ? color.red :
+  high > high[1] ? color.lime : // a comment
+  low < low[1] ? color.blue : color.black
+bgcolor(c)
+
+3.14, 6.02E-23, 3e8, 42, true, false, #FF55C6
+open, high, low, close, volume, time, hl2, hlc3, ohlc4
+
+c1 = 0
+c2 = c1 + 1
+c3 = c1 + 1
+if open > close
+    c3 := 0
+
+p = input(10, title="Period")
+
+a = open + close // Addition of two series
+b = high / 2     // Division of a series variable by
+                 // an integer literal constant
+c = close[1]     // Referring to the previous ``close`` value
+
+#000000                // black color
+#FF0000                // red color
+#00FF00                // green color
+#0000FF                // blue color
+#FFFFFF                // white color
+#808080                // gray color
+#3ff7a0                // some custom color
+#FF000080              // 50% transparent red color
+#FF0000FF              // same as #00FF00, fully opaque red color
+#FF000000              // completely transparent color
+
+b = input(true, "Use red color")
+c = b ? color.red : #000000  // c has color input type
+
+//@version=4
+study(title="Shading the chart's background", overlay=true)
+c = color.navy
+bgColor = (dayofweek == dayofweek.monday) ? color.new(c, 50) :
+(dayofweek == dayofweek.tuesday) ? color.new(c, 60) :
+(dayofweek == dayofweek.wednesday) ? color.new(c, 70) :
+(dayofweek == dayofweek.thursday) ? color.new(c, 80) :
+(dayofweek == dayofweek.friday) ? color.new(c, 90) :
+color.new(color.blue, 80)
+bgcolor(color=bgColor)
+
+"This is a double quoted string literal"
+'This is a single quoted string literal'
+"It's an example"
+'The "Star" indicator'
+'It\'s an example'
+"The \"Star\" indicator"
+
+myVar = na // Compilation error!
+var float myVar = na
+float myVar = na
+myVar = float(na)
+myClose = na(myVar) ? 0 : close
+calcSumAndMul(a, b) =>
+    sum = a + b
+    mul = a * b
+    [sum, mul]
+
+[s, m] = calcSumAndMul(high, low)
+isintraday ? red : isdaily ? green : ismonthly ? blue : na
+sma(close, 10)[1]
+
+//@version=4
+study("My Script", overlay=true)
+
+// Returns the value of "a" the last time the function was called 2 bars ago.
+f(a) => a[1]
+// Returns the value of last bar's "close", as expected.
+f2() => close[1]
+
+oneBarInTwo = bar_index % 2 == 0
+plot(oneBarInTwo ? f(close) : na, color=color.maroon, linewidth=6, style=plot.style_cross)
+plot(oneBarInTwo ? f2() : na, color=color.lime, linewidth=6, style=plot.style_circles)
+plot(close[2], color=color.maroon)
+plot(close[1], color=color.lime)
+
+study("Barssince",overlay=false)
+res = close>close[1] ? barssince(close<close[1]) : -1
+plot(res, style=plot.style_histogram, color=res >= 0 ? color.red : color.blue)
+
+study("My Script")
+va = 0.0
+for i = 1 to 2 by 1
+    if (i + bar_index) % 2 == 0
+        va := lowest(bar_index, 10)  // same context on each call
+plot(va)
+
+float f = 10            // NOTE: while the expression is of type int, the variable is float
+i = int(close)          // NOTE: explicit cast of float expression close to type int
+r = round(close)        // NOTE: round() and int() are different... int() simply throws fractional part away
+var hl = high - low
+
+// Creates a new label object on every bar:
+label lb = label.new(bar_index, close, title="Hello, World!")
+
+// Creates a label object only on the first bar in history:
+var label lb = label.new(bar_index, close, title="Hello, World!")
+
+// This code compiles
+x = if close > open
+    close
+else
+    open
+// This code doesn't compile
+x = if close > open
+    close
+else
+    "open"
+
+study("For loop")
+my_sma(price, length) =>
+    sum = price
+    for i = 1 to length-1
+        sum := sum + price[i]
+    sum / length
+plot(my_sma(close,14))
+
+study("SMA in for loop")
+    sum = 0
+    for i = 1 to 2
+        sum := sum + sma(close, i)
+    plot(sum)
+
+geom_average(x, y) =>
+    a = x*x
+    b = y*y
+    sqrt(a + b)

@@ -14,6 +14,7 @@ repository:
     expression:
         patterns: 
             - include: '#keywords'
+            - include: '#builtin-types'
             - include: '#strings'
             - include: '#comment'
             - include: '#number'
@@ -21,18 +22,18 @@ repository:
             - include: '#literal'
             - include: '#assignment-operator'
             - include: '#operator'
-            - include: '#variable'
             - include: '#function-call'
+            - include: '#object-accessor'
+            - include: '#variable'
             - include: '#array'
             - include: '#round-braces'
-            - include: 'builtin-types'
 
     builtin-types:
-        name: support.type.python
+        name: support.type.primitive.pine
         match: |
             (?x)
-            (?<!\.) \b(
-                bool | na | int | float | string | color
+            \b(
+                bool | int | float | string | color
             )\b
 
     keywords:
@@ -42,14 +43,14 @@ repository:
             - name: keyword.control.conditional.pine
               match: \b(if|else)\b
             - name: keyword.control.loop.pine
-              match: \b(for|to)\b
+              match: \b(for|to|by)\b
             - name: keyword.control.flow.pine
               match: \b(return|break|continue)\b
 
     literal:
         patterns:
             - name: constant.language.pine
-              match: \b(true|false|na)\b
+              match: \b(true|false|na|open|close|high|low)\b
 
             - include: '#number'
 
@@ -102,7 +103,7 @@ repository:
         match: (\#[0-9a-fA-F]+)
         
     assignment-operator:
-        name: keyword.operator.assignment.python
+        name: keyword.operator.assignment.pine
         match: |
             (?x)
                 =(?!=) | :=
@@ -147,7 +148,9 @@ repository:
         endCaptures:
             '1': {name: meta.brace.square.pine}
         patterns:
-            - include: '#number'
+            - name: punctuation.separator.comma.pine
+              match: (,)
+            - include: '#expression'
     
     strings: 
         name: string.quoted.double.pine
@@ -206,7 +209,7 @@ repository:
         name: meta.function.pine
         begin: >
             (?x)
-            \s* \b([[:alpha:]_][[:word:]]+) \s* (?=\()
+            \s* \b([[:alpha:]_][[:word:]]*) \s* (?=\(.+?=>)
               
         end: (=>)
         beginCaptures:
@@ -234,4 +237,16 @@ repository:
                 '1': {name: variable.parameter.pine}
                 '2': {name: punctuation.separator.parameter.pine}
     
-        
+    object-accessor: 
+        patterns:
+            - match: (?<=\.)([[:alpha:]_][[:word:]]*)(\.)
+              captures:
+                '1': {name: variable.other.object.property.pine}
+                '2': {name: punctuation.accessor.pine}
+            - match: \b([[:alpha:]_][[:word:]]*)(\.)
+              captures:
+                '1': {name: variable.other.object.pine}
+                '2': {name: punctuation.accessor.pine}
+            - match: (?<=\.)([[:alpha:]_][[:word:]]*)(?!\.)
+              captures:
+                '1': {name: variable.other.property.pine}

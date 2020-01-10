@@ -26,7 +26,7 @@ fn datasrc_test() {
         vec![print::declare_var()],
         vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
     );
-    let mut parser = pine::PineScript::new_with_libinfo(lib_info, &MyCallback);
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&MyCallback));
     parser.parse_src(MA_SCRIPT).unwrap();
     let data = vec![(
         "close",
@@ -56,7 +56,7 @@ fn func_call_test() {
         vec![print::declare_var()],
         vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
     );
-    let mut parser = pine::PineScript::new_with_libinfo(lib_info, &MyCallback);
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&MyCallback));
     parser.parse_src(FUNC_SCRIPT).unwrap();
     let data = vec![(
         "close",
@@ -91,7 +91,7 @@ fn if_else_test() {
             ("open", SyntaxType::Series(SimpleSyntaxType::Float)),
         ],
     );
-    let mut parser = pine::PineScript::new_with_libinfo(lib_info, &MyCallback);
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&MyCallback));
     parser.parse_src(IF_ELSE_SCRIPT).unwrap();
     let data = vec![
         (
@@ -128,7 +128,7 @@ fn for_range_test() {
         vec![print::declare_var()],
         vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
     );
-    let mut parser = pine::PineScript::new_with_libinfo(lib_info, &MyCallback);
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&MyCallback));
     parser.parse_src(FOR_RANGE_SCRIPT).unwrap();
     let data = vec![("close", vec![Some(1f64), Some(3f64)])];
     assert_eq!(parser.run(data), Ok(()));
@@ -156,7 +156,7 @@ fn ema_test() {
         vec![print::declare_var()],
         vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
     );
-    let mut parser = pine::PineScript::new_with_libinfo(lib_info, &MyCallback);
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&MyCallback));
     parser.parse_src(EMA_SCRIPT).unwrap();
     let data = vec![("close", vec![Some(2f64), Some(4f64)])];
 
@@ -195,7 +195,7 @@ fn macd_test() {
         vec![print::declare_var()],
         vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
     );
-    let mut parser = pine::PineScript::new_with_libinfo(lib_info, &MyCallback);
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&MyCallback));
     parser.parse_src(MACD_SCRIPT).unwrap();
     let data = vec![("close", vec![Some(200f64), Some(400f64)])];
 

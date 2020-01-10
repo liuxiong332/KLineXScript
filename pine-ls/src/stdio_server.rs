@@ -1,11 +1,13 @@
 use self::jsonrpc_core::{IoHandler, Params};
+use super::pine_server::PineServer;
 use jsonrpc_core;
 use lsp_types::*;
 use serde;
 use serde_json;
 use serde_json::json;
 use std::io::{self, BufRead, Read, Write};
-use std::sync::mpsc::{channel, Sender};
+use std::sync::mpsc::channel;
+use std::sync::{Arc, Mutex};
 use std::thread::spawn;
 
 pub fn start() {
@@ -14,10 +16,13 @@ pub fn start() {
 
     let mut io = IoHandler::new();
 
+    let pine_server = Arc::new(Mutex::new(PineServer::new(response_sender.clone())));
+    let server = Arc::clone(&pine_server);
     io.add_method("initialize", move |params: Params| {
         // let value = server.lock().unwrap().initialize_request(params.parse()?)?;
         // serde_json::to_value(value).map_err(|_| jsonrpc_core::Error::internal_error())
         info!("Initialize with params {:?}", params);
+        server.lock().unwrap().init_params(params.parse()?);
         let mut capabilities = ServerCapabilities::default();
         // Make the text document sync mode as incremental
         capabilities.text_document_sync = Some(TextDocumentSyncCapability::Kind(
@@ -33,21 +38,24 @@ pub fn start() {
         serde_json::to_value(result).map_err(|_| jsonrpc_core::Error::internal_error())
     });
 
-    // let server = lang_server.clone();
+    let server = Arc::clone(&pine_server);
     io.add_notification("textDocument/didOpen", move |params: Params| {
         // server
         //     .lock()
         //     .unwrap()
         //     .text_document_did_open_notification(&params.parse().unwrap())
         info!("Open text document {:?}", params);
+        server.lock().unwrap().add_doc(params.parse().unwrap());
     });
 
+    let server = Arc::clone(&pine_server);
     io.add_notification("textDocument/didChange", move |params: Params| {
         // server
         //     .lock()
         //     .unwrap()
         //     .text_document_did_open_notification(&params.parse().unwrap())
         info!("Change text document {:?}", params);
+        server.lock().unwrap().change_doc(params.parse().unwrap());
     });
 
     io.add_notification("textDocument/didClose", move |params: Params| {

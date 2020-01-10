@@ -31,7 +31,7 @@ function getServerOptionsEmbedded(context: ExtensionContext) {
 		debug: {
 			command: serverCommand,
 			options: {
-				env: { RUST_LOG: "info" }
+				env: { RUST_LOG: "trace" }
 			}
 		},
 	};

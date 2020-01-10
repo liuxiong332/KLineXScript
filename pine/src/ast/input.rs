@@ -32,6 +32,14 @@ impl Position {
             character: u32::MAX,
         }
     }
+
+    pub fn get_line(&self) -> u32 {
+        self.line
+    }
+
+    pub fn get_character(&self) -> u32 {
+        self.character
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]

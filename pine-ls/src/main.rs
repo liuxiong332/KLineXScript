@@ -1,5 +1,6 @@
 mod pine_server;
 mod stdio_server;
+mod text_doc;
 
 #[macro_use]
 extern crate log;

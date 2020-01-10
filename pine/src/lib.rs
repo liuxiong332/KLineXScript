@@ -96,7 +96,7 @@ impl<'a, 'b, 'c> PineRunner<'a, 'b, 'c> {
 pub struct PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
     lib_info: LibInfo<'li>,
     blk: Block<'pa>,
-    callback: &'ra dyn Callback,
+    callback: Option<&'ra dyn Callback>,
     runner: Option<PineRunner<'ra, 'rb, 'rc>>,
     error_format: ErrorFormater,
 }
@@ -105,7 +105,7 @@ const SERIES_FLOAT: SyntaxType = SyntaxType::Series(SimpleSyntaxType::Float);
 const SERIES_INT: SyntaxType = SyntaxType::Series(SimpleSyntaxType::Int);
 
 impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
-    pub fn new(callback: &'ra dyn Callback) -> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
+    pub fn new(callback: Option<&'ra dyn Callback>) -> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
         PineScript {
             lib_info: LibInfo::new(
                 declare_vars(),
@@ -126,7 +126,7 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
 
     pub fn new_with_libinfo(
         lib_info: LibInfo<'li>,
-        callback: &'ra dyn Callback,
+        callback: Option<&'ra dyn Callback>,
     ) -> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
         PineScript {
             lib_info,
@@ -174,7 +174,7 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
                 let blk_ref: &'ra Block<'ra> =
                     mem::transmute::<&Block<'pa>, &'ra Block<'ra>>(&self.blk);
                 let lib_ref = mem::transmute::<&LibInfo<'li>, &LibInfo<'ra>>(&self.lib_info);
-                runner = PineRunner::new(lib_ref, blk_ref, self.callback);
+                runner = PineRunner::new(lib_ref, blk_ref, self.callback.unwrap());
             }
             self.runner = Some(runner);
         }

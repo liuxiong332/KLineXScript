@@ -2,4 +2,5 @@
 
 members = [
     "pine",
+    "pine-ls",
 ]

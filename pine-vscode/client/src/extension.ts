@@ -15,21 +15,27 @@ import {
 
 let client: LanguageClient;
 
-const languageServerBinaryName = 'pine_ls';
+const languageServerBinaryName = 'pine-ls';
 
 function getServerOptionsEmbedded(context: ExtensionContext) {
-    let serverCommand = context.asAbsolutePath(
-        path.join('server', 'bin', languageServerBinaryName)
-    );
-    let serverOptions: ServerOptions = {
-        run: {
-            command: serverCommand,
-        },
-        debug: {
-            command: serverCommand,
-        },
-    };
-    return serverOptions;
+	let serverCommand = context.asAbsolutePath(
+		path.join('dist', languageServerBinaryName)
+	);
+	let serverOptions: ServerOptions = {
+		run: {
+			command: serverCommand,
+			options: {
+				env: { RUST_LOG: "info" }
+			}
+		},
+		debug: {
+			command: serverCommand,
+			options: {
+				env: { RUST_LOG: "info" }
+			}
+		},
+	};
+	return serverOptions;
 }
 
 export function activate(context: ExtensionContext) {

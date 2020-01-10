@@ -1,0 +1,18 @@
+[package]
+name = "pine-ls"
+version = "0.1.0"
+authors = ["liuxiong <liuxiong332@163.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+pine = { path = "../pine"}
+jsonrpc-core = "^14"
+serde_json = "^1"
+serde = "^1"
+lsp-types = "^0.68"
+fnv = "^1"
+log = "^0.4"
+env_logger = "^0.7"
+futures = "^0.1"

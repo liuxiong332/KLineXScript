@@ -4,7 +4,11 @@
     "description": "The pine language extension",
     "version": "0.0.1",
     "scripts": {
-        "watch": "yaml-watch ./syntaxes -o ./dist -m"
+        "watch:syntax": "yaml-watch ./syntaxes -o ./dist -m",
+        "compile:ls": "cd .. && cargo build && cd pine-vscode && gulp copy:ls",
+        "compile:client": "cd client && tsc -b && cd ..",
+        "watch:client": "cd client && tsc -b -w && cd ..",
+        "postinstall": "cd client && npm install && cd .."
     },
     "engines": {
         "vscode": "^1.41.0"
@@ -41,13 +45,13 @@
             "type": "object",
             "title": "Pine configuration",
             "properties": {
-                "languageServerPine.maxNumberOfProblems": {
+                "pine.maxNumberOfProblems": {
                     "scope": "resource",
                     "type": "number",
                     "default": 100,
                     "description": "Controls the maximum number of problems produced by the server."
                 },
-                "languageServerPine.trace.server": {
+                "pine.trace.server": {
                     "scope": "window",
                     "type": "string",
                     "enum": [
@@ -62,10 +66,13 @@
         }
     },
     "devDependencies": {
+        "@types/mocha": "^5.2.7",
         "@types/node": "^13.1.5",
+        "cp-cli": "^2.0.0",
         "gulp": "^4.0.2",
         "gulp-yaml": "^2.0.4",
         "js-yaml": "^3.13.1",
+        "typescript": "^3.7.4",
         "yaml-watch": "^0.1.0"
     }
 }

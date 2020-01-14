@@ -129,7 +129,7 @@ fn func_def_test() {
         pine::parse_ast(FUNC_DEF),
         Ok(Block::new(
             vec![
-                Statement::None(StrRange::from_start("\n", Position::new(0, 0))),
+                // Statement::None(StrRange::from_start("\n", Position::new(0, 0))),
                 Statement::FuncDef(Box::new(FunctionDef::new(
                     VarName::new_with_start("updown", Position::new(1, 0)),
                     vec![VarName::new_with_start("s", Position::new(1, 7))],
@@ -163,7 +163,7 @@ fn func_def_test() {
                 )))
             ],
             None,
-            StrRange::new(Position::new(0, 0), Position::new(2, 23))
+            StrRange::new(Position::new(1, 0), Position::new(2, 23))
         ))
     );
 }

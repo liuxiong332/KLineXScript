@@ -27,6 +27,10 @@ impl<'a> StmtRunner<'a> for Statement<'a> {
             Statement::ForRange(ref fr) => StmtRunner::st_run(fr.as_ref(), context),
             Statement::FuncCall(ref fun_call) => StmtRunner::st_run(fun_call.as_ref(), context),
             Statement::FuncDef(ref fun_def) => fun_def.st_run(context),
+            Statement::Exp(ref exp) => {
+                exp.run(context)?;
+                Ok(())
+            }
         }
     }
 }

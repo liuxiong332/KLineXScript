@@ -63,7 +63,7 @@ fn plot_series<'a>(item_val: PineRef<'a>, context: &mut dyn Ctx<'a>) -> Result<(
 }
 
 fn plot_val<'a>(item_val: PineRef<'a>, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
-    println!("print val type {:?}", item_val.get_type());
+    // println!("print val type {:?}", item_val.get_type());
     match item_val.get_type() {
         (DataType::Float, SecondType::Series) => plot_series(item_val, context),
         // (DataType::Int, SecondType::Series) => plot_series::<Int, i32>(item_val, context),

@@ -334,7 +334,7 @@ mod tests {
         mut args: Vec<Option<PineRef<'a>>>,
         _func_type: FunctionType<'a>,
     ) -> Result<PineRef<'a>, RuntimeErr> {
-        println!("Get args {:?}", args);
+        // println!("Get args {:?}", args);
         let (arg1, arg2) = (
             mem::replace(&mut args[0], None),
             mem::replace(&mut args[1], None),

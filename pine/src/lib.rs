@@ -43,7 +43,7 @@ impl<'a> LibInfo<'a> {
         input_vars: Vec<(&'static str, SyntaxType<'a>)>,
     ) -> LibInfo<'a> {
         let (types, values, input_names) = extract_vars(lib_vars, input_vars);
-        println!("now input names {:?}", input_names);
+        // println!("now input names {:?}", input_names);
         LibInfo {
             var_types: types,
             var_values: values,

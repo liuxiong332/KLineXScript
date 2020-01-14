@@ -318,7 +318,6 @@ impl<'a> SyntaxParser<'a> {
 
         self.context = &mut sub_ctx;
         let parse_res = self.parse_blk(&mut spec_def.body)?;
-
         // Push the specific function definition to spec_defs.
         func_def.spec_defs.as_mut().unwrap().push(spec_def);
         let spec_index = func_def.spec_defs.as_ref().unwrap().len() as i32 - 1;
@@ -1000,6 +999,7 @@ impl<'a> SyntaxParser<'a> {
             Statement::VarAssignment(assign) => self.parse_var_assign(assign),
             Statement::FuncDef(func_def) => self.parse_func_def(func_def),
             Statement::None(_) => Ok(ParseValue::new_with_type(SyntaxType::Void)),
+            Statement::Exp(exp) => self.parse_exp(exp),
         }
     }
 

@@ -51,6 +51,14 @@ impl PineServer {
         let new_doc = TextDoc::new(text, uri.clone());
         self.parse_doc(&new_doc);
         self.text_docs.insert(uri, new_doc);
+
+        self.send_notification(
+            "window/showMessage",
+            ShowMessageParams {
+                typ: MessageType::Log,
+                message: String::from("After open text document"),
+            },
+        );
     }
 
     pub fn change_doc(&mut self, params: DidChangeTextDocumentParams) {
@@ -75,55 +83,75 @@ impl PineServer {
         let text_doc = self.text_docs.remove(&params.text_document.uri).unwrap();
         self.parse_doc(&text_doc);
         self.text_docs.insert(params.text_document.uri, text_doc);
+
+        self.send_notification(
+            "window/showMessage",
+            ShowMessageParams {
+                typ: MessageType::Log,
+                message: String::from("Change text document"),
+            },
+        );
     }
 
     pub fn parse_doc(&mut self, doc: &TextDoc) {
-        if let Err(errs) = doc.parse_src() {
-            // let diagnostics: Vec<_> = errs
-            //     .into_iter()
-            //     .map(|err| {
-            //         Diagnostic::new(
-            //             from_str_range(doc.transfer_range(err.range)),
-            //             Some(DiagnosticSeverity::Error),
-            //             None,
-            //             Some(String::from("pine ls")),
-            //             err.message,
-            //             None,
-            //             None,
-            //         )
-            //     })
-            //     .collect();
+        // The below is the test code for publishing diagnostics.
+        // let range = Range {
+        //     start: lsp_types::Position {
+        //         line: 3,
+        //         character: 0,
+        //     },
+        //     end: lsp_types::Position {
+        //         line: 3,
+        //         character: 2,
+        //     },
+        // };
+        // let diagnostics = vec![Diagnostic {
+        //     range: range.clone(),
+        //     code: None,
+        //     severity: Some(DiagnosticSeverity::Error),
+        //     source: Some("pine ls".to_owned()),
+        //     message: "No entity \'ent2\' within library \'lib\'".to_owned(),
+        //     related_information: Some(vec![DiagnosticRelatedInformation {
+        //         location: Location::new(doc.get_uri().clone(), range.clone()),
+        //         message: String::from("Spelling matters"),
+        //     }]),
+        //     tags: None,
+        // }];
 
-            let diagnostics = vec![Diagnostic {
-                range: Range {
-                    start: lsp_types::Position {
-                        line: 3,
-                        character: 0,
-                    },
-                    end: lsp_types::Position {
-                        line: 3,
-                        character: 2,
-                    },
-                },
-                code: None,
-                severity: Some(DiagnosticSeverity::Error),
-                source: Some("pine ls".to_owned()),
-                message: "No entity \'ent2\' within library \'lib\'".to_owned(),
-                related_information: None,
-                tags: None,
-            }];
+        // let publish_diagnostics = PublishDiagnosticsParams {
+        //     uri: doc.get_uri().clone(),
+        //     diagnostics: diagnostics,
+        //     version: None,
+        // };
+        // info!("publish errors {:?}", publish_diagnostics);
+        // self.send_notification("textDocument/publishDiagnostics", publish_diagnostics);
+        if let Err(errs) = doc.parse_src() {
+            let diagnostics: Vec<_> = errs
+                .into_iter()
+                .map(|err| {
+                    Diagnostic::new(
+                        from_str_range(doc.transfer_range(err.range)),
+                        Some(DiagnosticSeverity::Error),
+                        None,
+                        Some(String::from("pine ls")),
+                        err.message,
+                        None,
+                        None,
+                    )
+                })
+                .collect();
 
             let publish_diagnostics = PublishDiagnosticsParams {
                 uri: doc.get_uri().clone(),
                 diagnostics: diagnostics,
                 version: None,
             };
-            info!("publish errors {:?}", publish_diagnostics);
+            // info!("publish errors {:?}", publish_diagnostics);
             self.send_notification("textDocument/publishDiagnostics", publish_diagnostics);
         }
     }
 
-    fn send_notification(
+    pub fn send_notification(
         &self,
         method: impl Into<String>,
         notification: impl serde::ser::Serialize,
@@ -175,8 +203,8 @@ mod tests {
                 String::from("a = "),
             ),
         });
-        println!("receive msg {:?}", receiver.recv().unwrap());
+        // println!("receive msg {:?}", receiver.recv().unwrap());
 
-        assert_eq!(1, 2);
+        // assert_eq!(1, 2);
     }
 }

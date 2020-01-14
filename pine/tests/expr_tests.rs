@@ -199,10 +199,10 @@ fn if_stats_test() {
         pine::parse_ast(IF_STATES),
         Ok(Block::new(
             vec![
-                Statement::None(StrRange::from_start(
-                    "// This code compiles\n",
-                    Position::new(0, 0)
-                )),
+                // Statement::None(StrRange::from_start(
+                //     "// This code compiles\n",
+                //     Position::new(0, 0)
+                // )),
                 gen_assign(
                     VarName::new_with_start("x", Position::new(1, 0)),
                     Exp::Ite(Box::new(IfThenElse::new_no_ctxid(
@@ -234,7 +234,7 @@ fn if_stats_test() {
                 ),
             ],
             None,
-            StrRange::new(Position::new(0, 0), Position::new(4, 8))
+            StrRange::new(Position::new(1, 0), Position::new(4, 8))
         ))
     );
 
@@ -242,7 +242,7 @@ fn if_stats_test() {
         pine::parse_ast(IF_NEST_STATS),
         Ok(Block::new(
             vec![
-                Statement::None(StrRange::from_start("\n", Position::new(0, 0))),
+                // Statement::None(StrRange::from_start("\n", Position::new(0, 0))),
                 gen_assign(
                     VarName::new_with_start("x", Position::new(1, 0)),
                     Exp::Ite(Box::new(IfThenElse::new_no_ctxid(
@@ -316,7 +316,7 @@ fn if_stats_test() {
                 )
             ],
             None,
-            StrRange::new(Position::new(0, 0), Position::new(8, 8))
+            StrRange::new(Position::new(1, 0), Position::new(8, 8))
         ))
     );
 }
@@ -351,7 +351,7 @@ fn if_expr_test() {
         pine::parse_ast(IF_EXPR),
         Ok(Block::new(
             vec![
-                Statement::None(StrRange::from_start("\n", Position::new(0, 0))),
+                // Statement::None(StrRange::from_start("\n", Position::new(0, 0))),
                 Statement::Ite(Box::new(IfThenElse::new_no_ctxid(
                     gen_func_call(
                         VarName::new_with_start("crossover", Position::new(1, 4)),
@@ -454,7 +454,7 @@ fn if_expr_test() {
                 )))
             ],
             None,
-            StrRange::new(Position::new(0, 0), Position::new(6, 33))
+            StrRange::new(Position::new(1, 0), Position::new(6, 33))
         ))
     );
 }

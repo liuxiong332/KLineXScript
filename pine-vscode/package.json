@@ -45,13 +45,13 @@
             "type": "object",
             "title": "Pine configuration",
             "properties": {
-                "pine.maxNumberOfProblems": {
+                "pine_ls.maxNumberOfProblems": {
                     "scope": "resource",
                     "type": "number",
                     "default": 100,
                     "description": "Controls the maximum number of problems produced by the server."
                 },
-                "pine.trace.server": {
+                "pine_ls.trace.server": {
                     "scope": "window",
                     "type": "string",
                     "enum": [

@@ -5,7 +5,8 @@ for i = 1 to N
     ma := ma + close[i] 
 ma := ma / N
 
-hello = m / n
+// hell = s
+hello
 
-print(ma)
+// print(ma)
 

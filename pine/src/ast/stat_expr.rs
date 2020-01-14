@@ -308,7 +308,7 @@ impl DataTypeNode {
     }
 }
 
-fn datatype<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, DataTypeNode> {
+fn datatype<'a>(input: Input<'a>, _state: &AstState) -> PineResult<'a, DataTypeNode> {
     let (input, label) = alt((
         tag("float"),
         tag("int"),
@@ -437,7 +437,10 @@ fn block_with_indent<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, B
     let mut cur_input = input;
     while cur_input.len() > 0 {
         if let Ok((next_input, stas)) = statement_with_indent(cur_input, state) {
-            stmts.push(stas);
+            match stas {
+                Statement::None(_) => (),
+                _ => stmts.push(stas),
+            }
             cur_input = next_input;
         } else {
             break;
@@ -471,7 +474,7 @@ fn transfer_block_ret<'a>(mut blk: Block<'a>) -> Block<'a> {
         return blk;
     }
     match blk.stmts.last() {
-        Some(&Statement::Ite(_)) | Some(&Statement::ForRange(_)) => {
+        Some(&Statement::Ite(_)) | Some(&Statement::ForRange(_)) | Some(&Statement::Exp(_)) => {
             match blk.stmts.pop().unwrap() {
                 Statement::Ite(mut s) => {
                     s.then_blk = transfer_block_ret(s.then_blk);
@@ -484,6 +487,7 @@ fn transfer_block_ret<'a>(mut blk: Block<'a>) -> Block<'a> {
                     s.do_blk = transfer_block_ret(s.do_blk);
                     Block::new(blk.stmts, Some(Exp::ForRange(s)), blk.range)
                 }
+                Statement::Exp(s) => Block::new(blk.stmts, Some(s), blk.range),
                 _ => unreachable!(),
             }
         }
@@ -539,6 +543,10 @@ fn statement_with_indent<'a>(input: Input<'a>, state: &AstState) -> PineResult<'
         map(
             preceded(gen_indent(), |input| var_assign_with_indent(input, state)),
             |s| Statement::VarAssignment(Box::new(s)),
+        ),
+        map(
+            preceded(gen_indent(), |input| exp_with_indent(input, state)),
+            |s| Statement::Exp(s),
         ),
     ))(input)
 }
@@ -872,11 +880,12 @@ mod tests {
                 vec![
                     Statement::Break(StrRange::from_start("break", Position::new(0, 4))),
                     Statement::Continue(StrRange::from_start("continue", Position::new(1, 4))),
+                    Statement::Exp(Exp::Bool(BoolNode::new(
+                        true,
+                        StrRange::from_start("true", Position::new(2, 4)),
+                    ))),
                 ],
-                Some(Exp::Bool(BoolNode::new(
-                    true,
-                    StrRange::from_start("true", Position::new(2, 4)),
-                ))),
+                None,
                 StrRange::new(Position::new(0, 4), Position::new(2, 8)),
             ),
             "hello",
@@ -968,6 +977,24 @@ mod tests {
                     StrRange::new(Position::new(1, 4), Position::new(2, 9)),
                 ),
                 StrRange::new(Position::new(0, 0), Position::new(2, 9)),
+            ),
+        );
+
+        check_res(
+            "a(arg1) => \n    arg1",
+            function_def_with_indent,
+            FunctionDef::new(
+                VarName::new_with_start("a", Position::new(0, 0)),
+                vec![VarName::new_with_start("arg1", Position::new(0, 2))],
+                Block::new(
+                    vec![],
+                    Some(Exp::VarName(RVVarName::new_with_start(
+                        "arg1",
+                        Position::new(1, 4),
+                    ))),
+                    StrRange::new(Position::new(1, 4), Position::new(1, 8)),
+                ),
+                StrRange::new(Position::new(0, 0), Position::new(1, 8)),
             ),
         );
     }
@@ -1062,5 +1089,13 @@ mod tests {
                 StrRange::new(Position::new(0, 0), Position::new(3, 13)),
             ),
         );
+    }
+
+    #[test]
+    fn not_recognize_stmt_test() {
+        let test_input = Input::new_with_str("hello\nprint(ma)\n");
+        let (input, output) = block(test_input, &AstState::new()).unwrap();
+        println!("input {:?} {:?}", input, output);
+        assert_eq!(input.src, "");
     }
 }

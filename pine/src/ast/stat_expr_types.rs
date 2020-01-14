@@ -821,6 +821,7 @@ pub enum Statement<'a> {
     ForRange(Box<ForRange<'a>>),
     FuncCall(Box<FunctionCall<'a>>),
     FuncDef(Box<FunctionDef<'a>>),
+    Exp(Exp<'a>),
 }
 
 impl<'a> Statement<'a> {
@@ -835,6 +836,7 @@ impl<'a> Statement<'a> {
             Statement::ForRange(for_range) => for_range.range,
             Statement::FuncCall(func_call) => func_call.range,
             Statement::FuncDef(func_def) => func_def.range,
+            Statement::Exp(exp) => exp.range(),
         }
     }
 }

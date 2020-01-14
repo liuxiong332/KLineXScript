@@ -17,11 +17,10 @@ pub fn start() {
     let mut io = IoHandler::new();
 
     let pine_server = Arc::new(Mutex::new(PineServer::new(response_sender.clone())));
+
     let server = Arc::clone(&pine_server);
     io.add_method("initialize", move |params: Params| {
-        // let value = server.lock().unwrap().initialize_request(params.parse()?)?;
-        // serde_json::to_value(value).map_err(|_| jsonrpc_core::Error::internal_error())
-        info!("Initialize with params {:?}", params);
+        // info!("Initialize with params {:?}", params);
         server.lock().unwrap().init_params(params.parse()?);
         let mut capabilities = ServerCapabilities::default();
         // Make the text document sync mode as incremental
@@ -39,30 +38,48 @@ pub fn start() {
     });
 
     let server = Arc::clone(&pine_server);
+    io.add_notification("initialized", move |params: Params| {
+        info!("Initialized {:?}", params);
+        server.lock().unwrap().send_notification(
+            "window/showMessage",
+            ShowMessageParams {
+                typ: MessageType::Log,
+                message: String::from("After initialized"),
+            },
+        );
+    });
+
+    // io.add_notification("workspace/didChangeConfiguration", move |params: Params| {
+    //     info!("Did Change configuration {:?}", params);
+    // });
+
+    // io.add_notification(
+    //     "workspace/didChangeWorkspaceFolders",
+    //     move |params: Params| {
+    //         info!("Did Change Workspace folders {:?}", params);
+    //     },
+    // );
+
+    let server = Arc::clone(&pine_server);
     io.add_notification("textDocument/didOpen", move |params: Params| {
-        // server
-        //     .lock()
-        //     .unwrap()
-        //     .text_document_did_open_notification(&params.parse().unwrap())
-        info!("Open text document {:?}", params);
+        // info!("Open text document {:?}", params);
+        server.lock().unwrap().send_notification(
+            "window/showMessage",
+            ShowMessageParams {
+                typ: MessageType::Log,
+                message: String::from("Open text document"),
+            },
+        );
         server.lock().unwrap().add_doc(params.parse().unwrap());
     });
 
     let server = Arc::clone(&pine_server);
     io.add_notification("textDocument/didChange", move |params: Params| {
-        // server
-        //     .lock()
-        //     .unwrap()
-        //     .text_document_did_open_notification(&params.parse().unwrap())
         info!("Change text document {:?}", params);
         server.lock().unwrap().change_doc(params.parse().unwrap());
     });
 
     io.add_notification("textDocument/didClose", move |params: Params| {
-        // server
-        //     .lock()
-        //     .unwrap()
-        //     .text_document_did_open_notification(&params.parse().unwrap())
         info!("Close text document {:?}", params);
     });
 
@@ -160,9 +177,28 @@ fn read_header(reader: &mut dyn BufRead) -> u64 {
 }
 
 fn send_response(writer: &mut dyn Write, response: &str) {
-    trace!("SEND RESPONSE: {:?}", response);
-    writeln!(writer, "Content-Length: {}\r", response.len()).unwrap();
-    writeln!(writer, "\r").unwrap();
-    write!(writer, "{}", response).unwrap();
+    trace!("SEND RESPONSE: {:?} {}", response, response.len());
+    write!(
+        writer,
+        "Content-Length: {}\r\n\r\n{}",
+        response.len(),
+        response
+    )
+    .unwrap();
     writer.flush().expect("Could not flush stdout");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::BufReader;
+
+    #[test]
+    fn response_test() {
+        let mut buf = vec![];
+        send_response(&mut buf, "hello world");
+
+        let mut read_buf = BufReader::new(buf.as_slice());
+        assert_eq!("hello world", read_request(&mut read_buf));
+    }
 }

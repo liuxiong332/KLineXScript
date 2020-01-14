@@ -1,10 +1,12 @@
 use super::error::{PineError, PineErrorKind, PineResult};
 use super::input::{Input, StrRange};
+use super::utils::skip_ws;
 use nom::{
     branch::alt,
     bytes::complete::{escaped, is_not, tag, take_until},
     character::complete::one_of,
     sequence::delimited,
+    sequence::preceded,
     Err,
 };
 
@@ -90,6 +92,10 @@ fn gen_quote_str(quote_char: &'static str) -> impl Fn(Input) -> PineResult<Strin
 
 pub fn string_lit(input: Input) -> PineResult<StringNode> {
     alt((gen_quote_str("\""), gen_quote_str("'")))(input)
+}
+
+pub fn string_lit_ws(input: Input) -> PineResult<StringNode> {
+    preceded(skip_ws, alt((gen_quote_str("\""), gen_quote_str("'"))))(input)
 }
 
 #[cfg(test)]

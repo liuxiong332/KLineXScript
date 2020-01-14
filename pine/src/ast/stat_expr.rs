@@ -7,7 +7,7 @@ use super::num::num_lit_ws;
 use super::op::*;
 use super::stat_expr_types::*;
 use super::state::{AstState, PineInputError};
-use super::string::string_lit;
+use super::string::string_lit_ws;
 use super::trans::flatexp_from_components;
 use super::utils::{eat_sep, eat_statement, statement_end, statement_indent};
 use nom::{
@@ -32,7 +32,7 @@ pub fn exp2<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Exp2<'a>> 
             Exp2::Bool(BoolNode::new(false, StrRange::from_input(&s)))
         }),
         map(num_lit_ws, Exp2::Num),
-        map(string_lit, Exp2::Str),
+        map(string_lit_ws, Exp2::Str),
         map(|s| color_lit(s, state), Exp2::Color),
         map(|input| bracket_expr(input, state), Exp2::Exp),
         // map(rettupledef, |varnames| Exp2::RetTuple(Box::new(varnames))), // match [a, b]
@@ -642,6 +642,20 @@ mod tests {
         O: Debug + PartialEq,
     {
         check_res_input(s, handler, res, "")
+    }
+
+    #[test]
+    fn string_test() {
+        use crate::ast::string::*;
+
+        check_res(
+            r#""hello""#,
+            all_exp,
+            Exp::Str(StringNode::new(
+                String::from("hello"),
+                StrRange::new(Position::new(0, 1), Position::new(0, 6)),
+            )),
+        );
     }
 
     #[test]

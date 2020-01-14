@@ -38,6 +38,7 @@ fn func_call_arg<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, FuncC
     {
         Ok((input, result))
     } else {
+        println!("will match pos {:?}", input);
         let result = map(
             |s| all_exp(s, state),
             |s| FuncCallArg {
@@ -70,6 +71,7 @@ fn func_call_args<'a>(
 
     let mut cur_input = input;
 
+    println!("Now input {:?}", cur_input);
     while let Ok((next_input, arg)) =
         preceded(eat_sep(tag(",")), |s| func_call_arg(s, state))(cur_input)
     {
@@ -121,9 +123,9 @@ pub fn func_call_ws<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Fu
 #[cfg(test)]
 mod tests {
     use super::super::input::Position;
-    use super::super::stat_expr_types::{BoolNode, RVVarName};
+    use super::super::stat_expr_types::*;
     use super::*;
-    use crate::ast::stat_expr_types::PrefixExp;
+    use crate::ast::string::*;
     use std::convert::TryInto;
     use std::fmt::Debug;
 
@@ -197,6 +199,29 @@ mod tests {
                 vec![],
                 vec![],
                 StrRange::from_start("funa()", Position::new(0, 0)),
+            ),
+        );
+
+        check_res(
+            r#"funa("s1", "s2")"#,
+            func_call_ws,
+            FunctionCall::new_no_ctxid(
+                Exp::VarName(RVVarName::new(VarName::new(
+                    "funa",
+                    StrRange::from_start("funa", Position::new(0, 0)),
+                ))),
+                vec![
+                    Exp::Str(StringNode::new(
+                        String::from("s1"),
+                        StrRange::from_start(r#"s1"#, Position::new(0, 6)),
+                    )),
+                    Exp::Str(StringNode::new(
+                        String::from("s2"),
+                        StrRange::from_start(r#"s2"#, Position::new(0, 12)),
+                    )),
+                ],
+                vec![],
+                StrRange::from_start(r#"funa("s1", "s2")"#, Position::new(0, 0)),
             ),
         );
 

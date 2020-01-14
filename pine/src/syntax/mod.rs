@@ -1069,6 +1069,7 @@ mod tests {
     use crate::ast::color::ColorNode;
     use crate::ast::input::{Input, Position, StrRange};
     use crate::ast::name::VarName;
+    use crate::ast::op::*;
     use crate::ast::stat_expr_types::{BoolNode, DataType, NaNode, RefCall, TypeCast};
     use crate::ast::string::StringNode;
     use crate::ast::syntax_type::FunctionType;
@@ -1251,6 +1252,47 @@ mod tests {
         );
         assert_eq!(downcast_ctx(parser.context).parent, None);
         assert_eq!(func_call.ctxid, 0);
+
+        let mut parser = SyntaxParser::new();
+        let mut func_def = FunctionDef::new(
+            varname("fun"),
+            vec![varname("a1"), varname("a2")],
+            Block::new(
+                vec![],
+                Some(Exp::BinaryExp(Box::new(BinaryExp::new(
+                    BinaryOp::Plus,
+                    Exp::VarName(RVVarName::new(varname("a1"))),
+                    Exp::VarName(RVVarName::new(varname("a2"))),
+                    StrRange::new_empty(),
+                )))),
+                StrRange::new_empty(),
+            ),
+            StrRange::new_empty(),
+        );
+        parser.parse_func_def(&mut func_def).unwrap();
+
+        let mut func_call = FunctionCall::new(
+            Exp::VarName(rvarname("fun")),
+            vec![
+                Exp::Str(StringNode::new(
+                    String::from("hello"),
+                    StrRange::new_empty(),
+                )),
+                Exp::Str(StringNode::new(
+                    String::from("world"),
+                    StrRange::new_empty(),
+                )),
+            ],
+            vec![],
+            1,
+            StrRange::new_empty(),
+        );
+        assert_eq!(
+            parser.parse_func_call(&mut func_call),
+            Ok(ParseValue::new_with_type(SyntaxType::Simple(
+                SimpleSyntaxType::String
+            )))
+        );
     }
 
     #[test]

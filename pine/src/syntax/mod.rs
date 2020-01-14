@@ -685,10 +685,16 @@ impl<'a> SyntaxParser<'a> {
     fn parse_varname(&mut self, varname: &mut RVVarName<'a>) -> ParseResult<'a> {
         let name = varname.name.value;
         match downcast_ctx(self.context).get_var(name) {
-            None => Err(PineInputError::new(
-                PineErrorKind::VarNotDeclare,
-                varname.name.range,
-            )),
+            None => {
+                self.catch(PineInputError::new(
+                    PineErrorKind::VarNotDeclare,
+                    varname.name.range,
+                ));
+                Ok(ParseValue::new(
+                    SyntaxType::Simple(SimpleSyntaxType::Na),
+                    name,
+                ))
+            }
             Some(val) => {
                 varname.var_index = downcast_ctx(self.context).get_var_index(name);
                 Ok(ParseValue::new(val.clone(), name))
@@ -1411,6 +1417,22 @@ mod tests {
             Ok(ParseValue::new(INT_TYPE, "hello"))
         );
         assert_eq!(varname.var_index, VarIndex::new(0, 0));
+
+        let mut varname = rvarname("notExist");
+        assert_eq!(
+            parser.parse_varname(&mut varname),
+            Ok(ParseValue::new(
+                SyntaxType::Simple(SimpleSyntaxType::Na),
+                "notExist"
+            ))
+        );
+        assert_eq!(
+            parser.errors,
+            vec![PineInputError::new(
+                PineErrorKind::VarNotDeclare,
+                StrRange::new_empty()
+            )]
+        )
     }
 
     #[test]

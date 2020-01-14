@@ -70,7 +70,39 @@ pub fn flatexp<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, FlatExp
 pub fn exp<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Exp<'a>> {
     alt((
         map(|s| condition(s, state), |exp| Exp::Condition(Box::new(exp))), // match a ? b : c
+        map(eat_sep(|s| assign_expr(s, state)), |s| {
+            Exp::Assignment(Box::new(s))
+        }), // a = b
+        map(eat_sep(|s| var_assign_expr(s, state)), |s| {
+            Exp::VarAssignment(Box::new(s))
+        }), // a := b
         map(|s| flatexp(s, state), Exp::from),
+    ))(input)
+}
+
+// Will parse all the expression. if-then-else and for-range expression will consume the statement end.
+pub fn all_exp<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Exp<'a>> {
+    alt((
+        |s| exp(s, state),
+        map(eat_sep(|s| if_then_else_exp(s, state)), |s| {
+            Exp::Ite(Box::new(s))
+        }),
+        map(eat_sep(|s| for_range_exp(s, state)), |s| {
+            Exp::ForRange(Box::new(s))
+        }),
+    ))(input)
+}
+
+// Parse the expression that end with statement end, so the expression must end with \n
+pub fn exp_with_stmt_end<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Exp<'a>> {
+    alt((
+        terminated(|s| exp(s, state), statement_end),
+        map(eat_sep(|s| if_then_else_exp(s, state)), |s| {
+            Exp::Ite(Box::new(s))
+        }),
+        map(eat_sep(|s| for_range_exp(s, state)), |s| {
+            Exp::ForRange(Box::new(s))
+        }),
     ))(input)
 }
 
@@ -98,7 +130,7 @@ fn rettupledef<'a>(input: Input<'a>, _state: &AstState) -> PineResult<'a, LVTupl
 fn tupledef<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, TupleNode<'a>> {
     let (input, (paren_l, items, paren_r)) = eat_sep(tuple((
         eat_sep(tag("[")),
-        separated_list(eat_sep(tag(",")), |s| exp(s, state)),
+        separated_list(eat_sep(tag(",")), |s| all_exp(s, state)),
         eat_sep(tag("]")),
     )))(input)?;
     Ok((
@@ -111,7 +143,7 @@ fn type_cast<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, TypeCast<
     let (input, (data_type, _, e, end_tag)) = eat_sep(tuple((
         |s| datatype(s, state),
         eat_sep(tag("(")),
-        |s| exp(s, state),
+        |s| all_exp(s, state),
         eat_sep(tag(")")),
     )))(input)?;
     Ok((
@@ -126,7 +158,7 @@ fn type_cast<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, TypeCast<
 
 pub fn callable_expr<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Exp<'a>> {
     alt((
-        delimited(tag("("), |s| exp(s, state), eat_sep(tag(")"))),
+        delimited(tag("("), |s| all_exp(s, state), eat_sep(tag(")"))),
         map(
             |s| prefix_exp(s, state),
             |exp| Exp::PrefixExp(Box::new(exp)),
@@ -138,7 +170,7 @@ pub fn callable_expr<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, E
 fn ref_call<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, RefCall<'a>> {
     let (input, (name, (_, arg, paren_r))) = tuple((
         eat_sep(|s| callable_expr(s, state)),
-        tuple((eat_sep(tag("[")), |s| exp(s, state), eat_sep(tag("]")))),
+        tuple((eat_sep(tag("[")), |s| all_exp(s, state), eat_sep(tag("]")))),
     ))(input)?;
 
     let range = StrRange::new(name.range().start, paren_r.end);
@@ -146,16 +178,16 @@ fn ref_call<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, RefCall<'a
 }
 
 fn bracket_expr<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Exp<'a>> {
-    delimited(eat_sep(tag("(")), |s| exp(s, state), eat_sep(tag(")")))(input)
+    delimited(eat_sep(tag("(")), |s| all_exp(s, state), eat_sep(tag(")")))(input)
 }
 
 fn condition<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Condition<'a>> {
     let (input, (cond, _, exp1, _, exp2)) = tuple((
         map(|s| flatexp(s, state), |s| Exp::from(s)),
         eat_sep(tag("?")),
-        |s| exp(s, state),
+        |s| all_exp(s, state),
         eat_sep(tag(":")),
-        |s| exp(s, state),
+        |s| all_exp(s, state),
     ))(input)?;
 
     let range = StrRange::new(cond.range().start, exp2.range().end);
@@ -188,10 +220,9 @@ where
     F: Fn(Input<'a>, &AstState) -> PineResult<'a, Block<'a>>,
 {
     move |input: Input<'a>, state: &AstState| {
-        let (input, (if_tag, cond, _, then_block, else_block)) = tuple((
+        let (input, (if_tag, cond, then_block, else_block)) = tuple((
             tag("if"),
-            |s| exp(s, state),
-            statement_end,
+            |s| exp_with_stmt_end(s, state),
             |s| block_parser(s, state),
             opt(tuple((
                 preceded(statement_indent(state.get_indent()), tag("else")),
@@ -239,10 +270,10 @@ where
             tag("for"),
             varname_ws,
             eat_sep(tag("=")),
-            |s| exp(s, state), // int_lit_ws,
+            |s| all_exp(s, state), // int_lit_ws,
             eat_sep(tag("to")),
-            |s| exp(s, state), // int_lit_ws,
-            opt(tuple((eat_sep(tag("by")), |s| exp(s, state)))),
+            |s| all_exp(s, state), // int_lit_ws,
+            opt(tuple((eat_sep(tag("by")), |s| all_exp(s, state)))),
             statement_end,
             |s| block_parser(s, state),
         ))(input)?;
@@ -285,10 +316,13 @@ pub fn function_def_with_indent<'a>(
         eat_sep(tag("=>")),
         alt((
             preceded(statement_end, |s| inner_block_for_exp(s, state)),
-            map(terminated(|s| exp(s, state), statement_end), |s| {
-                let range = s.range();
-                Block::new(vec![], Some(s), range)
-            }),
+            map(
+                |s| exp_with_stmt_end(s, state),
+                |s| {
+                    let range = s.range();
+                    Block::new(vec![], Some(s), range)
+                },
+            ),
         )),
     ))(input)?;
 
@@ -334,24 +368,6 @@ fn datatype<'a>(input: Input<'a>, _state: &AstState) -> PineResult<'a, DataTypeN
     ))
 }
 
-pub fn exp_with_indent<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Exp<'a>> {
-    alt((
-        terminated(|s| exp(s, state), statement_end),
-        map(eat_sep(|s| if_then_else_exp(s, state)), |s| {
-            Exp::Ite(Box::new(s))
-        }),
-        map(eat_sep(|s| for_range_exp(s, state)), |s| {
-            Exp::ForRange(Box::new(s))
-        }),
-        map(eat_sep(|s| assign_with_indent(s, state)), |s| {
-            Exp::Assignment(Box::new(s))
-        }),
-        map(eat_sep(|s| var_assign_with_indent(s, state)), |s| {
-            Exp::VarAssignment(Box::new(s))
-        }),
-    ))(input)
-}
-
 fn assign_lv_names<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, LVTupleNode<'a>> {
     alt((
         map(varname_ws, |name| LVTupleNode::new(vec![name], name.range)),
@@ -359,10 +375,14 @@ fn assign_lv_names<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, LVT
     ))(input)
 }
 
-pub fn assign_with_indent<'a>(
+pub fn parse_assign<'a, F>(
     input: Input<'a>,
     state: &AstState,
-) -> PineResult<'a, Assignment<'a>> {
+    assign_fn: F,
+) -> PineResult<'a, Assignment<'a>>
+where
+    F: Fn(Input<'a>, &AstState) -> PineResult<'a, Exp<'a>>,
+{
     alt((
         map(
             tuple((
@@ -370,7 +390,7 @@ pub fn assign_with_indent<'a>(
                 eat_sep(|s| datatype(s, state)),
                 |s| assign_lv_names(s, state),
                 eat_sep(tag("=")),
-                |s| exp_with_indent(s, state),
+                |s| assign_fn(s, state),
             )),
             |s| {
                 let range = StrRange::new(s.0.start, s.4.range().end);
@@ -382,7 +402,7 @@ pub fn assign_with_indent<'a>(
                 tag("var"),
                 |s| assign_lv_names(s, state),
                 eat_sep(tag("=")),
-                |s| exp_with_indent(s, state),
+                |s| assign_fn(s, state),
             )),
             |s| {
                 let range = StrRange::new(s.0.start, s.3.range().end);
@@ -394,7 +414,7 @@ pub fn assign_with_indent<'a>(
                 |s| datatype(s, state),
                 |s| assign_lv_names(s, state),
                 eat_sep(tag("=")),
-                |s| exp_with_indent(s, state),
+                |s| assign_fn(s, state),
             )),
             |s| {
                 let range = StrRange::new(s.0.range.start, s.3.range().end);
@@ -405,7 +425,7 @@ pub fn assign_with_indent<'a>(
             tuple((
                 |s| assign_lv_names(s, state),
                 eat_sep(tag("=")),
-                |s| exp_with_indent(s, state),
+                |s| assign_fn(s, state),
             )),
             |s| {
                 let range = StrRange::new(s.0.range.start, s.2.range().end);
@@ -415,14 +435,26 @@ pub fn assign_with_indent<'a>(
     ))(input)
 }
 
-pub fn var_assign_with_indent<'a>(
+pub fn assign_expr<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Assignment<'a>> {
+    parse_assign(input, state, all_exp)
+}
+
+pub fn assign_stmt<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Assignment<'a>> {
+    preceded(statement_indent(state.get_indent()), |s| {
+        parse_assign(s, state, exp_with_stmt_end)
+    })(input)
+}
+
+pub fn parse_var_assign<'a, F>(
     input: Input<'a>,
     state: &AstState,
-) -> PineResult<'a, VarAssignment<'a>> {
+    assign_fn: F,
+) -> PineResult<'a, VarAssignment<'a>>
+where
+    F: Fn(Input<'a>, &AstState) -> PineResult<'a, Exp<'a>>,
+{
     map(
-        tuple((varname, eat_sep(tag(":=")), |input| {
-            exp_with_indent(input, state)
-        })),
+        tuple((varname, eat_sep(tag(":=")), |input| assign_fn(input, state))),
         |s| {
             let range = StrRange::new(s.0.range.start, s.2.range().end);
             VarAssignment::new(s.0, s.2, range)
@@ -430,11 +462,28 @@ pub fn var_assign_with_indent<'a>(
     )(input)
 }
 
+pub fn var_assign_expr<'a>(
+    input: Input<'a>,
+    state: &AstState,
+) -> PineResult<'a, VarAssignment<'a>> {
+    parse_var_assign(input, state, all_exp)
+}
+
+pub fn var_assign_stmt<'a>(
+    input: Input<'a>,
+    state: &AstState,
+) -> PineResult<'a, VarAssignment<'a>> {
+    preceded(statement_indent(state.get_indent()), |s| {
+        parse_var_assign(s, state, exp_with_stmt_end)
+    })(input)
+}
+
 fn block_with_indent<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Block<'a>> {
     let gen_indent = statement_indent(state.get_indent());
 
     let mut stmts: Vec<Statement<'a>> = vec![];
     let mut cur_input = input;
+    println!("current input: {:?}", cur_input);
     while cur_input.len() > 0 {
         if let Ok((next_input, stas)) = statement_with_indent(cur_input, state) {
             match stas {
@@ -448,7 +497,7 @@ fn block_with_indent<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, B
     }
     if cur_input.len() > 0 {
         if let Ok((next_input, ret_stmt)) =
-            eat_statement(gen_indent, |input| exp(input, state))(cur_input)
+            eat_statement(gen_indent, |input| exp_with_stmt_end(input, state))(cur_input)
         {
             let range = if stmts.is_empty() {
                 ret_stmt.range()
@@ -537,15 +586,15 @@ fn statement_with_indent<'a>(input: Input<'a>, state: &AstState) -> PineResult<'
             Statement::FuncCall(Box::new(s))
         }),
         map(
-            preceded(gen_indent(), |input| assign_with_indent(input, state)),
+            |input| assign_stmt(input, state),
             |s| Statement::Assignment(Box::new(s)),
         ),
         map(
-            preceded(gen_indent(), |input| var_assign_with_indent(input, state)),
+            |input| var_assign_stmt(input, state),
             |s| Statement::VarAssignment(Box::new(s)),
         ),
         map(
-            preceded(gen_indent(), |input| exp_with_indent(input, state)),
+            preceded(gen_indent(), |input| exp_with_stmt_end(input, state)),
             |s| Statement::Exp(s),
         ),
     ))(input)
@@ -807,6 +856,17 @@ mod tests {
 
     #[test]
     fn assignment_test() {
+        check_res(
+            "a = close",
+            all_exp,
+            Exp::Assignment(Box::new(Assignment::new(
+                vec![VarName::new_with_start("a", Position::new(0, 0))],
+                Exp::VarName(RVVarName::new_with_start("close", Position::new(0, 4))),
+                false,
+                None,
+                StrRange::from_start("a = close", Position::new(0, 0)),
+            ))),
+        );
         check_res(
             "a = close // This is also a comment\n",
             statement_with_indent,
@@ -1092,7 +1152,7 @@ mod tests {
     }
 
     #[test]
-    fn not_recognize_stmt_test() {
+    fn expr_stmt_test() {
         let test_input = Input::new_with_str("hello\nprint(ma)\n");
         let (input, output) = block(test_input, &AstState::new()).unwrap();
         println!("input {:?} {:?}", input, output);

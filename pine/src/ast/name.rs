@@ -50,6 +50,7 @@ fn reserved(input: Input) -> PineResult {
         tag("while"),
         tag("return"),
         tag("na"),
+        tag("var"),
     ))(input)
 }
 

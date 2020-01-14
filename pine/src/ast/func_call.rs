@@ -8,7 +8,7 @@ use nom::{
 use super::error::{PineError, PineErrorKind, PineResult};
 use super::input::{Input, StrRange};
 use super::name::{varname_ws, VarName};
-use super::stat_expr::{callable_expr, exp};
+use super::stat_expr::{all_exp, callable_expr};
 use super::stat_expr_types::{Exp, FunctionCall};
 use super::state::AstState;
 use super::utils::eat_sep;
@@ -28,7 +28,7 @@ impl<'a> FuncCallArg<'a> {
 
 fn func_call_arg<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, FuncCallArg<'a>> {
     if let Ok((input, result)) = map(
-        tuple((varname_ws, eat_sep(tag("=")), |s| exp(s, state))),
+        tuple((varname_ws, eat_sep(tag("=")), |s| all_exp(s, state))),
         |s| FuncCallArg {
             name: Some(s.0),
             range: StrRange::new(s.0.range.start, s.2.range().end),
@@ -39,7 +39,7 @@ fn func_call_arg<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, FuncC
         Ok((input, result))
     } else {
         let result = map(
-            |s| exp(s, state),
+            |s| all_exp(s, state),
             |s| FuncCallArg {
                 name: None,
                 range: s.range(),

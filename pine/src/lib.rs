@@ -66,9 +66,24 @@ impl<'a, 'b> PineParser<'a, 'b> {
     }
 
     pub fn parse(&mut self) -> Result<Block<'a>, Vec<PineInputError>> {
-        let mut blk = parse_ast(self.src)?;
-        parse_syntax(&mut blk, &self.var_types)?;
-        Ok(blk)
+        let mut all_errs = vec![];
+        let mut blk = match parse_ast(self.src) {
+            Ok(blk) => blk,
+            Err((Some(blk), errs)) => {
+                all_errs = errs;
+                blk
+            }
+            Err((None, errs)) => return Err(errs),
+        };
+        match parse_syntax(&mut blk, &self.var_types) {
+            Ok(_) => (),
+            Err(errs) => all_errs.extend(errs),
+        }
+        if all_errs.is_empty() {
+            Ok(blk)
+        } else {
+            Err(all_errs)
+        }
     }
 }
 
@@ -185,7 +200,7 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
     }
 }
 
-pub fn parse_ast(in_str: &str) -> Result<Block, Vec<PineInputError>> {
+pub fn parse_ast(in_str: &str) -> Result<Block, (Option<Block>, Vec<PineInputError>)> {
     let input = Input::new(in_str, Position::new(0, 0), Position::max());
     let state = AstState::new();
     match block(input.clone(), &state) {
@@ -199,19 +214,19 @@ pub fn parse_ast(in_str: &str) -> Result<Block, Vec<PineInputError>> {
             if state.is_ok() {
                 Ok(parsed)
             } else {
-                Err(state.into_inner())
+                Err((Some(parsed), state.into_inner()))
             }
         }
         Err(Err::Error(pine_error)) => {
             state.merge_pine_error(pine_error);
-            Err(state.into_inner())
+            Err((None, state.into_inner()))
         }
         _ => {
             state.catch(PineInputError::new(
                 PineErrorKind::UnknownErr,
                 StrRange::new(Position::new(0, 0), Position::max()),
             ));
-            Err(state.into_inner())
+            Err((None, state.into_inner()))
         }
     }
 }

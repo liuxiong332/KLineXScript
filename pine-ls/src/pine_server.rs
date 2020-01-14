@@ -130,7 +130,7 @@ impl PineServer {
                 .into_iter()
                 .map(|err| {
                     Diagnostic::new(
-                        from_str_range(doc.transfer_range(err.range)),
+                        from_str_range(err.range),
                         Some(DiagnosticSeverity::Error),
                         None,
                         Some(String::from("pine ls")),

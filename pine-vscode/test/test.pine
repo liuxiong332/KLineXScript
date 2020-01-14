@@ -42,7 +42,6 @@ plot(correlation(src, ovr, length),
    transp=40)
 
 mn(x, y) => 
-    
 updown(s, m) =>
     isEqual = s == s[1]
     isGrowing = s > s[1]
@@ -186,13 +185,13 @@ my_sma(price, length) =>
     sum / length
 plot(my_sma(close,14))
 
-study("SMA in for loop")
-    sum = 0
-    for i = 1 to 2
-        sum := sum + sma(close, i)
-    plot(sum)
+// study("SMA in for loop")
+//     sum = 0
+//     for i = 1 to 2
+//         sum := sum + sma(close, i)
+//     plot(sum)
 
-geom_average(x, y) =>
-    a = x*x
-    b = y*y
-    sqrt(a + b)
+// geom_average(x, y) =>
+//     a = x*x
+//     b = y*y
+//     sqrt(a + b)

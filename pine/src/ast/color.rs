@@ -1,5 +1,6 @@
 use super::error::{PineError, PineErrorKind, PineResult};
 use super::input::{Input, Position, StrRange};
+use super::state::{AstState, PineInputError};
 use super::utils::skip_ws;
 use nom::{
     bytes::complete::{tag, take_while},
@@ -32,7 +33,7 @@ fn is_hex_digit(c: char) -> bool {
     c.is_digit(16)
 }
 
-pub fn color_lit(input: Input) -> PineResult<ColorNode> {
+pub fn color_lit<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, ColorNode<'a>> {
     let (input, _) = skip_ws(input)?;
     let (next_input, out) = recognize(tuple((tag("#"), take_while(is_hex_digit))))(input)?;
 
@@ -41,10 +42,16 @@ pub fn color_lit(input: Input) -> PineResult<ColorNode> {
             next_input,
             ColorNode::new(out.src, StrRange::from_input(&out)),
         )),
-        _ => Err(Err::Error(PineError::from_pine_kind(
-            input,
-            PineErrorKind::InvalidColorLiteral,
-        ))),
+        _ => {
+            state.catch(PineInputError::new(
+                PineErrorKind::InvalidColorLiteral,
+                StrRange::from_input(&out),
+            ));
+            Ok((
+                next_input,
+                ColorNode::new(out.src, StrRange::from_input(&out)),
+            ))
+        }
     }
 }
 
@@ -56,7 +63,7 @@ mod tests {
     #[test]
     fn color_lit_test() {
         assert_eq!(
-            color_lit(Input::new_with_str(" #123456 d")),
+            color_lit(Input::new_with_str(" #123456 d"), &AstState::new()),
             Ok((
                 Input::new(" d", Position::new(0, 8), Position::max()),
                 ColorNode::new(

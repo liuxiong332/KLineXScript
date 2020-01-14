@@ -6,7 +6,7 @@ use super::name::{varname, varname_ws};
 use super::num::num_lit_ws;
 use super::op::*;
 use super::stat_expr_types::*;
-use super::state::AstState;
+use super::state::{AstState, PineInputError};
 use super::string::string_lit;
 use super::trans::flatexp_from_components;
 use super::utils::{eat_sep, eat_statement, statement_end, statement_indent};
@@ -33,7 +33,7 @@ pub fn exp2<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Exp2<'a>> 
         }),
         map(num_lit_ws, Exp2::Num),
         map(string_lit, Exp2::Str),
-        map(color_lit, Exp2::Color),
+        map(|s| color_lit(s, state), Exp2::Color),
         map(|input| bracket_expr(input, state), Exp2::Exp),
         // map(rettupledef, |varnames| Exp2::RetTuple(Box::new(varnames))), // match [a, b]
         map(|s| tupledef(s, state), |exps| Exp2::Tuple(Box::new(exps))), // match [a, b + c]
@@ -507,10 +507,14 @@ fn block_with_indent<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, B
         }
     }
     if stmts.is_empty() {
-        Err(Err::Error(PineError::from_pine_kind(
-            input,
+        state.catch(PineInputError::new(
             PineErrorKind::BlockNoStmts,
-        )))
+            StrRange::new(input.start, input.start),
+        ));
+        Ok((
+            cur_input,
+            Block::new(stmts, None, StrRange::new(input.start, input.start)),
+        ))
     } else {
         let range = StrRange::new(stmts[0].range().start, stmts.last().unwrap().range().end);
         Ok((cur_input, Block::new(stmts, None, range)))
@@ -1153,7 +1157,15 @@ mod tests {
     #[test]
     fn expr_stmt_test() {
         let test_input = Input::new_with_str("hello\nprint(ma)\n");
-        let (input, output) = block(test_input, &AstState::new()).unwrap();
+        let (input, _output) = block(test_input, &AstState::new()).unwrap();
+        assert_eq!(input.src, "");
+    }
+
+    #[test]
+    fn not_end_func_test() {
+        let test_input = Input::new_with_str("fun(x, y) =>\n");
+        let result = block(test_input, &AstState::new());
+        let (input, _output) = result.unwrap();
         assert_eq!(input.src, "");
     }
 }

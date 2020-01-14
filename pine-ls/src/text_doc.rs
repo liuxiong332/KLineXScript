@@ -67,16 +67,16 @@ impl TextDoc {
         &self.uri
     }
 
-    pub fn transfer_range(&self, range: StrRange) -> StrRange {
-        if range.end == StrPos::max() {
-            StrRange::new(
-                range.start,
-                StrPos::new(self.line_lens.len() as u32 - 1, range.end.get_character()),
-            )
-        } else {
-            range
-        }
-    }
+    // pub fn transfer_range(&self, range: StrRange) -> StrRange {
+    //     if range.end == StrPos::max() {
+    //         StrRange::new(
+    //             range.start,
+    //             StrPos::new(self.line_lens.len() as u32 - 1, range.end.get_character()),
+    //         )
+    //     } else {
+    //         range
+    //     }
+    // }
 
     pub fn parse_src(&self) -> Result<(), Vec<PineFormatError>> {
         let mut pine_script = PineScript::new(None);

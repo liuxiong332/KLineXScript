@@ -21,7 +21,7 @@ fn get_line_lens(text: &str) -> Vec<usize> {
         }
         iter_index += ch.len_utf8();
     }
-    if iter_index > start {
+    if iter_index > start || (iter_index == start && line_lens.len() > 0) {
         line_lens.push(iter_index - start);
     }
     line_lens
@@ -96,7 +96,7 @@ mod tests {
         );
         assert_eq!(
             get_line_lens("hello\nworld\r\n"),
-            vec!["hello\n".len(), "world\r\n".len(),]
+            vec!["hello\n".len(), "world\r\n".len(), 0]
         );
         assert_eq!(get_line_lens(""), Vec::<usize>::new());
         assert_eq!(get_line_lens("he"), vec![2]);
@@ -117,7 +117,7 @@ mod tests {
         assert_eq!(text_doc.text, String::from("hello\nwwoyaoode\n"));
         assert_eq!(
             text_doc.line_lens,
-            vec!["hello\n".len(), "wwoyaoode\n".len()]
+            vec!["hello\n".len(), "wwoyaoode\n".len(), 0]
         );
 
         text_doc.change(
@@ -129,7 +129,7 @@ mod tests {
         assert_eq!(text_doc.text, String::from("good-hello\nwwoyaoode\n"));
         assert_eq!(
             text_doc.line_lens,
-            vec!["good-hello\n".len(), "wwoyaoode\n".len()]
+            vec!["good-hello\n".len(), "wwoyaoode\n".len(), 0]
         );
 
         text_doc.change(
@@ -148,6 +148,7 @@ mod tests {
                 "hello\r\n".len(),
                 "woyao\n".len(),
                 "我的wwoyaoode\n".len(), // 11 + 13
+                0,
             ]
         );
 
@@ -165,6 +166,23 @@ mod tests {
             text_doc.line_lens,
             vec![
                 "hello\r\n".len(),
+                "woyao\n".len(),
+                "我的wwoyaoode\n".len(),
+                "hello".len()
+            ]
+        );
+
+        text_doc.change(
+            Position::new(0, 5),
+            Position::new(0, 5),
+            0,
+            String::from("\r\n"),
+        );
+        assert_eq!(
+            text_doc.line_lens,
+            vec![
+                "hello\r\n".len(),
+                "\r\n".len(),
                 "woyao\n".len(),
                 "我的wwoyaoode\n".len(),
                 "hello".len()

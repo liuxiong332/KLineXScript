@@ -51,6 +51,10 @@ pub trait SyntaxCtx<'a> {
 
     fn get_var_index(&mut self, name: &str) -> VarIndex;
 
+    fn contain_var_index(&self, name: &str) -> bool;
+
+    fn contain_var_index_scope(&self, name: &str) -> bool;
+
     fn gen_child_ctx_index(&mut self) -> i32;
 }
 
@@ -145,6 +149,20 @@ impl<'a> SyntaxCtx<'a> for SyntaxContext<'a> {
         } else {
             unreachable!();
         }
+    }
+
+    fn contain_var_index(&self, name: &str) -> bool {
+        if self.var_indexs.contains_key(name) {
+            true
+        } else if let Some(p) = self.parent {
+            downcast_ctx(p).contain_var_index(name)
+        } else {
+            false
+        }
+    }
+
+    fn contain_var_index_scope(&self, name: &str) -> bool {
+        self.var_indexs.contains_key(name)
     }
 
     fn gen_child_ctx_index(&mut self) -> i32 {
@@ -816,12 +834,12 @@ impl<'a> SyntaxParser<'a> {
         range: StrRange,
     ) -> Result<SyntaxType<'a>, PineInputError> {
         let context = downcast_ctx(self.context);
-        if context.get_var_scope(name.value).is_some() {
-            self.catch(PineInputError::new(
-                PineErrorKind::VarHasDeclare,
-                name.range,
-            ));
-        }
+        // if context.get_var_scope(name.value).is_some() {
+        //     self.catch(PineInputError::new(
+        //         PineErrorKind::VarHasDeclare,
+        //         name.range,
+        //     ));
+        // }
         if let Some(data_type) = var_type {
             let (is_cast_err, result) = implicity_type_cast(&val, &data_type);
             if is_cast_err {
@@ -864,7 +882,17 @@ impl<'a> SyntaxParser<'a> {
                     let varids = assign
                         .names
                         .iter()
-                        .map(|n| context.gen_var_index(n.value))
+                        .map(|n| {
+                            if context.contain_var_index_scope(n.value) {
+                                self.catch(PineInputError::new(
+                                    PineErrorKind::VarHasDeclare,
+                                    n.range,
+                                ));
+                                context.get_var_index(n.value).varid
+                            } else {
+                                context.gen_var_index(n.value)
+                            }
+                        })
                         .collect();
                     assign.varids = Some(varids);
                     Ok(ParseValue::new_with_type(SyntaxType::Tuple(Rc::new(
@@ -884,9 +912,18 @@ impl<'a> SyntaxParser<'a> {
                 val_res.syntax_type,
                 assign.range,
             )?;
-            assign.varids = Some(vec![
-                downcast_ctx(self.context).gen_var_index(assign.names[0].value)
-            ]);
+            let context = downcast_ctx(self.context);
+
+            let name = assign.names[0];
+            if context.contain_var_index_scope(name.value) {
+                self.catch(PineInputError::new(
+                    PineErrorKind::VarHasDeclare,
+                    name.range,
+                ));
+                assign.varids = Some(vec![context.get_var_index(assign.names[0].value).varid]);
+            } else {
+                assign.varids = Some(vec![context.gen_var_index(assign.names[0].value)]);
+            }
             Ok(ParseValue::new_with_type(rtype))
         }
     }
@@ -921,17 +958,18 @@ impl<'a> SyntaxParser<'a> {
     fn parse_func_def(&mut self, func_def: &mut FunctionDef<'a>) -> ParseResult<'a> {
         let context = downcast_ctx(self.context);
         let name = func_def.name.value;
-        if context.get_var_scope(name).is_some() {
+        self.user_funcs.insert(name, func_def);
+        let param_names: Vec<_> = func_def.params.iter().map(|v| v.value).collect();
+        let name_type = SyntaxType::UserFunction(Rc::new((param_names, SyntaxType::Any)));
+        if context.contain_var_index_scope(name) {
             self.catch(PineInputError::new(
                 PineErrorKind::VarHasDeclare,
                 func_def.name.range,
             ));
+            func_def.name_varid = context.get_var_index(name).varid;
+        } else {
+            func_def.name_varid = context.gen_var_index(name);
         }
-
-        self.user_funcs.insert(name, func_def);
-        let param_names: Vec<_> = func_def.params.iter().map(|v| v.value).collect();
-        let name_type = SyntaxType::UserFunction(Rc::new((param_names, SyntaxType::Any)));
-        func_def.name_varid = context.gen_var_index(name);
         context.declare_var(name, name_type.clone());
         Ok(ParseValue::new_with_type(name_type))
     }
@@ -1043,26 +1081,6 @@ mod tests {
         name
     }
 
-    #[test]
-    fn func_def_test() {
-        let mut parser = SyntaxParser::new();
-        let mut func_def = FunctionDef::new(
-            varname("funa"),
-            vec![varname("hello"), varname("hello2")],
-            Block::new(vec![], None, StrRange::new_empty()),
-            StrRange::new_empty(),
-        );
-        assert_eq!(
-            parser.parse_func_def(&mut func_def),
-            Ok(ParseValue::new_with_type(SyntaxType::UserFunction(
-                Rc::new((vec!["hello", "hello2"], SyntaxType::Any))
-            )))
-        );
-        assert_eq!(func_def.name_varid, 0);
-        assert_eq!(parser.user_funcs["funa"], &mut func_def as *mut FunctionDef);
-        assert_eq!(downcast_ctx(parser.context).vars.contains_key("funa"), true);
-    }
-
     const INT_TYPE: SyntaxType = SyntaxType::Simple(SimpleSyntaxType::Int);
     const FLOAT_TYPE: SyntaxType = SyntaxType::Simple(SimpleSyntaxType::Float);
 
@@ -1076,6 +1094,45 @@ mod tests {
 
     fn fun_nm<'a>() -> Exp<'a> {
         Exp::VarName(rvarname("func"))
+    }
+
+    #[test]
+    fn func_def_test() {
+        let gen_def = || {
+            FunctionDef::new(
+                varname("funa"),
+                vec![varname("hello"), varname("hello2")],
+                Block::new(vec![], None, StrRange::new_empty()),
+                StrRange::new_empty(),
+            )
+        };
+        let mut parser = SyntaxParser::new();
+        let mut func_def = gen_def();
+        assert_eq!(
+            parser.parse_func_def(&mut func_def),
+            Ok(ParseValue::new_with_type(SyntaxType::UserFunction(
+                Rc::new((vec!["hello", "hello2"], SyntaxType::Any))
+            )))
+        );
+        assert_eq!(func_def.name_varid, 0);
+        assert_eq!(parser.user_funcs["funa"], &mut func_def as *mut FunctionDef);
+        assert_eq!(downcast_ctx(parser.context).vars.contains_key("funa"), true);
+
+        let mut parser2 = SyntaxParser::new_with_vars(&vec![("funa", INT_TYPE)]);
+        let mut func_def = gen_def();
+        assert_eq!(
+            parser2.parse_func_def(&mut func_def),
+            Ok(ParseValue::new_with_type(SyntaxType::UserFunction(
+                Rc::new((vec!["hello", "hello2"], SyntaxType::Any))
+            )))
+        );
+        assert_eq!(
+            parser2.errors,
+            vec![PineInputError::new(
+                PineErrorKind::VarHasDeclare,
+                StrRange::new_empty()
+            )]
+        )
     }
 
     #[test]
@@ -1943,13 +2000,13 @@ mod tests {
         assert_eq!(context.get_var_scope("a"), Some(&val_type));
         assert_eq!(assign.varids, Some(vec![1]));
 
-        context.var_indexs = HashMap::new();
+        // context.var_indexs = HashMap::new();
         let mut assign = assign_stmt(input, &AstState::new()).unwrap().1;
         assert_eq!(
             parser.parse_assign(&mut assign),
             Ok(ParseValue::new_with_type(val_type.clone()))
         );
-        assert_eq!(assign.varids, Some(vec![2]));
+        assert_eq!(assign.varids, Some(vec![1]));
         assert_eq!(
             parser.errors.last(),
             Some(&PineInputError::new(
@@ -1968,7 +2025,7 @@ mod tests {
                 val_type.clone()
             ]))))
         );
-        assert_eq!(assign.varids, Some(vec![3, 4]));
+        assert_eq!(assign.varids, Some(vec![2, 3]));
 
         context.var_indexs = HashMap::new();
         let input = Input::new_with_str("int [a1, a2] = [1.0, 2.0]");

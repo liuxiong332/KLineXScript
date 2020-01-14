@@ -483,7 +483,6 @@ fn block_with_indent<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, B
 
     let mut stmts: Vec<Statement<'a>> = vec![];
     let mut cur_input = input;
-    println!("current input: {:?}", cur_input);
     while cur_input.len() > 0 {
         if let Ok((next_input, stas)) = statement_with_indent(cur_input, state) {
             match stas {
@@ -1155,7 +1154,6 @@ mod tests {
     fn expr_stmt_test() {
         let test_input = Input::new_with_str("hello\nprint(ma)\n");
         let (input, output) = block(test_input, &AstState::new()).unwrap();
-        println!("input {:?} {:?}", input, output);
         assert_eq!(input.src, "");
     }
 }

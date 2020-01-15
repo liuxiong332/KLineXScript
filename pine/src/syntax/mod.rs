@@ -2148,7 +2148,6 @@ mod tests {
 
         let input = Input::new_with_str(BLOCK);
         let myblk = block(input, &AstState::new());
-        println!("My blk: {:?}", myblk);
         let mut blk = myblk.unwrap().1;
         assert_eq!(
             parser.parse_blk(&mut blk),

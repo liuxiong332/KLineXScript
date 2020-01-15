@@ -22,9 +22,6 @@ use nom::{
 // exp2 contain the expressions that can apply the binary operators(+,-,*,/) and unary operators(+,-)
 pub fn exp2<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Exp2<'a>> {
     alt((
-        map(eat_sep(tag("na")), |s| {
-            Exp2::Na(NaNode::new(StrRange::from_input(&s)))
-        }),
         map(eat_sep(tag("true")), |s| {
             Exp2::Bool(BoolNode::new(true, StrRange::from_input(&s)))
         }),
@@ -35,19 +32,21 @@ pub fn exp2<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Exp2<'a>> 
         map(string_lit_ws, Exp2::Str),
         map(|s| color_lit(s, state), Exp2::Color),
         map(|input| bracket_expr(input, state), Exp2::Exp),
-        // map(rettupledef, |varnames| Exp2::RetTuple(Box::new(varnames))), // match [a, b]
         map(|s| tupledef(s, state), |exps| Exp2::Tuple(Box::new(exps))), // match [a, b + c]
         map(|s| type_cast(s, state), |exp| Exp2::TypeCast(Box::new(exp))), // match float(b)
+        map(
+            |s| func_call_ws(s, state),
+            |exp| Exp2::FuncCall(Box::new(exp)),
+        ), // match a(b) (a)(b) a.b.c(m)
+        map(|s| ref_call(s, state), |exp| Exp2::RefCall(Box::new(exp))), // match a[b] (a)[b] a.b.c[m]
         map(
             |s| prefix_exp_ws(s, state),
             |exp| Exp2::PrefixExp(Box::new(exp)),
         ), // match a.b.c
-        map(
-            |s| func_call_ws(s, state),
-            |exp| Exp2::FuncCall(Box::new(exp)),
-        ), // match a(b)
-        map(|s| ref_call(s, state), |exp| Exp2::RefCall(Box::new(exp))), // match a[b]
-        map(varname_ws, Exp2::VarName),                                  // match a
+        map(eat_sep(tag("na")), |s| {
+            Exp2::Na(NaNode::new(StrRange::from_input(&s)))
+        }), // match na but not na(m) and na.m
+        map(|s| varname_ws(s, state), Exp2::VarName),                    // match a
     ))(input)
 }
 
@@ -107,10 +106,10 @@ pub fn exp_with_stmt_end<'a>(input: Input<'a>, state: &AstState) -> PineResult<'
 }
 
 // The left return tuple of expression `[a, b] = [1, 2]` that contain variable name between square brackets
-fn rettupledef<'a>(input: Input<'a>, _state: &AstState) -> PineResult<'a, LVTupleNode<'a>> {
+fn rettupledef<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, LVTupleNode<'a>> {
     let (input, (paren_l, names, paren_r)) = eat_sep(tuple((
         eat_sep(tag("[")),
-        separated_list(eat_sep(tag(",")), varname_ws),
+        separated_list(eat_sep(tag(",")), |s| varname_ws(s, state)),
         eat_sep(tag("]")),
     )))(input)?;
     if names.is_empty() {
@@ -163,7 +162,10 @@ pub fn callable_expr<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, E
             |s| prefix_exp(s, state),
             |exp| Exp::PrefixExp(Box::new(exp)),
         ), // match a.b.c
-        map(varname, |name| Exp::VarName(RVVarName::new(name))), // match a
+        map(
+            |s| varname(s, state),
+            |name| Exp::VarName(RVVarName::new(name)),
+        ), // match a
     ))(input)
 }
 
@@ -194,9 +196,12 @@ fn condition<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Condition
     Ok((input, Condition::new(cond, exp1, exp2, range)))
 }
 
-fn prefix_exp<'a>(input: Input<'a>, _state: &AstState) -> PineResult<'a, PrefixExp<'a>> {
-    let (input, (prefix, _, names)) =
-        tuple((varname, tag("."), separated_list(tag("."), varname)))(input)?;
+fn prefix_exp<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, PrefixExp<'a>> {
+    let (input, (prefix, _, names)) = tuple((
+        |s| varname(s, state),
+        tag("."),
+        separated_list(tag("."), |s| varname(s, state)),
+    ))(input)?;
 
     if names.len() == 0 {
         Err(Err::Error(PineError::from_pine_kind(
@@ -268,7 +273,7 @@ where
     move |input: Input<'a>, state| {
         let (input, (for_tag, var, _, start, _, end, by, _, do_blk)) = tuple((
             tag("for"),
-            varname_ws,
+            |s| varname_ws(s, state),
             eat_sep(tag("=")),
             |s| all_exp(s, state), // int_lit_ws,
             eat_sep(tag("to")),
@@ -309,9 +314,9 @@ pub fn function_def_with_indent<'a>(
 ) -> PineResult<'a, FunctionDef<'a>> {
     let (input, (_, name, _, params, _, _, body)) = tuple((
         statement_indent(state.get_indent()),
-        varname,
+        |s| varname(s, state),
         eat_sep(tag("(")),
-        separated_list(eat_sep(tag(",")), varname_ws),
+        separated_list(eat_sep(tag(",")), |s| varname_ws(s, state)),
         eat_sep(tag(")")),
         eat_sep(tag("=>")),
         alt((
@@ -370,7 +375,10 @@ fn datatype<'a>(input: Input<'a>, _state: &AstState) -> PineResult<'a, DataTypeN
 
 fn assign_lv_names<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, LVTupleNode<'a>> {
     alt((
-        map(varname_ws, |name| LVTupleNode::new(vec![name], name.range)),
+        map(
+            |s| varname_ws(s, state),
+            |name| LVTupleNode::new(vec![name], name.range),
+        ),
         |s| rettupledef(s, state),
     ))(input)
 }
@@ -454,7 +462,11 @@ where
     F: Fn(Input<'a>, &AstState) -> PineResult<'a, Exp<'a>>,
 {
     map(
-        tuple((varname, eat_sep(tag(":=")), |input| assign_fn(input, state))),
+        tuple((
+            |s| varname(s, state),
+            eat_sep(tag(":=")),
+            |input| assign_fn(input, state),
+        )),
         |s| {
             let range = StrRange::new(s.0.range.start, s.2.range().end);
             VarAssignment::new(s.0, s.2, range)
@@ -1173,6 +1185,24 @@ mod tests {
         let test_input = Input::new_with_str("hello\nprint(ma)\n");
         let (input, _output) = block(test_input, &AstState::new()).unwrap();
         assert_eq!(input.src, "");
+
+        let test_input = Input::new_with_str("color.new(c, 50)");
+        let (input, _output) = all_exp(test_input, &AstState::new()).unwrap();
+        assert_eq!(input.src, "");
+
+        let test_input = Input::new_with_str(
+            "bgColor = (dayofweek == dayofweek) ? color.new(c, 50) : color.new(color.blue, 80)",
+        );
+        let (input, _output) = all_exp(test_input, &AstState::new()).unwrap();
+        assert_eq!(input.src, "");
+
+        let test_input = Input::new_with_str("na(myVar) ? 0 : close");
+        let (input, _output) = condition(test_input, &AstState::new()).unwrap();
+        assert_eq!(input.src, "");
+
+        // let test_input = Input::new_with_str("myClose = na(myVar) ? 0 : close");
+        // let (input, _output) = block(test_input, &AstState::new()).unwrap();
+        // assert_eq!(input.src, "");
     }
 
     #[test]

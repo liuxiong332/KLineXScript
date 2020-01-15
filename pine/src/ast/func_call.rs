@@ -28,7 +28,11 @@ impl<'a> FuncCallArg<'a> {
 
 fn func_call_arg<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, FuncCallArg<'a>> {
     if let Ok((input, result)) = map(
-        tuple((varname_ws, eat_sep(tag("=")), |s| all_exp(s, state))),
+        tuple((
+            |s| varname_ws(s, state),
+            eat_sep(tag("=")),
+            |s| all_exp(s, state),
+        )),
         |s| FuncCallArg {
             name: Some(s.0),
             range: StrRange::new(s.0.range.start, s.2.range().end),
@@ -38,7 +42,6 @@ fn func_call_arg<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, FuncC
     {
         Ok((input, result))
     } else {
-        println!("will match pos {:?}", input);
         let result = map(
             |s| all_exp(s, state),
             |s| FuncCallArg {
@@ -71,7 +74,6 @@ fn func_call_args<'a>(
 
     let mut cur_input = input;
 
-    println!("Now input {:?}", cur_input);
     while let Ok((next_input, arg)) =
         preceded(eat_sep(tag(",")), |s| func_call_arg(s, state))(cur_input)
     {

@@ -387,7 +387,7 @@ mod tests {
             mut args: Vec<Option<PineRef<'a>>>,
             _func_type: FunctionType<'a>,
         ) -> Result<PineRef<'a>, RuntimeErr> {
-            println!("args {:?}", args);
+            // println!("args {:?}", args);
             let arg1 = mem::replace(&mut args[0], None).unwrap();
             let arg1_val = downcast_pf::<Series<Int>>(arg1).unwrap();
             assert_eq!(arg1_val.get_history(), &vec![Some(100), Some(10)]);

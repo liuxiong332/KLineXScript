@@ -69,14 +69,14 @@ where
     D: Format + Clone + PartialEq + Debug + PineFrom<'a, D> + PineStaticType + 'a,
 {
     let items: RefData<Vec<D>> = Vec::implicity_from(item_val).unwrap();
-    println!("items {:?}", items);
+    // println!("items {:?}", items);
     let s: String = items
         .iter()
         .map(|v| Format::fmt(v))
         .collect::<Vec<String>>()
         .join(",");
 
-    println!("items str {:?}", s);
+    // println!("items str {:?}", s);
 
     context.get_callback().unwrap().print(s);
     Ok(())
@@ -93,7 +93,7 @@ where
 }
 
 fn print_val<'a>(item_val: PineRef<'a>, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
-    println!("print val type {:?}", item_val.get_type());
+    // println!("print val type {:?}", item_val.get_type());
     match item_val.get_type() {
         (DataType::Float, SecondType::Series) => print_series::<Float>(item_val, context),
         (DataType::Int, SecondType::Series) => print_series::<Int>(item_val, context),
@@ -196,7 +196,7 @@ mod tests {
         struct MyCallback;
         impl Callback for MyCallback {
             fn print(&self, _str: String) {
-                println!("get str {:?}", _str);
+                // println!("get str {:?}", _str);
                 assert_eq!(_str, String::from("1"));
             }
         }
@@ -212,7 +212,7 @@ mod tests {
         struct MyCallback;
         impl Callback for MyCallback {
             fn print(&self, _str: String) {
-                println!("get str {:?}", _str);
+                // println!("get str {:?}", _str);
                 assert_eq!(_str, String::from("1"));
             }
         }

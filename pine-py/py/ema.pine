@@ -2,4 +2,7 @@ pine_ema(x, y) =>
     sum = 0.0
     sum := x + (y * sum[1] ? y * sum[1] : 0)
     sum
+
+sma(close, 10)[1]
+
 print(pine_ema(close, 2))

@@ -1353,6 +1353,42 @@ mod tests {
     }
 
     #[test]
+    fn prefix_ref_func_call_test() {
+        check_res(
+            "sma(close, 10)[1]",
+            prefix_ref_func_call,
+            Exp::RefCall(Box::new(RefCall::new(
+                Exp::FuncCall(Box::new(FunctionCall::new(
+                    Exp::VarName(RVVarName::new_with_start("sma", Position::new(0, 0))),
+                    vec![
+                        Exp::VarName(RVVarName::new_with_start("close", Position::new(0, 4))),
+                        Exp::Num(Numeral::Int(IntNode::new(
+                            10,
+                            StrRange::from_start("10", Position::new(0, 11)),
+                        ))),
+                    ],
+                    vec![],
+                    0,
+                    StrRange::from_start("sma(close, 10)", Position::new(0, 0)),
+                ))),
+                Exp::Num(Numeral::Int(IntNode::new(
+                    1,
+                    StrRange::from_start("1", Position::new(0, 15)),
+                ))),
+                StrRange::from_start("sma(close, 10)[1]", Position::new(0, 0)),
+            ))),
+        );
+
+        let test_input = Input::new_with_str("sma.mm(close, 10)[1]");
+        let (input, _output) = prefix_ref_func_call(test_input, &AstState::new()).unwrap();
+        assert_eq!(input.src, "");
+
+        let test_input = Input::new_with_str("sma.mm[1]");
+        let (input, _output) = prefix_ref_func_call(test_input, &AstState::new()).unwrap();
+        assert_eq!(input.src, "");
+    }
+
+    #[test]
     fn expr_stmt_test() {
         let test_input = Input::new_with_str("hello\nprint(ma)\n");
         let (input, _output) = block(test_input, &AstState::new()).unwrap();

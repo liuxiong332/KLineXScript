@@ -148,6 +148,13 @@ impl PineServer {
             };
             // info!("publish errors {:?}", publish_diagnostics);
             self.send_notification("textDocument/publishDiagnostics", publish_diagnostics);
+        } else {
+            let publish_diagnostics = PublishDiagnosticsParams {
+                uri: doc.get_uri().clone(),
+                diagnostics: vec![],
+                version: None,
+            };
+            self.send_notification("textDocument/publishDiagnostics", publish_diagnostics);
         }
     }
 

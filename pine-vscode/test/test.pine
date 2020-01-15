@@ -128,7 +128,7 @@ calcSumAndMul(a, b) =>
 
 [s, m] = calcSumAndMul(high, low)
 isintraday ? red : isdaily ? green : ismonthly ? blue : na
-// sma(close, 10)[1]
+sma(close, 10)[1]
 
 //@version=4
 study("My Script", overlay=true)

@@ -337,12 +337,12 @@ fn gen_dot_func_call<'a>(
     dict_args: Vec<(VarName<'a>, Exp<'a>)>,
     range: StrRange,
 ) -> Statement<'a> {
-    Statement::FuncCall(Box::new(FunctionCall::new_no_ctxid(
-        gen_prefix(methods, methods_range),
+    Statement::Exp(Exp::FuncCall(Box::new(FunctionCall::new_no_ctxid(
+        gen_prefix(methods[0], methods[1], methods_range),
         pos_args,
         dict_args,
         range,
-    )))
+    ))))
 }
 
 #[test]
@@ -375,10 +375,8 @@ fn if_expr_test() {
                                     StrRange::from_start("BBandLE", Position::new(2, 20))
                                 )),
                                 gen_prefix(
-                                    vec![
-                                        VarName::new_with_start("strategy", Position::new(2, 30)),
-                                        VarName::new_with_start("long", Position::new(2, 39))
-                                    ],
+                                    VarName::new_with_start("strategy", Position::new(2, 30)),
+                                    VarName::new_with_start("long", Position::new(2, 39)),
                                     StrRange::from_start("strategy.long", Position::new(2, 30))
                                 ),
                             ],
@@ -402,15 +400,19 @@ fn if_expr_test() {
                                 ),
                                 (
                                     VarName::new_with_start("oca_type", Position::new(4, 19)),
-                                    gen_prefix(
-                                        vec![
+                                    gen_prefix_exp(
+                                        gen_prefix(
                                             VarName::new_with_start(
                                                 "strategy",
                                                 Position::new(4, 28)
                                             ),
                                             VarName::new_with_start("oca", Position::new(4, 37)),
-                                            VarName::new_with_start("cancel", Position::new(4, 41))
-                                        ],
+                                            StrRange::from_start(
+                                                "strategy.oca",
+                                                Position::new(4, 28)
+                                            )
+                                        ),
+                                        VarName::new_with_start("cancel", Position::new(4, 41)),
                                         StrRange::from_start(
                                             "strategy.oca.cancel",
                                             Position::new(4, 28)

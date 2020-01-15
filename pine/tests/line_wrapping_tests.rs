@@ -88,20 +88,16 @@ fn func_call_test() {
                     (
                         VarName::new_with_start("color", Position::new(1, 0)),
                         gen_prefix(
-                            vec![
-                                VarName::new_with_start("color", Position::new(1, 6)),
-                                VarName::new_with_start("purple", Position::new(1, 12))
-                            ],
+                            VarName::new_with_start("color", Position::new(1, 6)),
+                            VarName::new_with_start("purple", Position::new(1, 12)),
                             StrRange::from_start("color.purple", Position::new(1, 6))
                         ),
                     ),
                     (
                         VarName::new_with_start("style", Position::new(2, 0)),
                         gen_prefix(
-                            vec![
-                                VarName::new_with_start("plot", Position::new(2, 6)),
-                                VarName::new_with_start("style_area", Position::new(2, 11))
-                            ],
+                            VarName::new_with_start("plot", Position::new(2, 6)),
+                            VarName::new_with_start("style_area", Position::new(2, 11)),
                             StrRange::from_start("plot.style_area", Position::new(2, 6))
                         ),
                     ),
@@ -401,10 +397,8 @@ fn expr_comment_test() {
                             StrRange::from_start("open > close", Position::new(0, 4))
                         ),
                         gen_prefix(
-                            vec![
-                                VarName::new_with_start("color", Position::new(0, 19)),
-                                VarName::new_with_start("red", Position::new(0, 25))
-                            ],
+                            VarName::new_with_start("color", Position::new(0, 19)),
+                            VarName::new_with_start("red", Position::new(0, 25)),
                             StrRange::from_start("color.red", Position::new(0, 19))
                         ),
                         gen_condition(
@@ -419,10 +413,8 @@ fn expr_comment_test() {
                                 StrRange::from_start("high > high[1]", Position::new(1, 0))
                             ),
                             gen_prefix(
-                                vec![
-                                    VarName::new_with_start("color", Position::new(1, 17)),
-                                    VarName::new_with_start("lime", Position::new(1, 23))
-                                ],
+                                VarName::new_with_start("color", Position::new(1, 17)),
+                                VarName::new_with_start("lime", Position::new(1, 23)),
                                 StrRange::from_start("color.lime", Position::new(1, 17))
                             ),
                             gen_condition(
@@ -437,17 +429,13 @@ fn expr_comment_test() {
                                     StrRange::from_start("low < low[1]", Position::new(2, 0))
                                 ),
                                 gen_prefix(
-                                    vec![
-                                        VarName::new_with_start("color", Position::new(2, 15)),
-                                        VarName::new_with_start("blue", Position::new(2, 21))
-                                    ],
+                                    VarName::new_with_start("color", Position::new(2, 15)),
+                                    VarName::new_with_start("blue", Position::new(2, 21)),
                                     StrRange::from_start("color.blue", Position::new(2, 15))
                                 ),
                                 gen_prefix(
-                                    vec![
-                                        VarName::new_with_start("color", Position::new(2, 28)),
-                                        VarName::new_with_start("black", Position::new(2, 34))
-                                    ],
+                                    VarName::new_with_start("color", Position::new(2, 28)),
+                                    VarName::new_with_start("black", Position::new(2, 34)),
                                     StrRange::from_start("color.black", Position::new(2, 28))
                                 ),
                                 StrRange::from_start(

@@ -121,8 +121,8 @@ impl<'a> Runner<'a> for TypeCast<'a> {
 
 impl<'a> Runner<'a> for PrefixExp<'a> {
     fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
-        let varname = self.var_chain[0].value;
-        let var = context.move_var(self.var_index).unwrap();
+        let var = self.left_exp.rv_run(context)?;
+        // let var = context.move_var(self.var_index).unwrap();
         if var.get_type() != (FirstType::Object, SecondType::Simple) {
             return Err(PineRuntimeError::new(
                 RuntimeErr::UnknownRuntimeErr,
@@ -130,22 +130,22 @@ impl<'a> Runner<'a> for PrefixExp<'a> {
             ));
         }
         let object = downcast_pf::<Object>(var).unwrap();
-        let mut subobj = object.get(self.var_chain[1].value).unwrap();
-        for name in self.var_chain[2..].iter() {
-            match subobj.get_type() {
-                (FirstType::Object, SecondType::Simple) => {
-                    let obj = downcast_pf::<Object>(subobj).unwrap();
-                    subobj = obj.get(name.value).unwrap();
-                }
-                _ => {
-                    return Err(PineRuntimeError::new(
-                        RuntimeErr::NotSupportOperator,
-                        self.range,
-                    ))
-                }
-            }
-        }
-        context.update_var(self.var_index, object.into_pf());
+        let mut subobj = object.get(self.right_name.value).unwrap();
+        // for name in self.var_chain[2..].iter() {
+        //     match subobj.get_type() {
+        //         (FirstType::Object, SecondType::Simple) => {
+        //             let obj = downcast_pf::<Object>(subobj).unwrap();
+        //             subobj = obj.get(name.value).unwrap();
+        //         }
+        //         _ => {
+        //             return Err(PineRuntimeError::new(
+        //                 RuntimeErr::NotSupportOperator,
+        //                 self.range,
+        //             ))
+        //         }
+        //     }
+        // }
+        // context.update_var(self.var_index, object.into_pf());
         Ok(subobj)
     }
 }
@@ -246,12 +246,14 @@ mod tests {
             }
         }
 
-        let mut exp = PrefixExp::new_no_input(vec![
-            VarName::new_no_input("obja"),
-            VarName::new_no_input("object"),
+        let mut exp = PrefixExp::new_no_input(
+            Exp::PrefixExp(Box::new(PrefixExp::new_no_input(
+                Exp::VarName(RVVarName::new_no_range("obja")),
+                VarName::new_no_input("object"),
+            ))),
             VarName::new_no_input("int"),
-        ]);
-        exp.var_index = VarIndex::new(0, 0);
+        );
+        // exp.var_index = VarIndex::new(0, 0);
 
         let mut context = Context::new(None, ContextType::Normal);
         context.init_vars(vec![Some(PineRef::new_rc(Object::new(Box::new(A))))]);

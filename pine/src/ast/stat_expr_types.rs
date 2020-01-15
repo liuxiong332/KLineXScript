@@ -421,25 +421,28 @@ impl<'a> TypeCast<'a> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PrefixExp<'a> {
-    pub var_chain: Vec<VarName<'a>>,
+    pub left_exp: Exp<'a>,
+    pub right_name: VarName<'a>,
     pub range: StrRange,
-    pub var_index: VarIndex,
+    // pub var_index: VarIndex,
 }
 
 impl<'a> PrefixExp<'a> {
-    pub fn new(var_chain: Vec<VarName<'a>>, range: StrRange) -> PrefixExp<'a> {
+    pub fn new(left_exp: Exp<'a>, right_name: VarName<'a>, range: StrRange) -> PrefixExp<'a> {
         PrefixExp {
-            var_chain,
+            left_exp,
+            right_name,
             range,
-            var_index: VarIndex::new(0, 0),
+            // var_index: VarIndex::new(0, 0),
         }
     }
 
-    pub fn new_no_input(var_chain: Vec<VarName<'a>>) -> PrefixExp<'a> {
+    pub fn new_no_input(left_exp: Exp<'a>, right_name: VarName<'a>) -> PrefixExp<'a> {
         PrefixExp {
-            var_chain,
+            left_exp,
+            right_name,
             range: StrRange::new_empty(),
-            var_index: VarIndex::new(0, 0),
+            // var_index: VarIndex::new(0, 0),
         }
     }
 }

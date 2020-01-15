@@ -34,6 +34,15 @@ impl<'a> VarName<'a> {
             range: StrRange::from_start(value, start),
         }
     }
+
+    pub fn is_reserved(&self) -> bool {
+        if let Ok((rest, _)) = reserved(Input::new(self.value, self.range.start, self.range.end)) {
+            if rest.len() == 0 {
+                return true;
+            }
+        }
+        false
+    }
 }
 
 fn reserved(input: Input) -> PineResult {
@@ -73,17 +82,29 @@ fn is_alphanum_or_underscore(input: char) -> bool {
     input.is_alphanumeric() || input == '_'
 }
 
-pub fn varname<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, VarName<'a>> {
+pub fn varname_only<'a>(input: Input<'a>) -> PineResult<'a, VarName<'a>> {
+    let (input, name) = recognize(pair(
+        alpha_or_underscore,
+        take_while(is_alphanum_or_underscore),
+    ))(input)?;
+    Ok((input, VarName::new(name.src, StrRange::from_input(&name))))
+}
+
+pub fn varname<'a>(input: Input<'a>, _state: &AstState) -> PineResult<'a, VarName<'a>> {
     let (input, name) = recognize(pair(
         alpha_or_underscore,
         take_while(is_alphanum_or_underscore),
     ))(input)?;
     if let Ok((rest, _)) = reserved(name) {
         if rest.len() == 0 {
-            state.catch(PineInputError::new(
+            // state.catch(PineInputError::new(
+            //     PineErrorKind::ReservedVarName,
+            //     StrRange::from_input(&name),
+            // ))
+            return Err(Err::Error(PineError::from_pine_kind(
+                input,
                 PineErrorKind::ReservedVarName,
-                StrRange::from_input(&name),
-            ))
+            )));
         }
     }
 
@@ -103,7 +124,7 @@ mod tests {
 
     #[test]
     fn name_test() {
-        let test_input = Input::new_with_str("na");
+        let test_input = Input::new_with_str("for");
         assert_eq!(
             reserved(test_input),
             Ok(test_input.take_split(test_input.len()))

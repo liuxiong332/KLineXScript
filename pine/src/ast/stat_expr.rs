@@ -1,8 +1,8 @@
 use super::color::color_lit;
 use super::error::{PineError, PineErrorKind, PineResult};
-use super::func_call::{func_call, func_call_ws};
+use super::func_call::{func_call, func_call_args, func_call_ws};
 use super::input::{Input, StrRange};
-use super::name::{varname, varname_ws};
+use super::name::{varname, varname_only, varname_ws};
 use super::num::num_lit_ws;
 use super::op::*;
 use super::stat_expr_types::*;
@@ -34,19 +34,20 @@ pub fn exp2<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Exp2<'a>> 
         map(|input| bracket_expr(input, state), Exp2::Exp),
         map(|s| tupledef(s, state), |exps| Exp2::Tuple(Box::new(exps))), // match [a, b + c]
         map(|s| type_cast(s, state), |exp| Exp2::TypeCast(Box::new(exp))), // match float(b)
-        map(
-            |s| func_call_ws(s, state),
-            |exp| Exp2::FuncCall(Box::new(exp)),
-        ), // match a(b) (a)(b) a.b.c(m)
-        map(|s| ref_call(s, state), |exp| Exp2::RefCall(Box::new(exp))), // match a[b] (a)[b] a.b.c[m]
-        map(
-            |s| prefix_exp_ws(s, state),
-            |exp| Exp2::PrefixExp(Box::new(exp)),
-        ), // match a.b.c
-        map(eat_sep(tag("na")), |s| {
-            Exp2::Na(NaNode::new(StrRange::from_input(&s)))
-        }), // match na but not na(m) and na.m
-        map(|s| varname_ws(s, state), Exp2::VarName),                    // match a
+        // map(
+        //     |s| func_call_ws(s, state),
+        //     |exp| Exp2::FuncCall(Box::new(exp)),
+        // ), // match a(b) (a)(b) a.b.c(m)
+        // map(|s| ref_call(s, state), |exp| Exp2::RefCall(Box::new(exp))), // match a[b] (a)[b] a.b.c[m]
+        // map(
+        //     |s| prefix_exp_ws(s, state),
+        //     |exp| Exp2::PrefixExp(Box::new(exp)),
+        // ), // match a.b.c
+        map(|s| prefix_ref_func_call(s, state), |exp| Exp2::Exp(exp)),
+        // map(eat_sep(tag("na")), |s| {
+        //     Exp2::Na(NaNode::new(StrRange::from_input(&s)))
+        // }), // match na but not na(m) and na.m
+        // map(|s| varname_ws(s, state), Exp2::VarName), // match a
     ))(input)
 }
 
@@ -155,28 +156,127 @@ fn type_cast<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, TypeCast<
     ))
 }
 
-pub fn callable_expr<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Exp<'a>> {
-    alt((
+// pub fn callable_expr<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Exp<'a>> {
+//     alt((
+//         delimited(tag("("), |s| all_exp(s, state), eat_sep(tag(")"))),
+//         map(
+//             |s| prefix_exp(s, state),
+//             |exp| Exp::PrefixExp(Box::new(exp)),
+//         ), // match a.b.c
+//         map(
+//             |s| varname(s, state),
+//             |name| Exp::VarName(RVVarName::new(name)),
+//         ), // match a
+//     ))(input)
+// }
+
+// pub fn ref_callable_expr<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Exp<'a>> {
+//     alt((
+//         delimited(tag("("), |s| all_exp(s, state), eat_sep(tag(")"))),
+//         map(
+//             |s| prefix_exp(s, state),
+//             |exp| Exp::PrefixExp(Box::new(exp)),
+//         ), // match a.b.c
+//         map(|s| func_call(s, state), |exp| Exp::FuncCall(Box::new(exp))), // match a(b)
+//         map(
+//             |s| varname(s, state),
+//             |name| Exp::VarName(RVVarName::new(name)),
+//         ), // match a
+//     ))(input)
+// }
+
+// fn ref_call<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, RefCall<'a>> {
+//     let (input, (name, (_, arg, paren_r))) = tuple((
+//         eat_sep(|s| ref_callable_expr(s, state)),
+//         tuple((eat_sep(tag("[")), |s| all_exp(s, state), eat_sep(tag("]")))),
+//     ))(input)?;
+
+//     let range = StrRange::new(name.range().start, paren_r.end);
+//     Ok((input, RefCall::new(name, arg, range)))
+// }
+
+fn search_prefix_ref_func<'a>(
+    input: Input<'a>,
+    state: &AstState,
+    exp: Exp<'a>,
+) -> PineResult<'a, Exp<'a>> {
+    match eat_sep(tag("."))(input) {
+        Err(_) => (),
+        Ok((input, _)) => match eat_sep(|s| varname_only(s))(input) {
+            Err(_) => (),
+            Ok((input, name)) => {
+                if name.is_reserved() {
+                    state.catch(PineInputError::new(
+                        PineErrorKind::ReservedVarName,
+                        name.range,
+                    ));
+                }
+                let range = StrRange::new(exp.range().start, name.range.end);
+                return Ok((
+                    input,
+                    Exp::PrefixExp(Box::new(PrefixExp::new(exp, name, range))),
+                ));
+            }
+        },
+    };
+    match tuple((eat_sep(tag("[")), |s| all_exp(s, state), eat_sep(tag("]"))))(input) {
+        Err(_) => (),
+        Ok((input, (_, arg, paren_r))) => {
+            let range = StrRange::new(exp.range().start, paren_r.end);
+            return Ok((input, Exp::RefCall(Box::new(RefCall::new(exp, arg, range)))));
+        }
+    };
+
+    match tuple((
+        eat_sep(tag("(")),
+        |s| func_call_args(s, state),
+        eat_sep(tag(")")),
+    ))(input)
+    {
+        Err(_) => (),
+        Ok((input, (_, (pos_args, dict_args), paren_r))) => {
+            let start = exp.range().start;
+            return Ok((
+                input,
+                Exp::FuncCall(Box::new(FunctionCall::new_no_ctxid(
+                    exp,
+                    pos_args,
+                    dict_args,
+                    StrRange::new(start, paren_r.end),
+                ))),
+            ));
+        }
+    };
+    Err(Err::Error(PineError::from_pine_kind(
+        input,
+        PineErrorKind::UnknownErr,
+    )))
+}
+
+fn prefix_ref_func_call<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Exp<'a>> {
+    let (input, mut var_exp) = eat_sep(alt((
         delimited(tag("("), |s| all_exp(s, state), eat_sep(tag(")"))),
-        map(
-            |s| prefix_exp(s, state),
-            |exp| Exp::PrefixExp(Box::new(exp)),
-        ), // match a.b.c
         map(
             |s| varname(s, state),
             |name| Exp::VarName(RVVarName::new(name)),
         ), // match a
-    ))(input)
-}
-
-fn ref_call<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, RefCall<'a>> {
-    let (input, (name, (_, arg, paren_r))) = tuple((
-        eat_sep(|s| callable_expr(s, state)),
-        tuple((eat_sep(tag("[")), |s| all_exp(s, state), eat_sep(tag("]")))),
-    ))(input)?;
-
-    let range = StrRange::new(name.range().start, paren_r.end);
-    Ok((input, RefCall::new(name, arg, range)))
+    )))(input)?;
+    let mut cur_input = input;
+    loop {
+        match search_prefix_ref_func(cur_input, state, var_exp.clone()) {
+            Ok((input, exp)) => {
+                cur_input = input;
+                var_exp = exp;
+            }
+            Err(_) => break,
+        };
+    }
+    if let Exp::VarName(RVVarName { name, .. }) = var_exp {
+        if name.value == "na" {
+            return Ok((cur_input, Exp::Na(NaNode::new(name.range))));
+        }
+    }
+    Ok((cur_input, var_exp))
 }
 
 fn bracket_expr<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Exp<'a>> {
@@ -196,27 +296,32 @@ fn condition<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Condition
     Ok((input, Condition::new(cond, exp1, exp2, range)))
 }
 
-fn prefix_exp<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, PrefixExp<'a>> {
-    let (input, (prefix, _, names)) = tuple((
-        |s| varname(s, state),
-        tag("."),
-        separated_list(tag("."), |s| varname(s, state)),
-    ))(input)?;
+// fn prefix_exp<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, PrefixExp<'a>> {
+//     let (input, (prefix, _, names)) = tuple((
+//         |s| varname(s, state),
+//         tag("."),
+//         separated_list(tag("."), |s| varname(s, state)),
+//     ))(input)?;
 
-    if names.len() == 0 {
-        Err(Err::Error(PineError::from_pine_kind(
-            input,
-            PineErrorKind::PrefixNoNamesAfterDot,
-        )))
-    } else {
-        let range = StrRange::new(prefix.range.start, names.last().unwrap().range.end);
-        Ok((input, PrefixExp::new([vec![prefix], names].concat(), range)))
-    }
-}
+//     if names.len() == 0 {
+//         Err(Err::Error(PineError::from_pine_kind(
+//             input,
+//             PineErrorKind::PrefixNoNamesAfterDot,
+//         )))
+//     } else {
+//         let range = StrRange::new(prefix.range.start, names.last().unwrap().range.end);
+//         let exps: Vec<_> = [vec![prefix], names]
+//             .concat()
+//             .into_iter()
+//             .map(|v| Exp::VarName(RVVarName::new(v)))
+//             .collect();
+//         Ok((input, PrefixExp::new(exps, range)))
+//     }
+// }
 
-fn prefix_exp_ws<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, PrefixExp<'a>> {
-    eat_sep(|s| prefix_exp(s, state))(input)
-}
+// fn prefix_exp_ws<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, PrefixExp<'a>> {
+//     eat_sep(|s| prefix_exp(s, state))(input)
+// }
 
 fn if_then_else<'a, F>(
     block_parser: F,
@@ -597,9 +702,9 @@ fn statement_with_indent<'a>(input: Input<'a>, state: &AstState) -> PineResult<'
             |input| function_def_with_indent(input, state),
             |s| Statement::FuncDef(Box::new(s)),
         ),
-        map(eat_statement(gen_indent(), |s| func_call(s, state)), |s| {
-            Statement::FuncCall(Box::new(s))
-        }),
+        // map(eat_statement(gen_indent(), |s| func_call(s, state)), |s| {
+        //     Statement::FuncCall(Box::new(s))
+        // }),
         map(
             |input| assign_stmt(input, state),
             |s| Statement::Assignment(Box::new(s)),
@@ -732,15 +837,15 @@ mod tests {
     fn ref_call_test() {
         check_res(
             "hello[true]",
-            ref_call,
-            RefCall::new(
+            prefix_ref_func_call,
+            Exp::RefCall(Box::new(RefCall::new(
                 Exp::VarName(RVVarName::new_with_start("hello", Position::new(0, 0))),
                 Exp::Bool(BoolNode::new(
                     true,
                     StrRange::from_start("true", Position::new(0, 6)),
                 )),
                 StrRange::from_start("hello[true]", Position::new(0, 0)),
-            ),
+            ))),
         );
     }
 
@@ -817,7 +922,7 @@ mod tests {
                 state.enter_scope();
                 statement_with_indent(s, state)
             },
-            Statement::FuncCall(Box::new(FunctionCall::new_no_ctxid(
+            Statement::Exp(Exp::FuncCall(Box::new(FunctionCall::new_no_ctxid(
                 Exp::VarName(RVVarName::new_with_start("a", Position::new(0, 4))),
                 vec![Exp::VarName(RVVarName::new_with_start(
                     "arg1",
@@ -825,7 +930,7 @@ mod tests {
                 ))],
                 vec![],
                 StrRange::from_start("a(arg1)", Position::new(0, 4)),
-            ))),
+            )))),
         );
         check_res(
             "    a(arg1) => b \n",
@@ -908,6 +1013,39 @@ mod tests {
             ))),
         );
         check_res(
+            "var a = close",
+            all_exp,
+            Exp::Assignment(Box::new(Assignment::new(
+                vec![VarName::new_with_start("a", Position::new(0, 4))],
+                Exp::VarName(RVVarName::new_with_start("close", Position::new(0, 8))),
+                true,
+                None,
+                StrRange::from_start("var a = close", Position::new(0, 0)),
+            ))),
+        );
+        check_res(
+            "var a = close",
+            statement,
+            Statement::Assignment(Box::new(Assignment::new(
+                vec![VarName::new_with_start("a", Position::new(0, 4))],
+                Exp::VarName(RVVarName::new_with_start("close", Position::new(0, 8))),
+                true,
+                None,
+                StrRange::from_start("var a = close", Position::new(0, 0)),
+            ))),
+        );
+        check_res(
+            "var float a = close",
+            all_exp,
+            Exp::Assignment(Box::new(Assignment::new(
+                vec![VarName::new_with_start("a", Position::new(0, 10))],
+                Exp::VarName(RVVarName::new_with_start("close", Position::new(0, 14))),
+                true,
+                Some(DataType::Float),
+                StrRange::from_start("var float a = close", Position::new(0, 0)),
+            ))),
+        );
+        check_res(
             "a = b = close // This is also a comment\n",
             statement_with_indent,
             Statement::Assignment(Box::new(Assignment::new(
@@ -937,17 +1075,30 @@ mod tests {
 
     #[test]
     fn prefix_exp_test() {
+        let prefix_exp = Exp::PrefixExp(Box::new(PrefixExp::new(
+            Exp::PrefixExp(Box::new(PrefixExp::new(
+                Exp::VarName(RVVarName::new_with_start("a", Position::new(0, 0))),
+                VarName::new_with_start("b", Position::new(0, 2)),
+                StrRange::from_start("a.b", Position::new(0, 0)),
+            ))),
+            VarName::new_with_start("c", Position::new(0, 4)),
+            StrRange::from_start("a.b.c", Position::new(0, 0)),
+        )));
+        check_res("a.b.c", prefix_ref_func_call, prefix_exp.clone());
+        check_res("a.b.c", all_exp, prefix_exp.clone());
+
         check_res(
             "m = a.b.c \n",
             statement_with_indent,
             Statement::Assignment(Box::new(Assignment::new(
                 vec![VarName::new_with_start("m", Position::new(0, 0))],
                 Exp::PrefixExp(Box::new(PrefixExp::new(
-                    vec![
-                        VarName::new_with_start("a", Position::new(0, 4)),
+                    Exp::PrefixExp(Box::new(PrefixExp::new(
+                        Exp::VarName(RVVarName::new_with_start("a", Position::new(0, 4))),
                         VarName::new_with_start("b", Position::new(0, 6)),
-                        VarName::new_with_start("c", Position::new(0, 8)),
-                    ],
+                        StrRange::from_start("a.b", Position::new(0, 4)),
+                    ))),
+                    VarName::new_with_start("c", Position::new(0, 8)),
                     StrRange::from_start("a.b.c", Position::new(0, 4)),
                 ))),
                 false,
@@ -955,6 +1106,27 @@ mod tests {
                 StrRange::from_start("m = a.b.c", Position::new(0, 0)),
             ))),
         )
+    }
+
+    #[test]
+    fn func_call_test() {
+        check_res(
+            "funa.funb()",
+            prefix_ref_func_call,
+            Exp::FuncCall(Box::new(FunctionCall::new_no_ctxid(
+                Exp::PrefixExp(Box::new(PrefixExp::new(
+                    Exp::VarName(RVVarName::new(VarName::new(
+                        "funa",
+                        StrRange::from_start("funa", Position::new(0, 0)),
+                    ))),
+                    VarName::new("funb", StrRange::from_start("funb", Position::new(0, 5))),
+                    StrRange::from_start("funa.funb", Position::new(0, 0)),
+                ))),
+                vec![],
+                vec![],
+                StrRange::from_start("funa.funb()", Position::new(0, 0)),
+            ))),
+        );
     }
 
     #[test]
@@ -1200,9 +1372,13 @@ mod tests {
         let (input, _output) = condition(test_input, &AstState::new()).unwrap();
         assert_eq!(input.src, "");
 
-        // let test_input = Input::new_with_str("myClose = na(myVar) ? 0 : close");
-        // let (input, _output) = block(test_input, &AstState::new()).unwrap();
-        // assert_eq!(input.src, "");
+        let test_input = Input::new_with_str("myClose = na(myVar) ? 0 : close");
+        let (input, _output) = block(test_input, &AstState::new()).unwrap();
+        assert_eq!(input.src, "");
+
+        let test_input = Input::new_with_str("sma(close, 10)[1]");
+        let (input, _output) = block(test_input, &AstState::new()).unwrap();
+        assert_eq!(input.src, "");
     }
 
     #[test]

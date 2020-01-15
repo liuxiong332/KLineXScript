@@ -7,9 +7,9 @@ use nom::{
 
 use super::error::{PineError, PineErrorKind, PineResult};
 use super::input::{Input, StrRange};
-use super::name::{varname_ws, VarName};
-use super::stat_expr::{all_exp, callable_expr};
-use super::stat_expr_types::{Exp, FunctionCall};
+use super::name::{varname, varname_ws, VarName};
+use super::stat_expr::all_exp;
+use super::stat_expr_types::{Exp, FunctionCall, RVVarName};
 use super::state::AstState;
 use super::utils::eat_sep;
 
@@ -54,7 +54,7 @@ fn func_call_arg<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, FuncC
     }
 }
 
-fn func_call_args<'a>(
+pub fn func_call_args<'a>(
     input: Input<'a>,
     state: &AstState,
 ) -> PineResult<'a, (Vec<Exp<'a>>, Vec<(VarName<'a>, Exp<'a>)>)> {
@@ -99,18 +99,18 @@ fn func_call_args<'a>(
 
 pub fn func_call<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, FunctionCall<'a>> {
     let (input, (method, (_, (pos_args, dict_args), paren_r))) = tuple((
-        |s| callable_expr(s, state),
+        |s| varname(s, state),
         tuple((
             eat_sep(tag("(")),
             |s| func_call_args(s, state),
             eat_sep(tag(")")),
         )),
     ))(input)?;
-    let start = method.range().start;
+    let start = method.range.start;
     Ok((
         input,
         FunctionCall::new_no_ctxid(
-            method,
+            Exp::VarName(RVVarName::new(method)),
             pos_args,
             dict_args,
             StrRange::new(start, paren_r.end),
@@ -224,23 +224,6 @@ mod tests {
                 ],
                 vec![],
                 StrRange::from_start(r#"funa("s1", "s2")"#, Position::new(0, 0)),
-            ),
-        );
-
-        check_res(
-            "funa.funb()",
-            func_call_ws,
-            FunctionCall::new_no_ctxid(
-                Exp::PrefixExp(Box::new(PrefixExp::new(
-                    vec![
-                        VarName::new("funa", StrRange::from_start("funa", Position::new(0, 0))),
-                        VarName::new("funb", StrRange::from_start("funb", Position::new(0, 5))),
-                    ],
-                    StrRange::from_start("funa.funb", Position::new(0, 0)),
-                ))),
-                vec![],
-                vec![],
-                StrRange::from_start("funa.funb()", Position::new(0, 0)),
             ),
         );
     }

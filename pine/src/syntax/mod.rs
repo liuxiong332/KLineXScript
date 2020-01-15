@@ -480,20 +480,11 @@ impl<'a> SyntaxParser<'a> {
     }
 
     fn parse_prefix(&mut self, prefix: &mut PrefixExp<'a>) -> ParseResult<'a> {
-        let subkeys: Vec<_> = prefix.var_chain.iter().map(|s| s.value).collect();
-        let name = prefix.var_chain[0].value;
-        match downcast_ctx(self.context).get_var(name) {
-            None => Err(PineInputError::new(
-                PineErrorKind::VarNotDeclare,
-                prefix.range,
-            )),
-            Some(obj) => {
-                prefix.var_index = downcast_ctx(self.context).get_var_index(name);
-                match Self::get_for_obj(obj, &subkeys[1..]) {
-                    Ok(val_type) => Ok(ParseValue::new_with_type(val_type)),
-                    Err(code) => Err(PineInputError::new(code, prefix.range)),
-                }
-            }
+        let left_res = self.parse_exp(&mut prefix.left_exp)?;
+        let name = prefix.right_name;
+        match Self::get_for_obj(&left_res.syntax_type, &[name.value]) {
+            Ok(val_type) => Ok(ParseValue::new_with_type(val_type)),
+            Err(code) => Err(PineInputError::new(code, prefix.range)),
         }
     }
 
@@ -1998,17 +1989,23 @@ mod tests {
             .collect();
         context.declare_var_with_index("var", SyntaxType::Object(Rc::new(map1)));
 
-        let mut prefix_exp =
-            PrefixExp::new_no_input(vec![varname("var"), varname("key1"), varname("key2")]);
+        let mut prefix_exp = PrefixExp::new_no_input(
+            Exp::PrefixExp(Box::new(PrefixExp::new_no_input(
+                Exp::VarName(rvarname("var")),
+                varname("key1"),
+            ))),
+            varname("key2"),
+        );
         assert_eq!(
             parser.parse_prefix(&mut prefix_exp),
             Ok(ParseValue::new_with_type(SyntaxType::Simple(
                 SimpleSyntaxType::Int
             )))
         );
-        assert_eq!(prefix_exp.var_index, VarIndex::new(0, 0));
+        // assert_eq!(prefix_exp.var_index, VarIndex::new(0, 0));
 
-        let mut prefix_exp = PrefixExp::new_no_input(vec![varname("var"), varname("nokey")]);
+        let mut prefix_exp =
+            PrefixExp::new_no_input(Exp::VarName(rvarname("var")), varname("nokey"));
         assert_eq!(
             parser.parse_prefix(&mut prefix_exp),
             Err(PineInputError::new(
@@ -2017,11 +2014,12 @@ mod tests {
             ))
         );
 
-        let mut prefix_exp = PrefixExp::new_no_input(vec![varname("var2"), varname("nokey")]);
+        let mut prefix_exp =
+            PrefixExp::new_no_input(Exp::VarName(rvarname("var2")), varname("nokey"));
         assert_eq!(
             parser.parse_prefix(&mut prefix_exp),
             Err(PineInputError::new(
-                PineErrorKind::VarNotDeclare,
+                PineErrorKind::RefObjTypeNotObj,
                 StrRange::new_empty()
             ))
         );

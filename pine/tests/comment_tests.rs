@@ -19,7 +19,7 @@ fn comment_test() {
         Ok(Block::new(
             vec![
                 // Statement::None(StrRange::from_start("//@version=4\n", Position::new(0, 0))),
-                Statement::FuncCall(Box::new(FunctionCall::new_no_ctxid(
+                Statement::Exp(Exp::FuncCall(Box::new(FunctionCall::new_no_ctxid(
                     Exp::VarName(RVVarName::new_with_start("study", Position::new(1, 0))),
                     vec![Exp::Str(StringNode::new(
                         String::from("Test"),
@@ -27,7 +27,7 @@ fn comment_test() {
                     ))],
                     vec![],
                     StrRange::from_start("study(\"Test\")", Position::new(1, 0))
-                ))),
+                )))),
                 // Statement::None(StrRange::from_start(
                 //     "// This line is a comment\n",
                 //     Position::new(2, 0)
@@ -39,7 +39,7 @@ fn comment_test() {
                     None,
                     StrRange::from_start("a = close", Position::new(3, 0))
                 ))),
-                Statement::FuncCall(Box::new(FunctionCall::new_no_ctxid(
+                Statement::Exp(Exp::FuncCall(Box::new(FunctionCall::new_no_ctxid(
                     Exp::VarName(RVVarName::new_with_start("plot", Position::new(4, 0))),
                     vec![Exp::VarName(RVVarName::new_with_start(
                         "a",
@@ -47,7 +47,7 @@ fn comment_test() {
                     ))],
                     vec![],
                     StrRange::from_start("plot(a)", Position::new(4, 0))
-                )))
+                ))))
             ],
             None,
             StrRange::new(Position::new(1, 0), Position::new(4, 7))

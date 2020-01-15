@@ -120,45 +120,45 @@ myVar = na // Compilation error!
 var float myVar = na
 float myVar = na
 myVar = float(na)
-// myClose = na(myVar) ? 0 : close
-// calcSumAndMul(a, b) =>
-//     sum = a + b
-//     mul = a * b
-//     [sum, mul]
+myClose = na(myVar) ? 0 : close
+calcSumAndMul(a, b) =>
+    sum = a + b
+    mul = a * b
+    [sum, mul]
 
-// [s, m] = calcSumAndMul(high, low)
-// isintraday ? red : isdaily ? green : ismonthly ? blue : na
+[s, m] = calcSumAndMul(high, low)
+isintraday ? red : isdaily ? green : ismonthly ? blue : na
 // sma(close, 10)[1]
 
-// //@version=4
-// study("My Script", overlay=true)
+//@version=4
+study("My Script", overlay=true)
 
-// // Returns the value of "a" the last time the function was called 2 bars ago.
-// f(a) => a[1]
-// // Returns the value of last bar's "close", as expected.
-// f2() => close[1]
+// Returns the value of "a" the last time the function was called 2 bars ago.
+f(a) => a[1]
+// Returns the value of last bar's "close", as expected.
+f2() => close[1]
 
-// oneBarInTwo = bar_index % 2 == 0
-// plot(oneBarInTwo ? f(close) : na, color=color.maroon, linewidth=6, style=plot.style_cross)
-// plot(oneBarInTwo ? f2() : na, color=color.lime, linewidth=6, style=plot.style_circles)
-// plot(close[2], color=color.maroon)
-// plot(close[1], color=color.lime)
+oneBarInTwo = bar_index % 2 == 0
+plot(oneBarInTwo ? f(close) : na, color=color.maroon, linewidth=6, style=plot.style_cross)
+plot(oneBarInTwo ? f2() : na, color=color.lime, linewidth=6, style=plot.style_circles)
+plot(close[2], color=color.maroon)
+plot(close[1], color=color.lime)
 
-// study("Barssince",overlay=false)
-// res = close>close[1] ? barssince(close<close[1]) : -1
-// plot(res, style=plot.style_histogram, color=res >= 0 ? color.red : color.blue)
+study("Barssince",overlay=false)
+res = close>close[1] ? barssince(close<close[1]) : -1
+plot(res, style=plot.style_histogram, color=res >= 0 ? color.red : color.blue)
 
-// study("My Script")
-// va = 0.0
-// for i = 1 to 2 by 1
-//     if (i + bar_index) % 2 == 0
-//         va := lowest(bar_index, 10)  // same context on each call
-// plot(va)
+study("My Script")
+va = 0.0
+for i = 1 to 2 by 1
+    if (i + bar_index) % 2 == 0
+        va := lowest(bar_index, 10)  // same context on each call
+plot(va)
 
-// float f = 10            // NOTE: while the expression is of type int, the variable is float
-// i = int(close)          // NOTE: explicit cast of float expression close to type int
-// r = round(close)        // NOTE: round() and int() are different... int() simply throws fractional part away
-// var hl = high - low
+float f = 10            // NOTE: while the expression is of type int, the variable is float
+i = int(close)          // NOTE: explicit cast of float expression close to type int
+r = round(close)        // NOTE: round() and int() are different... int() simply throws fractional part away
+var hl = high - low
 
 // // Creates a new label object on every bar:
 // label lb = label.new(bar_index, close, title="Hello, World!")
@@ -166,32 +166,32 @@ myVar = float(na)
 // // Creates a label object only on the first bar in history:
 // var label lb = label.new(bar_index, close, title="Hello, World!")
 
-// // This code compiles
-// x = if close > open
-//     close
-// else
-//     open
-// // This code doesn't compile
-// x = if close > open
-//     close
-// else
-//     "open"
+// This code compiles
+x = if close > open
+    close
+else
+    open
+// This code doesn't compile
+x = if close > open
+    close
+else
+    "open"
 
-// study("For loop")
-// my_sma(price, length) =>
-//     sum = price
-//     for i = 1 to length-1
-//         sum := sum + price[i]
-//     sum / length
-// plot(my_sma(close,14))
+study("For loop")
+my_sma(price, length) =>
+    sum = price
+    for i = 1 to length-1
+        sum := sum + price[i]
+    sum / length
+plot(my_sma(close,14))
 
-// study("SMA in for loop")
-//     sum = 0
-//     for i = 1 to 2
-//         sum := sum + sma(close, i)
-//     plot(sum)
+study("SMA in for loop")
+    sum = 0
+    for i = 1 to 2
+        sum := sum + sma(close, i)
+    plot(sum)
 
-// geom_average(x, y) =>
-//     a = x*x
-//     b = y*y
-//     sqrt(a + b)
+geom_average(x, y) =>
+    a = x*x
+    b = y*y
+    sqrt(a + b)

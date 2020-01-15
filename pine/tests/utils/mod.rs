@@ -34,8 +34,16 @@ pub fn gen_ref_call<'a>(name: VarName<'a>, exp: Exp<'a>, range: StrRange) -> Exp
     )))
 }
 
-pub fn gen_prefix(vars: Vec<VarName>, range: StrRange) -> Exp {
-    Exp::PrefixExp(Box::new(PrefixExp::new(vars, range)))
+pub fn gen_prefix<'a>(var1: VarName<'a>, var2: VarName<'a>, range: StrRange) -> Exp<'a> {
+    Exp::PrefixExp(Box::new(PrefixExp::new(
+        Exp::VarName(RVVarName::new(var1)),
+        var2,
+        range,
+    )))
+}
+
+pub fn gen_prefix_exp<'a>(var1: Exp<'a>, var2: VarName<'a>, range: StrRange) -> Exp<'a> {
+    Exp::PrefixExp(Box::new(PrefixExp::new(var1, var2, range)))
 }
 
 pub fn gen_int(num: i32, range: StrRange) -> Exp<'static> {
@@ -75,10 +83,10 @@ pub fn gen_func_call_stmt<'a>(
     dict_args: Vec<(VarName<'a>, Exp<'a>)>,
     range: StrRange,
 ) -> Statement<'a> {
-    Statement::FuncCall(Box::new(FunctionCall::new_no_ctxid(
+    Statement::Exp(Exp::FuncCall(Box::new(FunctionCall::new_no_ctxid(
         Exp::VarName(RVVarName::new(method)),
         pos_args,
         dict_args,
         range,
-    )))
+    ))))
 }

@@ -6,9 +6,9 @@ use pine::ast::input::StrRange;
 use std::collections::HashMap;
 use std::sync::mpsc::Sender;
 
-pub struct PineServer {
+pub struct PineServer<'a> {
     init_params: Option<InitializeParams>,
-    text_docs: HashMap<Url, TextDoc>,
+    text_docs: HashMap<Url, TextDoc<'a>>,
     sender: Sender<String>,
 }
 
@@ -32,8 +32,8 @@ fn from_str_range(range: StrRange) -> Range {
 //     )
 // }
 
-impl PineServer {
-    pub fn new(sender: Sender<String>) -> PineServer {
+impl<'a> PineServer<'a> {
+    pub fn new(sender: Sender<String>) -> PineServer<'a> {
         PineServer {
             sender,
             init_params: None,
@@ -48,8 +48,8 @@ impl PineServer {
     pub fn add_doc(&mut self, params: DidOpenTextDocumentParams) {
         let text = params.text_document.text;
         let uri = params.text_document.uri;
-        let new_doc = TextDoc::new(text, uri.clone());
-        self.parse_doc(&new_doc);
+        let mut new_doc = TextDoc::new(text, uri.clone());
+        self.parse_doc(&mut new_doc);
         self.text_docs.insert(uri, new_doc);
 
         self.send_notification(
@@ -80,8 +80,8 @@ impl PineServer {
             }
             None => return,
         };
-        let text_doc = self.text_docs.remove(&params.text_document.uri).unwrap();
-        self.parse_doc(&text_doc);
+        let mut text_doc = self.text_docs.remove(&params.text_document.uri).unwrap();
+        self.parse_doc(&mut text_doc);
         self.text_docs.insert(params.text_document.uri, text_doc);
 
         self.send_notification(
@@ -93,7 +93,7 @@ impl PineServer {
         );
     }
 
-    pub fn parse_doc(&mut self, doc: &TextDoc) {
+    pub fn parse_doc(&mut self, doc: &mut TextDoc) {
         // The below is the test code for publishing diagnostics.
         // let range = Range {
         //     start: lsp_types::Position {

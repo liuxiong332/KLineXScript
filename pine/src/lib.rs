@@ -65,7 +65,9 @@ impl<'a, 'b> PineParser<'a, 'b> {
         }
     }
 
-    pub fn parse(&mut self) -> Result<Block<'a>, Vec<PineInputError>> {
+    pub fn parse(
+        &mut self,
+    ) -> Result<(Block<'a>, SyntaxParser<'a>, Vec<PineInputError>), Vec<PineInputError>> {
         let mut all_errs = vec![];
         let mut blk = match parse_ast(self.src) {
             Ok(blk) => blk,
@@ -75,15 +77,18 @@ impl<'a, 'b> PineParser<'a, 'b> {
             }
             Err((None, errs)) => return Err(errs),
         };
+        let syntax_parser;
         match parse_syntax(&mut blk, &self.var_types) {
-            Ok(_) => (),
-            Err(errs) => all_errs.extend(errs),
+            Ok(parser) => syntax_parser = parser,
+            Err((parser, errs)) => {
+                all_errs.extend(errs);
+                if parser.is_none() {
+                    return Err(all_errs);
+                }
+                syntax_parser = parser.unwrap();
+            }
         }
-        if all_errs.is_empty() {
-            Ok(blk)
-        } else {
-            Err(all_errs)
-        }
+        Ok((blk, syntax_parser, all_errs))
     }
 }
 
@@ -111,6 +116,7 @@ impl<'a, 'b, 'c> PineRunner<'a, 'b, 'c> {
 pub struct PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
     lib_info: LibInfo<'li>,
     blk: Block<'pa>,
+    syntax_parser: Option<SyntaxParser<'pa>>,
     callback: Option<&'ra dyn Callback>,
     runner: Option<PineRunner<'ra, 'rb, 'rc>>,
     error_format: ErrorFormater,
@@ -133,6 +139,7 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
                 ],
             ),
             blk: Block::new_no_input(vec![], None),
+            syntax_parser: None,
             callback,
             runner: None,
             error_format: ErrorFormater::new(),
@@ -146,6 +153,7 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
         PineScript {
             lib_info,
             blk: Block::new_no_input(vec![], None),
+            syntax_parser: None,
             callback,
             runner: None,
             error_format: ErrorFormater::new(),
@@ -166,10 +174,18 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
         }
         // parser = PineParser::new(src, &self.lib_info);
         match parser.parse() {
-            Ok(blk) => {
+            Ok((blk, parser, errs)) => {
                 self.blk = blk;
+                self.syntax_parser = Some(parser);
                 self.runner = None;
-                Ok(())
+                if errs.is_empty() {
+                    Ok(())
+                } else {
+                    Err(errs
+                        .into_iter()
+                        .map(|err| PineFormatError::from_input_error(&self.error_format, err))
+                        .collect())
+                }
             }
             Err(errs) => Err(errs
                 .into_iter()
@@ -197,6 +213,10 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
             Ok(val) => Ok(val),
             Err(err) => Err(PineFormatError::from_runtime_error(&self.error_format, err)),
         }
+    }
+
+    pub fn move_parser(&mut self) -> Option<SyntaxParser<'pa>> {
+        mem::replace(&mut self.syntax_parser, None)
     }
 }
 
@@ -234,19 +254,20 @@ pub fn parse_ast(in_str: &str) -> Result<Block, (Option<Block>, Vec<PineInputErr
 pub fn parse_syntax<'a>(
     blk: &mut Block<'a>,
     vars: &Vec<(&'a str, SyntaxType<'a>)>,
-) -> Result<(), Vec<PineInputError>> {
+) -> Result<SyntaxParser<'a>, (Option<SyntaxParser<'a>>, Vec<PineInputError>)> {
     let mut syntax_parser = SyntaxParser::new_with_vars(vars);
     match syntax_parser.parse_blk(blk) {
         Ok(_) => {
             if syntax_parser.is_ok() {
-                Ok(())
+                Ok(syntax_parser)
             } else {
-                Err(syntax_parser.move_errors())
+                let errs = syntax_parser.move_errors();
+                Err((Some(syntax_parser), errs))
             }
         }
         Err(e) => {
             syntax_parser.catch(e);
-            Err(syntax_parser.move_errors())
+            Err((None, syntax_parser.move_errors()))
         }
     }
 }

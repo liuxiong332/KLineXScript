@@ -30,6 +30,14 @@ pub fn start() {
         // capabilities.declaration_provider = Some(true);
         // capabilities.definition_provider = Some(true);
         // capabilities.references_provider = Some(true);
+        capabilities.hover_provider = Some(true);
+        capabilities.signature_help_provider = Some(SignatureHelpOptions {
+            trigger_characters: Some(vec![String::from("("), String::from(".")]),
+            retrigger_characters: None,
+            work_done_progress_options: WorkDoneProgressOptions {
+                work_done_progress: None,
+            },
+        });
         let result = InitializeResult {
             capabilities,
             server_info: None,
@@ -81,6 +89,11 @@ pub fn start() {
 
     io.add_notification("textDocument/didClose", move |params: Params| {
         info!("Close text document {:?}", params);
+    });
+
+    io.add_method("textDocument/hover", move |params: Params| {
+        info!("hover text document {:?}", params);
+        Ok(json!(null))
     });
 
     // Spawn thread to read requests from stdin

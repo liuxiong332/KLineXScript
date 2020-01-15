@@ -1,13 +1,16 @@
 use lsp_types::Url;
 use lsp_types::*;
-use pine::ast::input::{Position as StrPos, StrRange};
+// use pine::ast::input::{Position as StrPos, StrRange};
 use pine::runtime::error_format::PineFormatError;
+use pine::syntax::{SyntaxContext, SyntaxParser};
 use pine::PineScript;
+use std::mem;
 
-pub struct TextDoc {
+pub struct TextDoc<'a> {
     text: String,
     uri: Url,
     line_lens: Vec<usize>,
+    syntax_ctx: Option<Box<SyntaxContext<'a>>>,
 }
 
 fn get_line_lens(text: &str) -> Vec<usize> {
@@ -27,13 +30,14 @@ fn get_line_lens(text: &str) -> Vec<usize> {
     line_lens
 }
 
-impl TextDoc {
-    pub fn new(text: String, uri: Url) -> TextDoc {
+impl<'a> TextDoc<'a> {
+    pub fn new(text: String, uri: Url) -> TextDoc<'a> {
         let line_lens = get_line_lens(&text);
         TextDoc {
             text,
             uri,
             line_lens,
+            syntax_ctx: None,
         }
     }
 
@@ -78,9 +82,19 @@ impl TextDoc {
     //     }
     // }
 
-    pub fn parse_src(&self) -> Result<(), Vec<PineFormatError>> {
+    pub fn parse_src(&mut self) -> Result<(), Vec<PineFormatError>> {
         let mut pine_script = PineScript::new(None);
-        pine_script.parse_src(&self.text)
+        let result = pine_script.parse_src(&self.text);
+        let parser = pine_script.move_parser();
+        if parser.is_some() {
+            unsafe {
+                let mut syntax_parser =
+                    mem::transmute::<Option<SyntaxParser>, Option<SyntaxParser<'a>>>(parser);
+                let context = syntax_parser.unwrap().move_context();
+                self.syntax_ctx = Some(context);
+            }
+        }
+        result
     }
 }
 

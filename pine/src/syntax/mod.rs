@@ -13,6 +13,7 @@ use crate::ast::syntax_type::{FunctionTypes, SimpleSyntaxType, SyntaxType};
 use std::collections::HashMap;
 use std::convert::From;
 use std::mem;
+use std::ptr::NonNull;
 use std::rc::Rc;
 
 mod convert;
@@ -59,7 +60,7 @@ pub trait SyntaxCtx<'a> {
 }
 
 pub struct SyntaxContext<'a> {
-    parent: Option<*mut (dyn SyntaxCtx<'a> + 'a)>,
+    parent: Option<NonNull<(dyn SyntaxCtx<'a> + 'a)>>,
     context_type: ContextType,
 
     vars: HashMap<&'a str, SyntaxType<'a>>,
@@ -74,6 +75,8 @@ pub struct SyntaxContext<'a> {
     // The max index of children context
     max_child_ctx_index: i32,
 }
+
+unsafe impl<'a> Send for SyntaxContext<'a> {}
 
 pub fn downcast_ctx<'a>(item: *mut (dyn SyntaxCtx<'a> + 'a)) -> &mut SyntaxContext<'a> {
     unsafe {
@@ -92,7 +95,7 @@ impl<'a> SyntaxCtx<'a> for SyntaxContext<'a> {
         if self.vars.contains_key(name) {
             self.vars.insert(name, t);
         } else if let Some(p) = self.parent {
-            downcast_ctx(p).update_var(name, t);
+            downcast_ctx(p.as_ptr()).update_var(name, t);
         } else {
             unreachable!();
         }
@@ -102,7 +105,7 @@ impl<'a> SyntaxCtx<'a> for SyntaxContext<'a> {
         if self.vars.contains_key(name) {
             self.vars.get(name)
         } else if let Some(p) = self.parent {
-            downcast_ctx(p).get_var(name)
+            downcast_ctx(p.as_ptr()).get_var(name)
         } else {
             None
         }
@@ -120,7 +123,7 @@ impl<'a> SyntaxCtx<'a> for SyntaxContext<'a> {
         if self.user_func_types.contains_key(name) {
             self.user_func_types.get(name)
         } else if let Some(p) = self.parent {
-            downcast_ctx(p).get_user_func(name)
+            downcast_ctx(p.as_ptr()).get_user_func(name)
         } else {
             None
         }
@@ -143,7 +146,7 @@ impl<'a> SyntaxCtx<'a> for SyntaxContext<'a> {
         if self.var_indexs.contains_key(name) {
             VarIndex::new(self.var_indexs[name], 0)
         } else if let Some(p) = self.parent {
-            let mut var_index = downcast_ctx(p).get_var_index(name);
+            let mut var_index = downcast_ctx(p.as_ptr()).get_var_index(name);
             var_index.rel_ctx += 1;
             var_index
         } else {
@@ -155,7 +158,7 @@ impl<'a> SyntaxCtx<'a> for SyntaxContext<'a> {
         if self.var_indexs.contains_key(name) {
             true
         } else if let Some(p) = self.parent {
-            downcast_ctx(p).contain_var_index(name)
+            downcast_ctx(p.as_ptr()).contain_var_index(name)
         } else {
             false
         }
@@ -173,7 +176,7 @@ impl<'a> SyntaxCtx<'a> for SyntaxContext<'a> {
 
 impl<'a> SyntaxContext<'a> {
     pub fn new(
-        parent: Option<*mut (dyn SyntaxCtx<'a> + 'a)>,
+        parent: Option<NonNull<(dyn SyntaxCtx<'a> + 'a)>>,
         context_type: ContextType,
     ) -> SyntaxContext<'a> {
         SyntaxContext {
@@ -265,6 +268,13 @@ impl<'a> SyntaxParser<'a> {
         mem::replace(&mut self.errors, vec![])
     }
 
+    pub fn move_context(&mut self) -> Box<SyntaxContext<'a>> {
+        mem::replace(
+            &mut self._root_ctx,
+            Box::new(SyntaxContext::new(None, ContextType::Normal)),
+        )
+    }
+
     fn parse_std_func_call(
         &mut self,
         func_call: &mut FunctionCall<'a>,
@@ -317,7 +327,10 @@ impl<'a> SyntaxParser<'a> {
         method_name: &'a str,
         func_name: String,
     ) -> ParseResult<'a> {
-        let mut sub_ctx = SyntaxContext::new(Some(self.context), ContextType::FuncDefBlock);
+        let mut sub_ctx = SyntaxContext::new(
+            unsafe { Some(NonNull::new_unchecked(self.context)) },
+            ContextType::FuncDefBlock,
+        );
         names
             .iter()
             .zip(arg_types.iter())
@@ -340,7 +353,7 @@ impl<'a> SyntaxParser<'a> {
         func_def.spec_defs.as_mut().unwrap().push(spec_def);
         let spec_index = func_def.spec_defs.as_ref().unwrap().len() as i32 - 1;
 
-        self.context = sub_ctx.parent.unwrap();
+        self.context = sub_ctx.parent.unwrap().as_ptr();
         downcast_ctx(self.context).declare_user_func(
             func_name,
             SyntaxType::UserFunction(Rc::new((names.clone(), parse_res.syntax_type.clone()))),
@@ -528,11 +541,14 @@ impl<'a> SyntaxParser<'a> {
     fn parse_ifthenelse_then(&mut self, ite: &mut IfThenElse<'a>) -> ParseResult<'a> {
         ite.then_ctxid = downcast_ctx(self.context).gen_child_ctx_index();
         // Create new context for if block
-        let mut if_ctx = SyntaxContext::new(Some(self.context), ContextType::IfElseBlock);
+        let mut if_ctx = SyntaxContext::new(
+            Some(NonNull::new(self.context).unwrap()),
+            ContextType::IfElseBlock,
+        );
         self.context = &mut if_ctx;
 
         let then_res = self.parse_blk(&mut ite.then_blk)?;
-        self.context = if_ctx.parent.unwrap();
+        self.context = if_ctx.parent.unwrap().as_ptr();
         Ok(then_res)
     }
 
@@ -543,11 +559,14 @@ impl<'a> SyntaxParser<'a> {
     ) -> ParseResult<'a> {
         *ctxid = downcast_ctx(self.context).gen_child_ctx_index();
         // Create new context for if block
-        let mut else_ctx = SyntaxContext::new(Some(self.context), ContextType::IfElseBlock);
+        let mut else_ctx = SyntaxContext::new(
+            unsafe { Some(NonNull::new_unchecked(self.context)) },
+            ContextType::IfElseBlock,
+        );
         self.context = &mut else_ctx;
 
         let else_res = self.parse_blk(else_blk)?;
-        self.context = else_ctx.parent.unwrap();
+        self.context = else_ctx.parent.unwrap().as_ptr();
         Ok(else_res)
     }
 
@@ -635,7 +654,10 @@ impl<'a> SyntaxParser<'a> {
         }
         for_range.ctxid = downcast_ctx(self.context).gen_child_ctx_index();
 
-        let mut for_ctx = SyntaxContext::new(Some(self.context), ContextType::ForRangeBlock);
+        let mut for_ctx = SyntaxContext::new(
+            unsafe { Some(NonNull::new_unchecked(self.context)) },
+            ContextType::ForRangeBlock,
+        );
         for_ctx.declare_var(
             for_range.var.value,
             SyntaxType::Simple(SimpleSyntaxType::Int),
@@ -644,7 +666,7 @@ impl<'a> SyntaxParser<'a> {
         for_range.varid = for_ctx.gen_var_index(for_range.var.value);
 
         let blk_res = self.parse_blk(&mut for_range.do_blk)?;
-        self.context = for_ctx.parent.unwrap();
+        self.context = for_ctx.parent.unwrap().as_ptr();
         Ok(blk_res)
     }
 

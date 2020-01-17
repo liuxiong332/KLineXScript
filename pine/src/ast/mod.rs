@@ -4,6 +4,7 @@ pub mod error;
 pub mod func_call;
 pub mod input;
 pub mod name;
+pub mod node_finder;
 pub mod num;
 pub mod op;
 pub mod stat_expr;

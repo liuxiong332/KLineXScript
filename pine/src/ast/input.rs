@@ -8,7 +8,7 @@ use std::ops;
 use std::str::{CharIndices, Chars};
 use std::u32;
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
 pub struct Position {
     line: u32,
     character: u32,
@@ -72,6 +72,10 @@ impl StrRange {
             Position::new(start.line + line_count - 1, end_col)
         };
         StrRange::new(start, end)
+    }
+
+    pub fn contain(&self, pos: Position) -> bool {
+        self.start <= pos && pos <= self.end
     }
 }
 

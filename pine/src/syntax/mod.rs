@@ -411,10 +411,15 @@ impl<'a> SyntaxParser<'a> {
         } else if let SyntaxType::UserFunction(names) = method_type.syntax_type {
             self.parse_user_func_call(func_call, &names.0, method_type.varname.unwrap())
         } else {
-            Err(PineInputError::new(
+            // Err(PineInputError::new(
+            //     PineErrorKind::VarNotCallable,
+            //     func_call.range,
+            // ))
+            self.catch(PineInputError::new(
                 PineErrorKind::VarNotCallable,
                 func_call.range,
-            ))
+            ));
+            Ok(ParseValue::new_with_type(SyntaxType::Any))
         }
     }
 

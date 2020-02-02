@@ -166,7 +166,7 @@ impl<'a> NodeFinder<'a> for BinaryExp<'a> {
 
 impl<'a> NodeFinder<'a> for Assignment<'a> {
     fn find(&self, pos: Position, state: &mut FindState) -> Option<FindVal<'a>> {
-        for (n, id) in self.names.iter().zip(self.varids.as_ref().unwrap().iter()) {
+        for (n, _id) in self.names.iter().zip(self.varids.as_ref().unwrap().iter()) {
             if n.range.contain(pos) {
                 return Some(FindVal::new(n.value, state.ctx_index));
             }

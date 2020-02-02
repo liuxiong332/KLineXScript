@@ -63,6 +63,8 @@ pub struct SyntaxContext<'a> {
     parent: Option<NonNull<(dyn SyntaxCtx<'a> + 'a)>>,
     context_type: ContextType,
 
+    subctxs: Vec<Box<dyn SyntaxCtx<'a> + 'a>>,
+
     vars: HashMap<&'a str, SyntaxType<'a>>,
     // User defined function's type for the specific name, the name is like method_name@id
     user_func_types: HashMap<String, (SyntaxType<'a>, i32)>,
@@ -182,6 +184,7 @@ impl<'a> SyntaxContext<'a> {
         SyntaxContext {
             parent,
             context_type,
+            subctxs: vec![],
             user_func_types: HashMap::new(),
             vars: HashMap::new(),
             var_indexs: HashMap::new(),
@@ -327,10 +330,10 @@ impl<'a> SyntaxParser<'a> {
         method_name: &'a str,
         func_name: String,
     ) -> ParseResult<'a> {
-        let mut sub_ctx = SyntaxContext::new(
+        let mut sub_ctx = Box::new(SyntaxContext::new(
             unsafe { Some(NonNull::new_unchecked(self.context)) },
             ContextType::FuncDefBlock,
-        );
+        ));
         names
             .iter()
             .zip(arg_types.iter())
@@ -347,14 +350,17 @@ impl<'a> SyntaxParser<'a> {
         let varids: Vec<_> = names.iter().map(|n| sub_ctx.gen_var_index(n)).collect();
         spec_def.varids = Some(varids);
 
-        self.context = &mut sub_ctx;
+        self.context = &mut *sub_ctx;
         let parse_res = self.parse_blk(&mut spec_def.body)?;
         // Push the specific function definition to spec_defs.
         func_def.spec_defs.as_mut().unwrap().push(spec_def);
         let spec_index = func_def.spec_defs.as_ref().unwrap().len() as i32 - 1;
 
         self.context = sub_ctx.parent.unwrap().as_ptr();
-        downcast_ctx(self.context).declare_user_func(
+
+        let parent_context = downcast_ctx(self.context);
+        parent_context.subctxs.push(sub_ctx);
+        parent_context.declare_user_func(
             func_name,
             SyntaxType::UserFunction(Rc::new((names.clone(), parse_res.syntax_type.clone()))),
             spec_index,
@@ -546,14 +552,20 @@ impl<'a> SyntaxParser<'a> {
     fn parse_ifthenelse_then(&mut self, ite: &mut IfThenElse<'a>) -> ParseResult<'a> {
         ite.then_ctxid = downcast_ctx(self.context).gen_child_ctx_index();
         // Create new context for if block
-        let mut if_ctx = SyntaxContext::new(
+        let mut if_ctx = Box::new(SyntaxContext::new(
             Some(NonNull::new(self.context).unwrap()),
             ContextType::IfElseBlock,
-        );
-        self.context = &mut if_ctx;
+        ));
+        self.context = &mut *if_ctx;
 
         let then_res = self.parse_blk(&mut ite.then_blk)?;
         self.context = if_ctx.parent.unwrap().as_ptr();
+
+        downcast_ctx(self.context).subctxs.push(if_ctx);
+        println!(
+            "if now context len {}",
+            downcast_ctx(self.context).subctxs.len()
+        );
         Ok(then_res)
     }
 
@@ -564,14 +576,20 @@ impl<'a> SyntaxParser<'a> {
     ) -> ParseResult<'a> {
         *ctxid = downcast_ctx(self.context).gen_child_ctx_index();
         // Create new context for if block
-        let mut else_ctx = SyntaxContext::new(
+        let mut else_ctx = Box::new(SyntaxContext::new(
             unsafe { Some(NonNull::new_unchecked(self.context)) },
             ContextType::IfElseBlock,
-        );
-        self.context = &mut else_ctx;
+        ));
+        self.context = &mut *else_ctx;
 
         let else_res = self.parse_blk(else_blk)?;
         self.context = else_ctx.parent.unwrap().as_ptr();
+
+        downcast_ctx(self.context).subctxs.push(else_ctx);
+        println!(
+            "now context len {}",
+            downcast_ctx(self.context).subctxs.len()
+        );
         Ok(else_res)
     }
 
@@ -592,6 +610,7 @@ impl<'a> SyntaxParser<'a> {
             ));
         }
         if let Some(else_blk) = &mut ite.else_blk {
+            println!("parser else block");
             // Create new context for if block
             let else_res = self.parse_ifthenelse_else(else_blk, &mut ite.else_ctxid)?;
 
@@ -659,19 +678,22 @@ impl<'a> SyntaxParser<'a> {
         }
         for_range.ctxid = downcast_ctx(self.context).gen_child_ctx_index();
 
-        let mut for_ctx = SyntaxContext::new(
+        let mut for_ctx = Box::new(SyntaxContext::new(
             unsafe { Some(NonNull::new_unchecked(self.context)) },
             ContextType::ForRangeBlock,
-        );
+        ));
         for_ctx.declare_var(
             for_range.var.value,
             SyntaxType::Simple(SimpleSyntaxType::Int),
         );
-        self.context = &mut for_ctx;
+        self.context = &mut *for_ctx;
         for_range.varid = for_ctx.gen_var_index(for_range.var.value);
 
         let blk_res = self.parse_blk(&mut for_range.do_blk)?;
         self.context = for_ctx.parent.unwrap().as_ptr();
+
+        downcast_ctx(self.context).subctxs.push(for_ctx);
+
         Ok(blk_res)
     }
 
@@ -1311,6 +1333,8 @@ mod tests {
                 SimpleSyntaxType::String
             )))
         );
+        assert_eq!(downcast_ctx(parser.context).subctxs.len(), 1);
+        assert_eq!(downcast_ctx(parser.context).max_child_ctx_index, 0);
     }
 
     #[test]
@@ -1613,6 +1637,8 @@ mod tests {
                 SimpleSyntaxType::Float
             )))
         );
+        assert_eq!(downcast_ctx(parser.context).subctxs.len(), 2);
+        assert_eq!(downcast_ctx(parser.context).max_child_ctx_index, 1);
         assert_eq!(exp.result_type, SyntaxType::Series(SimpleSyntaxType::Float));
         assert_eq!(exp.then_ctxid, 0);
         assert_eq!(exp.else_ctxid, 1);
@@ -1684,6 +1710,8 @@ mod tests {
             )))
         );
         assert_eq!(for_range.varid, 0);
+        assert_eq!(downcast_ctx(parser.context).subctxs.len(), 1);
+        assert_eq!(downcast_ctx(parser.context).max_child_ctx_index, 0);
     }
 
     #[test]

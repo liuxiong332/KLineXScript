@@ -57,6 +57,8 @@ pub trait SyntaxCtx<'a> {
     fn contain_var_index_scope(&self, name: &str) -> bool;
 
     fn gen_child_ctx_index(&mut self) -> i32;
+
+    fn gen_lib_func_index(&mut self) -> i32;
 }
 
 pub struct SyntaxContext<'a> {
@@ -76,6 +78,9 @@ pub struct SyntaxContext<'a> {
 
     // The max index of children context
     max_child_ctx_index: i32,
+
+    // The max index of library function
+    max_lib_func_index: i32,
 }
 
 unsafe impl<'a> Send for SyntaxContext<'a> {}
@@ -174,6 +179,11 @@ impl<'a> SyntaxCtx<'a> for SyntaxContext<'a> {
         self.max_child_ctx_index += 1;
         self.max_child_ctx_index
     }
+
+    fn gen_lib_func_index(&mut self) -> i32 {
+        self.max_lib_func_index += 1;
+        self.max_lib_func_index
+    }
 }
 
 impl<'a> SyntaxContext<'a> {
@@ -190,6 +200,7 @@ impl<'a> SyntaxContext<'a> {
             var_indexs: HashMap::new(),
             max_var_index: -1,
             max_child_ctx_index: -1,
+            max_lib_func_index: -1,
         }
     }
 
@@ -310,6 +321,7 @@ impl<'a> SyntaxParser<'a> {
                 false
             }
         });
+        func_call.ctxid = downcast_ctx(self.context).gen_lib_func_index();
         match res_fun {
             None => Err(PineInputError::new(
                 PineErrorKind::FuncCallSignatureNotMatch,

@@ -1,9 +1,9 @@
 use super::VarResult;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
-use crate::runtime::context::Ctx;
+use crate::runtime::context::{downcast_ctx_const, Ctx};
 use crate::types::{
     Bool, Callable, DataType, Float, Int, ParamCollectCall, PineFrom, PineRef, PineType, RefData,
-    RuntimeErr, SecondType, Series, NA,
+    RuntimeErr, SecondType, Series, SimpleCall, NA,
 };
 use std::borrow::Borrow;
 use std::rc::Rc;
@@ -92,6 +92,12 @@ thread_local!(static INT_TYPE: FunctionType<'static> =
         SyntaxType::int(),
     ))
 );
+
+struct PineInput {}
+
+impl<'a> SimpleCall<'a> for PineInput {
+    fn prepare(&mut self, _syntax_ctx: &mut dyn SyntaxCtx<'a>) {}
+}
 
 fn pine_input<'a>(
     context: &mut dyn Ctx<'a>,

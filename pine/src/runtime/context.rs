@@ -81,7 +81,10 @@ pub struct Context<'a, 'b, 'c> {
     _series: Vec<&'a str>,
     callables: Vec<RefData<Callable<'a>>>,
     // declare_vars: HashSet<&'a str>,
+
+    // The input value from user
     inputs: Vec<InputVal>,
+    // input_index: i32,
     callback: Option<&'a dyn Callback>,
     first_commit: bool,
 

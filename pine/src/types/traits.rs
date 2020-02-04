@@ -25,6 +25,7 @@ pub enum DataType {
     PineVar,
     Tuple,
     Callable,
+    CallableFactory,
     Function,
     Object,
     Evaluate, // The variable need lazy evaluate.

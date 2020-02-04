@@ -12,8 +12,6 @@ use std::fmt;
 use std::mem;
 
 pub trait SimpleCall<'a> {
-    fn prepare(&mut self, _syntax_ctx: &mut dyn SyntaxCtx<'a>) {}
-
     fn step(
         &self,
         _context: &mut dyn Ctx<'a>,
@@ -257,8 +255,6 @@ impl<'a> Callable<'a> {
         }
     }
 
-    fn prepare(&mut self, syntax_ctx: &mut dyn SyntaxCtx<'a>) {}
-
     pub fn call(
         &mut self,
         context: &mut dyn Ctx<'a>,
@@ -317,10 +313,47 @@ impl<'a> Callable<'a> {
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
+struct CallableFactory<'a> {
+    create_func: fn() -> Callable<'a>,
+}
+
+impl<'a> PineFrom<'a, CallableFactory<'a>> for CallableFactory<'a> {}
+
+impl<'a> PineStaticType for CallableFactory<'a> {
+    fn static_type() -> (DataType, SecondType) {
+        (DataType::CallableFactory, SecondType::Simple)
+    }
+}
+impl<'a> PineType<'a> for CallableFactory<'a> {
+    fn get_type(&self) -> (DataType, SecondType) {
+        <Self as PineStaticType>::static_type()
+    }
+
+    fn category(&self) -> Category {
+        Category::Complex
+    }
+
+    fn copy(&self) -> PineRef<'a> {
+        PineRef::new_rc(self.clone())
+    }
+}
+
+impl<'a> ComplexType for CallableFactory<'a> {}
+
+impl<'a> CallableFactory<'a> {
+    pub fn new(create_func: fn() -> Callable<'a>) -> CallableFactory<'a> {
+        CallableFactory { create_func }
+    }
+
+    pub fn create(&self) -> Callable<'a> {
+        (self.create_func)()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::primitive::Int;
-    use super::super::Arithmetic;
     use super::*;
     use crate::ast::syntax_type::{SimpleSyntaxType, SyntaxType};
     use crate::runtime::context::{Context, ContextType};
@@ -431,6 +464,7 @@ mod tests {
         let func_type = FunctionType((vec![("arg1", INT_TYPE)], INT_TYPE));
 
         let call = ParamCollectCall::new(test_func);
+        call.init_param_len(1);
         let mut context = Context::new(None, ContextType::Normal);
 
         assert!(call

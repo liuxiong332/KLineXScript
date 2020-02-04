@@ -1,4 +1,4 @@
-use super::context::{Context, Ctx, PineRuntimeError, Runner, VarOperate};
+use super::context::{Context, Ctx, InputVal, PineRuntimeError, Runner, VarOperate};
 // use super::ctxid_parser::CtxIdParser;
 use crate::ast::stat_expr_types::{Block, VarIndex};
 use crate::types::{Float, Int, PineFrom, PineRef, RefData, RuntimeErr, Series};
@@ -65,9 +65,13 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
         }
     }
 
+    pub fn change_inputs(&mut self, inputs: Vec<InputVal>) {
+        self.context.change_inputs(inputs);
+    }
+
     fn run_data(
         &mut self,
-        data: Vec<(&'static str, Vec<Float>)>,
+        data: &Vec<(&'static str, Vec<Float>)>,
         len: usize,
     ) -> Result<(), PineRuntimeError> {
         let bar_index = self.input_names.iter().position(|s| *s == "bar_index");
@@ -112,17 +116,17 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
         true
     }
 
-    pub fn run(&mut self, data: Vec<(&'static str, Vec<Float>)>) -> Result<(), PineRuntimeError> {
-        debug_assert!(self.check_data(&data));
-        let len = get_len(&data)?;
+    pub fn run(&mut self, data: &Vec<(&'static str, Vec<Float>)>) -> Result<(), PineRuntimeError> {
+        debug_assert!(self.check_data(data));
+        let len = get_len(data)?;
         self.run_data(data, len)
     }
 
     pub fn update(
         &mut self,
-        data: Vec<(&'static str, Vec<Float>)>,
+        data: &Vec<(&'static str, Vec<Float>)>,
     ) -> Result<(), PineRuntimeError> {
-        let len = get_len(&data)?;
+        let len = get_len(data)?;
         self.context.roll_back()?;
         self.run_data(data, len)
     }
@@ -166,7 +170,7 @@ mod tests {
 
         let data = vec![("close", vec![Some(10f64), Some(100f64)])];
 
-        assert_eq!(datasrc.run(data), Ok(()));
+        assert_eq!(datasrc.run(&data), Ok(()));
         datasrc.context.map_var(VarIndex::new(1, 0), |hv| match hv {
             None => None,
             Some(v) => {

@@ -1,3 +1,4 @@
+pub mod input;
 pub mod plot;
 pub mod print;
 use crate::ast::syntax_type::SyntaxType;
@@ -36,7 +37,11 @@ fn check_names<'a>(vars: &Vec<VarResult<'a>>) -> bool {
 }
 
 pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
-    let list = vec![plot::declare_var(), print::declare_var()];
+    let list = vec![
+        plot::declare_var(),
+        print::declare_var(),
+        input::declare_var(),
+    ];
     debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());
     // map.insert(plot::VAR_NAME, plot::declare_var());

@@ -131,8 +131,8 @@ pub const VAR_NAME: &'static str = "print";
 pub fn declare_var<'a>() -> VarResult<'a> {
     let value = PineRef::new(Callable::new(
         None,
-        Some(Box::new(ParamCollectCall::new(pine_print, &vec!["item"]))),
-        vec!["item"],
+        None,
+        Some(Box::new(ParamCollectCall::new(pine_print))),
     ));
     let syntax_type = SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType((
         vec![("item", SyntaxType::Series(SimpleSyntaxType::Float))],
@@ -164,7 +164,7 @@ mod tests {
             }
         }
 
-        let callable = downcast_pf::<Callable>(declare_var().value).unwrap();
+        let mut callable = downcast_pf::<Callable>(declare_var().value).unwrap();
         let mut ctx = Context::new_with_callback(&MyCallback);
         callable
             .call(

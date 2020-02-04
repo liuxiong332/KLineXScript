@@ -6,11 +6,29 @@ use crate::ast::stat_expr_types::VarIndex;
 use crate::ast::syntax_type::{FunctionType, SyntaxType};
 use crate::runtime::context::{commit_series_for_operator, Ctx, VarOperate};
 use crate::runtime::statement::process_assign_val;
+use crate::syntax::SyntaxCtx;
 use std::cell::{Cell, RefCell};
 use std::fmt;
 use std::mem;
 
+pub trait SimpleCall<'a> {
+    fn prepare(&mut self, _syntax_ctx: &mut dyn SyntaxCtx<'a>) {}
+
+    fn step(
+        &self,
+        _context: &mut dyn Ctx<'a>,
+        _p: Vec<Option<PineRef<'a>>>,
+        _func_type: FunctionType<'a>,
+    ) -> Result<PineRef<'a>, RuntimeErr> {
+        Ok(PineRef::Box(Box::new(NA)))
+    }
+
+    fn copy(&self) -> Box<dyn SimpleCall<'a> + 'a>;
+}
+
 pub trait SeriesCall<'a> {
+    fn init_param_len(&self, len: usize);
+
     fn step(
         &self,
         _context: &mut dyn Ctx<'a>,
@@ -68,12 +86,9 @@ impl<'a> ParamCollectCall<'a> {
             Vec<Option<PineRef<'a>>>,
             FunctionType<'a>,
         ) -> Result<PineRef<'a>, RuntimeErr>,
-        param_names: &Vec<&'static str>,
     ) -> ParamCollectCall<'a> {
-        let mut params = Vec::with_capacity(param_names.len());
-        params.resize_with(param_names.len(), || None);
         ParamCollectCall {
-            params: RefCell::new(params),
+            params: RefCell::new(vec![]),
             func,
             func_type: Cell::new(None),
         }
@@ -104,6 +119,12 @@ impl<'a> VarOperate<'a> for Vec<Option<PineRef<'a>>> {
 }
 
 impl<'a> SeriesCall<'a> for ParamCollectCall<'a> {
+    fn init_param_len(&self, len: usize) {
+        let mut params = Vec::with_capacity(len);
+        params.resize_with(len, || None);
+        self.params.replace(params);
+    }
+
     fn step(
         &self,
         _context: &mut dyn Ctx<'a>,
@@ -158,8 +179,9 @@ pub struct Callable<'a> {
             FunctionType<'a>,
         ) -> Result<PineRef<'a>, RuntimeErr>,
     >,
+    simple_caller: Option<Box<dyn SimpleCall<'a> + 'a>>,
     caller: Option<Box<dyn SeriesCall<'a> + 'a>>,
-    param_names: Vec<&'static str>,
+    param_names: Option<Vec<&'a str>>,
 }
 
 impl<'a> fmt::Debug for Callable<'a> {
@@ -174,9 +196,14 @@ impl<'a> Clone for Callable<'a> {
             Some(ref c) => Some(c.copy()),
             None => None,
         };
+        let simple_caller = match self.simple_caller {
+            Some(ref c) => Some(c.copy()),
+            None => None,
+        };
         Callable {
             func: self.func,
             caller: caller,
+            simple_caller: simple_caller,
             param_names: self.param_names.clone(),
         }
     }
@@ -219,34 +246,45 @@ impl<'a> Callable<'a> {
                 FunctionType<'a>,
             ) -> Result<PineRef<'a>, RuntimeErr>,
         >,
+        simple_caller: Option<Box<dyn SimpleCall<'a> + 'a>>,
         caller: Option<Box<dyn SeriesCall<'a> + 'a>>,
-        param_names: Vec<&'static str>,
     ) -> Callable<'a> {
         Callable {
             func,
+            simple_caller,
             caller,
-            param_names,
+            param_names: None,
         }
     }
 
+    fn prepare(&mut self, syntax_ctx: &mut dyn SyntaxCtx<'a>) {}
+
     pub fn call(
-        &self,
+        &mut self,
         context: &mut dyn Ctx<'a>,
         pos_args: Vec<PineRef<'a>>,
         dict_args: Vec<(&'a str, PineRef<'a>)>,
         func_type: FunctionType<'a>,
     ) -> Result<PineRef<'a>, RuntimeErr> {
-        if pos_args.len() > self.param_names.len() {
+        if self.param_names.is_none() {
+            self.param_names = Some(func_type.arg_names());
+            if let Some(ref caller) = self.caller {
+                caller.init_param_len(self.param_names.as_ref().unwrap().len());
+            }
+        }
+        let param_names = self.param_names.as_ref().unwrap();
+        let param_len = param_names.len();
+        if pos_args.len() > param_len {
             return Err(RuntimeErr::NotValidParam);
         }
 
-        let mut all_args: Vec<Option<PineRef<'a>>> = Vec::with_capacity(self.param_names.len());
-        all_args.resize_with(self.param_names.len(), || None);
+        let mut all_args: Vec<Option<PineRef<'a>>> = Vec::with_capacity(param_len);
+        all_args.resize_with(param_len, || None);
         for (i, val) in pos_args.into_iter().enumerate() {
             all_args[i] = Some(val);
         }
         for (name, val) in dict_args.into_iter() {
-            match self.param_names.iter().position(|&v| name == v) {
+            match param_names.iter().position(|&v| name == v) {
                 None => return Err(RuntimeErr::NotValidParam),
                 Some(pos) => {
                     all_args[pos] = Some(val);
@@ -312,7 +350,7 @@ mod tests {
 
     #[test]
     fn callable_test() {
-        let callable = Callable::new(Some(test_func), None, vec!["arg1", "arg2"]);
+        let mut callable = Callable::new(Some(test_func), None, None);
         let mut context = Context::new(None, ContextType::Normal);
 
         let call_res = callable.call(
@@ -348,13 +386,10 @@ mod tests {
 
     #[test]
     fn series_call_test() {
-        let callable = Callable::new(
+        let mut callable = Callable::new(
             None,
-            Some(Box::new(ParamCollectCall::new(
-                add_test_func,
-                &vec!["arg1", "arg2"],
-            ))),
-            vec!["arg1", "arg2"],
+            None,
+            Some(Box::new(ParamCollectCall::new(add_test_func))),
         );
         let gen_params = |val1, val2| {
             vec![
@@ -395,7 +430,7 @@ mod tests {
         }
         let func_type = FunctionType((vec![("arg1", INT_TYPE)], INT_TYPE));
 
-        let call = ParamCollectCall::new(test_func, &vec!["arg"]);
+        let call = ParamCollectCall::new(test_func);
         let mut context = Context::new(None, ContextType::Normal);
 
         assert!(call

@@ -5,6 +5,7 @@ use crate::types::{
     Bool, Callable, DataType, Float, Int, ParamCollectCall, PineFrom, PineRef, PineType, RefData,
     RuntimeErr, SecondType, Series, NA,
 };
+use std::borrow::Borrow;
 use std::rc::Rc;
 
 trait IntoTarget<D> {
@@ -28,28 +29,6 @@ impl IntoTarget<bool> for Bool {
         *self
     }
 }
-
-// fn plot_series<'a, D, T>(item_val: PineRef<'a>, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr>
-// where
-//     D: Default
-//         + IntoTarget<T>
-//         + Clone
-//         + PartialEq
-//         + Debug
-//         + PineStaticType
-//         + PineFrom<'a, D>
-//         + PineType<'a>
-//         + 'a,
-// {
-//     let items: RefData<Series<D>> = Series::implicity_from(item_val).unwrap();
-//     let s: Vec<T> = items
-//         .get_history()
-//         .iter()
-//         .map(|v| IntoTarget::into(v))
-//         .collect();
-//     context.get_callback().unwrap().plot(s);
-//     Ok(())
-// }
 
 fn plot_series<'a>(item_val: PineRef<'a>, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
     let items: RefData<Series<Float>> = Series::implicity_from(item_val).unwrap();
@@ -75,10 +54,9 @@ fn plot_val<'a>(item_val: PineRef<'a>, context: &mut dyn Ctx<'a>) -> Result<(), 
     }
 }
 
-fn pine_plot<'a>(
+fn input_for_bool<'a>(
     context: &mut dyn Ctx<'a>,
     mut param: Vec<Option<PineRef<'a>>>,
-    _func_type: FunctionType<'a>,
 ) -> Result<PineRef<'a>, RuntimeErr> {
     match param.remove(0) {
         Some(item_val) => {
@@ -89,18 +67,59 @@ fn pine_plot<'a>(
     }
 }
 
-pub const VAR_NAME: &'static str = "plot";
+thread_local!(static BOOL_TYPE: FunctionType<'static> = FunctionType((
+    vec![
+        ("defval", SyntaxType::bool()),
+        ("title", SyntaxType::string()),
+        ("type", SyntaxType::string()),
+        ("confirm", SyntaxType::bool()),
+    ],
+    SyntaxType::bool(),
+)));
+
+thread_local!(static INT_TYPE: FunctionType<'static> = 
+    FunctionType((
+        vec![
+            ("defval", SyntaxType::int()),
+            ("title", SyntaxType::string()),
+            ("type", SyntaxType::string()),
+            ("minval", SyntaxType::int()),
+            ("maxval", SyntaxType::int()),
+            ("confirm", SyntaxType::bool()),
+            ("step", SyntaxType::int()),
+            ("options", SyntaxType::List(SimpleSyntaxType::Int)),
+        ],
+        SyntaxType::int(),
+    ))
+);
+
+fn pine_input<'a>(
+    context: &mut dyn Ctx<'a>,
+    param: Vec<Option<PineRef<'a>>>,
+    func_type: FunctionType<'a>,
+) -> Result<PineRef<'a>, RuntimeErr> {
+    if func_type.arg_names().len() == 4 {
+        input_for_bool(context, param)
+    } else {
+        unreachable!();
+    }
+}
+
+pub const VAR_NAME: &'static str = "input";
 
 pub fn declare_var<'a>() -> VarResult<'a> {
-    let value = PineRef::new(Callable::new(
-        None,
-        None,
-        Some(Box::new(ParamCollectCall::new(pine_plot))),
-    ));
-    let syntax_type = SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType((
-        vec![("item", SyntaxType::Series(SimpleSyntaxType::Float))],
-        SyntaxType::Void,
-    ))])));
+    let value = PineRef::new(Callable::new(Some(pine_input), None, None));
+    /*
+        input(defval, title, type, confirm) → input bool
+        input(defval, title, type, minval, maxval, confirm, step, options) → input integer
+        input(defval, title, type, minval, maxval, confirm, step, options) → input float
+        input(defval, title, type, confirm, options) → input string
+        input(defval, title, type) → series[float]
+    */
+    let syntax_type = SyntaxType::Function(Rc::new(FunctionTypes(vec![
+        BOOL_TYPE.with(|s| s.clone()),
+        INT_TYPE.with(|s| s.clone()),
+    ])));
     VarResult::new(value, syntax_type, VAR_NAME)
 }
 

@@ -7,6 +7,12 @@ use std::string::ToString;
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct FunctionType<'a>(pub (Vec<(&'a str, SyntaxType<'a>)>, SyntaxType<'a>));
 
+impl<'a> FunctionType<'a> {
+    pub fn arg_names(&self) -> Vec<&'a str> {
+        (self.0).0.iter().map(|s| s.0).collect()
+    }
+}
+
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct FunctionTypes<'a>(pub Vec<FunctionType<'a>>);
 
@@ -60,6 +66,7 @@ pub enum SyntaxType<'a> {
     Void,
     Simple(SimpleSyntaxType),
     Series(SimpleSyntaxType),
+    List(SimpleSyntaxType), // tuple list like [1, 2, 3]
     Tuple(Rc<Vec<SyntaxType<'a>>>),
     Object(Rc<BTreeMap<&'a str, SyntaxType<'a>>>),
     Function(Rc<FunctionTypes<'a>>),
@@ -105,5 +112,21 @@ impl<'a> SyntaxType<'a> {
             | SyntaxType::Series(SimpleSyntaxType::String) => true,
             _ => false,
         }
+    }
+
+    pub fn int() -> SyntaxType<'a> {
+        SyntaxType::Simple(SimpleSyntaxType::Int)
+    }
+
+    pub fn bool() -> SyntaxType<'a> {
+        SyntaxType::Simple(SimpleSyntaxType::Bool)
+    }
+
+    pub fn float() -> SyntaxType<'a> {
+        SyntaxType::Simple(SimpleSyntaxType::Float)
+    }
+
+    pub fn string() -> SyntaxType<'a> {
+        SyntaxType::Simple(SimpleSyntaxType::String)
     }
 }

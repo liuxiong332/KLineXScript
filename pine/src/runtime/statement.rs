@@ -496,7 +496,7 @@ impl<'a> Runner<'a> for FunctionCall<'a> {
 
         let result = match result.get_type() {
             (FirstType::Callable, SecondType::Simple) => {
-                let callable = downcast_pf::<Callable>(result).unwrap();
+                let mut callable = downcast_pf::<Callable>(result).unwrap();
                 // let ctx_ref = create_sub_ctx(context, self.ctxid, ContextType::FuncDefBlock, 0, 0);
                 let func_type = self.func_type.as_ref().unwrap().clone();
                 let result = callable.call(context, pos_args, dict_args, func_type);
@@ -902,7 +902,7 @@ mod tests {
         context.init_vars(vec![Some(PineRef::new_rc(Callable::new(
             Some(test_func),
             None,
-            vec!["arg"],
+            None,
         )))]);
 
         let res = downcast_pf::<Bool>(exp.run(&mut context).unwrap()).unwrap();

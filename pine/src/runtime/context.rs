@@ -58,6 +58,14 @@ pub enum ContextType {
     FuncDefBlock,
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub enum InputVal {
+    Int(i32),
+    Float(f64),
+    Bool(bool),
+    String(String),
+}
+
 // 'a is the lifetime of Exp, 'b is the parent context's lifetime, 'c is the context self's lifetime
 pub struct Context<'a, 'b, 'c> {
     // input: &'a str,
@@ -73,6 +81,7 @@ pub struct Context<'a, 'b, 'c> {
     _series: Vec<&'a str>,
     callables: Vec<RefData<Callable<'a>>>,
     // declare_vars: HashSet<&'a str>,
+    inputs: Vec<InputVal>,
     callback: Option<&'a dyn Callback>,
     first_commit: bool,
 
@@ -147,6 +156,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             callables: vec![],
             // declare_vars: HashSet::new(),
             callback: None,
+            inputs: vec![],
             first_commit: false,
             is_run: false,
         }
@@ -162,6 +172,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             callables: vec![],
             // declare_vars: HashSet::new(),
             callback: Some(callback),
+            inputs: vec![],
             first_commit: false,
             is_run: false,
         }
@@ -184,6 +195,14 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
         let mut ctxs: Vec<Option<Box<dyn 'c + Ctx<'a>>>> = Vec::with_capacity(ctx_count);
         ctxs.resize_with(ctx_count, || None);
         self.init_sub_contexts(ctxs);
+    }
+
+    pub fn change_inputs(&mut self, inputs: Vec<InputVal>) {
+        self.inputs = inputs;
+    }
+
+    pub fn get_inputs(&self) -> &Vec<InputVal> {
+        &self.inputs
     }
 
     pub fn create_sub_context(
@@ -468,23 +487,23 @@ mod tests {
     fn callable_context_test() {
         // Parent context create callable
         let mut context1 = Context::new(None, ContextType::Normal);
-        context1.create_callable(RefData::new_rc(Callable::new(None, None, vec![])));
+        context1.create_callable(RefData::new_rc(Callable::new(None, None, None)));
         assert_eq!(context1.callables.len(), 1);
 
         {
             // Child context create callable
             let mut context2 = Context::new(Some(&mut context1), ContextType::Normal);
-            context2.create_callable(RefData::new_rc(Callable::new(None, None, vec![])));
+            context2.create_callable(RefData::new_rc(Callable::new(None, None, None)));
         }
         assert_eq!(context1.callables.len(), 2);
 
         context1.commit();
 
         // After commit, parent context and child context should not add callable by create callable
-        context1.create_callable(RefData::new_rc(Callable::new(None, None, vec![])));
+        context1.create_callable(RefData::new_rc(Callable::new(None, None, None)));
         {
             let mut context2 = Context::new(Some(&mut context1), ContextType::Normal);
-            context2.create_callable(RefData::new_rc(Callable::new(None, None, vec![])));
+            context2.create_callable(RefData::new_rc(Callable::new(None, None, None)));
         }
         assert_eq!(context1.callables.len(), 2);
 

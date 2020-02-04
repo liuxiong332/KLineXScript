@@ -1,34 +1,65 @@
-use super::input::Position;
-use super::stat_expr_types::*;
+use crate::ast::input::Position;
+use crate::ast::stat_expr_types::*;
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct FindVal<'a> {
-    name: &'a str,
+    name: Option<&'a str>,
+    lib_name: Option<&'a str>,
     ctx_index: i32,
 }
 
 impl<'a> FindVal<'a> {
     pub fn new(name: &'a str, ctx_index: i32) -> FindVal<'a> {
-        FindVal { name, ctx_index }
+        FindVal {
+            name: Some(name),
+            lib_name: None,
+            ctx_index,
+        }
+    }
+
+    pub fn new_with_lib_name(lib_name: &'a str) -> FindVal<'a> {
+        FindVal {
+            name: None,
+            lib_name: Some(lib_name),
+            ctx_index: -1,
+        }
     }
 }
 
-struct FindState {
+struct FindState<'a> {
     ctx_index: i32,
+    lib_names: Vec<&'a str>,
 }
 
-impl FindState {
-    pub fn new() -> FindState {
-        FindState { ctx_index: 0 }
+impl<'a> FindState<'a> {
+    pub fn new() -> FindState<'a> {
+        FindState {
+            ctx_index: 0,
+            lib_names: vec![],
+        }
     }
 
-    pub fn new_with_ctx_index(ctx_index: i32) -> FindState {
-        FindState { ctx_index }
+    pub fn new_with_lib_names(names: Vec<&'a str>) -> FindState<'a> {
+        FindState {
+            ctx_index: 0,
+            lib_names: names,
+        }
+    }
+
+    pub fn new_with_ctx_index(ctx_index: i32) -> FindState<'a> {
+        FindState {
+            ctx_index,
+            lib_names: vec![],
+        }
     }
 }
 
 trait NodeFinder<'a> {
     fn find(&self, pos: Position, state: &mut FindState) -> Option<FindVal<'a>>;
+}
+
+trait LibNameForPrefix {
+    fn gen_lib_name(&self) -> String;
 }
 
 impl<'a> NodeFinder<'a> for TupleNode<'a> {
@@ -38,13 +69,23 @@ impl<'a> NodeFinder<'a> for TupleNode<'a> {
                 return Some(res);
             }
         }
-        None
+        Some(FindVal::new_with_lib_name("[]"))
     }
 }
 
 impl<'a> NodeFinder<'a> for TypeCast<'a> {
     fn find(&self, pos: Position, state: &mut FindState) -> Option<FindVal<'a>> {
-        self.exp.find(pos, state)
+        if let Some(res) = self.exp.find(pos, state) {
+            return Some(res);
+        }
+        let type_str = match self.data_type {
+            DataType::Bool => "bool",
+            DataType::Color => "color",
+            DataType::Int => "int",
+            DataType::Float => "float",
+            DataType::String => "string",
+        };
+        Some(FindVal::new_with_lib_name(type_str))
     }
 }
 
@@ -75,7 +116,7 @@ impl<'a> NodeFinder<'a> for RefCall<'a> {
         if let Some(res) = self.arg.find(pos, state) {
             return Some(res);
         }
-        None
+        Some(FindVal::new_with_lib_name("[]"))
     }
 }
 
@@ -290,6 +331,10 @@ mod tests {
         assert_eq!(
             tuple_exp.find(Position::new(0, 4), &mut FindState::new_with_ctx_index(1)),
             Some(FindVal::new("wo", 01))
+        );
+        assert_eq!(
+            tuple_exp.find(Position::new(0, 0), &mut FindState::new_with_ctx_index(1)),
+            Some(FindVal::new_with_lib_name("[]"))
         );
 
         let type_cast_exp = Exp::TypeCast(Box::new(TypeCast::new(

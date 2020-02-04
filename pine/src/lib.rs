@@ -9,6 +9,7 @@ extern crate lazy_static;
 extern crate assert_matches;
 
 pub mod ast;
+pub mod helper;
 pub mod libs;
 pub mod runtime;
 pub mod syntax;

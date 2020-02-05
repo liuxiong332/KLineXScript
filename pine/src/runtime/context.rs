@@ -92,7 +92,9 @@ pub struct Context<'a, 'b, 'c> {
 
     // The input value from user
     inputs: Vec<InputVal>,
-    // input_index: i32,
+    // The input index will increment after input function is invoked
+    input_index: i32,
+
     callback: Option<&'a dyn Callback>,
     first_commit: bool,
 
@@ -169,6 +171,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             // declare_vars: HashSet::new(),
             callback: None,
             inputs: vec![],
+            input_index: -1,
             first_commit: false,
             is_run: false,
         }
@@ -186,6 +189,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             // declare_vars: HashSet::new(),
             callback: Some(callback),
             inputs: vec![],
+            input_index: -1,
             first_commit: false,
             is_run: false,
         }
@@ -225,6 +229,19 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
 
     pub fn get_inputs(&self) -> &Vec<InputVal> {
         &self.inputs
+    }
+
+    pub fn copy_next_input(&mut self) -> Option<InputVal> {
+        if self.input_index as usize >= self.inputs.len() {
+            None
+        } else {
+            self.input_index += 1;
+            Some(self.inputs[self.input_index as usize].clone())
+        }
+    }
+
+    pub fn reset_input_index(&mut self) {
+        self.input_index = -1;
     }
 
     pub fn create_sub_context(

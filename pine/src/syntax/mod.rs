@@ -302,6 +302,7 @@ impl<'a> SyntaxParser<'a> {
         for (name, exp) in func_call.dict_args.iter_mut() {
             dict_arg_type.push((name, self.parse_exp(exp)?));
         }
+
         let res_fun = fun_type.0.iter().find(|func| {
             let (args, _) = &func.0;
             if args.len() >= pos_arg_type.len() {

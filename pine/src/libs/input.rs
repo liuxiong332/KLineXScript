@@ -1,71 +1,31 @@
 use super::VarResult;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
-use crate::runtime::context::{downcast_ctx_const, Ctx};
+use crate::runtime::context::{downcast_ctx, Ctx, InputVal};
 use crate::types::{
-    Bool, Callable, DataType, Float, Int, ParamCollectCall, PineFrom, PineRef, PineType, RefData,
-    RuntimeErr, SecondType, Series, SimpleCall, NA,
+    Bool, Callable, CallableFactory, DataType, Float, Int, ParamCollectCall, PineFrom, PineRef,
+    PineType, RefData, RuntimeErr, SecondType, Series, SimpleCall, NA,
 };
-use std::borrow::Borrow;
 use std::rc::Rc;
-
-trait IntoTarget<D> {
-    fn into(&self) -> D;
-}
-
-impl IntoTarget<i32> for Int {
-    fn into(&self) -> i32 {
-        self.unwrap()
-    }
-}
-
-impl IntoTarget<f64> for Float {
-    fn into(&self) -> f64 {
-        self.unwrap()
-    }
-}
-
-impl IntoTarget<bool> for Bool {
-    fn into(&self) -> bool {
-        *self
-    }
-}
-
-fn plot_series<'a>(item_val: PineRef<'a>, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
-    let items: RefData<Series<Float>> = Series::implicity_from(item_val).unwrap();
-    let s: Vec<f64> = items
-        .get_history()
-        .iter()
-        .map(|v| IntoTarget::into(v))
-        .collect();
-    context.get_callback().unwrap().plot(s);
-    Ok(())
-}
-
-fn plot_val<'a>(item_val: PineRef<'a>, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
-    // println!("print val type {:?}", item_val.get_type());
-    match item_val.get_type() {
-        (DataType::Float, SecondType::Series) => plot_series(item_val, context),
-        // (DataType::Int, SecondType::Series) => plot_series::<Int, i32>(item_val, context),
-        // (DataType::Bool, SecondType::Series) => plot_series::<Bool, bool>(item_val, context),
-        t => Err(RuntimeErr::NotImplement(format!(
-            "The plot now only support int, float, bool type, but get {:?}",
-            t
-        ))),
-    }
-}
 
 fn input_for_bool<'a>(
     context: &mut dyn Ctx<'a>,
     mut param: Vec<Option<PineRef<'a>>>,
 ) -> Result<PineRef<'a>, RuntimeErr> {
-    let inputs = downcast_ctx_const(context).get_inputs();
-    match param.remove(0) {
-        Some(item_val) => {
-            plot_val(item_val, context)?;
-            Ok(PineRef::new_box(NA))
-        }
-        _ => Err(RuntimeErr::NotSupportOperator),
+    let input_val = downcast_ctx(context).copy_next_input();
+    match input_val {
+        Some(InputVal::Bool(val)) => Ok(PineRef::new_box(val)),
+        _ => match param.remove(0) {
+            Some(val) => Ok(val),
+            _ => Err(RuntimeErr::NotValidParam),
+        },
     }
+    // match param.remove(0) {
+    //     Some(item_val) => {
+    //         plot_val(item_val, context)?;
+    //         Ok(PineRef::new_box(NA))
+    //     }
+    //     _ => Err(RuntimeErr::NotSupportOperator),
+    // }
 }
 
 thread_local!(static BOOL_TYPE: FunctionType<'static> = FunctionType((
@@ -109,7 +69,9 @@ fn pine_input<'a>(
 pub const VAR_NAME: &'static str = "input";
 
 pub fn declare_var<'a>() -> VarResult<'a> {
-    let value = PineRef::new(Callable::new(Some(pine_input), None, None));
+    let value = PineRef::new(CallableFactory::new(|| {
+        Callable::new(Some(pine_input), None, None)
+    }));
     /*
         input(defval, title, type, confirm) → input bool
         input(defval, title, type, minval, maxval, confirm, step, options) → input integer
@@ -125,4 +87,21 @@ pub fn declare_var<'a>() -> VarResult<'a> {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+    use crate::{LibInfo, PineParser};
+
+    #[test]
+    fn input_type_test() {
+        let lib_info = LibInfo::new(vec![declare_var()], vec![]);
+        PineParser::new("input(true, 'title', 'bool', false)", &lib_info);
+        PineParser::new(
+            "input(defval = true, title = 'title', type = 'bool', confirm = false)",
+            &lib_info,
+        );
+        PineParser::new(
+            "input(true, 'hello', defval = true, title = 'title', type = 'bool', confirm = false)",
+            &lib_info,
+        );
+    }
+}

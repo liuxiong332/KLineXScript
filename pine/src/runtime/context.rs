@@ -535,23 +535,23 @@ mod tests {
     fn callable_context_test() {
         // Parent context create callable
         let mut context1 = Context::new(None, ContextType::Normal);
-        context1.create_callable(RefData::new_rc(Callable::new(None, None, None)));
+        context1.create_callable(RefData::new_rc(Callable::new(None, None)));
         assert_eq!(context1.callables.len(), 1);
 
         {
             // Child context create callable
             let mut context2 = Context::new(Some(&mut context1), ContextType::Normal);
-            context2.create_callable(RefData::new_rc(Callable::new(None, None, None)));
+            context2.create_callable(RefData::new_rc(Callable::new(None, None)));
         }
         assert_eq!(context1.callables.len(), 2);
 
         context1.commit();
 
         // After commit, parent context and child context should not add callable by create callable
-        context1.create_callable(RefData::new_rc(Callable::new(None, None, None)));
+        context1.create_callable(RefData::new_rc(Callable::new(None, None)));
         {
             let mut context2 = Context::new(Some(&mut context1), ContextType::Normal);
-            context2.create_callable(RefData::new_rc(Callable::new(None, None, None)));
+            context2.create_callable(RefData::new_rc(Callable::new(None, None)));
         }
         assert_eq!(context1.callables.len(), 2);
 

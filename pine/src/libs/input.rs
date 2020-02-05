@@ -3,7 +3,7 @@ use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, Syn
 use crate::runtime::context::{downcast_ctx, Ctx, InputVal};
 use crate::types::{
     Bool, Callable, CallableFactory, DataType, Float, Int, ParamCollectCall, PineFrom, PineRef,
-    PineType, RefData, RuntimeErr, SecondType, Series, SimpleCall, NA,
+    PineType, RefData, RuntimeErr, SecondType, Series, NA,
 };
 use std::rc::Rc;
 
@@ -70,7 +70,7 @@ pub const VAR_NAME: &'static str = "input";
 
 pub fn declare_var<'a>() -> VarResult<'a> {
     let value = PineRef::new(CallableFactory::new(|| {
-        Callable::new(Some(pine_input), None, None)
+        Callable::new(Some(pine_input), None)
     }));
     /*
         input(defval, title, type, confirm) → input bool

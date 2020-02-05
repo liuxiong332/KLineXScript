@@ -94,7 +94,6 @@ pub const VAR_NAME: &'static str = "plot";
 pub fn declare_var<'a>() -> VarResult<'a> {
     let value = PineRef::new(Callable::new(
         None,
-        None,
         Some(Box::new(ParamCollectCall::new(pine_plot))),
     ));
     let syntax_type = SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType((

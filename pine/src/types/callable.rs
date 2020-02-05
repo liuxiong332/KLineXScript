@@ -11,21 +11,8 @@ use std::cell::{Cell, RefCell};
 use std::fmt;
 use std::mem;
 
-pub trait SimpleCall<'a> {
-    fn step(
-        &self,
-        _context: &mut dyn Ctx<'a>,
-        _p: Vec<Option<PineRef<'a>>>,
-        _func_type: FunctionType<'a>,
-    ) -> Result<PineRef<'a>, RuntimeErr> {
-        Ok(PineRef::Box(Box::new(NA)))
-    }
-
-    fn copy(&self) -> Box<dyn SimpleCall<'a> + 'a>;
-}
-
 pub trait SeriesCall<'a> {
-    fn init_param_len(&self, len: usize);
+    fn init_param_len(&self, len: usize) {}
 
     fn step(
         &self,
@@ -177,7 +164,6 @@ pub struct Callable<'a> {
             FunctionType<'a>,
         ) -> Result<PineRef<'a>, RuntimeErr>,
     >,
-    simple_caller: Option<Box<dyn SimpleCall<'a> + 'a>>,
     caller: Option<Box<dyn SeriesCall<'a> + 'a>>,
     param_names: Option<Vec<&'a str>>,
 }
@@ -194,14 +180,10 @@ impl<'a> Clone for Callable<'a> {
             Some(ref c) => Some(c.copy()),
             None => None,
         };
-        let simple_caller = match self.simple_caller {
-            Some(ref c) => Some(c.copy()),
-            None => None,
-        };
+
         Callable {
             func: self.func,
             caller: caller,
-            simple_caller: simple_caller,
             param_names: self.param_names.clone(),
         }
     }
@@ -244,12 +226,10 @@ impl<'a> Callable<'a> {
                 FunctionType<'a>,
             ) -> Result<PineRef<'a>, RuntimeErr>,
         >,
-        simple_caller: Option<Box<dyn SimpleCall<'a> + 'a>>,
         caller: Option<Box<dyn SeriesCall<'a> + 'a>>,
     ) -> Callable<'a> {
         Callable {
             func,
-            simple_caller,
             caller,
             param_names: None,
         }
@@ -383,7 +363,7 @@ mod tests {
 
     #[test]
     fn callable_test() {
-        let mut callable = Callable::new(Some(test_func), None, None);
+        let mut callable = Callable::new(Some(test_func), None);
         let mut context = Context::new(None, ContextType::Normal);
 
         let call_res = callable.call(
@@ -419,11 +399,8 @@ mod tests {
 
     #[test]
     fn series_call_test() {
-        let mut callable = Callable::new(
-            None,
-            None,
-            Some(Box::new(ParamCollectCall::new(add_test_func))),
-        );
+        let mut callable =
+            Callable::new(None, Some(Box::new(ParamCollectCall::new(add_test_func))));
         let gen_params = |val1, val2| {
             vec![
                 PineRef::new(Series::from(Some(val1))),

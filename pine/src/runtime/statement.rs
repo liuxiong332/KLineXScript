@@ -925,7 +925,6 @@ mod tests {
         context.init_vars(vec![Some(PineRef::new_rc(Callable::new(
             Some(test_func),
             None,
-            None,
         )))]);
 
         let res = downcast_pf::<Bool>(exp.run(&mut context).unwrap()).unwrap();
@@ -935,7 +934,7 @@ mod tests {
         let mut context = Context::new(None, ContextType::Normal);
         context.init(1, 1, 1);
         context.init_vars(vec![Some(PineRef::new_rc(CallableFactory::new(|| {
-            Callable::new(Some(test_func), None, None)
+            Callable::new(Some(test_func), None)
         })))]);
         let res = downcast_pf::<Bool>(exp.run(&mut context).unwrap()).unwrap();
         assert_eq!(res, RefData::new_box(true));

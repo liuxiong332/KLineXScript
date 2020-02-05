@@ -147,7 +147,7 @@ mod tests {
         evaluate.prepare(&mut syntax_ctx);
 
         let mut context = Context::new(None, RunContextType::Normal);
-        context.init(2, 0);
+        context.init(2, 0, 0);
         context.create_var(0, PineRef::new(Series::from(Some(1f64))));
         context.create_var(1, PineRef::new(Series::from(Some(2f64))));
 

@@ -38,7 +38,7 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
         callback: &'a dyn Callback,
     ) -> DataSrc<'a, 'b, 'c> {
         let mut context = Context::new_with_callback(callback);
-        context.init(blk.var_count, blk.subctx_count);
+        context.init(blk.var_count, blk.subctx_count, blk.libfun_count);
 
         let input_index = lib_vars.len() as i32;
 

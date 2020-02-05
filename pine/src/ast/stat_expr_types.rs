@@ -565,6 +565,7 @@ pub struct Block<'a> {
     pub ret_stmt: Option<Exp<'a>>,
     pub range: StrRange,
     pub var_count: i32,
+    pub libfun_count: i32,
     pub subctx_count: i32,
 }
 
@@ -575,6 +576,7 @@ impl<'a> Block<'a> {
             ret_stmt,
             range,
             var_count: 0,
+            libfun_count: 0,
             subctx_count: 0,
         }
     }
@@ -585,6 +587,7 @@ impl<'a> Block<'a> {
             ret_stmt,
             range: StrRange::new_empty(),
             var_count: 0,
+            libfun_count: 0,
             subctx_count: 0,
         }
     }
@@ -593,6 +596,7 @@ impl<'a> Block<'a> {
         stmts: Vec<Statement<'a>>,
         ret_stmt: Option<Exp<'a>>,
         var_count: i32,
+        libfun_count: i32,
         subctx_count: i32,
     ) -> Block<'a> {
         Block {
@@ -600,6 +604,7 @@ impl<'a> Block<'a> {
             ret_stmt,
             range: StrRange::new_empty(),
             var_count,
+            libfun_count,
             subctx_count,
         }
     }
@@ -658,12 +663,20 @@ impl<'a> IfThenElse<'a> {
         self.then_blk.var_count
     }
 
+    pub fn get_then_libfun_count(&self) -> i32 {
+        self.then_blk.libfun_count
+    }
+
     pub fn get_then_subctx_count(&self) -> i32 {
         self.then_blk.subctx_count
     }
 
     pub fn get_else_var_count(&self) -> i32 {
         self.else_blk.as_ref().unwrap().var_count
+    }
+
+    pub fn get_else_libfun_count(&self) -> i32 {
+        self.else_blk.as_ref().unwrap().libfun_count
     }
 
     pub fn get_else_subctx_count(&self) -> i32 {
@@ -755,6 +768,10 @@ impl<'a> ForRange<'a> {
         self.do_blk.var_count
     }
 
+    pub fn get_libfun_count(&self) -> i32 {
+        self.do_blk.libfun_count
+    }
+
     pub fn get_subctx_count(&self) -> i32 {
         self.do_blk.subctx_count
     }
@@ -806,6 +823,10 @@ impl<'a> FunctionDef<'a> {
 
     pub fn get_var_count(&self) -> i32 {
         self.body.var_count
+    }
+
+    pub fn get_libfun_count(&self) -> i32 {
+        self.body.libfun_count
     }
 
     pub fn get_subctx_count(&self) -> i32 {

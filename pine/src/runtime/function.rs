@@ -83,6 +83,10 @@ impl<'a> Function<'a> {
         self.def.get_subctx_count()
     }
 
+    pub fn get_libfun_count(&self) -> i32 {
+        self.def.get_libfun_count()
+    }
+
     pub fn get_def(&self) -> &'a FunctionDef<'a> {
         self.def
     }
@@ -114,7 +118,11 @@ mod tests {
         func_def.varids = Some(vec![0]);
         let func = Function::new(&func_def);
         let mut ctx = Context::new(None, ContextType::FuncDefBlock);
-        ctx.init(func_def.get_var_count(), func_def.get_subctx_count());
+        ctx.init(
+            func_def.get_var_count(),
+            func_def.get_subctx_count(),
+            func_def.get_libfun_count(),
+        );
 
         assert_eq!(
             func.call(

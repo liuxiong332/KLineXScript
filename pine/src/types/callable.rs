@@ -314,7 +314,7 @@ impl<'a> Callable<'a> {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-struct CallableFactory<'a> {
+pub struct CallableFactory<'a> {
     create_func: fn() -> Callable<'a>,
 }
 

@@ -58,6 +58,7 @@ fn input_for_bool<'a>(
     context: &mut dyn Ctx<'a>,
     mut param: Vec<Option<PineRef<'a>>>,
 ) -> Result<PineRef<'a>, RuntimeErr> {
+    let inputs = downcast_ctx_const(context).get_inputs();
     match param.remove(0) {
         Some(item_val) => {
             plot_val(item_val, context)?;
@@ -92,12 +93,6 @@ thread_local!(static INT_TYPE: FunctionType<'static> =
         SyntaxType::int(),
     ))
 );
-
-struct PineInput {}
-
-impl<'a> SimpleCall<'a> for PineInput {
-    fn prepare(&mut self, _syntax_ctx: &mut dyn SyntaxCtx<'a>) {}
-}
 
 fn pine_input<'a>(
     context: &mut dyn Ctx<'a>,

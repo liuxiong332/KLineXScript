@@ -10,8 +10,9 @@ use crate::ast::stat_expr_types::{
     VarAssignment, VarIndex,
 };
 use crate::types::{
-    downcast_pf, Bool, Callable, Color, DataType as FirstType, Float, Int, PineFrom, PineRef,
-    PineStaticType, PineType, RefData, RuntimeErr, SecondType, Series, Tuple, NA,
+    downcast_pf, Bool, Callable, CallableFactory, Color, DataType as FirstType, Float, Int,
+    PineFrom, PineRef, PineStaticType, PineType, RefData, RuntimeErr, SecondType, Series, Tuple,
+    NA,
 };
 use std::fmt::Debug;
 
@@ -322,6 +323,7 @@ impl<'a> Runner<'a> for IfThenElse<'a> {
                 self.then_ctxid,
                 ContextType::IfElseBlock,
                 self.get_then_var_count(),
+                self.get_then_libfun_count(),
                 self.get_then_subctx_count(),
             );
             let result = self.then_blk.run(subctx);
@@ -333,6 +335,7 @@ impl<'a> Runner<'a> for IfThenElse<'a> {
                 self.else_ctxid,
                 ContextType::IfElseBlock,
                 self.get_else_var_count(),
+                self.get_else_libfun_count(),
                 self.get_else_subctx_count(),
             );
             let result = else_blk.run(subctx);
@@ -387,6 +390,7 @@ impl<'a> Runner<'a> for ForRange<'a> {
             self.ctxid,
             ContextType::ForRangeBlock,
             self.get_var_count(),
+            self.get_libfun_count(),
             self.get_subctx_count(),
         );
         while (step > 0 && iter < end) || (step < 0 && iter > end) {
@@ -455,13 +459,15 @@ pub fn create_sub_ctx<'a, 'b, 'c>(
     ctxid: i32,
     ctx_type: ContextType,
     var_count: i32,
+    libfun_count: i32,
     subctx_count: i32,
 ) -> &'c mut (dyn Ctx<'a> + 'c) {
     let ctx_instance = downcast_ctx(context);
     let sub_context;
     // Get or create sub context for the function call context.
     if !ctx_instance.contains_sub_context(ctxid) {
-        sub_context = ctx_instance.create_sub_context(ctxid, ctx_type, var_count, subctx_count);
+        sub_context =
+            ctx_instance.create_sub_context(ctxid, ctx_type, var_count, subctx_count, libfun_count);
     } else {
         sub_context = ctx_instance.get_sub_context(ctxid).unwrap();
     }
@@ -504,6 +510,22 @@ impl<'a> Runner<'a> for FunctionCall<'a> {
                 context.create_callable(callable);
                 result
             }
+            (FirstType::CallableFactory, SecondType::Simple) => {
+                let mut opt_instance = context.move_fun_instance(self.ctxid);
+                if opt_instance.is_none() {
+                    let factory = downcast_pf::<CallableFactory>(result).unwrap();
+                    context.create_fun_instance(self.ctxid, RefData::new_rc(factory.create()));
+                    opt_instance = context.move_fun_instance(self.ctxid);
+                }
+                let mut callable = opt_instance.unwrap();
+
+                let func_type = self.func_type.as_ref().unwrap().clone();
+                let result = callable.call(context, pos_args, dict_args, func_type);
+
+                context.create_fun_instance(self.ctxid, RefData::clone(&callable));
+                context.create_callable(callable);
+                result
+            }
             (FirstType::Function, SecondType::Simple) => {
                 let callable = downcast_pf::<Function>(result).unwrap();
                 let def = callable.get_def();
@@ -514,6 +536,7 @@ impl<'a> Runner<'a> for FunctionCall<'a> {
                     self.ctxid,
                     ContextType::FuncDefBlock,
                     function.get_var_count(),
+                    function.get_libfun_count(),
                     function.get_subctx_count(),
                 );
                 let result = function.call(ctx_ref, pos_args, dict_args, self.range);
@@ -659,7 +682,7 @@ mod tests {
             vec![var1_index.varid, var2_index.varid],
         )));
         let mut context = Context::new(None, ContextType::Normal);
-        context.init(4, 0);
+        context.init(4, 0, 0);
         context.create_var(nv1_index.varid, PineRef::new_box(Some(100)));
         context.create_var(nv2_index.varid, PineRef::new_box(Some(200)));
 
@@ -695,7 +718,7 @@ mod tests {
             vec![myvar_index.varid],
         )));
         let mut context = Context::new(None, ContextType::Normal);
-        context.init(2, 0);
+        context.init(2, 0, 0);
         context.create_var(newvar_index.varid, PineRef::new_rc(Series::from(Some(100))));
 
         assert_eq!(assign.st_run(&mut context), Ok(()));
@@ -819,7 +842,7 @@ mod tests {
             .unwrap();
 
         let mut context = Context::new(None, ContextType::Normal);
-        context.init(0, 1);
+        context.init(0, 1, 0);
 
         let result = Runner::run(&for_range, &mut context);
         assert!(result.is_ok());
@@ -841,7 +864,7 @@ mod tests {
             vec![1],
         )));
         let block =
-            Block::new_with_count(vec![assign], Some(Exp::Num(Numeral::from_i32(10))), 2, 0);
+            Block::new_with_count(vec![assign], Some(Exp::Num(Numeral::from_i32(10))), 2, 0, 0);
         let for_range = ForRange::new_with_ctxid(
             VarName::new_no_input("i"),
             Exp::VarName(RVVarName::new_with_index("start", VarIndex::new(0, 0))),
@@ -857,7 +880,7 @@ mod tests {
         );
 
         let mut context = Context::new(None, ContextType::Normal);
-        context.init(3, 1);
+        context.init(3, 1, 0);
         context.create_var(0, PineRef::new(Some(1)));
         context.create_var(1, PineRef::new(Some(10)));
         context.create_var(2, PineRef::new(Some(5)));
@@ -898,7 +921,7 @@ mod tests {
             }
         }
 
-        context.init(1, 1);
+        context.init(1, 1, 0);
         context.init_vars(vec![Some(PineRef::new_rc(Callable::new(
             Some(test_func),
             None,
@@ -907,6 +930,16 @@ mod tests {
 
         let res = downcast_pf::<Bool>(exp.run(&mut context).unwrap()).unwrap();
         assert_eq!(res, RefData::new_box(true));
+
+        // Test for CallableFactory
+        let mut context = Context::new(None, ContextType::Normal);
+        context.init(1, 1, 1);
+        context.init_vars(vec![Some(PineRef::new_rc(CallableFactory::new(|| {
+            Callable::new(Some(test_func), None, None)
+        })))]);
+        let res = downcast_pf::<Bool>(exp.run(&mut context).unwrap()).unwrap();
+        assert_eq!(res, RefData::new_box(true));
+        assert!(context.move_fun_instance(0).is_some());
     }
 
     #[test]
@@ -941,13 +974,14 @@ mod tests {
                 ))),
                 2,
                 0,
+                0,
             ),
             StrRange::new_empty(),
         );
         let mut parent_def = def_exp.clone();
         parent_def.spec_defs.as_mut().unwrap().push(def_exp);
         let mut context = Context::new(None, ContextType::Normal);
-        context.init(2, 2);
+        context.init(2, 2, 0);
         context.create_var(
             name_index.varid,
             PineRef::new_rc(Function::new(&parent_def)),
@@ -987,6 +1021,7 @@ mod tests {
             ))),
             1,
             0,
+            0,
         );
         let for_range = ForRange::new_with_ctxid(
             VarName::new_no_input("i"),
@@ -1000,7 +1035,7 @@ mod tests {
         );
 
         let mut context = Context::new(None, ContextType::Normal);
-        context.init(0, 1);
+        context.init(0, 1, 0);
 
         let result = Runner::run(&for_range, &mut context);
         assert!(result.is_ok());
@@ -1023,6 +1058,7 @@ mod tests {
             ))),
             1,
             0,
+            0,
         );
         let for_range = ForRange::new_with_ctxid(
             VarName::new_no_input("i"),
@@ -1036,7 +1072,7 @@ mod tests {
         );
 
         let mut context = Context::new(None, ContextType::Normal);
-        context.init(0, 1);
+        context.init(0, 1, 0);
 
         let result = Runner::run(&for_range, &mut context);
         assert!(result.is_ok());

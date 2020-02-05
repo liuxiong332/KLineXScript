@@ -29,6 +29,10 @@ pub trait Ctx<'a>: VarOperate<'a> {
 
     fn create_callable(&mut self, call: RefData<Callable<'a>>);
 
+    fn move_fun_instance(&mut self, index: i32) -> Option<RefData<Callable<'a>>>;
+
+    fn create_fun_instance(&mut self, index: i32, val: RefData<Callable<'a>>);
+
     // fn create_declare(&mut self, name: &'a str);
 
     // fn contains_declare(&self, name: &'a str) -> bool;
@@ -77,6 +81,10 @@ pub struct Context<'a, 'b, 'c> {
 
     // variable map that defined by user and library.
     vars: Vec<Option<PineRef<'a>>>,
+
+    // function instances
+    fun_instances: Vec<Option<RefData<Callable<'a>>>>,
+
     // All the Series type variable name
     _series: Vec<&'a str>,
     callables: Vec<RefData<Callable<'a>>>,
@@ -155,6 +163,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             context_type: t,
             sub_contexts: Vec::new(),
             vars: Vec::new(),
+            fun_instances: Vec::new(),
             _series: vec![],
             callables: vec![],
             // declare_vars: HashSet::new(),
@@ -171,6 +180,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             context_type: ContextType::Normal,
             sub_contexts: Vec::new(),
             vars: Vec::new(),
+            fun_instances: Vec::new(),
             _series: vec![],
             callables: vec![],
             // declare_vars: HashSet::new(),
@@ -189,7 +199,11 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
         self.sub_contexts = sub_contexts;
     }
 
-    pub fn init(&mut self, var_count: i32, subctx_count: i32) {
+    pub fn init_fun_instances(&mut self, fun_instances: Vec<Option<RefData<Callable<'a>>>>) {
+        self.fun_instances = fun_instances;
+    }
+
+    pub fn init(&mut self, var_count: i32, subctx_count: i32, libfun_count: i32) {
         let mut vars: Vec<Option<PineRef<'a>>> = Vec::with_capacity(var_count as usize);
         vars.resize(var_count as usize, None);
         self.init_vars(vars);
@@ -198,6 +212,11 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
         let mut ctxs: Vec<Option<Box<dyn 'c + Ctx<'a>>>> = Vec::with_capacity(ctx_count);
         ctxs.resize_with(ctx_count, || None);
         self.init_sub_contexts(ctxs);
+
+        let fun_count = libfun_count as usize;
+        let mut funs: Vec<Option<RefData<Callable<'a>>>> = Vec::with_capacity(fun_count);
+        funs.resize_with(fun_count, || None);
+        self.init_fun_instances(funs);
     }
 
     pub fn change_inputs(&mut self, inputs: Vec<InputVal>) {
@@ -214,13 +233,14 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
         t: ContextType,
         var_count: i32,
         subctx_count: i32,
+        libfun_count: i32,
     ) -> &mut Box<dyn Ctx<'a> + 'c>
     where
         'a: 'c,
         'b: 'c,
     {
         let mut subctx = Box::new(Context::new(None, t));
-        subctx.init(var_count, subctx_count);
+        subctx.init(var_count, subctx_count, libfun_count);
         unsafe {
             // Force the &Context to &mut Context to prevent the rust's borrow checker
             // When the sub context borrow the parent context, the parent context should not
@@ -391,6 +411,14 @@ impl<'a, 'b, 'c> Ctx<'a> for Context<'a, 'b, 'c> {
         } else if !self.first_commit {
             self.callables.push(call);
         }
+    }
+
+    fn move_fun_instance(&mut self, index: i32) -> Option<RefData<Callable<'a>>> {
+        mem::replace(&mut self.fun_instances[index as usize], None)
+    }
+
+    fn create_fun_instance(&mut self, index: i32, val: RefData<Callable<'a>>) {
+        self.fun_instances[index as usize] = Some(val);
     }
 
     fn set_is_run(&mut self, is_run: bool) {

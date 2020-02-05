@@ -1111,6 +1111,7 @@ impl<'a> SyntaxParser<'a> {
         let context = downcast_ctx(self.context);
         blk.var_count = context.max_var_index + 1;
         blk.subctx_count = context.max_child_ctx_index + 1;
+        blk.libfun_count = context.max_lib_func_index + 1;
         result
     }
 }
@@ -2220,5 +2221,6 @@ mod tests {
         );
         assert_eq!(blk.var_count, 3);
         assert_eq!(blk.subctx_count, 5);
+        assert_eq!(blk.libfun_count, 0);
     }
 }

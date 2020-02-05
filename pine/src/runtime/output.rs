@@ -73,6 +73,23 @@ pub struct IOInfo {
     outputs: Vec<OutputInfo>,
 }
 
+impl IOInfo {
+    pub fn new() -> IOInfo {
+        IOInfo {
+            inputs: vec![],
+            outputs: vec![],
+        }
+    }
+
+    pub fn push_input(&mut self, input: InputInfo) {
+        self.inputs.push(input);
+    }
+
+    pub fn push_output(&mut self, output: OutputInfo) {
+        self.outputs.push(output);
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct OutputData {
     from: Option<i32>,

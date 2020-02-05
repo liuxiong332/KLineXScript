@@ -135,7 +135,7 @@ impl<'a, 'b, 'c> PineRunner<'a, 'b, 'c> {
         self.datasrc.update(data)
     }
 
-    pub fn change_inputs(&mut self, inputs: Vec<InputVal>) {
+    pub fn change_inputs(&mut self, inputs: Vec<Option<InputVal>>) {
         self.datasrc.change_inputs(inputs);
     }
 
@@ -228,7 +228,7 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
         }
     }
 
-    pub fn run_with_input(&mut self, input: Vec<InputVal>) -> Result<(), PineFormatError> {
+    pub fn run_with_input(&mut self, input: Vec<Option<InputVal>>) -> Result<(), PineFormatError> {
         let runner = self.runner.as_mut().unwrap();
         runner.change_inputs(input);
         match runner.run(&self.data) {

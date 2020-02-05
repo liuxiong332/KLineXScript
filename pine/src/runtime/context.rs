@@ -1,4 +1,5 @@
 use super::data_src::Callback;
+use super::output::{IOInfo, OutputData};
 use crate::ast::input::{Position, StrRange};
 use crate::ast::stat_expr_types::VarIndex;
 use crate::types::{
@@ -91,9 +92,13 @@ pub struct Context<'a, 'b, 'c> {
     // declare_vars: HashSet<&'a str>,
 
     // The input value from user
-    inputs: Vec<InputVal>,
+    inputs: Vec<Option<InputVal>>,
     // The input index will increment after input function is invoked
     input_index: i32,
+
+    outputs: Vec<Option<OutputData>>,
+
+    io_info: IOInfo,
 
     // The output values
     callback: Option<&'a dyn Callback>,
@@ -173,6 +178,8 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             callback: None,
             inputs: vec![],
             input_index: -1,
+            outputs: vec![],
+            io_info: IOInfo::new(),
             first_commit: false,
             is_run: false,
         }
@@ -191,6 +198,8 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             callback: Some(callback),
             inputs: vec![],
             input_index: -1,
+            outputs: vec![],
+            io_info: IOInfo::new(),
             first_commit: false,
             is_run: false,
         }
@@ -224,11 +233,11 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
         self.init_fun_instances(funs);
     }
 
-    pub fn change_inputs(&mut self, inputs: Vec<InputVal>) {
+    pub fn change_inputs(&mut self, inputs: Vec<Option<InputVal>>) {
         self.inputs = inputs;
     }
 
-    pub fn get_inputs(&self) -> &Vec<InputVal> {
+    pub fn get_inputs(&self) -> &Vec<Option<InputVal>> {
         &self.inputs
     }
 
@@ -237,8 +246,13 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
         if self.input_index as usize >= self.inputs.len() {
             None
         } else {
-            Some(self.inputs[self.input_index as usize].clone())
+            self.inputs[self.input_index as usize].clone()
         }
+    }
+
+    pub fn get_next_input_index(&mut self) -> i32 {
+        self.input_index += 1;
+        self.input_index
     }
 
     pub fn reset_input_index(&mut self) {

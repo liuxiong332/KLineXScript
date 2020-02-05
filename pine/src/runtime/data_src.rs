@@ -68,7 +68,7 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
         }
     }
 
-    pub fn change_inputs(&mut self, inputs: Vec<InputVal>) {
+    pub fn change_inputs(&mut self, inputs: Vec<Option<InputVal>>) {
         self.context.change_inputs(inputs);
     }
 

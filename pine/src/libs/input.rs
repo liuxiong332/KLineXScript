@@ -126,7 +126,7 @@ mod tests {
             Some(PineRef::new_box(true))
         );
 
-        runner.change_inputs(vec![InputVal::Bool(false)]);
+        runner.change_inputs(vec![Some(InputVal::Bool(false))]);
         runner.run(&vec![("close", vec![Some(1f64)])]).unwrap();
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(2, 0)),

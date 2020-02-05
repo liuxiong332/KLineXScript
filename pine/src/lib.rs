@@ -25,7 +25,7 @@ use ast::syntax_type::{SimpleSyntaxType, SyntaxType};
 use syntax::SyntaxParser;
 
 use libs::{declare_vars, VarResult};
-use runtime::context::{InputVal, PineRuntimeError};
+use runtime::context::{Context, InputVal, PineRuntimeError};
 use runtime::data_src::{Callback, DataSrc};
 use runtime::error_format::{ErrorFormater, PineFormatError};
 use std::mem;
@@ -91,6 +91,19 @@ impl<'a, 'b> PineParser<'a, 'b> {
         }
         Ok((blk, syntax_parser, all_errs))
     }
+
+    pub fn parse_blk(&mut self) -> Result<Block<'a>, Vec<PineInputError>> {
+        match self.parse() {
+            Ok((blk, _, errs)) => {
+                if errs.is_empty() {
+                    Ok(blk)
+                } else {
+                    Err(errs)
+                }
+            }
+            Err(errs) => Err(errs),
+        }
+    }
 }
 
 pub struct PineRunner<'a, 'b, 'c> {
@@ -100,12 +113,14 @@ pub struct PineRunner<'a, 'b, 'c> {
 impl<'a, 'b, 'c> PineRunner<'a, 'b, 'c> {
     pub fn new(
         lib_info: &LibInfo<'a>,
-        blk: &'a Block<'a>,
+        blk: &Block<'a>,
         callback: &'a dyn Callback,
     ) -> PineRunner<'a, 'b, 'c> {
         let var_values = lib_info.var_values.clone();
         let input_names = lib_info.input_names.clone();
-        let datasrc = DataSrc::new(blk, var_values, input_names, callback);
+
+        let blk_ref = unsafe { mem::transmute::<&Block<'a>, &'a Block<'a>>(blk) };
+        let datasrc = DataSrc::new(blk_ref, var_values, input_names, callback);
         PineRunner { datasrc }
     }
 
@@ -122,6 +137,10 @@ impl<'a, 'b, 'c> PineRunner<'a, 'b, 'c> {
 
     pub fn change_inputs(&mut self, inputs: Vec<InputVal>) {
         self.datasrc.change_inputs(inputs);
+    }
+
+    pub fn get_context(&mut self) -> &mut Context<'a, 'b, 'c> {
+        self.datasrc.get_context()
     }
 }
 

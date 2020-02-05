@@ -89,7 +89,11 @@ pub fn declare_var<'a>() -> VarResult<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{LibInfo, PineParser};
+    use crate::ast::stat_expr_types::{Block, VarIndex};
+    use crate::runtime::context::{Context, VarOperate};
+    use crate::runtime::data_src::{Callback, NoneCallback};
+    use crate::types::PineRef;
+    use crate::{LibInfo, PineParser, PineRunner, PineRuntimeError};
 
     #[test]
     fn input_type_test() {
@@ -102,6 +106,31 @@ mod tests {
         PineParser::new(
             "input(true, 'hello', defval = true, title = 'title', type = 'bool', confirm = false)",
             &lib_info,
+        );
+    }
+
+    #[test]
+    fn bool_input_test<'a>() {
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+        );
+        let src = "m = input(true, 'title', 'bool', false)";
+
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        runner.run(&vec![("close", vec![Some(1f64)])]).unwrap();
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(2, 0)),
+            Some(PineRef::new_box(true))
+        );
+
+        runner.change_inputs(vec![InputVal::Bool(false)]);
+        runner.run(&vec![("close", vec![Some(1f64)])]).unwrap();
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(2, 0)),
+            Some(PineRef::new_box(false))
         );
     }
 }

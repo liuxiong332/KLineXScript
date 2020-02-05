@@ -232,10 +232,10 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
     }
 
     pub fn copy_next_input(&mut self) -> Option<InputVal> {
+        self.input_index += 1;
         if self.input_index as usize >= self.inputs.len() {
             None
         } else {
-            self.input_index += 1;
             Some(self.inputs[self.input_index as usize].clone())
         }
     }

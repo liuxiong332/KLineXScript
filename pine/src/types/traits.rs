@@ -53,18 +53,33 @@ pub trait PineType<'a> {
 
 impl<'a> fmt::Debug for dyn PineType<'a> + 'a {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use super::{Float, Int, Series};
+        use super::{Bool, Color, Float, Int, Series};
 
         match self.get_type() {
             (DataType::Int, SecondType::Simple) => downcast_ref::<Int>(self).unwrap().fmt(f),
             (DataType::Float, SecondType::Simple) => downcast_ref::<Float>(self).unwrap().fmt(f),
+            (DataType::Bool, SecondType::Simple) => downcast_ref::<Bool>(self).unwrap().fmt(f),
             (DataType::NA, SecondType::Simple) => write!(f, "NA"),
+            (DataType::String, SecondType::Simple) => downcast_ref::<String>(self).unwrap().fmt(f),
+            (DataType::Color, SecondType::Simple) => downcast_ref::<Color>(self).unwrap().fmt(f),
+
             (DataType::Int, SecondType::Series) => {
                 downcast_ref::<Series<Int>>(self).unwrap().fmt(f)
             }
             (DataType::Float, SecondType::Series) => {
                 downcast_ref::<Series<Float>>(self).unwrap().fmt(f)
             }
+            (DataType::Bool, SecondType::Series) => {
+                downcast_ref::<Series<Bool>>(self).unwrap().fmt(f)
+            }
+            (DataType::NA, SecondType::Series) => write!(f, "series(NA)"),
+            (DataType::String, SecondType::Series) => {
+                downcast_ref::<Series<String>>(self).unwrap().fmt(f)
+            }
+            (DataType::Color, SecondType::Series) => {
+                downcast_ref::<Series<Color>>(self).unwrap().fmt(f)
+            }
+
             (DataType::Int, SecondType::Array) => downcast_ref::<Vec<Int>>(self).unwrap().fmt(f),
             (DataType::Float, SecondType::Array) => {
                 downcast_ref::<Vec<Float>>(self).unwrap().fmt(f)
@@ -76,7 +91,7 @@ impl<'a> fmt::Debug for dyn PineType<'a> + 'a {
 
 impl<'a> PartialEq for dyn PineType<'a> + 'a {
     fn eq(&self, other: &(dyn PineType<'a> + 'a)) -> bool {
-        use super::{Bool, Float, Int, Series};
+        use super::{Bool, Color, Float, Int, Series, NA};
 
         match self.get_type() {
             (DataType::Int, SecondType::Simple) => downcast_ref::<Int>(self)
@@ -88,6 +103,16 @@ impl<'a> PartialEq for dyn PineType<'a> + 'a {
             (DataType::Bool, SecondType::Simple) => downcast_ref::<Bool>(self)
                 .unwrap()
                 .eq(downcast_ref::<Bool>(other).unwrap()),
+            (DataType::NA, SecondType::Simple) => downcast_ref::<NA>(self)
+                .unwrap()
+                .eq(downcast_ref::<NA>(other).unwrap()),
+            (DataType::String, SecondType::Simple) => downcast_ref::<String>(self)
+                .unwrap()
+                .eq(downcast_ref::<String>(other).unwrap()),
+            (DataType::Color, SecondType::Simple) => downcast_ref::<Color>(self)
+                .unwrap()
+                .eq(downcast_ref::<Color>(other).unwrap()),
+
             (DataType::Int, SecondType::Series) => downcast_ref::<Series<Int>>(self)
                 .unwrap()
                 .eq(downcast_ref::<Series<Int>>(other).unwrap()),
@@ -97,6 +122,15 @@ impl<'a> PartialEq for dyn PineType<'a> + 'a {
             (DataType::Bool, SecondType::Series) => downcast_ref::<Series<Bool>>(self)
                 .unwrap()
                 .eq(downcast_ref::<Series<Bool>>(other).unwrap()),
+            (DataType::NA, SecondType::Series) => downcast_ref::<Series<NA>>(self)
+                .unwrap()
+                .eq(downcast_ref::<Series<NA>>(other).unwrap()),
+            (DataType::String, SecondType::Series) => downcast_ref::<Series<String>>(self)
+                .unwrap()
+                .eq(downcast_ref::<Series<String>>(other).unwrap()),
+            (DataType::Color, SecondType::Series) => downcast_ref::<Series<Color>>(self)
+                .unwrap()
+                .eq(downcast_ref::<Series<Color>>(other).unwrap()),
             _ => false,
         }
     }

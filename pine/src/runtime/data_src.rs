@@ -9,6 +9,9 @@ pub trait Callback {
     fn plot(&self, _floats: Vec<f64>) {}
 }
 
+pub struct NoneCallback();
+impl Callback for NoneCallback {}
+
 pub struct DataSrc<'a, 'b, 'c> {
     context: Context<'a, 'b, 'c>,
     blk: &'a Block<'a>,
@@ -130,6 +133,10 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
         let len = get_len(data)?;
         self.context.roll_back()?;
         self.run_data(data, len)
+    }
+
+    pub fn get_context(&mut self) -> &mut Context<'a, 'b, 'c> {
+        &mut self.context
     }
 }
 

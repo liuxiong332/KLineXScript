@@ -95,6 +95,7 @@ pub struct Context<'a, 'b, 'c> {
     // The input index will increment after input function is invoked
     input_index: i32,
 
+    // The output values
     callback: Option<&'a dyn Callback>,
     first_commit: bool,
 

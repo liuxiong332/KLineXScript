@@ -32,7 +32,7 @@ fn datasrc_test() {
         "close",
         vec![Some(1f64), Some(2f64), Some(3f64), Some(4f64), Some(5f64)],
     )];
-    assert_eq!(parser.run(data), Ok(()));
+    assert!(parser.run_with_data(data).is_ok());
 }
 
 const FUNC_SCRIPT: &str = "
@@ -62,7 +62,7 @@ fn func_call_test() {
         "close",
         vec![Some(2f64), Some(4f64), Some(8f64), Some(16f64), Some(32f64)],
     )];
-    assert_eq!(parser.run(data), Ok(()));
+    assert!(parser.run_with_data(data).is_ok());
 }
 
 const IF_ELSE_SCRIPT: &str = "
@@ -103,7 +103,7 @@ fn if_else_test() {
             vec![Some(0f64), Some(4f64), Some(4f64), Some(8f64), Some(8f64)],
         ),
     ];
-    assert_eq!(parser.run(data), Ok(()));
+    assert!(parser.run_with_data(data).is_ok());
 }
 
 const FOR_RANGE_SCRIPT: &str = "
@@ -131,7 +131,7 @@ fn for_range_test() {
     let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&MyCallback));
     parser.parse_src(FOR_RANGE_SCRIPT).unwrap();
     let data = vec![("close", vec![Some(1f64), Some(3f64)])];
-    assert_eq!(parser.run(data), Ok(()));
+    assert!(parser.run_with_data(data).is_ok());
 }
 
 const EMA_SCRIPT: &str = "
@@ -160,7 +160,7 @@ fn ema_test() {
     parser.parse_src(EMA_SCRIPT).unwrap();
     let data = vec![("close", vec![Some(2f64), Some(4f64)])];
 
-    assert_eq!(parser.run(data), Ok(()));
+    assert!(parser.run_with_data(data).is_ok());
 }
 
 const MACD_SCRIPT: &str = "
@@ -199,5 +199,5 @@ fn macd_test() {
     parser.parse_src(MACD_SCRIPT).unwrap();
     let data = vec![("close", vec![Some(200f64), Some(400f64)])];
 
-    assert_eq!(parser.run(data), Ok(()));
+    assert!(parser.run_with_data(data).is_ok());
 }

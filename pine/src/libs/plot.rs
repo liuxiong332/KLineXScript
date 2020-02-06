@@ -155,8 +155,6 @@ pub fn declare_var<'a>() -> VarResult<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::stat_expr_types::VarIndex;
-    use crate::runtime::context::VarOperate;
     use crate::runtime::data_src::NoneCallback;
     use crate::{LibInfo, PineParser, PineRunner};
 

@@ -31,6 +31,7 @@ use libs::{declare_vars, VarResult};
 use runtime::context::{Context, InputVal, PineRuntimeError};
 use runtime::data_src::{Callback, DataSrc};
 use runtime::error_format::{ErrorFormater, PineFormatError};
+use runtime::output::{IOInfo, OutputData};
 use std::mem;
 use types::{Float, PineRef};
 
@@ -239,21 +240,7 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
         }
     }
 
-    pub fn run_with_input(&mut self, input: Vec<Option<InputVal>>) -> Result<(), PineFormatError> {
-        let runner = self.runner.as_mut().unwrap();
-        runner.change_inputs(input);
-        match runner.run(&self.data) {
-            Ok(val) => Ok(val),
-            Err(err) => Err(PineFormatError::from_runtime_error(&self.error_format, err)),
-        }
-    }
-
-    // Run the script with new data
-    pub fn run(&mut self, data: Vec<(&'static str, Vec<Float>)>) -> Result<(), PineFormatError>
-    where
-        'li: 'ra,
-        'pa: 'ra,
-    {
+    fn get_runner(&mut self) -> &mut PineRunner<'ra, 'rb, 'rc> {
         if self.runner.is_none() {
             let runner: PineRunner<'ra, 'rb, 'rc>;
             unsafe {
@@ -264,27 +251,107 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
             }
             self.runner = Some(runner);
         }
-        self.data = data;
+        self.runner.as_mut().unwrap()
+    }
+
+    // Run the script with the experimental data to generate IOInfo data
+    pub fn gen_io_info(&mut self) -> Result<IOInfo, PineFormatError> {
+        match self.get_runner().run(&vec![
+            ("close", vec![Some(0f64)]),
+            ("open", vec![Some(0f64)]),
+            ("high", vec![Some(0f64)]),
+            ("low", vec![Some(0f64)]),
+        ]) {
+            Err(err) => Err(PineFormatError::from_runtime_error(&self.error_format, err)),
+            Ok(_) => Ok(self.get_runner().get_context().get_io_info().clone()),
+        }
+    }
+
+    fn move_output_data(&mut self) -> Vec<Option<OutputData>> {
+        self.get_runner().get_context().move_output_data()
+    }
+
+    // Run the script with new input settings and old data
+    pub fn run_with_input(
+        &mut self,
+        input: Vec<Option<InputVal>>,
+    ) -> Result<Vec<Option<OutputData>>, PineFormatError> {
+        let runner = self.get_runner();
+        runner.change_inputs(input);
         match self.runner.as_mut().unwrap().run(&self.data) {
-            Ok(val) => Ok(val),
+            Ok(_) => Ok(self.move_output_data()),
             Err(err) => Err(PineFormatError::from_runtime_error(&self.error_format, err)),
         }
     }
 
-    // Run the script with updated data(The last data included).
-    pub fn update(&mut self, data: Vec<(&'static str, Vec<Float>)>) -> Result<(), PineFormatError> {
+    // Run the script with new data
+    pub fn run_with_data(
+        &mut self,
+        data: Vec<(&'static str, Vec<Float>)>,
+    ) -> Result<Vec<Option<OutputData>>, PineFormatError>
+    where
+        'li: 'ra,
+        'pa: 'ra,
+    {
+        self.data = data;
+        self.get_runner();
+        match self.runner.as_mut().unwrap().run(&self.data) {
+            Ok(_) => Ok(self.move_output_data()),
+            Err(err) => Err(PineFormatError::from_runtime_error(&self.error_format, err)),
+        }
+    }
+
+    // Run the script with new data
+    pub fn run(
+        &mut self,
+        input: Vec<Option<InputVal>>,
+        data: Vec<(&'static str, Vec<Float>)>,
+    ) -> Result<Vec<Option<OutputData>>, PineFormatError>
+    where
+        'li: 'ra,
+        'pa: 'ra,
+    {
+        self.data = data;
+        self.get_runner().change_inputs(input);
+        match self.runner.as_mut().unwrap().run(&self.data) {
+            Ok(_) => Ok(self.move_output_data()),
+            Err(err) => Err(PineFormatError::from_runtime_error(&self.error_format, err)),
+        }
+    }
+
+    fn merge_data(&mut self, new_data: &Vec<(&'static str, Vec<Float>)>, from: usize) {
         let origin_data = mem::replace(&mut self.data, vec![]);
         self.data = origin_data
             .into_iter()
-            .zip(data.clone())
+            .zip(new_data.clone())
             .map(|(mut v1, v2)| {
                 debug_assert!(v1.0 == v2.0);
-                v1.1.pop();
+                v1.1.splice(from..v1.1.len(), vec![]);
                 (v1.0, [v1.1, v2.1].concat())
             })
             .collect();
+    }
+
+    // Run the script with updated data(The last data included).
+    pub fn update(
+        &mut self,
+        data: Vec<(&'static str, Vec<Float>)>,
+    ) -> Result<Vec<Option<OutputData>>, PineFormatError> {
+        self.merge_data(&data, self.data.len() - 1);
         match self.runner.as_mut().unwrap().update(&data) {
-            Ok(val) => Ok(val),
+            Ok(_) => Ok(self.move_output_data()),
+            Err(err) => Err(PineFormatError::from_runtime_error(&self.error_format, err)),
+        }
+    }
+
+    pub fn update_from(
+        &mut self,
+        data: Vec<(&'static str, Vec<Float>)>,
+        from: i32,
+    ) -> Result<Vec<Option<OutputData>>, PineFormatError> {
+        self.merge_data(&data, from as usize);
+        match self.runner.as_mut().unwrap().update_from(&data, from) {
+            Ok(_) => Ok(self.move_output_data()),
             Err(err) => Err(PineFormatError::from_runtime_error(&self.error_format, err)),
         }
     }

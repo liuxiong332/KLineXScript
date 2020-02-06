@@ -25,5 +25,5 @@ fn datasrc_test() {
     let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&MyCallback));
     parser.parse_src(INPUT_SCRIPT).unwrap();
     let data = vec![("close", vec![Some(1f64)])];
-    assert_eq!(parser.run(data), Ok(()));
+    assert!(parser.run_with_data(data).is_ok());
 }

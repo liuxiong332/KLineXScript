@@ -59,11 +59,13 @@ fn plot_series<'a>(
     item_val: PineRef<'a>,
     _context: &mut dyn Ctx<'a>,
 ) -> Result<Vec<Option<f64>>, RuntimeErr> {
-    let items: RefData<Series<Float>> = Series::implicity_from(item_val).unwrap();
-    let s: Vec<Option<f64>> = items.get_history().iter().cloned().collect();
+    let mut items: RefData<Series<Float>> = Series::implicity_from(item_val).unwrap();
+    // let s: Vec<Option<f64>> = items.get_history().iter().cloned().collect();
     // context.get_callback().unwrap().plot(s);
     // downcast_ctx(context).push_output_data()
-    Ok(s)
+
+    // Move out the series history
+    Ok(items.move_history())
 }
 
 fn plot_val<'a>(
@@ -93,21 +95,22 @@ fn pine_plot<'a>(
             editable, show_last
         ) = param
     );
-    let plot_info = PlotInfo {
-        title: pine_ref_to_string(title),
-        color: pine_ref_to_string(color),
-        linewidth: pine_ref_to_i32(linewidth),
-        style: pine_ref_to_i32(style),
-        transp: pine_ref_to_i32(transp),
-        trackprice: pine_ref_to_bool(trackprice),
-        histbase: pine_ref_to_f64(histbase),
-        offset: pine_ref_to_i32(offset),
-        join: pine_ref_to_bool(join),
-        editable: pine_ref_to_bool(editable),
-        show_last: pine_ref_to_i32(show_last),
-    };
-    downcast_ctx(context).push_output_info(OutputInfo::Plot(plot_info));
-
+    if !downcast_ctx(context).check_is_output_info_ready() {
+        let plot_info = PlotInfo {
+            title: pine_ref_to_string(title),
+            color: pine_ref_to_string(color),
+            linewidth: pine_ref_to_i32(linewidth),
+            style: pine_ref_to_i32(style),
+            transp: pine_ref_to_i32(transp),
+            trackprice: pine_ref_to_bool(trackprice),
+            histbase: pine_ref_to_f64(histbase),
+            offset: pine_ref_to_i32(offset),
+            join: pine_ref_to_bool(join),
+            editable: pine_ref_to_bool(editable),
+            show_last: pine_ref_to_i32(show_last),
+        };
+        downcast_ctx(context).push_output_info(OutputInfo::Plot(plot_info));
+    }
     match series {
         Some(item_val) => {
             let data = plot_val(item_val, context)?;
@@ -150,4 +153,84 @@ pub fn declare_var<'a>() -> VarResult<'a> {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+    use crate::ast::stat_expr_types::VarIndex;
+    use crate::runtime::context::VarOperate;
+    use crate::runtime::data_src::NoneCallback;
+    use crate::{LibInfo, PineParser, PineRunner};
+
+    #[test]
+    fn plot_test() {
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+        );
+        let src = "plot(close)\nplot(close + 1)";
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        runner
+            .run(&vec![("close", vec![Some(1f64), Some(2f64)])])
+            .unwrap();
+
+        assert_eq!(
+            runner.get_context().move_output_data(),
+            vec![
+                Some(OutputData::new(
+                    Some(0),
+                    Some(2),
+                    vec![Some(1f64), Some(2f64)]
+                )),
+                Some(OutputData::new(
+                    Some(0),
+                    Some(2),
+                    vec![Some(2f64), Some(3f64)]
+                ))
+            ]
+        );
+        assert_eq!(runner.get_context().get_io_info().get_outputs().len(), 2);
+
+        runner
+            .update(&vec![("close", vec![Some(10f64), Some(11f64)])])
+            .unwrap();
+        assert_eq!(
+            runner.get_context().move_output_data(),
+            vec![
+                Some(OutputData::new(
+                    Some(1),
+                    Some(3),
+                    vec![Some(10f64), Some(11f64)]
+                )),
+                Some(OutputData::new(
+                    Some(1),
+                    Some(3),
+                    vec![Some(11f64), Some(12f64)]
+                )),
+            ]
+        );
+        assert_eq!(runner.get_context().get_io_info().get_outputs().len(), 2);
+
+        runner
+            .update_from(
+                &vec![("close", vec![Some(100f64), Some(101f64), Some(102f64)])],
+                1,
+            )
+            .unwrap();
+        assert_eq!(
+            runner.get_context().move_output_data(),
+            vec![
+                Some(OutputData::new(
+                    Some(1),
+                    Some(4),
+                    vec![Some(100f64), Some(101f64), Some(102f64)]
+                )),
+                Some(OutputData::new(
+                    Some(1),
+                    Some(4),
+                    vec![Some(101f64), Some(102f64), Some(103f64)]
+                )),
+            ]
+        );
+    }
+}

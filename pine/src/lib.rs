@@ -138,6 +138,14 @@ impl<'a, 'b, 'c> PineRunner<'a, 'b, 'c> {
         self.datasrc.update(data)
     }
 
+    pub fn update_from(
+        &mut self,
+        data: &Vec<(&'static str, Vec<Float>)>,
+        from: i32,
+    ) -> Result<(), PineRuntimeError> {
+        self.datasrc.update_from(data, from)
+    }
+
     pub fn change_inputs(&mut self, inputs: Vec<Option<InputVal>>) {
         self.datasrc.change_inputs(inputs);
     }

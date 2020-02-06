@@ -105,7 +105,10 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
         }
         match self.context.run_callbacks() {
             Err(err) => Err(PineRuntimeError::new_no_range(err)),
-            _ => Ok(()),
+            _ => {
+                self.context.let_output_info_ready();
+                Ok(())
+            }
         }
     }
 

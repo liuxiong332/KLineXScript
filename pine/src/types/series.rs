@@ -102,6 +102,10 @@ impl<'a, D: Default + PineType<'a> + Clone + Debug + 'a> Series<'a, D> {
     pub fn get_history(&self) -> &Vec<D> {
         &self.history
     }
+
+    pub fn move_history(&mut self) -> Vec<D> {
+        mem::replace(&mut self.history, vec![])
+    }
 }
 
 impl<'a, D: PineStaticType + Clone + Debug + 'a> PineStaticType for Series<'a, D> {

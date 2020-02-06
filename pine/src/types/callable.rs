@@ -130,7 +130,7 @@ impl<'a> SeriesCall<'a> for ParamCollectCall<'a> {
     }
 
     fn run(&self, _context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
-        let val = self.params.replace(vec![]);
+        let val = self.params.borrow().clone();
         (self.func)(_context, val, self.func_type.take().unwrap())?;
         Ok(())
     }

@@ -278,9 +278,9 @@ pub fn declare_var<'a>() -> VarResult<'a> {
         input(defval, title, type) → series[float]
     */
     let syntax_type = SyntaxType::Function(Rc::new(FunctionTypes(vec![
-        gen_bool_type(),
         gen_int_type(),
         gen_float_type(),
+        gen_bool_type(),
     ])));
     VarResult::new(value, syntax_type, VAR_NAME)
 }

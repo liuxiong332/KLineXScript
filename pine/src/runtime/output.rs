@@ -81,6 +81,10 @@ impl IOInfo {
         }
     }
 
+    pub fn new_with_io(inputs: Vec<InputInfo>, outputs: Vec<OutputInfo>) -> IOInfo {
+        IOInfo { inputs, outputs }
+    }
+
     pub fn push_input(&mut self, input: InputInfo) {
         self.inputs.push(input);
     }

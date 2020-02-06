@@ -263,7 +263,10 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
             ("low", vec![Some(0f64)]),
         ]) {
             Err(err) => Err(PineFormatError::from_runtime_error(&self.error_format, err)),
-            Ok(_) => Ok(self.get_runner().get_context().get_io_info().clone()),
+            Ok(_) => {
+                self.move_output_data();
+                Ok(self.get_runner().get_context().get_io_info().clone())
+            }
         }
     }
 
@@ -321,6 +324,7 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
 
     fn merge_data(&mut self, new_data: &Vec<(&'static str, Vec<Float>)>, from: usize) {
         let origin_data = mem::replace(&mut self.data, vec![]);
+
         self.data = origin_data
             .into_iter()
             .zip(new_data.clone())
@@ -337,7 +341,7 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
         &mut self,
         data: Vec<(&'static str, Vec<Float>)>,
     ) -> Result<Vec<Option<OutputData>>, PineFormatError> {
-        self.merge_data(&data, self.data.len() - 1);
+        self.merge_data(&data, self.data[0].1.len() - 1);
         match self.runner.as_mut().unwrap().update(&data) {
             Ok(_) => Ok(self.move_output_data()),
             Err(err) => Err(PineFormatError::from_runtime_error(&self.error_format, err)),
@@ -436,4 +440,112 @@ pub fn extract_vars<'a>(
     // map.insert(print::VAR_NAME, print::declare_var());
     // map.insert(plot::VAR_NAME, plot::declare_var());
     (types, values, input_names)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::libs::input;
+    use crate::libs::plot;
+    use crate::runtime::data_src::NoneCallback;
+    use crate::runtime::output::{InputInfo, IntInputInfo, OutputInfo, PlotInfo};
+
+    #[test]
+    fn script_test() {
+        let lib_info = LibInfo::new(
+            vec![input::declare_var(), plot::declare_var()],
+            vec![
+                ("close", SERIES_FLOAT.clone()),
+                ("open", SERIES_FLOAT.clone()),
+                ("high", SERIES_FLOAT.clone()),
+                ("low", SERIES_FLOAT.clone()),
+                ("bar_index", SERIES_INT.clone()),
+            ],
+        );
+        let mut parser = PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+        parser
+            .parse_src("m = input(1, 'hello', 'int')\nplot(close + m)")
+            .unwrap();
+        assert_eq!(
+            parser.gen_io_info(),
+            Ok(IOInfo::new_with_io(
+                vec![InputInfo::Int(IntInputInfo {
+                    defval: Some(1),
+                    title: Some(String::from("hello")),
+                    input_type: String::from("int"),
+                    confirm: None,
+                    minval: None,
+                    maxval: None,
+                    step: None,
+                    options: None,
+                })],
+                vec![OutputInfo::Plot(PlotInfo {
+                    title: None,
+                    color: None,
+                    linewidth: None,
+                    style: None,
+                    transp: None,
+                    trackprice: None,
+                    histbase: None,
+                    offset: None,
+                    join: None,
+                    editable: None,
+                    show_last: None,
+                })]
+            ))
+        );
+        let data = vec![("close", vec![Some(1f64), Some(2f64)])];
+        assert_eq!(
+            parser.run_with_data(data.clone()),
+            Ok(vec![Some(OutputData::new(
+                Some(0),
+                Some(2),
+                vec![Some(2f64), Some(3f64)]
+            ))])
+        );
+
+        assert_eq!(
+            parser.run_with_input(vec![Some(InputVal::Int(10))]),
+            Ok(vec![Some(OutputData::new(
+                Some(0),
+                Some(2),
+                vec![Some(11f64), Some(12f64)]
+            ))])
+        );
+
+        assert_eq!(
+            parser.run_with_data(data.clone()),
+            Ok(vec![Some(OutputData::new(
+                Some(0),
+                Some(2),
+                vec![Some(11f64), Some(12f64)]
+            ))])
+        );
+
+        assert_eq!(
+            parser.update(vec![("close", vec![Some(10f64), Some(11f64)])]),
+            Ok(vec![Some(OutputData::new(
+                Some(1),
+                Some(3),
+                vec![Some(20f64), Some(21f64)]
+            ))])
+        );
+        assert_eq!(
+            parser.update_from(vec![("close", vec![Some(10f64), Some(11f64)])], 2),
+            Ok(vec![Some(OutputData::new(
+                Some(2),
+                Some(4),
+                vec![Some(20f64), Some(21f64)]
+            ))])
+        );
+
+        assert_eq!(
+            parser.run_with_input(vec![Some(InputVal::Int(100))]),
+            Ok(vec![Some(OutputData::new(
+                Some(0),
+                Some(4),
+                vec![Some(101f64), Some(110f64), Some(110f64), Some(111f64)]
+            ))])
+        );
+    }
 }

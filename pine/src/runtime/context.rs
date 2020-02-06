@@ -309,6 +309,11 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
     }
 
     pub fn move_output_data(&mut self) -> Vec<Option<OutputData>> {
+        println!(
+            "data len {:?} {:?}",
+            self.outputs.len(),
+            self.io_info.get_outputs().len()
+        );
         debug_assert_eq!(self.outputs.len(), self.io_info.get_outputs().len());
         mem::replace(&mut self.outputs, vec![])
     }

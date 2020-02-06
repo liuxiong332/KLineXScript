@@ -1,6 +1,7 @@
 use crate::ast::error::PineErrorKind;
 use crate::ast::input::StrRange;
 use crate::ast::state::PineInputError;
+use crate::helper::str_replace;
 use crate::runtime::context::PineRuntimeError;
 use crate::types::error::RuntimeErr;
 use std::collections::HashMap;
@@ -58,35 +59,13 @@ static ERROR_MAP: &[(&'static str, &'static str)] = &[
     ("NotImplement", "The operation has not implemented now."),
     ("InvalidTypeCast", "The type cast is not valid."),
     ("InvalidNADeclarer", "The variable cann't be declared with na."),
+    ("FuncCallParamNotValid", "The function call's parameters is not valid, {}."),
     ("VarNotFound", "The variable doesn't exist in this cotnext."),
     ("UnknownRuntimeErr", "Unknown runtime error."),
     ("Continue", "Continue statement."),
     ("Break", "Break statement."),
     ("ForRangeIndexIsNA", "The index for for range statement cann't be na")
 ];
-
-fn replace(template: &'static str, args: Vec<String>) -> String {
-    let mut str_list = vec![];
-    let mut operate_str = template;
-    loop {
-        match template.find("{}") {
-            None => break,
-            Some(index) => {
-                str_list.push(&operate_str[..index]);
-                operate_str = &operate_str[index + 2..];
-            }
-        }
-    }
-    debug_assert!(str_list.len() == args.len() + 1);
-    let mut last_list = vec![];
-    let arg_len = args.len();
-    for (i, arg) in args.into_iter().enumerate() {
-        last_list.push(String::from(str_list[i]));
-        last_list.push(arg);
-    }
-    last_list.push(String::from(str_list[arg_len]));
-    last_list.join("")
-}
 
 pub struct ErrorFormater {
     error_map: HashMap<&'static str, &'static str>,
@@ -126,7 +105,7 @@ impl ErrorFormater {
             PineErrorKind::LVTupleNoNames => String::from(self.error_map["LVTupleNoNames"]),
             PineErrorKind::BlockNoStmts => String::from(self.error_map["BlockNoStmts"]),
             PineErrorKind::VarNotDeclare => String::from(self.error_map["VarNotDeclare"]),
-            PineErrorKind::InvalidTypeCast { origin, cast } => replace(
+            PineErrorKind::InvalidTypeCast { origin, cast } => str_replace(
                 self.error_map["CannotInferType"],
                 vec![origin.to_string(), cast.to_string()],
             ),
@@ -170,6 +149,9 @@ impl ErrorFormater {
             RuntimeErr::NotImplement(_) => String::from(self.error_map["NotImplement"]),
             RuntimeErr::InvalidTypeCast => String::from(self.error_map["InvalidTypeCast"]),
             RuntimeErr::InvalidNADeclarer => String::from(self.error_map["InvalidNADeclarer"]),
+            RuntimeErr::FuncCallParamNotValid(s) => {
+                str_replace(self.error_map["FuncCallParamNotValid"], vec![s])
+            }
             RuntimeErr::VarNotFound => String::from(self.error_map["VarNotFound"]),
             RuntimeErr::UnknownRuntimeErr => String::from(self.error_map["UnknownRuntimeErr"]),
             RuntimeErr::Continue => String::from(self.error_map["Continue"]),

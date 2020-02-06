@@ -101,6 +101,7 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
             // self.context.clear_declare();
             self.context.clear_is_run();
             self.context.reset_input_index();
+            self.context.let_io_info_ready();
         }
         match self.context.run_callbacks() {
             Err(err) => Err(PineRuntimeError::new_no_range(err)),

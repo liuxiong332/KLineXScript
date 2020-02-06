@@ -1,31 +1,121 @@
 use super::VarResult;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
+use crate::helper::err_msgs::*;
+use crate::helper::str_replace;
 use crate::runtime::context::{downcast_ctx, Ctx, InputVal};
+use crate::runtime::output::{BoolInputInfo, InputInfo};
 use crate::types::{
     Bool, Callable, CallableFactory, DataType, Float, Int, ParamCollectCall, PineFrom, PineRef,
-    PineType, RefData, RuntimeErr, SecondType, Series, NA,
+    PineType, RefData, RuntimeErr, SecondType, Series, SeriesCall, NA,
 };
+use std::cell::RefCell;
+use std::mem;
 use std::rc::Rc;
+
+const BOOL_TYPE_STR: &'static str = "bool";
+const INT_TYPE_STR: &'static str = "int";
+const FLOAT_TYPE_STR: &'static str = "float";
+
+#[derive(Debug, PartialEq, Clone)]
+struct InputCall<'a> {
+    val: RefCell<Option<PineRef<'a>>>,
+}
+
+impl<'a> InputCall<'a> {
+    pub fn new() -> InputCall<'a> {
+        InputCall {
+            val: RefCell::new(None),
+        }
+    }
+}
+
+impl<'a> SeriesCall<'a> for InputCall<'a> {
+    fn step(
+        &self,
+        context: &mut dyn Ctx<'a>,
+        val: Vec<Option<PineRef<'a>>>,
+        func_type: FunctionType<'a>,
+    ) -> Result<PineRef<'a>, RuntimeErr> {
+        if let Some(val) = &*self.val.borrow() {
+            return Ok(val.clone());
+        }
+        match pine_input(context, val, func_type) {
+            Err(e) => Err(e),
+            Ok(res) => {
+                self.val.replace(Some(res.clone()));
+                Ok(res)
+            }
+        }
+    }
+
+    fn run(&self, _context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
+        self.val.replace(None);
+        Ok(())
+    }
+
+    fn copy(&self) -> Box<dyn SeriesCall<'a> + 'a> {
+        Box::new(self.clone())
+    }
+}
+
+fn pine_ref_to_bool<'a>(val: Option<PineRef<'a>>) -> Option<bool> {
+    if val.is_none() {
+        return None;
+    }
+    match Bool::implicity_from(val.unwrap()) {
+        Ok(res) => Some(res.into_inner()),
+        Err(_) => None,
+    }
+}
+
+fn pine_ref_to_string<'a>(val: Option<PineRef<'a>>) -> Option<String> {
+    if val.is_none() {
+        return None;
+    }
+    match String::implicity_from(val.unwrap()) {
+        Ok(res) => Some(res.into_inner()),
+        Err(_) => None,
+    }
+}
+
+fn move_element<T>(vector: &mut Vec<Option<T>>, index: usize) -> Option<T> {
+    mem::replace(&mut vector[index], None)
+}
 
 fn input_for_bool<'a>(
     context: &mut dyn Ctx<'a>,
     mut param: Vec<Option<PineRef<'a>>>,
 ) -> Result<PineRef<'a>, RuntimeErr> {
-    let input_val = downcast_ctx(context).copy_next_input();
+    let ctx_ins = downcast_ctx(context);
+    if !ctx_ins.check_is_io_info_ready() {
+        let type_str = pine_ref_to_string(move_element(&mut param, 2));
+
+        if type_str.is_some() && type_str.as_ref().unwrap() != BOOL_TYPE_STR {
+            // type must be BOOL_TYPE_STR
+            return Err(RuntimeErr::FuncCallParamNotValid(str_replace(
+                EXP_VAL_BUT_GET_VAL,
+                vec![
+                    String::from(BOOL_TYPE_STR),
+                    String::from(type_str.as_ref().unwrap()),
+                ],
+            )));
+        }
+        ctx_ins.push_input_info(InputInfo::Bool(BoolInputInfo {
+            defval: pine_ref_to_bool(param[0].clone()),
+            title: pine_ref_to_string(move_element(&mut param, 1)),
+            input_type: String::from(BOOL_TYPE_STR),
+            confirm: pine_ref_to_bool(move_element(&mut param, 3)),
+        }));
+    }
+
+    let input_val = ctx_ins.copy_next_input();
     match input_val {
         Some(InputVal::Bool(val)) => Ok(PineRef::new_box(val)),
-        _ => match param.remove(0) {
+        _ => match move_element(&mut param, 0) {
             Some(val) => Ok(val),
             _ => Err(RuntimeErr::NotValidParam),
         },
     }
-    // match param.remove(0) {
-    //     Some(item_val) => {
-    //         plot_val(item_val, context)?;
-    //         Ok(PineRef::new_box(NA))
-    //     }
-    //     _ => Err(RuntimeErr::NotSupportOperator),
-    // }
 }
 
 thread_local!(static BOOL_TYPE: FunctionType<'static> = FunctionType((
@@ -70,7 +160,7 @@ pub const VAR_NAME: &'static str = "input";
 
 pub fn declare_var<'a>() -> VarResult<'a> {
     let value = PineRef::new(CallableFactory::new(|| {
-        Callable::new(Some(pine_input), None)
+        Callable::new(None, Some(Box::new(InputCall::new())))
     }));
     /*
         input(defval, title, type, confirm) → input bool
@@ -132,5 +222,14 @@ mod tests {
             runner.get_context().move_var(VarIndex::new(2, 0)),
             Some(PineRef::new_box(false))
         );
+        assert_eq!(
+            runner.get_context().get_io_info().get_inputs(),
+            &vec![InputInfo::Bool(BoolInputInfo {
+                defval: Some(true),
+                title: Some(String::from("title")),
+                input_type: String::from("bool"),
+                confirm: Some(false),
+            })]
+        )
     }
 }

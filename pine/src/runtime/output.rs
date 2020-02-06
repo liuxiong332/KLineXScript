@@ -1,9 +1,9 @@
 #[derive(Debug, PartialEq, Clone)]
 pub struct BoolInputInfo {
-    defval: Option<bool>,
-    title: Option<String>,
-    input_type: String,
-    confirm: Option<bool>,
+    pub defval: Option<bool>,
+    pub title: Option<String>,
+    pub input_type: String,
+    pub confirm: Option<bool>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -87,6 +87,14 @@ impl IOInfo {
 
     pub fn push_output(&mut self, output: OutputInfo) {
         self.outputs.push(output);
+    }
+
+    pub fn get_inputs(&self) -> &Vec<InputInfo> {
+        &self.inputs
+    }
+
+    pub fn get_outputs(&self) -> &Vec<OutputInfo> {
+        &self.outputs
     }
 }
 

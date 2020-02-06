@@ -1,5 +1,5 @@
 use super::data_src::Callback;
-use super::output::{IOInfo, OutputData};
+use super::output::{IOInfo, InputInfo, OutputData, OutputInfo};
 use crate::ast::input::{Position, StrRange};
 use crate::ast::stat_expr_types::VarIndex;
 use crate::types::{
@@ -99,6 +99,8 @@ pub struct Context<'a, 'b, 'c> {
     outputs: Vec<Option<OutputData>>,
 
     io_info: IOInfo,
+    // Check if io_info is ready
+    is_io_info_ready: bool,
 
     // The output values
     callback: Option<&'a dyn Callback>,
@@ -180,6 +182,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             input_index: -1,
             outputs: vec![],
             io_info: IOInfo::new(),
+            is_io_info_ready: false,
             first_commit: false,
             is_run: false,
         }
@@ -200,6 +203,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             input_index: -1,
             outputs: vec![],
             io_info: IOInfo::new(),
+            is_io_info_ready: false,
             first_commit: false,
             is_run: false,
         }
@@ -234,6 +238,9 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
     }
 
     pub fn change_inputs(&mut self, inputs: Vec<Option<InputVal>>) {
+        debug_assert!(
+            self.io_info.get_inputs().is_empty() || inputs.len() == self.io_info.get_inputs().len()
+        );
         self.inputs = inputs;
     }
 
@@ -257,6 +264,36 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
 
     pub fn reset_input_index(&mut self) {
         self.input_index = -1;
+    }
+
+    // io_info related methods
+    pub fn push_input_info(&mut self, input: InputInfo) {
+        self.io_info.push_input(input);
+    }
+
+    pub fn push_output_info(&mut self, output: OutputInfo) {
+        self.io_info.push_output(output);
+    }
+
+    pub fn get_io_info(&self) -> &IOInfo {
+        &self.io_info
+    }
+
+    pub fn check_is_io_info_ready(&self) -> bool {
+        self.is_io_info_ready
+    }
+
+    pub fn let_io_info_ready(&mut self) {
+        self.is_io_info_ready = true;
+    }
+
+    pub fn push_output_data(&mut self, data: Option<OutputData>) {
+        self.outputs.push(data);
+    }
+
+    pub fn move_output_data(&mut self) -> Vec<Option<OutputData>> {
+        debug_assert_eq!(self.outputs.len(), self.io_info.get_outputs().len());
+        mem::replace(&mut self.outputs, vec![])
     }
 
     pub fn create_sub_context(

@@ -2,6 +2,7 @@ use super::VarResult;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
 use crate::helper::err_msgs::*;
 use crate::helper::str_replace;
+use crate::helper::{move_element, pine_ref_to_bool, pine_ref_to_string};
 use crate::runtime::context::{downcast_ctx, Ctx, InputVal};
 use crate::runtime::output::{BoolInputInfo, InputInfo};
 use crate::types::{
@@ -9,7 +10,6 @@ use crate::types::{
     PineType, RefData, RuntimeErr, SecondType, Series, SeriesCall, NA,
 };
 use std::cell::RefCell;
-use std::mem;
 use std::rc::Rc;
 
 const BOOL_TYPE_STR: &'static str = "bool";
@@ -58,36 +58,12 @@ impl<'a> SeriesCall<'a> for InputCall<'a> {
     }
 }
 
-fn pine_ref_to_bool<'a>(val: Option<PineRef<'a>>) -> Option<bool> {
-    if val.is_none() {
-        return None;
-    }
-    match Bool::implicity_from(val.unwrap()) {
-        Ok(res) => Some(res.into_inner()),
-        Err(_) => None,
-    }
-}
-
-fn pine_ref_to_string<'a>(val: Option<PineRef<'a>>) -> Option<String> {
-    if val.is_none() {
-        return None;
-    }
-    match String::implicity_from(val.unwrap()) {
-        Ok(res) => Some(res.into_inner()),
-        Err(_) => None,
-    }
-}
-
-fn move_element<T>(vector: &mut Vec<Option<T>>, index: usize) -> Option<T> {
-    mem::replace(&mut vector[index], None)
-}
-
 fn input_for_bool<'a>(
     context: &mut dyn Ctx<'a>,
     mut param: Vec<Option<PineRef<'a>>>,
 ) -> Result<PineRef<'a>, RuntimeErr> {
     let ctx_ins = downcast_ctx(context);
-    if !ctx_ins.check_is_io_info_ready() {
+    if !ctx_ins.check_is_input_info_ready() {
         let type_str = pine_ref_to_string(move_element(&mut param, 2));
 
         if type_str.is_some() && type_str.as_ref().unwrap() != BOOL_TYPE_STR {
@@ -179,11 +155,11 @@ pub fn declare_var<'a>() -> VarResult<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::stat_expr_types::{Block, VarIndex};
-    use crate::runtime::context::{Context, VarOperate};
-    use crate::runtime::data_src::{Callback, NoneCallback};
+    use crate::ast::stat_expr_types::VarIndex;
+    use crate::runtime::context::VarOperate;
+    use crate::runtime::data_src::NoneCallback;
     use crate::types::PineRef;
-    use crate::{LibInfo, PineParser, PineRunner, PineRuntimeError};
+    use crate::{LibInfo, PineParser, PineRunner};
 
     #[test]
     fn input_type_test() {

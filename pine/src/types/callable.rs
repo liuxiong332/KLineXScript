@@ -51,7 +51,7 @@ pub struct ParamCollectCall<'a> {
         context: &mut dyn Ctx<'a>,
         Vec<Option<PineRef<'a>>>,
         FunctionType<'a>,
-    ) -> Result<PineRef<'a>, RuntimeErr>,
+    ) -> Result<(), RuntimeErr>,
     params: RefCell<Vec<Option<PineRef<'a>>>>,
     func_type: Cell<Option<FunctionType<'a>>>,
 }
@@ -70,7 +70,7 @@ impl<'a> ParamCollectCall<'a> {
             context: &mut dyn Ctx<'a>,
             Vec<Option<PineRef<'a>>>,
             FunctionType<'a>,
-        ) -> Result<PineRef<'a>, RuntimeErr>,
+        ) -> Result<(), RuntimeErr>,
     ) -> ParamCollectCall<'a> {
         ParamCollectCall {
             params: RefCell::new(vec![]),
@@ -384,7 +384,7 @@ mod tests {
         _context: &mut dyn Ctx<'a>,
         mut args: Vec<Option<PineRef<'a>>>,
         _func_type: FunctionType<'a>,
-    ) -> Result<PineRef<'a>, RuntimeErr> {
+    ) -> Result<(), RuntimeErr> {
         // println!("Get args {:?}", args);
         let (arg1, arg2) = (
             mem::replace(&mut args[0], None),
@@ -394,7 +394,7 @@ mod tests {
         let arg2_val = downcast_pf::<Series<Int>>(arg2.unwrap()).unwrap();
         assert_eq!(arg1_val.get_history(), &vec![Some(1), Some(3)]);
         assert_eq!(arg2_val.get_history(), &vec![Some(2), Some(4)]);
-        Ok(PineRef::new(NA))
+        Ok(())
     }
 
     #[test]
@@ -431,12 +431,12 @@ mod tests {
             _context: &mut dyn Ctx<'a>,
             mut args: Vec<Option<PineRef<'a>>>,
             _func_type: FunctionType<'a>,
-        ) -> Result<PineRef<'a>, RuntimeErr> {
+        ) -> Result<(), RuntimeErr> {
             // println!("args {:?}", args);
             let arg1 = mem::replace(&mut args[0], None).unwrap();
             let arg1_val = downcast_pf::<Series<Int>>(arg1).unwrap();
             assert_eq!(arg1_val.get_history(), &vec![Some(100), Some(10)]);
-            Ok(PineRef::new_box(NA))
+            Ok(())
         }
         let func_type = FunctionType((vec![("arg1", INT_TYPE)], INT_TYPE));
 

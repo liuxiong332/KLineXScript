@@ -129,4 +129,8 @@ impl<'a> SyntaxType<'a> {
     pub fn string() -> SyntaxType<'a> {
         SyntaxType::Simple(SimpleSyntaxType::String)
     }
+
+    pub fn color() -> SyntaxType<'a> {
+        SyntaxType::Simple(SimpleSyntaxType::Color)
+    }
 }

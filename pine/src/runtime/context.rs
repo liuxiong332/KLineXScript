@@ -100,7 +100,10 @@ pub struct Context<'a, 'b, 'c> {
 
     io_info: IOInfo,
     // Check if io_info is ready
-    is_io_info_ready: bool,
+    is_input_info_ready: bool,
+
+    // The range of data
+    data_range: (Option<i32>, Option<i32>),
 
     // The output values
     callback: Option<&'a dyn Callback>,
@@ -182,7 +185,8 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             input_index: -1,
             outputs: vec![],
             io_info: IOInfo::new(),
-            is_io_info_ready: false,
+            is_input_info_ready: false,
+            data_range: (Some(0), Some(0)),
             first_commit: false,
             is_run: false,
         }
@@ -203,7 +207,8 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             input_index: -1,
             outputs: vec![],
             io_info: IOInfo::new(),
-            is_io_info_ready: false,
+            is_input_info_ready: false,
+            data_range: (Some(0), Some(0)),
             first_commit: false,
             is_run: false,
         }
@@ -279,12 +284,12 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
         &self.io_info
     }
 
-    pub fn check_is_io_info_ready(&self) -> bool {
-        self.is_io_info_ready
+    pub fn check_is_input_info_ready(&self) -> bool {
+        self.is_input_info_ready
     }
 
-    pub fn let_io_info_ready(&mut self) {
-        self.is_io_info_ready = true;
+    pub fn let_input_info_ready(&mut self) {
+        self.is_input_info_ready = true;
     }
 
     pub fn push_output_data(&mut self, data: Option<OutputData>) {
@@ -294,6 +299,14 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
     pub fn move_output_data(&mut self) -> Vec<Option<OutputData>> {
         debug_assert_eq!(self.outputs.len(), self.io_info.get_outputs().len());
         mem::replace(&mut self.outputs, vec![])
+    }
+
+    pub fn get_data_range(&self) -> (Option<i32>, Option<i32>) {
+        self.data_range.clone()
+    }
+
+    pub fn update_data_range(&mut self, range: (Option<i32>, Option<i32>)) {
+        self.data_range = range;
     }
 
     pub fn create_sub_context(

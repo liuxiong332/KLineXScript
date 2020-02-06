@@ -49,17 +49,17 @@ pub enum InputInfo {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct PlotInfo {
-    title: Option<String>,
-    color: Option<String>,
-    linewidth: Option<i32>,
-    style: Option<i32>,
-    transp: Option<i32>,
-    trackprice: Option<bool>,
-    histbase: Option<f64>,
-    offset: Option<i32>,
-    join: Option<bool>,
-    editable: Option<bool>,
-    show_last: Option<i32>,
+    pub title: Option<String>,
+    pub color: Option<String>,
+    pub linewidth: Option<i32>,
+    pub style: Option<i32>,
+    pub transp: Option<i32>,
+    pub trackprice: Option<bool>,
+    pub histbase: Option<f64>,
+    pub offset: Option<i32>,
+    pub join: Option<bool>,
+    pub editable: Option<bool>,
+    pub show_last: Option<i32>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -103,4 +103,10 @@ pub struct OutputData {
     from: Option<i32>,
     to: Option<i32>,
     series: Vec<Option<f64>>,
+}
+
+impl OutputData {
+    pub fn new(from: Option<i32>, to: Option<i32>, series: Vec<Option<f64>>) -> OutputData {
+        OutputData { from, to, series }
+    }
 }

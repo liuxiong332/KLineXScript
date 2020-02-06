@@ -115,13 +115,14 @@ fn pine_print<'a>(
     context: &mut dyn Ctx<'a>,
     mut param: Vec<Option<PineRef<'a>>>,
     _func_type: FunctionType<'a>,
-) -> Result<PineRef<'a>, RuntimeErr> {
+) -> Result<(), RuntimeErr> {
     // println!("pine print Series run, {:?}", param.get("item"));
     match param.remove(0) {
         None => Err(RuntimeErr::NotSupportOperator),
         Some(item_val) => {
             print_val(item_val, context)?;
-            Ok(PineRef::new_box(NA))
+            // Ok(PineRef::new_box(NA))
+            Ok(())
         }
     }
 }

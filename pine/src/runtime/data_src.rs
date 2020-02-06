@@ -101,7 +101,7 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
             // self.context.clear_declare();
             self.context.clear_is_run();
             self.context.reset_input_index();
-            self.context.let_io_info_ready();
+            self.context.let_input_info_ready();
         }
         match self.context.run_callbacks() {
             Err(err) => Err(PineRuntimeError::new_no_range(err)),
@@ -124,6 +124,8 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
     pub fn run(&mut self, data: &Vec<(&'static str, Vec<Float>)>) -> Result<(), PineRuntimeError> {
         debug_assert!(self.check_data(data));
         let len = get_len(data)?;
+        // Update the range of data.
+        self.context.update_data_range((Some(0), Some(len as i32)));
         self.run_data(data, len)
     }
 
@@ -132,7 +134,33 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
         data: &Vec<(&'static str, Vec<Float>)>,
     ) -> Result<(), PineRuntimeError> {
         let len = get_len(data)?;
+
+        // Get the range of exist running data.
+        let range = self.context.get_data_range();
+        // The new data's start index.
+        let start = range.1.unwrap() - 1;
+        self.context
+            .update_data_range((Some(start), Some(start + len as i32)));
         self.context.roll_back()?;
+        self.run_data(data, len)
+    }
+
+    pub fn update_from(
+        &mut self,
+        data: &Vec<(&'static str, Vec<Float>)>,
+        from: i32,
+    ) -> Result<(), PineRuntimeError> {
+        let len = get_len(data)?;
+
+        let range = self.context.get_data_range();
+        // Calculate the count of roll_back invocation
+        let roll_count = range.1.unwrap() - from;
+        self.context
+            .update_data_range((Some(from), Some(from + len as i32)));
+
+        for _ in 0..roll_count {
+            self.context.roll_back()?;
+        }
         self.run_data(data, len)
     }
 

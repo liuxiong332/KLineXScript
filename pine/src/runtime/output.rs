@@ -8,26 +8,26 @@ pub struct BoolInputInfo {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct IntInputInfo {
-    defval: Option<i32>,
-    title: Option<String>,
-    input_type: String,
-    minval: Option<i32>,
-    maxval: Option<i32>,
-    confirm: Option<bool>,
-    step: Option<i32>,
-    options: Option<Vec<i32>>,
+    pub defval: Option<i32>,
+    pub title: Option<String>,
+    pub input_type: String,
+    pub minval: Option<i32>,
+    pub maxval: Option<i32>,
+    pub confirm: Option<bool>,
+    pub step: Option<i32>,
+    pub options: Option<Vec<i32>>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct FloatInputInfo {
-    defval: Option<f64>,
-    title: Option<String>,
-    input_type: String,
-    minval: Option<f64>,
-    maxval: Option<f64>,
-    confirm: Option<bool>,
-    step: Option<f64>,
-    options: Option<Vec<f64>>,
+    pub defval: Option<f64>,
+    pub title: Option<String>,
+    pub input_type: String,
+    pub minval: Option<f64>,
+    pub maxval: Option<f64>,
+    pub confirm: Option<bool>,
+    pub step: Option<f64>,
+    pub options: Option<Vec<f64>>,
 }
 
 #[derive(Debug, PartialEq, Clone)]

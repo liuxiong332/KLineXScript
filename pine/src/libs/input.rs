@@ -2,12 +2,14 @@ use super::VarResult;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
 use crate::helper::err_msgs::*;
 use crate::helper::str_replace;
-use crate::helper::{move_element, pine_ref_to_bool, pine_ref_to_string};
+use crate::helper::{
+    move_element, pine_ref_to_bool, pine_ref_to_f64, pine_ref_to_i32, pine_ref_to_string,
+};
 use crate::runtime::context::{downcast_ctx, Ctx, InputVal};
-use crate::runtime::output::{BoolInputInfo, InputInfo};
+use crate::runtime::output::{BoolInputInfo, FloatInputInfo, InputInfo, IntInputInfo};
 use crate::types::{
-    Bool, Callable, CallableFactory, DataType, Float, Int, ParamCollectCall, PineFrom, PineRef,
-    PineType, RefData, RuntimeErr, SecondType, Series, SeriesCall, NA,
+    downcast_pf, Bool, Callable, CallableFactory, DataType, Float, Int, ParamCollectCall, PineFrom,
+    PineRef, PineType, RefData, RuntimeErr, SecondType, Series, SeriesCall, Tuple, NA,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -94,17 +96,123 @@ fn input_for_bool<'a>(
     }
 }
 
-thread_local!(static BOOL_TYPE: FunctionType<'static> = FunctionType((
-    vec![
-        ("defval", SyntaxType::bool()),
-        ("title", SyntaxType::string()),
-        ("type", SyntaxType::string()),
-        ("confirm", SyntaxType::bool()),
-    ],
-    SyntaxType::bool(),
-)));
+pub fn pine_ref_to_list<'a, T, F>(val: Option<PineRef<'a>>, f: F) -> Option<Vec<T>>
+where
+    F: Fn(Option<PineRef<'a>>) -> Option<T>,
+{
+    if val.is_none() {
+        return None;
+    }
+    match downcast_pf::<Tuple>(val.unwrap()) {
+        Ok(res) => {
+            let tuple_val = res.into_inner();
+            Some(tuple_val.0.into_iter().filter_map(|s| f(Some(s))).collect())
+        }
+        Err(_) => None,
+    }
+}
 
-thread_local!(static INT_TYPE: FunctionType<'static> = 
+pub fn pine_ref_to_i32_list<'a>(val: Option<PineRef<'a>>) -> Option<Vec<i32>> {
+    pine_ref_to_list(val, pine_ref_to_i32)
+}
+
+pub fn pine_ref_to_f64_list<'a>(val: Option<PineRef<'a>>) -> Option<Vec<f64>> {
+    pine_ref_to_list(val, pine_ref_to_f64)
+}
+
+fn input_for_int<'a>(
+    context: &mut dyn Ctx<'a>,
+    mut param: Vec<Option<PineRef<'a>>>,
+) -> Result<PineRef<'a>, RuntimeErr> {
+    move_tuplet!((defval, title, input_type, minval, maxval, confirm, step, options) = param);
+    let ctx_ins = downcast_ctx(context);
+    if !ctx_ins.check_is_input_info_ready() {
+        let type_str = pine_ref_to_string(input_type);
+        if type_str.is_some() && type_str.as_ref().unwrap() != INT_TYPE_STR {
+            // type must be BOOL_TYPE_STR
+            return Err(RuntimeErr::FuncCallParamNotValid(str_replace(
+                EXP_VAL_BUT_GET_VAL,
+                vec![
+                    String::from(INT_TYPE_STR),
+                    String::from(type_str.as_ref().unwrap()),
+                ],
+            )));
+        }
+        ctx_ins.push_input_info(InputInfo::Int(IntInputInfo {
+            defval: pine_ref_to_i32(defval.clone()),
+            title: pine_ref_to_string(title),
+            input_type: String::from(INT_TYPE_STR),
+            minval: pine_ref_to_i32(minval),
+            maxval: pine_ref_to_i32(maxval),
+            confirm: pine_ref_to_bool(confirm),
+            step: pine_ref_to_i32(step),
+            options: pine_ref_to_i32_list(options),
+        }));
+    }
+
+    let input_val = ctx_ins.copy_next_input();
+    match input_val {
+        Some(InputVal::Int(val)) => Ok(PineRef::new_box(Some(val))),
+        _ => match defval {
+            Some(val) => Ok(val),
+            _ => Err(RuntimeErr::NotValidParam),
+        },
+    }
+}
+
+fn input_for_float<'a>(
+    context: &mut dyn Ctx<'a>,
+    mut param: Vec<Option<PineRef<'a>>>,
+) -> Result<PineRef<'a>, RuntimeErr> {
+    move_tuplet!((defval, title, input_type, minval, maxval, confirm, step, options) = param);
+    let ctx_ins = downcast_ctx(context);
+    if !ctx_ins.check_is_input_info_ready() {
+        let type_str = pine_ref_to_string(input_type);
+        if type_str.is_some() && type_str.as_ref().unwrap() != FLOAT_TYPE_STR {
+            // type must be BOOL_TYPE_STR
+            return Err(RuntimeErr::FuncCallParamNotValid(str_replace(
+                EXP_VAL_BUT_GET_VAL,
+                vec![
+                    String::from(FLOAT_TYPE_STR),
+                    String::from(type_str.as_ref().unwrap()),
+                ],
+            )));
+        }
+        ctx_ins.push_input_info(InputInfo::Float(FloatInputInfo {
+            defval: pine_ref_to_f64(defval.clone()),
+            title: pine_ref_to_string(title),
+            input_type: String::from(FLOAT_TYPE_STR),
+            minval: pine_ref_to_f64(minval),
+            maxval: pine_ref_to_f64(maxval),
+            confirm: pine_ref_to_bool(confirm),
+            step: pine_ref_to_f64(step),
+            options: pine_ref_to_f64_list(options),
+        }));
+    }
+
+    let input_val = ctx_ins.copy_next_input();
+    match input_val {
+        Some(InputVal::Int(val)) => Ok(PineRef::new_box(Some(val))),
+        _ => match defval {
+            Some(val) => Ok(val),
+            _ => Err(RuntimeErr::NotValidParam),
+        },
+    }
+}
+
+fn gen_bool_type<'a>() -> FunctionType<'a> {
+    FunctionType((
+        vec![
+            ("defval", SyntaxType::bool()),
+            ("title", SyntaxType::string()),
+            ("type", SyntaxType::string()),
+            ("confirm", SyntaxType::bool()),
+        ],
+        SyntaxType::bool(),
+    ))
+}
+
+fn gen_int_type<'a>() -> FunctionType<'a> {
     FunctionType((
         vec![
             ("defval", SyntaxType::int()),
@@ -118,7 +226,23 @@ thread_local!(static INT_TYPE: FunctionType<'static> =
         ],
         SyntaxType::int(),
     ))
-);
+}
+
+fn gen_float_type<'a>() -> FunctionType<'a> {
+    FunctionType((
+        vec![
+            ("defval", SyntaxType::float()),
+            ("title", SyntaxType::string()),
+            ("type", SyntaxType::string()),
+            ("minval", SyntaxType::float()),
+            ("maxval", SyntaxType::float()),
+            ("confirm", SyntaxType::bool()),
+            ("step", SyntaxType::float()),
+            ("options", SyntaxType::List(SimpleSyntaxType::Float)),
+        ],
+        SyntaxType::int(),
+    ))
+}
 
 fn pine_input<'a>(
     context: &mut dyn Ctx<'a>,
@@ -127,6 +251,14 @@ fn pine_input<'a>(
 ) -> Result<PineRef<'a>, RuntimeErr> {
     if func_type.arg_names().len() == 4 {
         input_for_bool(context, param)
+    } else if func_type.arg_names().len() == 8 {
+        if func_type == gen_int_type() {
+            input_for_int(context, param)
+        } else if func_type == gen_float_type() {
+            input_for_float(context, param)
+        } else {
+            unreachable!();
+        }
     } else {
         unreachable!();
     }
@@ -146,8 +278,9 @@ pub fn declare_var<'a>() -> VarResult<'a> {
         input(defval, title, type) → series[float]
     */
     let syntax_type = SyntaxType::Function(Rc::new(FunctionTypes(vec![
-        BOOL_TYPE.with(|s| s.clone()),
-        INT_TYPE.with(|s| s.clone()),
+        gen_bool_type(),
+        gen_int_type(),
+        gen_float_type(),
     ])));
     VarResult::new(value, syntax_type, VAR_NAME)
 }
@@ -171,6 +304,21 @@ mod tests {
         );
         PineParser::new(
             "input(true, 'hello', defval = true, title = 'title', type = 'bool', confirm = false)",
+            &lib_info,
+        );
+
+        PineParser::new(
+            "input(1, 'hello', type = 'int', confirm = false)",
+            &lib_info,
+        );
+
+        PineParser::new(
+            "input(1, 'hello', 'int', 1, 10, true, 1, [1, 2, 3])",
+            &lib_info,
+        );
+
+        PineParser::new(
+            "input(1, 'hello', 'float', 1, 10, true, 1, [1, 2, 3])",
             &lib_info,
         );
     }
@@ -207,5 +355,61 @@ mod tests {
                 confirm: Some(false),
             })]
         )
+    }
+
+    #[test]
+    fn int_input_test<'a>() {
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+        );
+        let src = "m = input(1, 'hello', 'int', 1, 10, true, 1, [1, 2, 3])";
+
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        runner.run(&vec![("close", vec![Some(1f64)])]).unwrap();
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(2, 0)),
+            Some(PineRef::new_box(Some(1)))
+        );
+
+        runner.change_inputs(vec![Some(InputVal::Int(4))]);
+        runner.run(&vec![("close", vec![Some(1f64)])]).unwrap();
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(2, 0)),
+            Some(PineRef::new_box(Some(4)))
+        );
+        assert_eq!(
+            runner.get_context().get_io_info().get_inputs(),
+            &vec![InputInfo::Int(IntInputInfo {
+                defval: Some(1),
+                title: Some(String::from("hello")),
+                input_type: String::from("int"),
+                confirm: Some(true),
+                minval: Some(1),
+                maxval: Some(10),
+                step: Some(1),
+                options: Some(vec![1, 2, 3])
+            })]
+        )
+    }
+
+    #[test]
+    fn float_input_test<'a>() {
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+        );
+        let src = "m = input(1.5, 'hello', 'float', 1, 10, true, 1, [1, 2, 3])";
+
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        runner.run(&vec![("close", vec![Some(1f64)])]).unwrap();
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(2, 0)),
+            Some(PineRef::new_box(Some(1.5f64)))
+        );
     }
 }

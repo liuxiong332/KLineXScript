@@ -55,6 +55,26 @@ pub fn implicity_convert<'a>(origin_type: &SyntaxType<'a>, dest_type: &SyntaxTyp
             | SyntaxType::Series(SimpleSyntaxType::String) => true,
             _ => false,
         },
+
+        SyntaxType::Tuple(types) => match dest_type {
+            // Tuple(Int) can convert to List(Int)
+            SyntaxType::List(SimpleSyntaxType::Int) => types
+                .iter()
+                .all(|s| implicity_convert(&s, &SyntaxType::Simple(SimpleSyntaxType::Int))),
+            // Tuple(Float) can convert to List(Float)
+            SyntaxType::List(SimpleSyntaxType::Float) => types
+                .iter()
+                .all(|s| implicity_convert(&s, &SyntaxType::Simple(SimpleSyntaxType::Float))),
+            // Tuple(String) can convert to List(String)
+            SyntaxType::List(SimpleSyntaxType::String) => types
+                .iter()
+                .all(|s| implicity_convert(&s, &SyntaxType::Simple(SimpleSyntaxType::String))),
+            // Tuple(Color) can convert to List(Color)
+            SyntaxType::List(SimpleSyntaxType::Color) => types
+                .iter()
+                .all(|s| implicity_convert(&s, &SyntaxType::Simple(SimpleSyntaxType::Color))),
+            _ => false,
+        },
         _ => false,
     }
 }

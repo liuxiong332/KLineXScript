@@ -8,6 +8,9 @@ extern crate lazy_static;
 #[macro_use]
 extern crate assert_matches;
 
+#[macro_use]
+extern crate serde_derive;
+
 pub mod ast;
 
 #[macro_use]
@@ -28,10 +31,10 @@ use ast::syntax_type::{SimpleSyntaxType, SyntaxType};
 use syntax::SyntaxParser;
 
 use libs::{declare_vars, VarResult};
-use runtime::context::{Context, InputVal, PineRuntimeError};
+use runtime::context::{Context, PineRuntimeError};
 use runtime::data_src::{Callback, DataSrc};
 use runtime::error_format::{ErrorFormater, PineFormatError};
-use runtime::output::{IOInfo, OutputData};
+use runtime::output::{IOInfo, InputVal, OutputData};
 use std::mem;
 use types::{Float, PineRef};
 

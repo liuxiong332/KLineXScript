@@ -1,4 +1,5 @@
 use super::data_src::Callback;
+use super::output::InputVal;
 use super::output::{IOInfo, InputInfo, OutputData, OutputInfo};
 use crate::ast::input::{Position, StrRange};
 use crate::ast::stat_expr_types::VarIndex;
@@ -61,14 +62,6 @@ pub enum ContextType {
     IfElseBlock,
     ForRangeBlock,
     FuncDefBlock,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum InputVal {
-    Int(i32),
-    Float(f64),
-    Bool(bool),
-    String(String),
 }
 
 // 'a is the lifetime of Exp, 'b is the parent context's lifetime, 'c is the context self's lifetime

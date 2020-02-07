@@ -1,5 +1,6 @@
-use super::context::{Context, Ctx, InputVal, PineRuntimeError, Runner, VarOperate};
+use super::context::{Context, Ctx, PineRuntimeError, Runner, VarOperate};
 // use super::ctxid_parser::CtxIdParser;
+use super::output::InputVal;
 use crate::ast::stat_expr_types::{Block, VarIndex};
 use crate::types::{Float, Int, PineFrom, PineRef, RefData, RuntimeErr, Series};
 

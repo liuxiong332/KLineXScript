@@ -8,7 +8,7 @@ use std::ops;
 use std::str::{CharIndices, Chars};
 use std::u32;
 
-#[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
+#[derive(Debug, PartialEq, PartialOrd, Clone, Copy, Serialize)]
 pub struct Position {
     line: u32,
     character: u32,
@@ -42,7 +42,7 @@ impl Position {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Serialize)]
 pub struct StrRange {
     pub start: Position,
     pub end: Position,

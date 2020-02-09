@@ -1,5 +1,6 @@
 mod utils;
 
+use std::mem;
 use wasm_bindgen::prelude::*;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
@@ -38,6 +39,11 @@ use std::f64;
 use std::mem::transmute;
 
 #[wasm_bindgen]
+pub fn init_panic_hook() {
+    utils::set_panic_hook();
+}
+
+#[wasm_bindgen]
 pub struct ExportPineRunner {
     script: *mut (),
 }
@@ -74,7 +80,7 @@ pub fn gen_io_info(runner: &mut ExportPineRunner) -> Result<JsValue, JsValue> {
     }
 }
 
-fn output_data_to_slice(output: Vec<Option<OutputData>>) -> Box<[f64]> {
+fn output_data_to_slice(output: Vec<Option<OutputData>>) -> *mut f64 {
     let mut res: Vec<f64> = Vec::new();
     for data in output {
         match data {
@@ -94,50 +100,68 @@ fn output_data_to_slice(output: Vec<Option<OutputData>>) -> Box<[f64]> {
             None => res.push(f64::from_le_bytes([0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0])),
         }
     }
-    res.into_boxed_slice()
+    res.shrink_to_fit();
+    let ptr = res.as_mut_ptr();
+    mem::forget(res); // prevent deallocation in Rust
+    ptr
 }
 
 #[wasm_bindgen]
 pub fn run_with_input(
     runner: &mut ExportPineRunner,
     input_val: JsValue,
-) -> Result<JsValue, JsValue> {
+) -> Result<*mut f64, JsValue> {
     let runner_ins = unsafe {
         let script = transmute::<*mut (), *mut PineScript>(runner.script);
         script.as_mut().unwrap()
     };
     let input: Vec<Option<InputVal>> = input_val.into_serde().unwrap();
     match runner_ins.run_with_input(input) {
-        Ok(output) => Ok(JsValue::from_serde(&output).unwrap()),
+        Ok(output) => Ok(output_data_to_slice(output)),
         Err(err) => Err(JsValue::from_serde(&err).unwrap()),
     }
 }
 
+fn slice_input_data(origin_data: &[f64], index: usize, count: usize) -> Vec<Option<f64>> {
+    origin_data[index * count..(index + 1) * count]
+        .iter()
+        .map(|s| if *s == f64::NAN { None } else { Some(*s) })
+        .collect()
+}
+
 #[wasm_bindgen]
-pub fn run_with_data(runner: &mut ExportPineRunner, data: JsValue) -> Result<JsValue, JsValue> {
+pub fn run_with_data(
+    runner: &mut ExportPineRunner,
+    srcs: JsValue,
+    count: usize,
+    data: &[f64],
+) -> Result<*mut f64, JsValue> {
     let runner_ins = unsafe {
         let script = transmute::<*mut (), *mut PineScript>(runner.script);
         script.as_mut().unwrap()
     };
-    let input: Vec<(String, Vec<Option<f64>>)> = data.into_serde().unwrap();
-    let input_data: Vec<_> = input
+    let src_strs: Vec<String> = srcs.into_serde().unwrap();
+    // let mut origin_data = data.to_vec();
+    debug_assert_eq!(data.len(), src_strs.len() * count);
+    let input_data: Vec<(&'static str, Vec<Option<f64>>)> = src_strs
         .into_iter()
-        .map(|s| {
-            if s.0 == "close" {
-                ("close", s.1)
-            } else if s.0 == "open" {
-                ("open", s.1)
-            } else if s.0 == "high" {
-                ("high", s.1)
-            } else if s.0 == "low" {
-                ("low", s.1)
+        .enumerate()
+        .map(|(i, s)| {
+            if s == "close" {
+                ("close", slice_input_data(data, i, count))
+            } else if s == "open" {
+                ("open", slice_input_data(data, i, count))
+            } else if s == "high" {
+                ("high", slice_input_data(data, i, count))
+            } else if s == "low" {
+                ("low", slice_input_data(data, i, count))
             } else {
                 unreachable!();
             }
         })
         .collect();
     match runner_ins.run_with_data(input_data) {
-        Ok(output) => Ok(JsValue::from_serde(&output).unwrap()),
+        Ok(output) => Ok(output_data_to_slice(output)),
         Err(err) => Err(JsValue::from_serde(&err).unwrap()),
     }
 }

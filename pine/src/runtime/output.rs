@@ -40,6 +40,7 @@ pub struct StringInputInfo {
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub enum InputInfo {
     Bool(BoolInputInfo),
     Int(IntInputInfo),
@@ -63,6 +64,7 @@ pub struct PlotInfo {
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub enum OutputInfo {
     Plot(PlotInfo),
 }
@@ -131,6 +133,7 @@ impl OutputData {
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", content = "content")]
 pub enum InputVal {
     Int(i32),
     Float(f64),

@@ -191,6 +191,7 @@ fn input_for_float<'a>(
     }
 
     let input_val = ctx_ins.copy_next_input();
+    println!("Input vals {:?} {:?}", defval, input_val);
     match input_val {
         Some(InputVal::Int(val)) => Ok(PineRef::new_box(Some(val))),
         _ => match defval {
@@ -321,6 +322,8 @@ mod tests {
             "input(1, 'hello', 'float', 1, 10, true, 1, [1, 2, 3])",
             &lib_info,
         );
+
+        PineParser::new("input(1, 'hello', 'int')", &lib_info);
     }
 
     #[test]
@@ -393,6 +396,24 @@ mod tests {
                 options: Some(vec![1, 2, 3])
             })]
         )
+    }
+
+    #[test]
+    fn some_int_input_test<'a>() {
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+        );
+        let src = "m = input(1, 'hello', 'int')";
+
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+        runner.change_inputs(vec![Some(InputVal::Int(4))]);
+        runner.run(&vec![("close", vec![Some(1f64)])]).unwrap();
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(2, 0)),
+            Some(PineRef::new_box(Some(4)))
+        );
     }
 
     #[test]

@@ -129,21 +129,12 @@ fn slice_input_data(origin_data: &[f64], index: usize, count: usize) -> Vec<Opti
         .collect()
 }
 
-#[wasm_bindgen]
-pub fn run_with_data(
-    runner: &mut ExportPineRunner,
-    srcs: JsValue,
+fn transfer_input_data(
+    src_strs: Vec<String>,
     count: usize,
     data: &[f64],
-) -> Result<*mut f64, JsValue> {
-    let runner_ins = unsafe {
-        let script = transmute::<*mut (), *mut PineScript>(runner.script);
-        script.as_mut().unwrap()
-    };
-    let src_strs: Vec<String> = srcs.into_serde().unwrap();
-    // let mut origin_data = data.to_vec();
-    debug_assert_eq!(data.len(), src_strs.len() * count);
-    let input_data: Vec<(&'static str, Vec<Option<f64>>)> = src_strs
+) -> Vec<(&'static str, Vec<Option<f64>>)> {
+    src_strs
         .into_iter()
         .enumerate()
         .map(|(i, s)| {
@@ -159,8 +150,88 @@ pub fn run_with_data(
                 unreachable!();
             }
         })
-        .collect();
+        .collect()
+}
+
+#[wasm_bindgen]
+pub fn run_with_data(
+    runner: &mut ExportPineRunner,
+    srcs: JsValue,
+    count: usize,
+    data: &[f64],
+) -> Result<*mut f64, JsValue> {
+    let runner_ins = unsafe {
+        let script = transmute::<*mut (), *mut PineScript>(runner.script);
+        script.as_mut().unwrap()
+    };
+    let src_strs: Vec<String> = srcs.into_serde().unwrap();
+    debug_assert_eq!(data.len(), src_strs.len() * count);
+    let input_data = transfer_input_data(src_strs, count, data);
     match runner_ins.run_with_data(input_data) {
+        Ok(output) => Ok(output_data_to_slice(output)),
+        Err(err) => Err(JsValue::from_serde(&err).unwrap()),
+    }
+}
+
+#[wasm_bindgen]
+pub fn run(
+    runner: &mut ExportPineRunner,
+    input_val: JsValue,
+    srcs: JsValue,
+    count: usize,
+    data: &[f64],
+) -> Result<*mut f64, JsValue> {
+    let runner_ins = unsafe {
+        let script = transmute::<*mut (), *mut PineScript>(runner.script);
+        script.as_mut().unwrap()
+    };
+    let src_strs: Vec<String> = srcs.into_serde().unwrap();
+    debug_assert_eq!(data.len(), src_strs.len() * count);
+
+    let input: Vec<Option<InputVal>> = input_val.into_serde().unwrap();
+    let input_data = transfer_input_data(src_strs, count, data);
+    match runner_ins.run(input, input_data) {
+        Ok(output) => Ok(output_data_to_slice(output)),
+        Err(err) => Err(JsValue::from_serde(&err).unwrap()),
+    }
+}
+
+#[wasm_bindgen]
+pub fn update(
+    runner: &mut ExportPineRunner,
+    srcs: JsValue,
+    count: usize,
+    data: &[f64],
+) -> Result<*mut f64, JsValue> {
+    let runner_ins = unsafe {
+        let script = transmute::<*mut (), *mut PineScript>(runner.script);
+        script.as_mut().unwrap()
+    };
+    let src_strs: Vec<String> = srcs.into_serde().unwrap();
+    debug_assert_eq!(data.len(), src_strs.len() * count);
+    let input_data = transfer_input_data(src_strs, count, data);
+    match runner_ins.update(input_data) {
+        Ok(output) => Ok(output_data_to_slice(output)),
+        Err(err) => Err(JsValue::from_serde(&err).unwrap()),
+    }
+}
+
+#[wasm_bindgen]
+pub fn update_from(
+    runner: &mut ExportPineRunner,
+    srcs: JsValue,
+    from: i32,
+    count: usize,
+    data: &[f64],
+) -> Result<*mut f64, JsValue> {
+    let runner_ins = unsafe {
+        let script = transmute::<*mut (), *mut PineScript>(runner.script);
+        script.as_mut().unwrap()
+    };
+    let src_strs: Vec<String> = srcs.into_serde().unwrap();
+    debug_assert_eq!(data.len(), src_strs.len() * count);
+    let input_data = transfer_input_data(src_strs, count, data);
+    match runner_ins.update_from(input_data, from) {
         Ok(output) => Ok(output_data_to_slice(output)),
         Err(err) => Err(JsValue::from_serde(&err).unwrap()),
     }

@@ -27,10 +27,36 @@ fn runner_test() {
         &mut runner,
         JsValue::from_serde(&vec!["close", "open", "high", "low"]).unwrap(),
         1,
-        input_data.into_boxed_slice().as_mut()
+        input_data.clone().into_boxed_slice().as_mut()
     )
     .is_ok());
 
     let input_vals: Vec<Option<InputVal>> = vec![Some(InputVal::Int(1))];
     assert!(run_with_input(&mut runner, JsValue::from_serde(&input_vals).unwrap()).is_ok());
+
+    assert!(run(
+        &mut runner,
+        JsValue::from_serde(&input_vals).unwrap(),
+        JsValue::from_serde(&vec!["close", "open", "high", "low"]).unwrap(),
+        1,
+        input_data.clone().into_boxed_slice().as_mut()
+    )
+    .is_ok());
+
+    assert!(update(
+        &mut runner,
+        JsValue::from_serde(&vec!["close", "open", "high", "low"]).unwrap(),
+        1,
+        input_data.clone().into_boxed_slice().as_mut()
+    )
+    .is_ok());
+
+    assert!(update_from(
+        &mut runner,
+        JsValue::from_serde(&vec!["close", "open", "high", "low"]).unwrap(),
+        0,
+        1,
+        input_data.clone().into_boxed_slice().as_mut()
+    )
+    .is_ok());
 }

@@ -1,0 +1,26 @@
+{
+  "name": "pine-ws",
+  "scripts": {
+    "clean": "rimraf pkg",
+    "build-node": "wasm-pack build --target nodejs --out-dir pkg/node --out-name pine",
+    "build-bundler": "wasm-pack build --out-dir pkg/bundler --out-name pine",
+    "cp": "node scripts/change",
+    "build": "npm run clean && npm run build-node && npm run build-bundler && npm run cp"
+  },
+  "collaborators": [
+    "liuxiong332 <liuxiong332@163.com>"
+  ],
+  "version": "0.1.0",
+  "files": [
+    "bundler/",
+    "node/"
+  ],
+  "main": "node/pine.js",
+  "module": "bundler/pine.js",
+  "types": "node/pine.d.ts",
+  "sideEffects": false,
+  "devDependencies": {
+    "fs-extra": "^8.1.0",
+    "rimraf": "^3.0.2"
+  }
+}

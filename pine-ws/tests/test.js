@@ -6,26 +6,21 @@ init_panic_hook();
 let runner = new_runner();
 console.log("runner:", runner);
 
+// Parse the pine source code.
 let result = parse_src(runner, "m = input(1, 'hello', 'int')\nplot(close + m)");
 console.log("src result", result);
 
-let io_info = gen_io_info(runner);
-console.log("io info:", JSON.stringify(io_info));
+// Get the input and output information
+let ioInfo = gen_io_info(runner);
+console.log("io info:", JSON.stringify(ioInfo));
 
-console.log("len", new Float64Array([0, 0, 0, 0]).length);
-
-let dataPtr = run_with_data(
-    runner, ["close", "open", "high", "low"], 1,
-    new Float64Array([100.1, 90, 0, 0]),
-);
-
+// Extract data from the data pointer
 function getOutputData(dataPtr) {
     let outputData = [];
     let byteOffset = 0;
     for (let i = 0; i < io_info.outputs.length; i += 1) {
         const cells = new Int32Array(memory.buffer, dataPtr + byteOffset, 2);
         byteOffset += 4 * 2;
-        console.log("cells", cells);
         if (cells[0] === 0 && cells[1] === 0) {
             outputData.push([]);
         } else {
@@ -37,6 +32,11 @@ function getOutputData(dataPtr) {
     return outputData;
 }
 
+// Run the script with the specific data
+let dataPtr = run_with_data(
+    runner, ["close", "open", "high", "low"], 1,
+    new Float64Array([100.1, 90, 0, 0]),
+);
 console.log("Run with data result:", getOutputData(dataPtr));
 
 dataPtr = run_with_input(runner, [{ type: "Int", content: 100 }]);

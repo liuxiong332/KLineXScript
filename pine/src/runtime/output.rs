@@ -40,12 +40,20 @@ pub struct StringInputInfo {
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub struct SourceInputInfo {
+    pub defval: Option<String>,
+    pub title: Option<String>,
+    pub input_type: String,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum InputInfo {
     Bool(BoolInputInfo),
     Int(IntInputInfo),
     Float(FloatInputInfo),
     String(StringInputInfo),
+    Source(SourceInputInfo),
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]

@@ -32,7 +32,7 @@ pub trait Ctx<'a>: VarOperate<'a> {
 
     fn set_varname_index(&mut self, name: &'a str, index: i32);
 
-    fn get_varname_index(&self, name: &'a str) -> Option<&i32>;
+    fn get_varname_index(&self, name: &str) -> Option<&i32>;
 
     fn create_callable(&mut self, call: RefData<Callable<'a>>);
 
@@ -514,7 +514,7 @@ impl<'a, 'b, 'c> Ctx<'a> for Context<'a, 'b, 'c> {
         self.varname_indexs.insert(name, index);
     }
 
-    fn get_varname_index(&self, name: &'a str) -> Option<&i32> {
+    fn get_varname_index(&self, name: &str) -> Option<&i32> {
         self.varname_indexs.get(name)
     }
 

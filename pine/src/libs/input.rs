@@ -1,4 +1,5 @@
 use super::VarResult;
+use crate::ast::stat_expr_types::VarIndex;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
 use crate::helper::err_msgs::*;
 use crate::helper::str_replace;
@@ -7,7 +8,8 @@ use crate::helper::{
 };
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::output::{
-    BoolInputInfo, FloatInputInfo, InputInfo, InputVal, IntInputInfo, StringInputInfo,
+    BoolInputInfo, FloatInputInfo, InputInfo, InputVal, IntInputInfo, SourceInputInfo,
+    StringInputInfo,
 };
 use crate::types::{
     downcast_pf, Bool, Callable, CallableFactory, DataType, Float, Int, ParamCollectCall, PineFrom,
@@ -20,6 +22,7 @@ const BOOL_TYPE_STR: &'static str = "bool";
 const INT_TYPE_STR: &'static str = "int";
 const FLOAT_TYPE_STR: &'static str = "float";
 const STRING_TYPE_STR: &'static str = "string";
+const SOURCE_TYPE_STR: &'static str = "string";
 
 #[derive(Debug, PartialEq, Clone)]
 struct InputCall<'a> {
@@ -136,36 +139,67 @@ fn input_for_string<'a>(
     }
 }
 
+const SOURCES: &[&'static str] = &["close", "open", "high", "low"];
+fn get_name_from_source<'a>(
+    context: &mut dyn Ctx<'a>,
+    var: &Option<PineRef<'a>>,
+) -> Option<String> {
+    if var.is_none() {
+        return None;
+    }
+    SOURCES
+        .iter()
+        .find(|name| match context.get_varname_index(name) {
+            Some(&index) => match context.get_var(VarIndex::new(index, 0)) {
+                Some(val) => val.as_ptr() == var.as_ref().unwrap().as_ptr(),
+                _ => false,
+            },
+            _ => false,
+        })
+        .map(|&s| String::from(s))
+}
+
+fn get_source_from_name<'a>(context: &mut dyn Ctx<'a>, name: String) -> Option<PineRef<'a>> {
+    match context.get_varname_index(&name) {
+        Some(&index) => match context.get_var(VarIndex::new(index, 0)) {
+            Some(val) => Some(PineRef::clone(val)),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 fn input_for_source<'a>(
     context: &mut dyn Ctx<'a>,
     mut param: Vec<Option<PineRef<'a>>>,
 ) -> Result<PineRef<'a>, RuntimeErr> {
-    let ctx_ins = downcast_ctx(context);
-    if !ctx_ins.check_is_input_info_ready() {
+    if !downcast_ctx(context).check_is_input_info_ready() {
         let type_str = pine_ref_to_string(move_element(&mut param, 2));
 
-        if type_str.is_some() && type_str.as_ref().unwrap() != STRING_TYPE_STR {
+        if type_str.is_some() && type_str.as_ref().unwrap() != SOURCE_TYPE_STR {
             // type must be BOOL_TYPE_STR
             return Err(RuntimeErr::FuncCallParamNotValid(str_replace(
                 EXP_VAL_BUT_GET_VAL,
                 vec![
-                    String::from(STRING_TYPE_STR),
+                    String::from(SOURCE_TYPE_STR),
                     String::from(type_str.as_ref().unwrap()),
                 ],
             )));
         }
-        ctx_ins.push_input_info(InputInfo::String(StringInputInfo {
-            defval: pine_ref_to_string(param[0].clone()),
+        let name = get_name_from_source(context, &param[0]);
+        downcast_ctx(context).push_input_info(InputInfo::Source(SourceInputInfo {
+            defval: name,
             title: pine_ref_to_string(move_element(&mut param, 1)),
-            input_type: String::from(STRING_TYPE_STR),
-            confirm: pine_ref_to_bool(move_element(&mut param, 3)),
-            options: pine_ref_to_str_list(move_element(&mut param, 3)),
+            input_type: String::from(SOURCE_TYPE_STR),
         }));
     }
 
-    let input_val = ctx_ins.copy_next_input();
+    let input_val = downcast_ctx(context).copy_next_input();
     match input_val {
-        Some(InputVal::String(val)) => Ok(PineRef::new_rc(val)),
+        Some(InputVal::String(val)) => match get_source_from_name(context, val) {
+            Some(pine_val) => Ok(pine_val),
+            None => Err(RuntimeErr::NotValidParam),
+        },
         _ => match move_element(&mut param, 0) {
             Some(val) => Ok(val),
             _ => Err(RuntimeErr::NotValidParam),
@@ -365,7 +399,9 @@ fn pine_input<'a>(
             unreachable!();
         }
     } else if func_type.arg_names().len() == 5 {
-        input_for_float(context, param)
+        input_for_string(context, param)
+    } else if func_type.arg_names().len() == 3 {
+        input_for_source(context, param)
     } else {
         unreachable!();
     }

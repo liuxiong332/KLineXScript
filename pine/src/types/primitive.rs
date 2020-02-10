@@ -432,7 +432,7 @@ impl<'a> PineType<'a> for String {
     }
 
     fn copy(&self) -> PineRef<'a> {
-        PineRef::Box(Box::new(self.clone()))
+        PineRef::new_rc(self.clone())
     }
 }
 

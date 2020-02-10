@@ -22,7 +22,7 @@ const BOOL_TYPE_STR: &'static str = "bool";
 const INT_TYPE_STR: &'static str = "int";
 const FLOAT_TYPE_STR: &'static str = "float";
 const STRING_TYPE_STR: &'static str = "string";
-const SOURCE_TYPE_STR: &'static str = "string";
+const SOURCE_TYPE_STR: &'static str = "source";
 
 #[derive(Debug, PartialEq, Clone)]
 struct InputCall<'a> {
@@ -173,6 +173,7 @@ fn input_for_source<'a>(
     context: &mut dyn Ctx<'a>,
     mut param: Vec<Option<PineRef<'a>>>,
 ) -> Result<PineRef<'a>, RuntimeErr> {
+    println!("input for source");
     if !downcast_ctx(context).check_is_input_info_ready() {
         let type_str = pine_ref_to_string(move_element(&mut param, 2));
 
@@ -187,6 +188,7 @@ fn input_for_source<'a>(
             )));
         }
         let name = get_name_from_source(context, &param[0]);
+        println!("get name {:?}", name);
         downcast_ctx(context).push_input_info(InputInfo::Source(SourceInputInfo {
             defval: name,
             title: pine_ref_to_string(move_element(&mut param, 1)),
@@ -388,6 +390,7 @@ fn pine_input<'a>(
     param: Vec<Option<PineRef<'a>>>,
     func_type: FunctionType<'a>,
 ) -> Result<PineRef<'a>, RuntimeErr> {
+    println!("func type {:?}", func_type);
     if func_type.arg_names().len() == 4 {
         input_for_bool(context, param)
     } else if func_type.arg_names().len() == 8 {
@@ -575,6 +578,57 @@ mod tests {
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(2, 0)),
             Some(PineRef::new_box(Some(1.5f64)))
+        );
+    }
+
+    #[test]
+    fn string_input_test<'a>() {
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+        );
+        let src = "m = input('defval', 'hello', 'string')";
+
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        runner.run(&vec![("close", vec![Some(1f64)])]).unwrap();
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(2, 0)),
+            Some(PineRef::new_rc(String::from("defval")))
+        );
+    }
+
+    #[test]
+    fn source_input_test<'a>() {
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![
+                ("close", SyntaxType::Series(SimpleSyntaxType::Float)),
+                ("open", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ],
+        );
+        let src = "m = input(close, 'hello', 'source')";
+
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        runner
+            .run(&vec![
+                ("close", vec![Some(1f64)]),
+                ("open", vec![Some(2f64)]),
+            ])
+            .unwrap();
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(3, 0)),
+            Some(PineRef::new_rc(Series::from_vec(vec![Some(1f64)])))
+        );
+
+        runner.change_inputs(vec![Some(InputVal::String(String::from("open")))]);
+        runner.run(&vec![("open", vec![Some(10f64)])]).unwrap();
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(3, 0)),
+            Some(PineRef::new_rc(Series::from_vec(vec![Some(10f64)])))
         );
     }
 }

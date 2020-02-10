@@ -130,7 +130,7 @@ impl<'a> Runner<'a> for PrefixExp<'a> {
             ));
         }
         let object = downcast_pf::<Object>(var).unwrap();
-        let mut subobj = object.get(self.right_name.value).unwrap();
+        let subobj = object.get(self.right_name.value).unwrap();
         // for name in self.var_chain[2..].iter() {
         //     match subobj.get_type() {
         //         (FirstType::Object, SecondType::Simple) => {

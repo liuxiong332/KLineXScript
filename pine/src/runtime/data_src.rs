@@ -127,20 +127,7 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
         }
     }
 
-    fn check_data(&self, data: &Vec<(&'static str, Vec<Float>)>) -> bool {
-        for (i, (name, _)) in data.iter().enumerate() {
-            if i >= self.input_names.len() {
-                return false;
-            }
-            if self.input_names[i] != *name {
-                return false;
-            }
-        }
-        true
-    }
-
     pub fn run(&mut self, data: &Vec<(&'static str, Vec<Float>)>) -> Result<(), PineRuntimeError> {
-        debug_assert!(self.check_data(data));
         let len = get_len(data)?;
         // Update the range of data.
         self.context.update_data_range((Some(0), Some(len as i32)));

@@ -176,7 +176,7 @@ impl<'a> RunnerForName<'a> for Assignment<'a> {
     fn run_name(
         &'a self,
         context: &mut dyn Ctx<'a>,
-        vn: &VarName<'a>,
+        _vn: &VarName<'a>,
         val: PineRef<'a>,
         varid: i32,
     ) -> Result<PineRef<'a>, RuntimeErr> {

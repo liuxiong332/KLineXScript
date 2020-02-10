@@ -349,7 +349,7 @@ impl<'a> SyntaxParser<'a> {
         }
 
         let res_fun = fun_type.0.iter().find(|func| {
-            let (args, _) = &func.0;
+            let (args, _) = &func.signature;
             if args.len() >= pos_arg_type.len() {
                 let pos_match = pos_arg_type.iter().zip(args.iter()).all(|(x1, x2)| {
                     x1.syntax_type == x2.1 || implicity_convert(&x1.syntax_type, &x2.1)
@@ -375,7 +375,7 @@ impl<'a> SyntaxParser<'a> {
             )),
             Some(d) => {
                 func_call.func_type = Some(d.clone());
-                Ok(ParseValue::new_with_type((d.0).1.clone()))
+                Ok(ParseValue::new_with_type((d.signature).1.clone()))
             }
         }
     }
@@ -1252,8 +1252,8 @@ mod tests {
         downcast_ctx(parser.context).declare_var_with_index(
             "func",
             SyntaxType::Function(Rc::new(FunctionTypes(vec![
-                FunctionType((vec![("arg1", INT_TYPE), ("arg2", INT_TYPE)], INT_TYPE)),
-                FunctionType((vec![("arg1", FLOAT_TYPE), ("arg2", FLOAT_TYPE)], FLOAT_TYPE)),
+                FunctionType::new((vec![("arg1", INT_TYPE), ("arg2", INT_TYPE)], INT_TYPE)),
+                FunctionType::new((vec![("arg1", FLOAT_TYPE), ("arg2", FLOAT_TYPE)], FLOAT_TYPE)),
             ]))),
         );
 

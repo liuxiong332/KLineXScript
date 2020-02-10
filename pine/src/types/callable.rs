@@ -12,7 +12,7 @@ use std::fmt;
 use std::mem;
 
 pub trait SeriesCall<'a> {
-    fn init_param_len(&self, len: usize) {}
+    fn init_param_len(&self, _len: usize) {}
 
     fn step(
         &self,
@@ -373,7 +373,7 @@ mod tests {
                 PineRef::Box(Box::new(Some(2)) as Box<dyn PineType>),
             ],
             vec![],
-            FunctionType((vec![("arg1", INT_TYPE), ("arg2", INT_TYPE)], INT_TYPE)),
+            FunctionType::new((vec![("arg1", INT_TYPE), ("arg2", INT_TYPE)], INT_TYPE)),
         );
 
         let val = downcast_pf::<Int>(call_res.unwrap()).unwrap();
@@ -409,7 +409,7 @@ mod tests {
         };
 
         let mut context = Context::new(None, ContextType::Normal);
-        let func_type = FunctionType((vec![("arg1", INT_TYPE), ("arg2", INT_TYPE)], INT_TYPE));
+        let func_type = FunctionType::new((vec![("arg1", INT_TYPE), ("arg2", INT_TYPE)], INT_TYPE));
 
         let call_res = callable
             .call(&mut context, gen_params(1, 2), vec![], func_type.clone())
@@ -438,7 +438,7 @@ mod tests {
             assert_eq!(arg1_val.get_history(), &vec![Some(100), Some(10)]);
             Ok(())
         }
-        let func_type = FunctionType((vec![("arg1", INT_TYPE)], INT_TYPE));
+        let func_type = FunctionType::new((vec![("arg1", INT_TYPE)], INT_TYPE));
 
         let call = ParamCollectCall::new(test_func);
         call.init_param_len(1);

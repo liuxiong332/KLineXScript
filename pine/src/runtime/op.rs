@@ -82,7 +82,7 @@ where
 }
 
 fn eq_run<'a, 'b>(
-    binary_exp: &'a BinaryExp,
+    binary_exp: &'a BinaryExp<'a>,
     context: &mut (dyn 'b + Ctx<'a>),
 ) -> Result<PineRef<'a>, PineRuntimeError> {
     let val1 = binary_exp.exp1.rv_run(context)?;
@@ -174,7 +174,7 @@ fn bool_into_val<'a>(val: bool, result_type: &SyntaxType<'a>) -> PineRef<'a> {
 }
 
 pub fn binary_op_run<'a, 'b>(
-    binary_exp: &'a BinaryExp,
+    binary_exp: &'a BinaryExp<'a>,
     context: &mut (dyn 'b + Ctx<'a>),
 ) -> Result<PineRef<'a>, PineRuntimeError> {
     match binary_exp.op {
@@ -296,7 +296,7 @@ mod tests {
         Exp::Num(Numeral::from_f64(f))
     }
 
-    fn biop_runner<'a, D: PineStaticType + PartialEq + Debug>(
+    fn biop_runner<'a, D: PineStaticType + PartialEq + Debug + 'a>(
         op: BinaryOp,
         v1: Exp<'a>,
         v2: Exp<'a>,
@@ -311,7 +311,7 @@ mod tests {
         )
     }
 
-    fn biop_runner_type<'a, D: PineStaticType + PartialEq + Debug>(
+    fn biop_runner_type<'a, D: PineStaticType + PartialEq + Debug + 'a>(
         op: BinaryOp,
         v1: Exp<'a>,
         v2: Exp<'a>,
@@ -465,7 +465,7 @@ mod tests {
         );
     }
 
-    fn biop_rv_runner<'a, D: PineStaticType + PartialEq + Debug>(
+    fn biop_rv_runner<'a, D: PineStaticType + PartialEq + Debug + 'a>(
         op: BinaryOp,
         v1: Exp<'a>,
         v2: Exp<'a>,
@@ -485,7 +485,7 @@ mod tests {
         )
     }
 
-    fn biop_rv_runner_type<'a, D: PineStaticType + PartialEq + Debug>(
+    fn biop_rv_runner_type<'a, D: PineStaticType + PartialEq + Debug + 'a>(
         op: BinaryOp,
         v1: Exp<'a>,
         v2: Exp<'a>,

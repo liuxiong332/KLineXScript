@@ -184,17 +184,18 @@ const SERIES_INT: SyntaxType = SyntaxType::Series(SimpleSyntaxType::Int);
 
 impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
     pub fn new(callback: Option<&'ra dyn Callback>) -> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
+        let lib_info = LibInfo::new(
+            declare_vars(),
+            vec![
+                ("close", SERIES_FLOAT.clone()),
+                ("open", SERIES_FLOAT.clone()),
+                ("high", SERIES_FLOAT.clone()),
+                ("low", SERIES_FLOAT.clone()),
+                (BAR_INDEX, SERIES_INT.clone()),
+            ],
+        );
         PineScript {
-            lib_info: LibInfo::new(
-                declare_vars(),
-                vec![
-                    ("close", SERIES_FLOAT.clone()),
-                    ("open", SERIES_FLOAT.clone()),
-                    ("high", SERIES_FLOAT.clone()),
-                    ("low", SERIES_FLOAT.clone()),
-                    (BAR_INDEX, SERIES_INT.clone()),
-                ],
-            ),
+            lib_info,
             blk: Block::new_no_input(vec![], None),
             syntax_parser: None,
             callback,

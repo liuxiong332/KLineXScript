@@ -202,7 +202,7 @@ fn input_for_float<'a>(
 }
 
 fn gen_bool_type<'a>() -> FunctionType<'a> {
-    FunctionType((
+    FunctionType::new((
         vec![
             ("defval", SyntaxType::bool()),
             ("title", SyntaxType::string()),
@@ -214,7 +214,7 @@ fn gen_bool_type<'a>() -> FunctionType<'a> {
 }
 
 fn gen_int_type<'a>() -> FunctionType<'a> {
-    FunctionType((
+    FunctionType::new((
         vec![
             ("defval", SyntaxType::int()),
             ("title", SyntaxType::string()),
@@ -230,7 +230,7 @@ fn gen_int_type<'a>() -> FunctionType<'a> {
 }
 
 fn gen_float_type<'a>() -> FunctionType<'a> {
-    FunctionType((
+    FunctionType::new((
         vec![
             ("defval", SyntaxType::float()),
             ("title", SyntaxType::string()),
@@ -241,7 +241,31 @@ fn gen_float_type<'a>() -> FunctionType<'a> {
             ("step", SyntaxType::float()),
             ("options", SyntaxType::List(SimpleSyntaxType::Float)),
         ],
-        SyntaxType::int(),
+        SyntaxType::float(),
+    ))
+}
+
+fn gen_string_type<'a>() -> FunctionType<'a> {
+    FunctionType::new((
+        vec![
+            ("defval", SyntaxType::string()),
+            ("title", SyntaxType::string()),
+            ("type", SyntaxType::string()),
+            ("confirm", SyntaxType::bool()),
+            ("options", SyntaxType::List(SimpleSyntaxType::String)),
+        ],
+        SyntaxType::string(),
+    ))
+}
+
+fn gen_source_type<'a>() -> FunctionType<'a> {
+    FunctionType::new((
+        vec![
+            ("defval", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("title", SyntaxType::string()),
+            ("type", SyntaxType::string()),
+        ],
+        SyntaxType::Series(SimpleSyntaxType::Float),
     ))
 }
 
@@ -282,6 +306,8 @@ pub fn declare_var<'a>() -> VarResult<'a> {
         gen_int_type(),
         gen_float_type(),
         gen_bool_type(),
+        gen_string_type(),
+        gen_source_type(),
     ])));
     VarResult::new(value, syntax_type, VAR_NAME)
 }

@@ -907,7 +907,10 @@ mod tests {
             StrRange::new_empty(),
         );
         let bool_type = SyntaxType::Simple(SimpleSyntaxType::Bool);
-        exp.func_type = Some(FunctionType((vec![("arg", bool_type.clone())], bool_type)));
+        exp.func_type = Some(FunctionType::new((
+            vec![("arg", bool_type.clone())],
+            bool_type,
+        )));
         let mut context = Context::new(None, ContextType::Normal);
 
         fn test_func<'a>(

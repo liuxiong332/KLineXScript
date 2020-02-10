@@ -134,7 +134,7 @@ pub fn declare_var<'a>() -> VarResult<'a> {
         None,
         Some(Box::new(ParamCollectCall::new(pine_print))),
     ));
-    let syntax_type = SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType((
+    let syntax_type = SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType::new((
         vec![("item", SyntaxType::Series(SimpleSyntaxType::Float))],
         SyntaxType::Void,
     ))])));
@@ -149,7 +149,7 @@ mod tests {
     use crate::types::{downcast_pf, PineRef};
 
     fn new_func_type<'a>() -> FunctionType<'a> {
-        FunctionType((
+        FunctionType::new((
             vec![("item", SyntaxType::Series(SimpleSyntaxType::Float))],
             SyntaxType::Void,
         ))

@@ -132,7 +132,7 @@ pub fn declare_var<'a>() -> VarResult<'a> {
 
     // plot(series, title, color, linewidth, style, trackprice, transp, histbase, offset, join, editable, show_last) → plot
 
-    let syntax_type = SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType((
+    let syntax_type = SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType::new((
         vec![
             ("series", SyntaxType::Series(SimpleSyntaxType::Float)),
             ("title", SyntaxType::string()),

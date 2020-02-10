@@ -1,63 +1,17 @@
 use super::stat_expr_types::DataType;
 use std::collections::BTreeMap;
 use std::convert::From;
-use std::fmt;
-use std::hash::{Hash, Hasher};
-use std::mem;
 use std::rc::Rc;
 use std::string::ToString;
 
-#[derive(Clone)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct FunctionType<'a> {
     pub signature: (Vec<(&'a str, SyntaxType<'a>)>, SyntaxType<'a>),
-    pub match_func: Option<*const ()>,
-}
-
-impl<'a> fmt::Debug for FunctionType<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.signature.fmt(f)
-    }
-}
-
-impl<'a> PartialEq for FunctionType<'a> {
-    fn eq(&self, other: &Self) -> bool {
-        self.signature == other.signature
-    }
-}
-
-impl<'a> Eq for FunctionType<'a> {}
-
-impl<'a> Hash for FunctionType<'a> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.signature.hash(state);
-    }
 }
 
 impl<'a> FunctionType<'a> {
     pub fn new(signature: (Vec<(&'a str, SyntaxType<'a>)>, SyntaxType<'a>)) -> FunctionType<'a> {
-        FunctionType {
-            signature,
-            match_func: None,
-        }
-    }
-
-    pub fn set_match_func(&mut self, func: fn(&Vec<SyntaxType<'a>>) -> bool) {
-        self.match_func = Some(func as *const ());
-    }
-
-    pub fn has_match_func(&self) -> bool {
-        self.match_func.is_some()
-    }
-
-    pub fn check_match(&self, params: &Vec<SyntaxType<'a>>) -> bool {
-        if let Some(match_func) = self.match_func {
-            let func = unsafe {
-                mem::transmute::<*const (), fn(&Vec<SyntaxType<'a>>) -> bool>(match_func)
-            };
-            func(params)
-        } else {
-            true
-        }
+        FunctionType { signature }
     }
 
     pub fn arg_names(&self) -> Vec<&'a str> {

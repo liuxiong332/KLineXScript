@@ -32,11 +32,11 @@ pub struct FloatInputInfo {
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct StringInputInfo {
-    defval: Option<String>,
-    title: Option<String>,
-    input_type: String,
-    confirm: Option<bool>,
-    options: Option<Vec<String>>,
+    pub defval: Option<String>,
+    pub title: Option<String>,
+    pub input_type: String,
+    pub confirm: Option<bool>,
+    pub options: Option<Vec<String>>,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]

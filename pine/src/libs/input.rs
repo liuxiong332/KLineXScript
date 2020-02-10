@@ -6,7 +6,9 @@ use crate::helper::{
     move_element, pine_ref_to_bool, pine_ref_to_f64, pine_ref_to_i32, pine_ref_to_string,
 };
 use crate::runtime::context::{downcast_ctx, Ctx};
-use crate::runtime::output::{BoolInputInfo, FloatInputInfo, InputInfo, InputVal, IntInputInfo};
+use crate::runtime::output::{
+    BoolInputInfo, FloatInputInfo, InputInfo, InputVal, IntInputInfo, StringInputInfo,
+};
 use crate::types::{
     downcast_pf, Bool, Callable, CallableFactory, DataType, Float, Int, ParamCollectCall, PineFrom,
     PineRef, PineType, RefData, RuntimeErr, SecondType, Series, SeriesCall, Tuple, NA,
@@ -17,6 +19,7 @@ use std::rc::Rc;
 const BOOL_TYPE_STR: &'static str = "bool";
 const INT_TYPE_STR: &'static str = "int";
 const FLOAT_TYPE_STR: &'static str = "float";
+const STRING_TYPE_STR: &'static str = "string";
 
 #[derive(Debug, PartialEq, Clone)]
 struct InputCall<'a> {
@@ -96,6 +99,80 @@ fn input_for_bool<'a>(
     }
 }
 
+fn input_for_string<'a>(
+    context: &mut dyn Ctx<'a>,
+    mut param: Vec<Option<PineRef<'a>>>,
+) -> Result<PineRef<'a>, RuntimeErr> {
+    let ctx_ins = downcast_ctx(context);
+    if !ctx_ins.check_is_input_info_ready() {
+        let type_str = pine_ref_to_string(move_element(&mut param, 2));
+
+        if type_str.is_some() && type_str.as_ref().unwrap() != STRING_TYPE_STR {
+            // type must be BOOL_TYPE_STR
+            return Err(RuntimeErr::FuncCallParamNotValid(str_replace(
+                EXP_VAL_BUT_GET_VAL,
+                vec![
+                    String::from(STRING_TYPE_STR),
+                    String::from(type_str.as_ref().unwrap()),
+                ],
+            )));
+        }
+        ctx_ins.push_input_info(InputInfo::String(StringInputInfo {
+            defval: pine_ref_to_string(param[0].clone()),
+            title: pine_ref_to_string(move_element(&mut param, 1)),
+            input_type: String::from(STRING_TYPE_STR),
+            confirm: pine_ref_to_bool(move_element(&mut param, 3)),
+            options: pine_ref_to_str_list(move_element(&mut param, 3)),
+        }));
+    }
+
+    let input_val = ctx_ins.copy_next_input();
+    match input_val {
+        Some(InputVal::String(val)) => Ok(PineRef::new_rc(val)),
+        _ => match move_element(&mut param, 0) {
+            Some(val) => Ok(val),
+            _ => Err(RuntimeErr::NotValidParam),
+        },
+    }
+}
+
+fn input_for_source<'a>(
+    context: &mut dyn Ctx<'a>,
+    mut param: Vec<Option<PineRef<'a>>>,
+) -> Result<PineRef<'a>, RuntimeErr> {
+    let ctx_ins = downcast_ctx(context);
+    if !ctx_ins.check_is_input_info_ready() {
+        let type_str = pine_ref_to_string(move_element(&mut param, 2));
+
+        if type_str.is_some() && type_str.as_ref().unwrap() != STRING_TYPE_STR {
+            // type must be BOOL_TYPE_STR
+            return Err(RuntimeErr::FuncCallParamNotValid(str_replace(
+                EXP_VAL_BUT_GET_VAL,
+                vec![
+                    String::from(STRING_TYPE_STR),
+                    String::from(type_str.as_ref().unwrap()),
+                ],
+            )));
+        }
+        ctx_ins.push_input_info(InputInfo::String(StringInputInfo {
+            defval: pine_ref_to_string(param[0].clone()),
+            title: pine_ref_to_string(move_element(&mut param, 1)),
+            input_type: String::from(STRING_TYPE_STR),
+            confirm: pine_ref_to_bool(move_element(&mut param, 3)),
+            options: pine_ref_to_str_list(move_element(&mut param, 3)),
+        }));
+    }
+
+    let input_val = ctx_ins.copy_next_input();
+    match input_val {
+        Some(InputVal::String(val)) => Ok(PineRef::new_rc(val)),
+        _ => match move_element(&mut param, 0) {
+            Some(val) => Ok(val),
+            _ => Err(RuntimeErr::NotValidParam),
+        },
+    }
+}
+
 pub fn pine_ref_to_list<'a, T, F>(val: Option<PineRef<'a>>, f: F) -> Option<Vec<T>>
 where
     F: Fn(Option<PineRef<'a>>) -> Option<T>,
@@ -118,6 +195,10 @@ pub fn pine_ref_to_i32_list<'a>(val: Option<PineRef<'a>>) -> Option<Vec<i32>> {
 
 pub fn pine_ref_to_f64_list<'a>(val: Option<PineRef<'a>>) -> Option<Vec<f64>> {
     pine_ref_to_list(val, pine_ref_to_f64)
+}
+
+pub fn pine_ref_to_str_list<'a>(val: Option<PineRef<'a>>) -> Option<Vec<String>> {
+    pine_ref_to_list(val, pine_ref_to_string)
 }
 
 fn input_for_int<'a>(
@@ -191,7 +272,6 @@ fn input_for_float<'a>(
     }
 
     let input_val = ctx_ins.copy_next_input();
-    println!("Input vals {:?} {:?}", defval, input_val);
     match input_val {
         Some(InputVal::Int(val)) => Ok(PineRef::new_box(Some(val))),
         _ => match defval {
@@ -284,6 +364,8 @@ fn pine_input<'a>(
         } else {
             unreachable!();
         }
+    } else if func_type.arg_names().len() == 5 {
+        input_for_float(context, param)
     } else {
         unreachable!();
     }

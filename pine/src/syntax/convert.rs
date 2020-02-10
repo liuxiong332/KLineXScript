@@ -1,32 +1,41 @@
 use super::{SimpleSyntaxType, SyntaxType};
 
+// Series variable can only be implicity converted to Series, Simple can be implicity converted to Simple and Series
 pub fn implicity_convert<'a>(origin_type: &SyntaxType<'a>, dest_type: &SyntaxType<'a>) -> bool {
     if origin_type == dest_type {
         return true;
     }
     match origin_type {
-        SyntaxType::Series(SimpleSyntaxType::Na) | SyntaxType::Simple(SimpleSyntaxType::Na) => {
-            match dest_type {
-                SyntaxType::Simple(_) => true,
-                SyntaxType::Series(_) => true,
-                _ => false,
-            }
-        }
-        SyntaxType::Series(SimpleSyntaxType::Int) | SyntaxType::Simple(SimpleSyntaxType::Int) => {
-            match dest_type {
-                SyntaxType::Simple(SimpleSyntaxType::Bool)
-                | SyntaxType::Simple(SimpleSyntaxType::Int)
-                | SyntaxType::Simple(SimpleSyntaxType::Float) => true,
+        SyntaxType::Simple(SimpleSyntaxType::Na) => match dest_type {
+            SyntaxType::Simple(_) => true,
+            SyntaxType::Series(_) => true,
+            _ => false,
+        },
+        SyntaxType::Series(SimpleSyntaxType::Na) => match dest_type {
+            SyntaxType::Series(_) => true,
+            _ => false,
+        },
 
-                SyntaxType::Series(SimpleSyntaxType::Bool)
-                | SyntaxType::Series(SimpleSyntaxType::Float)
-                | SyntaxType::Series(SimpleSyntaxType::Int) => true,
+        SyntaxType::Simple(SimpleSyntaxType::Int) => match dest_type {
+            SyntaxType::Simple(SimpleSyntaxType::Bool)
+            | SyntaxType::Simple(SimpleSyntaxType::Int)
+            | SyntaxType::Simple(SimpleSyntaxType::Float) => true,
 
-                _ => false,
-            }
-        }
-        SyntaxType::Series(SimpleSyntaxType::Float)
-        | SyntaxType::Simple(SimpleSyntaxType::Float) => match dest_type {
+            SyntaxType::Series(SimpleSyntaxType::Bool)
+            | SyntaxType::Series(SimpleSyntaxType::Float)
+            | SyntaxType::Series(SimpleSyntaxType::Int) => true,
+
+            _ => false,
+        },
+        SyntaxType::Series(SimpleSyntaxType::Int) => match dest_type {
+            SyntaxType::Series(SimpleSyntaxType::Bool)
+            | SyntaxType::Series(SimpleSyntaxType::Float)
+            | SyntaxType::Series(SimpleSyntaxType::Int) => true,
+
+            _ => false,
+        },
+
+        SyntaxType::Simple(SimpleSyntaxType::Float) => match dest_type {
             SyntaxType::Simple(SimpleSyntaxType::Bool)
             | SyntaxType::Simple(SimpleSyntaxType::Float) => true,
 
@@ -35,24 +44,40 @@ pub fn implicity_convert<'a>(origin_type: &SyntaxType<'a>, dest_type: &SyntaxTyp
 
             _ => false,
         },
+        SyntaxType::Series(SimpleSyntaxType::Float) => match dest_type {
+            SyntaxType::Series(SimpleSyntaxType::Bool)
+            | SyntaxType::Series(SimpleSyntaxType::Float) => true,
 
-        SyntaxType::Series(SimpleSyntaxType::Bool) | SyntaxType::Simple(SimpleSyntaxType::Bool) => {
-            match dest_type {
-                SyntaxType::Simple(SimpleSyntaxType::Bool)
-                | SyntaxType::Series(SimpleSyntaxType::Bool) => true,
-                _ => false,
-            }
-        }
-        SyntaxType::Series(SimpleSyntaxType::Color)
-        | SyntaxType::Simple(SimpleSyntaxType::Color) => match dest_type {
+            _ => false,
+        },
+
+        SyntaxType::Simple(SimpleSyntaxType::Bool) => match dest_type {
+            SyntaxType::Simple(SimpleSyntaxType::Bool)
+            | SyntaxType::Series(SimpleSyntaxType::Bool) => true,
+            _ => false,
+        },
+        SyntaxType::Series(SimpleSyntaxType::Bool) => match dest_type {
+            SyntaxType::Series(SimpleSyntaxType::Bool) => true,
+            _ => false,
+        },
+
+        SyntaxType::Simple(SimpleSyntaxType::Color) => match dest_type {
             SyntaxType::Simple(SimpleSyntaxType::Color)
             | SyntaxType::Series(SimpleSyntaxType::Color) => true,
             _ => false,
         },
-        SyntaxType::Series(SimpleSyntaxType::String)
-        | SyntaxType::Simple(SimpleSyntaxType::String) => match dest_type {
+        SyntaxType::Series(SimpleSyntaxType::Color) => match dest_type {
+            SyntaxType::Series(SimpleSyntaxType::Color) => true,
+            _ => false,
+        },
+
+        SyntaxType::Simple(SimpleSyntaxType::String) => match dest_type {
             SyntaxType::Simple(SimpleSyntaxType::String)
             | SyntaxType::Series(SimpleSyntaxType::String) => true,
+            _ => false,
+        },
+        SyntaxType::Series(SimpleSyntaxType::String) => match dest_type {
+            SyntaxType::Series(SimpleSyntaxType::String) => true,
             _ => false,
         },
 

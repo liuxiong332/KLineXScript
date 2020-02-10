@@ -7,6 +7,7 @@ use crate::types::{
     Bool, Callable, Color, DataType, Float, Int, PineFrom, PineRef, PineStaticType, PineType,
     RefData, RuntimeErr, SecondType, Series, NA,
 };
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::mem;
@@ -28,6 +29,10 @@ pub trait Ctx<'a>: VarOperate<'a> {
     fn contains_var(&self, index: VarIndex) -> bool;
 
     fn contains_var_scope(&self, index: i32) -> bool;
+
+    fn set_varname_index(&mut self, name: &'a str, index: i32);
+
+    fn get_varname_index(&self, name: &'a str) -> Option<&i32>;
 
     fn create_callable(&mut self, call: RefData<Callable<'a>>);
 
@@ -75,6 +80,8 @@ pub struct Context<'a, 'b, 'c> {
 
     // variable map that defined by user and library.
     vars: Vec<Option<PineRef<'a>>>,
+
+    varname_indexs: HashMap<&'a str, i32>,
 
     // function instances
     fun_instances: Vec<Option<RefData<Callable<'a>>>>,
@@ -171,6 +178,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             context_type: t,
             sub_contexts: Vec::new(),
             vars: Vec::new(),
+            varname_indexs: HashMap::new(),
             fun_instances: Vec::new(),
             _series: vec![],
             callables: vec![],
@@ -194,6 +202,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             context_type: ContextType::Normal,
             sub_contexts: Vec::new(),
             vars: Vec::new(),
+            varname_indexs: HashMap::new(),
             fun_instances: Vec::new(),
             _series: vec![],
             callables: vec![],
@@ -499,6 +508,14 @@ impl<'a, 'b, 'c> Ctx<'a> for Context<'a, 'b, 'c> {
     fn contains_var(&self, index: VarIndex) -> bool {
         let dest_ctx = self.get_subctx(index);
         downcast_ctx_const(dest_ctx).vars[index.varid as usize].is_some()
+    }
+
+    fn set_varname_index(&mut self, name: &'a str, index: i32) {
+        self.varname_indexs.insert(name, index);
+    }
+
+    fn get_varname_index(&self, name: &'a str) -> Option<&i32> {
+        self.varname_indexs.get(name)
     }
 
     fn create_callable(&mut self, call: RefData<Callable<'a>>) {

@@ -834,7 +834,7 @@ impl<'a> SyntaxParser<'a> {
                 }
             }
             UnaryOp::BoolNot => {
-                if implicity_convert(&exp_type, &SyntaxType::Simple(SimpleSyntaxType::Bool)) {
+                if implicity_convert(&exp_type, &SyntaxType::Series(SimpleSyntaxType::Bool)) {
                     match exp_type {
                         SyntaxType::Simple(_) => Ok(ParseValue::new_with_type(SyntaxType::Simple(
                             SimpleSyntaxType::Bool,

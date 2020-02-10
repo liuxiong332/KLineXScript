@@ -48,6 +48,7 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
 
         for (i, (_k, v)) in lib_vars.into_iter().enumerate() {
             context.create_var(i as i32, v);
+            context.set_varname_index(_k, i as i32);
         }
 
         // Create variable from the hash map
@@ -55,9 +56,11 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
             if *name == "bar_index" {
                 let s: Series<Int> = Series::new();
                 context.create_var(input_index + i as i32, PineRef::new_rc(s));
+                context.set_varname_index(*name, input_index + i as i32);
             } else {
                 let s: Series<Float> = Series::new();
                 context.create_var(input_index + i as i32, PineRef::new_rc(s));
+                context.set_varname_index(*name, input_index + i as i32);
             }
         }
         DataSrc {

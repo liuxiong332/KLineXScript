@@ -73,20 +73,31 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
         self.context.change_inputs(inputs);
     }
 
+    pub fn set_input_srcs(&mut self, srcs: Vec<String>) {
+        self.context.set_input_srcs(srcs);
+    }
+
     fn run_data(
         &mut self,
         data: &Vec<(&'static str, Vec<Float>)>,
         len: usize,
     ) -> Result<(), PineRuntimeError> {
         let bar_index = self.input_names.iter().position(|s| *s == "bar_index");
+        let name_indexs: Vec<Option<usize>> = data
+            .iter()
+            .map(|(k, _)| self.input_names.iter().position(|&s| s == *k))
+            .collect();
         for i in 0..len {
             // Extract data into context
             for (index, (_k, v)) in data.iter().enumerate() {
-                let var_index = VarIndex::new(self.input_index + index as i32, 0);
-                let series = self.context.move_var(var_index).unwrap();
-                let mut float_s: RefData<Series<Float>> = Series::implicity_from(series).unwrap();
-                float_s.update(v[i]);
-                self.context.update_var(var_index, float_s.into_pf());
+                if let Some(name_index) = name_indexs[index] {
+                    let var_index = VarIndex::new(self.input_index + name_index as i32, 0);
+                    let series = self.context.move_var(var_index).unwrap();
+                    let mut float_s: RefData<Series<Float>> =
+                        Series::implicity_from(series).unwrap();
+                    float_s.update(v[i]);
+                    self.context.update_var(var_index, float_s.into_pf());
+                }
             }
 
             if let Some(bar_index) = bar_index {

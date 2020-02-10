@@ -94,11 +94,15 @@ impl IOInfo {
         }
     }
 
-    pub fn new_with_io(inputs: Vec<InputInfo>, outputs: Vec<OutputInfo>) -> IOInfo {
+    pub fn new_with_io(
+        inputs: Vec<InputInfo>,
+        outputs: Vec<OutputInfo>,
+        input_srcs: Vec<String>,
+    ) -> IOInfo {
         IOInfo {
             inputs,
             outputs,
-            input_srcs: IOInfo::gen_srcs(),
+            input_srcs,
         }
     }
 
@@ -108,6 +112,10 @@ impl IOInfo {
 
     pub fn push_output(&mut self, output: OutputInfo) {
         self.outputs.push(output);
+    }
+
+    pub fn set_input_srcs(&mut self, input_srcs: Vec<String>) {
+        self.input_srcs = input_srcs;
     }
 
     pub fn get_inputs(&self) -> &Vec<InputInfo> {

@@ -277,6 +277,10 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
         self.io_info.push_output(output);
     }
 
+    pub fn set_input_srcs(&mut self, srcs: Vec<String>) {
+        self.io_info.set_input_srcs(srcs);
+    }
+
     pub fn get_io_info(&self) -> &IOInfo {
         &self.io_info
     }

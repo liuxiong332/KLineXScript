@@ -42,20 +42,24 @@ use types::{Float, PineRef};
 pub struct LibInfo<'a> {
     var_types: Vec<(&'a str, SyntaxType<'a>)>,
     var_values: Vec<(&'a str, PineRef<'a>)>,
-    input_names: Vec<&'a str>,
+    input_names: Vec<&'a str>, // The input varnames include bar_index
+    client_input_names: Vec<&'a str>, // The input varnames user client should pass in
 }
+
+const BAR_INDEX: &'static str = "bar_index";
 
 impl<'a> LibInfo<'a> {
     pub fn new(
         lib_vars: Vec<VarResult<'a>>,
         input_vars: Vec<(&'static str, SyntaxType<'a>)>,
     ) -> LibInfo<'a> {
-        let (types, values, input_names) = extract_vars(lib_vars, input_vars);
+        let (types, values, input_names, client_input_names) = extract_vars(lib_vars, input_vars);
         // println!("now input names {:?}", input_names);
         LibInfo {
             var_types: types,
             var_values: values,
             input_names,
+            client_input_names,
         }
     }
 }
@@ -63,6 +67,7 @@ impl<'a> LibInfo<'a> {
 pub struct PineParser<'a, 'b> {
     src: &'a str,
     var_types: &'b Vec<(&'a str, SyntaxType<'a>)>,
+    client_input_names: &'b Vec<&'a str>,
 }
 
 impl<'a, 'b> PineParser<'a, 'b> {
@@ -70,6 +75,7 @@ impl<'a, 'b> PineParser<'a, 'b> {
         PineParser {
             src,
             var_types: &lib_info.var_types,
+            client_input_names: &lib_info.client_input_names,
         }
     }
 
@@ -86,7 +92,7 @@ impl<'a, 'b> PineParser<'a, 'b> {
             Err((None, errs)) => return Err(errs),
         };
         let syntax_parser;
-        match parse_syntax(&mut blk, &self.var_types) {
+        match parse_syntax(&mut blk, &self.var_types, &self.client_input_names) {
             Ok(parser) => syntax_parser = parser,
             Err((parser, errs)) => {
                 all_errs.extend(errs);
@@ -150,6 +156,10 @@ impl<'a, 'b, 'c> PineRunner<'a, 'b, 'c> {
         self.datasrc.update_from(data, from)
     }
 
+    pub fn set_input_srcs(&mut self, srcs: Vec<String>) {
+        self.datasrc.set_input_srcs(srcs);
+    }
+
     pub fn change_inputs(&mut self, inputs: Vec<Option<InputVal>>) {
         self.datasrc.change_inputs(inputs);
     }
@@ -182,7 +192,7 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
                     ("open", SERIES_FLOAT.clone()),
                     ("high", SERIES_FLOAT.clone()),
                     ("low", SERIES_FLOAT.clone()),
-                    ("bar_index", SERIES_INT.clone()),
+                    (BAR_INDEX, SERIES_INT.clone()),
                 ],
             ),
             blk: Block::new_no_input(vec![], None),
@@ -245,12 +255,14 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
 
     fn get_runner(&mut self) -> &mut PineRunner<'ra, 'rb, 'rc> {
         if self.runner.is_none() {
-            let runner: PineRunner<'ra, 'rb, 'rc>;
+            let mut runner: PineRunner<'ra, 'rb, 'rc>;
             unsafe {
                 let blk_ref: &'ra Block<'ra> =
                     mem::transmute::<&Block<'pa>, &'ra Block<'ra>>(&self.blk);
                 let lib_ref = mem::transmute::<&LibInfo<'li>, &LibInfo<'ra>>(&self.lib_info);
                 runner = PineRunner::new(lib_ref, blk_ref, self.callback.unwrap());
+                let names = self.syntax_parser.as_ref().unwrap().get_inputnames();
+                runner.set_input_srcs(names.into_iter().map(|s| String::from(s)).collect());
             }
             self.runner = Some(runner);
         }
@@ -402,8 +414,10 @@ pub fn parse_ast(in_str: &str) -> Result<Block, (Option<Block>, Vec<PineInputErr
 pub fn parse_syntax<'a>(
     blk: &mut Block<'a>,
     vars: &Vec<(&'a str, SyntaxType<'a>)>,
+    input_names: &Vec<&'a str>,
 ) -> Result<SyntaxParser<'a>, (Option<SyntaxParser<'a>>, Vec<PineInputError>)> {
     let mut syntax_parser = SyntaxParser::new_with_vars(vars);
+    syntax_parser.init_input_options(input_names.clone());
     match syntax_parser.parse_blk(blk) {
         Ok(_) => {
             if syntax_parser.is_ok() {
@@ -427,10 +441,12 @@ pub fn extract_vars<'a>(
     Vec<(&'a str, SyntaxType<'a>)>,
     Vec<(&'a str, PineRef<'a>)>,
     Vec<&'a str>,
+    Vec<&'a str>,
 ) {
     let mut types = Vec::with_capacity(vars.len() + input_vars.len());
     let mut values = Vec::with_capacity(vars.len());
     let mut input_names = Vec::with_capacity(input_vars.len());
+    let mut user_input_names = Vec::with_capacity(input_vars.len());
     for var in vars {
         types.push((var.name, var.syntax_type));
         values.push((var.name, var.value));
@@ -438,11 +454,14 @@ pub fn extract_vars<'a>(
     for (n, t) in input_vars {
         input_names.push(n);
         types.push((n, t));
+        if n != BAR_INDEX {
+            user_input_names.push(n);
+        }
     }
     // debug_assert!(check_names(&types));
     // map.insert(print::VAR_NAME, print::declare_var());
     // map.insert(plot::VAR_NAME, plot::declare_var());
-    (types, values, input_names)
+    (types, values, input_names, user_input_names)
 }
 
 #[cfg(test)]
@@ -494,7 +513,8 @@ mod tests {
                     join: None,
                     editable: None,
                     show_last: None,
-                })]
+                })],
+                vec![String::from("close")]
             ))
         );
         let data = vec![("close", vec![Some(1f64), Some(2f64)])];

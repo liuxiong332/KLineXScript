@@ -48,6 +48,10 @@ pub trait SyntaxCtx<'a> {
 
     fn get_user_func(&self, name: &str) -> Option<&(SyntaxType<'a>, i32)>;
 
+    fn declare_inputnames(&mut self, name: &'a str);
+
+    fn get_inputnames(&self) -> Vec<&'a str>;
+
     fn gen_var_index(&mut self, name: &str) -> i32;
 
     fn get_var_index(&mut self, name: &str) -> VarIndex;
@@ -70,6 +74,11 @@ pub struct SyntaxContext<'a> {
     vars: HashMap<&'a str, SyntaxType<'a>>,
     // User defined function's type for the specific name, the name is like method_name@id
     user_func_types: HashMap<String, (SyntaxType<'a>, i32)>,
+
+    // all of the input varnames
+    input_options: Option<Vec<&'a str>>,
+    // The input varname(e.g. close, open etc) that the script use
+    input_varnames: Vec<&'a str>,
 
     // The variable name to index map that can transfer the map lookup to vector getter.
     var_indexs: HashMap<String, i32>,
@@ -141,6 +150,18 @@ impl<'a> SyntaxCtx<'a> for SyntaxContext<'a> {
         self.gen_var_index(name);
     }
 
+    fn declare_inputnames(&mut self, name: &'a str) {
+        if let Some(p) = self.parent {
+            downcast_ctx(p.as_ptr()).declare_inputnames(name)
+        } else {
+            self.input_varnames.push(name)
+        }
+    }
+
+    fn get_inputnames(&self) -> Vec<&'a str> {
+        self.input_varnames.clone()
+    }
+
     fn gen_var_index(&mut self, name: &str) -> i32 {
         self.max_var_index += 1;
         debug_assert!(!self.var_indexs.contains_key(name));
@@ -197,10 +218,26 @@ impl<'a> SyntaxContext<'a> {
             subctxs: vec![],
             user_func_types: HashMap::new(),
             vars: HashMap::new(),
+            input_options: None,
+            input_varnames: vec![],
             var_indexs: HashMap::new(),
             max_var_index: -1,
             max_child_ctx_index: -1,
             max_lib_func_index: -1,
+        }
+    }
+
+    pub fn set_input_options(&mut self, input_options: Vec<&'a str>) {
+        self.input_options = Some(input_options);
+    }
+
+    pub fn is_input_option(&self, name: &'a str) -> bool {
+        if let Some(p) = self.parent {
+            downcast_ctx(p.as_ptr()).is_input_option(name)
+        } else if let Some(ref options) = self.input_options {
+            options.iter().position(|&x| x == name).is_some()
+        } else {
+            false
         }
     }
 
@@ -268,6 +305,14 @@ impl<'a> SyntaxParser<'a> {
             types_id_gen: TypesIdGen::new(),
             errors: vec![],
         }
+    }
+
+    pub fn init_input_options(&mut self, input_options: Vec<&'a str>) {
+        downcast_ctx(self.context).set_input_options(input_options);
+    }
+
+    pub fn get_inputnames(&self) -> Vec<&'a str> {
+        downcast_ctx(self.context).get_inputnames()
     }
 
     pub fn catch(&mut self, err: PineInputError) {
@@ -737,6 +782,11 @@ impl<'a> SyntaxParser<'a> {
 
     fn parse_varname(&mut self, varname: &mut RVVarName<'a>) -> ParseResult<'a> {
         let name = varname.name.value;
+        let ctx_ins = downcast_ctx(self.context);
+        // If the input names are found, we should record this name.
+        if ctx_ins.is_input_option(name) {
+            ctx_ins.declare_inputnames(name);
+        }
         match downcast_ctx(self.context).get_var(name) {
             None => {
                 self.catch(PineInputError::new(
@@ -1531,6 +1581,40 @@ mod tests {
                 StrRange::new_empty()
             )]
         )
+    }
+
+    #[test]
+    fn input_varname_test() {
+        let mut parser = SyntaxParser::new();
+        downcast_ctx(parser.context).declare_var_with_index("close", INT_TYPE);
+        downcast_ctx(parser.context).declare_var_with_index("open", INT_TYPE);
+        downcast_ctx(parser.context).set_input_options(vec!["close", "open", "high", "low"]);
+        let mut varname = rvarname("close");
+        assert_eq!(
+            parser.parse_varname(&mut varname),
+            Ok(ParseValue::new(INT_TYPE, "close"))
+        );
+        assert_eq!(downcast_ctx(parser.context).get_inputnames(), vec!["close"]);
+
+        let mut subctx = SyntaxContext::new(
+            Some(NonNull::new(parser.context).unwrap()),
+            ContextType::Normal,
+        );
+        parser.context = &mut subctx;
+        let mut varname = rvarname("open");
+        assert_eq!(
+            parser.parse_varname(&mut varname),
+            Ok(ParseValue::new(INT_TYPE, "open"))
+        );
+        assert_eq!(
+            downcast_ctx(parser.context).get_inputnames(),
+            Vec::<&'static str>::new()
+        );
+        let parent = downcast_ctx(parser.context).parent.unwrap();
+        assert_eq!(
+            downcast_ctx(parent.as_ptr()).get_inputnames(),
+            vec!["close", "open"]
+        );
     }
 
     #[test]

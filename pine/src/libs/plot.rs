@@ -1,5 +1,7 @@
 use super::VarResult;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
+use crate::helper::err_msgs::*;
+use crate::helper::str_replace;
 use crate::helper::{
     move_element, pine_ref_to_bool, pine_ref_to_color, pine_ref_to_f64, pine_ref_to_i32,
     pine_ref_to_string,
@@ -7,9 +9,10 @@ use crate::helper::{
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::output::{OutputData, OutputInfo, PlotInfo};
 use crate::types::{
-    Bool, Callable, CallableFactory, DataType, Float, Int, ParamCollectCall, PineFrom, PineRef,
-    PineType, RefData, RuntimeErr, SecondType, Series, NA,
+    Bool, Callable, CallableObject, DataType, Float, Int, ParamCollectCall, PineClass, PineFrom,
+    PineRef, PineType, RefData, RuntimeErr, SecondType, Series, NA,
 };
+use std::collections::BTreeMap;
 use std::rc::Rc;
 
 trait IntoTarget<D> {
@@ -125,16 +128,46 @@ fn pine_plot<'a>(
     }
 }
 
+struct PlotProps;
+
+impl<'a> PineClass<'a> for PlotProps {
+    fn custom_type(&self) -> &str {
+        "input"
+    }
+
+    fn get(&self, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
+        match name {
+            "style_area" => Ok(PineRef::new_rc(String::from("area"))),
+            "style_areabr" => Ok(PineRef::new_rc(String::from("areabr"))),
+            "style_circles" => Ok(PineRef::new_rc(String::from("circles"))),
+            "style_columns" => Ok(PineRef::new_rc(String::from("columns"))),
+            "style_cross" => Ok(PineRef::new_rc(String::from("cross"))),
+            "style_histogram" => Ok(PineRef::new_rc(String::from("histogram"))),
+            "style_line" => Ok(PineRef::new_rc(String::from("line"))),
+            "style_linebr" => Ok(PineRef::new_rc(String::from("linebr"))),
+            "style_stepline" => Ok(PineRef::new_rc(String::from("stepline"))),
+            _ => Err(RuntimeErr::NotImplement(str_replace(
+                NO_FIELD_IN_OBJECT,
+                vec![String::from(name), String::from("plot")],
+            ))),
+        }
+    }
+
+    fn copy(&self) -> Box<dyn PineClass<'a> + 'a> {
+        Box::new(PlotProps)
+    }
+}
+
 pub const VAR_NAME: &'static str = "plot";
 
 pub fn declare_var<'a>() -> VarResult<'a> {
-    let value = PineRef::new(CallableFactory::new(|| {
+    let value = PineRef::new(CallableObject::new(Box::new(PlotProps), || {
         Callable::new(None, Some(Box::new(ParamCollectCall::new(pine_plot))))
     }));
 
     // plot(series, title, color, linewidth, style, trackprice, transp, histbase, offset, join, editable, show_last) → plot
 
-    let syntax_type = SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType::new((
+    let func_type = FunctionTypes(vec![FunctionType::new((
         vec![
             ("series", SyntaxType::Series(SimpleSyntaxType::Float)),
             ("title", SyntaxType::string()),
@@ -151,7 +184,18 @@ pub fn declare_var<'a>() -> VarResult<'a> {
             ("display", SyntaxType::bool()),
         ],
         SyntaxType::Void,
-    ))])));
+    ))]);
+    let mut obj_type = BTreeMap::new();
+    obj_type.insert("style_area", SyntaxType::string());
+    obj_type.insert("style_areabr", SyntaxType::string());
+    obj_type.insert("style_circles", SyntaxType::string());
+    obj_type.insert("style_columns", SyntaxType::string());
+    obj_type.insert("style_cross", SyntaxType::string());
+    obj_type.insert("style_histogram", SyntaxType::string());
+    obj_type.insert("style_line", SyntaxType::string());
+    obj_type.insert("style_linebr", SyntaxType::string());
+    obj_type.insert("style_stepline", SyntaxType::string());
+    let syntax_type = SyntaxType::ObjectFunction(Rc::new(obj_type), Rc::new(func_type));
     VarResult::new(value, syntax_type, VAR_NAME)
 }
 
@@ -269,5 +313,44 @@ mod tests {
                 display: Some(true)
             })]
         )
+    }
+
+    #[test]
+    fn plot_fields_test() {
+        use crate::ast::stat_expr_types::VarIndex;
+        use crate::runtime::VarOperate;
+        use crate::types::{downcast_pf, Tuple};
+
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![("close", SyntaxType::float_series())],
+        );
+        let src = r"m = [
+            plot.style_area, plot.style_areabr, plot.style_circles, plot.style_columns, 
+            plot.style_cross, plot.style_histogram, plot.style_line, plot.style_linebr,
+            plot.style_stepline
+        ]";
+
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        runner.run(&vec![("close", vec![Some(1f64)])]).unwrap();
+        let tuple_res =
+            downcast_pf::<Tuple>(runner.get_context().move_var(VarIndex::new(2, 0)).unwrap());
+        let tuple_vec = tuple_res.unwrap().into_inner().0;
+        assert_eq!(
+            tuple_vec,
+            vec![
+                PineRef::new_rc(String::from("area")),
+                PineRef::new_rc(String::from("areabr")),
+                PineRef::new_rc(String::from("circles")),
+                PineRef::new_rc(String::from("columns")),
+                PineRef::new_rc(String::from("cross")),
+                PineRef::new_rc(String::from("histogram")),
+                PineRef::new_rc(String::from("line")),
+                PineRef::new_rc(String::from("linebr")),
+                PineRef::new_rc(String::from("stepline")),
+            ]
+        );
     }
 }

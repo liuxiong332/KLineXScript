@@ -1,4 +1,4 @@
-use crate::types::{Bool, Float, Int, PineFrom, PineRef};
+use crate::types::{Bool, Color, Float, Int, PineFrom, PineRef};
 
 pub fn pine_ref_to_bool<'a>(val: Option<PineRef<'a>>) -> Option<bool> {
     if val.is_none() {
@@ -16,6 +16,16 @@ pub fn pine_ref_to_string<'a>(val: Option<PineRef<'a>>) -> Option<String> {
     }
     match String::implicity_from(val.unwrap()) {
         Ok(res) => Some(res.into_inner()),
+        Err(_) => None,
+    }
+}
+
+pub fn pine_ref_to_color<'a>(val: Option<PineRef<'a>>) -> Option<String> {
+    if val.is_none() {
+        return None;
+    }
+    match Color::implicity_from(val.unwrap()) {
+        Ok(res) => Some(String::from(res.into_inner().0)),
         Err(_) => None,
     }
 }

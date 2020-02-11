@@ -514,6 +514,7 @@ mod tests {
                     join: None,
                     editable: None,
                     show_last: None,
+                    display: None,
                 })],
                 vec![String::from("close")]
             ))

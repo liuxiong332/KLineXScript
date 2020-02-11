@@ -61,7 +61,7 @@ pub struct PlotInfo {
     pub title: Option<String>,
     pub color: Option<String>,
     pub linewidth: Option<i32>,
-    pub style: Option<i32>,
+    pub style: Option<String>,
     pub transp: Option<i32>,
     pub trackprice: Option<bool>,
     pub histbase: Option<f64>,
@@ -69,6 +69,7 @@ pub struct PlotInfo {
     pub join: Option<bool>,
     pub editable: Option<bool>,
     pub show_last: Option<i32>,
+    pub display: Option<bool>,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]

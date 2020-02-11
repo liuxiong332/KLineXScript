@@ -1,7 +1,8 @@
 use super::VarResult;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
 use crate::helper::{
-    move_element, pine_ref_to_bool, pine_ref_to_f64, pine_ref_to_i32, pine_ref_to_string,
+    move_element, pine_ref_to_bool, pine_ref_to_color, pine_ref_to_f64, pine_ref_to_i32,
+    pine_ref_to_string,
 };
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::output::{OutputData, OutputInfo, PlotInfo};
@@ -91,16 +92,16 @@ fn pine_plot<'a>(
 ) -> Result<(), RuntimeErr> {
     move_tuplet!(
         (
-            series, title, color, linewidth, style, transp, trackprice, histbase, offset, join,
-            editable, show_last
+            series, title, color, linewidth, style, trackprice, transp, histbase, offset, join,
+            editable, show_last, display
         ) = param
     );
     if !downcast_ctx(context).check_is_output_info_ready() {
         let plot_info = PlotInfo {
             title: pine_ref_to_string(title),
-            color: pine_ref_to_string(color),
+            color: pine_ref_to_color(color),
             linewidth: pine_ref_to_i32(linewidth),
-            style: pine_ref_to_i32(style),
+            style: pine_ref_to_string(style),
             transp: pine_ref_to_i32(transp),
             trackprice: pine_ref_to_bool(trackprice),
             histbase: pine_ref_to_f64(histbase),
@@ -108,6 +109,7 @@ fn pine_plot<'a>(
             join: pine_ref_to_bool(join),
             editable: pine_ref_to_bool(editable),
             show_last: pine_ref_to_i32(show_last),
+            display: pine_ref_to_bool(display),
         };
         downcast_ctx(context).push_output_info(OutputInfo::Plot(plot_info));
     }
@@ -138,7 +140,7 @@ pub fn declare_var<'a>() -> VarResult<'a> {
             ("title", SyntaxType::string()),
             ("color", SyntaxType::color()),
             ("linewidth", SyntaxType::int()),
-            ("style", SyntaxType::int()),
+            ("style", SyntaxType::string()),
             ("trackprice", SyntaxType::bool()),
             ("transp", SyntaxType::int()),
             ("histbase", SyntaxType::float()),
@@ -146,6 +148,7 @@ pub fn declare_var<'a>() -> VarResult<'a> {
             ("join", SyntaxType::bool()),
             ("editable", SyntaxType::bool()),
             ("show_last", SyntaxType::int()),
+            ("display", SyntaxType::bool()),
         ],
         SyntaxType::Void,
     ))])));
@@ -230,5 +233,41 @@ mod tests {
                 )),
             ]
         );
+    }
+
+    #[test]
+    fn plot_info_test() {
+        use crate::runtime::OutputInfo;
+
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+        );
+        let src = r"plot(close, title='Title', color=#00ffaa, linewidth=2, 
+            style='area', transp=70, offset=15, trackprice=true, 
+            histbase=0.0, join=true, editable=true, show_last=100, display=true)";
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        runner
+            .run(&vec![("close", vec![Some(1f64), Some(2f64)])])
+            .unwrap();
+        assert_eq!(
+            runner.get_context().get_io_info().get_outputs(),
+            &vec![OutputInfo::Plot(PlotInfo {
+                title: Some(String::from("Title")),
+                color: Some(String::from("#00ffaa")),
+                linewidth: Some(2),
+                style: Some(String::from("area")),
+                trackprice: Some(true),
+                transp: Some(70),
+                histbase: Some(0.0f64),
+                offset: Some(15),
+                join: Some(true),
+                editable: Some(true),
+                show_last: Some(100),
+                display: Some(true)
+            })]
+        )
     }
 }

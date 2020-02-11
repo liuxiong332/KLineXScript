@@ -15,50 +15,6 @@ use crate::types::{
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-trait IntoTarget<D> {
-    fn into(&self) -> D;
-}
-
-impl IntoTarget<i32> for Int {
-    fn into(&self) -> i32 {
-        self.unwrap()
-    }
-}
-
-impl IntoTarget<f64> for Float {
-    fn into(&self) -> f64 {
-        self.unwrap()
-    }
-}
-
-impl IntoTarget<bool> for Bool {
-    fn into(&self) -> bool {
-        *self
-    }
-}
-
-// fn plot_series<'a, D, T>(item_val: PineRef<'a>, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr>
-// where
-//     D: Default
-//         + IntoTarget<T>
-//         + Clone
-//         + PartialEq
-//         + Debug
-//         + PineStaticType
-//         + PineFrom<'a, D>
-//         + PineType<'a>
-//         + 'a,
-// {
-//     let items: RefData<Series<D>> = Series::implicity_from(item_val).unwrap();
-//     let s: Vec<T> = items
-//         .get_history()
-//         .iter()
-//         .map(|v| IntoTarget::into(v))
-//         .collect();
-//     context.get_callback().unwrap().plot(s);
-//     Ok(())
-// }
-
 fn plot_series<'a>(
     item_val: PineRef<'a>,
     _context: &mut dyn Ctx<'a>,
@@ -76,11 +32,8 @@ fn plot_val<'a>(
     item_val: PineRef<'a>,
     context: &mut dyn Ctx<'a>,
 ) -> Result<Vec<Option<f64>>, RuntimeErr> {
-    // println!("print val type {:?}", item_val.get_type());
     match item_val.get_type() {
         (DataType::Float, SecondType::Series) => plot_series(item_val, context),
-        // (DataType::Int, SecondType::Series) => plot_series::<Int, i32>(item_val, context),
-        // (DataType::Bool, SecondType::Series) => plot_series::<Bool, bool>(item_val, context),
         t => Err(RuntimeErr::NotImplement(format!(
             "The plot now only support int, float, bool type, but get {:?}",
             t

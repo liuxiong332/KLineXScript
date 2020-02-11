@@ -1,5 +1,6 @@
 pub mod input;
 pub mod plot;
+pub mod plotarrow;
 pub mod print;
 use crate::ast::syntax_type::SyntaxType;
 use crate::types::PineRef;
@@ -41,6 +42,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         plot::declare_var(),
         print::declare_var(),
         input::declare_var(),
+        plotarrow::declare_var(),
     ];
     debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());

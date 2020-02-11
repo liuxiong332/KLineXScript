@@ -73,9 +73,24 @@ pub struct PlotInfo {
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub struct PlotArrowInfo {
+    pub title: Option<String>,
+    pub colorup: Option<String>,
+    pub colordown: Option<String>,
+    pub transp: Option<i32>,
+    pub offset: Option<i32>,
+    pub minheight: Option<i32>,
+    pub maxheight: Option<i32>,
+    pub editable: Option<bool>,
+    pub show_last: Option<i32>,
+    pub display: Option<bool>,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum OutputInfo {
     Plot(PlotInfo),
+    PlotArrow(PlotArrowInfo),
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]

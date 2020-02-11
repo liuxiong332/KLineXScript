@@ -24,10 +24,11 @@ pub enum DataType {
     NA,
     PineVar,
     Tuple,
-    Callable,
+    Callable, // The callable function defined by the library
     CallableFactory,
-    Function,
+    Function, // The function defined by the script
     Object,
+    CallableObject,
     Evaluate, // The variable need lazy evaluate.
 }
 

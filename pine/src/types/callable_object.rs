@@ -1,0 +1,134 @@
+use super::{
+    Callable, Category, ComplexType, DataType, PineClass, PineFrom, PineRef, PineStaticType,
+    PineType, RuntimeErr, SecondType,
+};
+
+#[derive(Debug)]
+pub struct CallableObject<'a> {
+    obj: Box<dyn PineClass<'a> + 'a>,
+    create_func: fn() -> Callable<'a>,
+}
+
+impl<'a> PartialEq for CallableObject<'a> {
+    fn eq(&self, other: &CallableObject<'a>) -> bool {
+        PartialEq::eq(&*self.obj, &*other.obj) && self.create_func == other.create_func
+    }
+}
+
+impl<'a> PineStaticType for CallableObject<'a> {
+    fn static_type() -> (DataType, SecondType) {
+        (DataType::CallableObject, SecondType::Simple)
+    }
+}
+
+impl<'a> PineType<'a> for CallableObject<'a> {
+    fn get_type(&self) -> (DataType, SecondType) {
+        <Self as PineStaticType>::static_type()
+    }
+
+    fn category(&self) -> Category {
+        Category::Complex
+    }
+
+    fn copy(&self) -> PineRef<'a> {
+        self.obj.copy()
+    }
+}
+impl<'a> PineFrom<'a, CallableObject<'a>> for CallableObject<'a> {}
+
+impl<'a> ComplexType for CallableObject<'a> {}
+
+impl<'a> CallableObject<'a> {
+    pub fn new(
+        obj: Box<dyn PineClass<'a> + 'a>,
+        create_func: fn() -> Callable<'a>,
+    ) -> CallableObject<'a> {
+        CallableObject { obj, create_func }
+    }
+
+    pub fn get(&self, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
+        self.obj.get(name)
+    }
+
+    pub fn set(&self, name: &str, property: PineRef<'a>) -> Result<(), RuntimeErr> {
+        self.obj.set(name, property)
+    }
+
+    pub fn create(&self) -> Callable<'a> {
+        (self.create_func)()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::{downcast_pf, Callable, Int, Object, RefData};
+    use super::*;
+    use crate::ast::syntax_type::FunctionType;
+    use crate::ast::syntax_type::{SimpleSyntaxType, SyntaxType};
+    use crate::runtime::context::{Context, ContextType, Ctx};
+    use std::mem;
+
+    struct A;
+    impl<'a> PineClass<'a> for A {
+        fn custom_type(&self) -> &str {
+            "Custom A"
+        }
+
+        fn get(&self, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
+            match name {
+                "int1" => Ok(PineRef::new_box(Some(1i32))),
+                "int2" => Ok(PineRef::new_box(Some(2i32))),
+                "float1" => Ok(PineRef::new_box(Some(1f64))),
+                "float2" => Ok(PineRef::new_box(Some(2f64))),
+                _ => Err(RuntimeErr::NotSupportOperator),
+            }
+        }
+
+        fn set(&self, _n: &str, _p: PineRef<'a>) -> Result<(), RuntimeErr> {
+            Err(RuntimeErr::NotSupportOperator)
+        }
+
+        fn copy(&self) -> PineRef<'a> {
+            PineRef::new_rc(Object::new(Box::new(A)))
+        }
+    }
+
+    fn test_func<'a>(
+        _context: &mut dyn Ctx<'a>,
+        mut args: Vec<Option<PineRef<'a>>>,
+        _func_type: FunctionType<'a>,
+    ) -> Result<PineRef<'a>, RuntimeErr> {
+        Ok(mem::replace(&mut args[0], None).unwrap())
+    }
+    const INT_TYPE: SyntaxType = SyntaxType::Simple(SimpleSyntaxType::Int);
+
+    #[test]
+    fn object_test() {
+        let obj = CallableObject::new(Box::new(A), || Callable::new(Some(test_func), None));
+        assert_eq!(
+            obj.get_type(),
+            (DataType::CallableObject, SecondType::Simple)
+        );
+        assert_eq!(
+            downcast_pf::<Int>(obj.get("int1").unwrap()).unwrap(),
+            RefData::new_box(Some(1))
+        );
+        let mut callable = obj.create();
+        let mut context = Context::new(None, ContextType::Normal);
+
+        assert_eq!(
+            downcast_pf::<Int>(
+                callable
+                    .call(
+                        &mut context,
+                        vec![PineRef::new_box(Some(1))],
+                        vec![],
+                        FunctionType::new((vec![("arg1", INT_TYPE)], INT_TYPE))
+                    )
+                    .unwrap()
+            )
+            .unwrap(),
+            RefData::new_box(Some(1))
+        );
+    }
+}

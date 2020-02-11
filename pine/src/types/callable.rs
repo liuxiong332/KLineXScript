@@ -3,10 +3,9 @@ use super::{
     RefData, RuntimeErr, SecondType, NA,
 };
 use crate::ast::stat_expr_types::VarIndex;
-use crate::ast::syntax_type::{FunctionType, SyntaxType};
+use crate::ast::syntax_type::FunctionType;
 use crate::runtime::context::{commit_series_for_operator, Ctx, VarOperate};
 use crate::runtime::statement::process_assign_val;
-use crate::syntax::SyntaxCtx;
 use std::cell::{Cell, RefCell};
 use std::fmt;
 use std::mem;

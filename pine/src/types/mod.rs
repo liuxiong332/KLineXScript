@@ -1,8 +1,10 @@
 pub mod array;
 pub mod callable;
+pub mod callable_object;
 pub mod downcast;
 pub mod error;
 pub mod evaluate;
+pub mod object;
 pub mod pine_ref;
 pub mod primitive;
 pub mod ref_data;
@@ -10,9 +12,11 @@ pub mod series;
 pub mod traits;
 
 pub use callable::*;
+pub use callable_object::*;
 pub use downcast::*;
 pub use error::*;
 pub use evaluate::*;
+pub use object::*;
 pub use pine_ref::*;
 pub use primitive::*;
 pub use ref_data::*;

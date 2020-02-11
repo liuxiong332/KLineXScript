@@ -76,6 +76,7 @@ pub enum SyntaxType<'a> {
     Tuple(Rc<Vec<SyntaxType<'a>>>),
     Object(Rc<BTreeMap<&'a str, SyntaxType<'a>>>),
     Function(Rc<FunctionTypes<'a>>),
+    ObjectFunction(Rc<BTreeMap<&'a str, SyntaxType<'a>>>, Rc<FunctionTypes<'a>>),
     UserFunction(Rc<(Vec<&'a str>, SyntaxType<'a>)>),
     Any,
 }
@@ -138,5 +139,9 @@ impl<'a> SyntaxType<'a> {
 
     pub fn color() -> SyntaxType<'a> {
         SyntaxType::Simple(SimpleSyntaxType::Color)
+    }
+
+    pub fn float_series() -> SyntaxType<'a> {
+        SyntaxType::Series(SimpleSyntaxType::Float)
     }
 }

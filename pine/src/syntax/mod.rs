@@ -472,6 +472,8 @@ impl<'a> SyntaxParser<'a> {
         let method_type = self.parse_exp(&mut func_call.method)?;
         if let SyntaxType::Function(fun_type) = method_type.syntax_type {
             self.parse_std_func_call(func_call, &fun_type)
+        } else if let SyntaxType::ObjectFunction(_, fun_type) = method_type.syntax_type {
+            self.parse_std_func_call(func_call, &fun_type)
         } else if let SyntaxType::UserFunction(names) = method_type.syntax_type {
             self.parse_user_func_call(func_call, &names.0, method_type.varname.unwrap())
         } else {
@@ -545,19 +547,22 @@ impl<'a> SyntaxParser<'a> {
         obj: &SyntaxType<'a>,
         keys: &[&'a str],
     ) -> Result<SyntaxType<'a>, PineErrorKind> {
-        if let SyntaxType::Object(map) = obj {
-            match map.get(&keys[0]) {
-                None => Err(PineErrorKind::RefKeyNotExist),
-                Some(dest_type) => {
-                    if keys.len() > 1 {
-                        Self::get_for_obj(&dest_type, &keys[1..])
-                    } else {
-                        Ok(dest_type.clone())
-                    }
+        let map = if let SyntaxType::Object(map) = obj {
+            map
+        } else if let SyntaxType::ObjectFunction(map, _) = obj {
+            map
+        } else {
+            return Err(PineErrorKind::RefObjTypeNotObj);
+        };
+        match map.get(&keys[0]) {
+            None => Err(PineErrorKind::RefKeyNotExist),
+            Some(dest_type) => {
+                if keys.len() > 1 {
+                    Self::get_for_obj(&dest_type, &keys[1..])
+                } else {
+                    Ok(dest_type.clone())
                 }
             }
-        } else {
-            Err(PineErrorKind::RefObjTypeNotObj)
         }
     }
 

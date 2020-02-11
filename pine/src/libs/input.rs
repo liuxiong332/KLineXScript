@@ -12,10 +12,11 @@ use crate::runtime::output::{
     StringInputInfo,
 };
 use crate::types::{
-    downcast_pf, Bool, Callable, CallableFactory, DataType, Float, Int, ParamCollectCall, PineFrom,
-    PineRef, PineType, RefData, RuntimeErr, SecondType, Series, SeriesCall, Tuple, NA,
+    downcast_pf, Bool, Callable, CallableObject, DataType, Float, Int, ParamCollectCall, PineClass,
+    PineFrom, PineRef, PineType, RefData, RuntimeErr, SecondType, Series, SeriesCall, Tuple, NA,
 };
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::rc::Rc;
 
 const BOOL_TYPE_STR: &'static str = "bool";
@@ -410,10 +411,39 @@ fn pine_input<'a>(
     }
 }
 
+struct InputProps;
+
+impl<'a> PineClass<'a> for InputProps {
+    fn custom_type(&self) -> &str {
+        "input"
+    }
+
+    fn get(&self, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
+        match name {
+            "bool" => Ok(PineRef::new_rc(String::from(BOOL_TYPE_STR))),
+            "float" => Ok(PineRef::new_rc(String::from(FLOAT_TYPE_STR))),
+            "integer" => Ok(PineRef::new_rc(String::from(INT_TYPE_STR))),
+            "resolution" => Ok(PineRef::new_rc(String::from(STRING_TYPE_STR))),
+            "session" => Ok(PineRef::new_rc(String::from(STRING_TYPE_STR))),
+            "source" => Ok(PineRef::new_rc(String::from(SOURCE_TYPE_STR))),
+            "string" => Ok(PineRef::new_rc(String::from(STRING_TYPE_STR))),
+            "symbol" => Ok(PineRef::new_rc(String::from(STRING_TYPE_STR))),
+            _ => Err(RuntimeErr::NotImplement(str_replace(
+                NO_FIELD_IN_OBJECT,
+                vec![String::from(name), String::from("input")],
+            ))),
+        }
+    }
+
+    fn copy(&self) -> Box<dyn PineClass<'a> + 'a> {
+        Box::new(InputProps)
+    }
+}
+
 pub const VAR_NAME: &'static str = "input";
 
 pub fn declare_var<'a>() -> VarResult<'a> {
-    let value = PineRef::new(CallableFactory::new(|| {
+    let value = PineRef::new(CallableObject::new(Box::new(InputProps), || {
         Callable::new(None, Some(Box::new(InputCall::new())))
     }));
     /*
@@ -423,13 +453,25 @@ pub fn declare_var<'a>() -> VarResult<'a> {
         input(defval, title, type, confirm, options) → input string
         input(defval, title, type) → series[float]
     */
-    let syntax_type = SyntaxType::Function(Rc::new(FunctionTypes(vec![
-        gen_int_type(),
-        gen_float_type(),
-        gen_bool_type(),
-        gen_string_type(),
-        gen_source_type(),
-    ])));
+    let mut obj_type = BTreeMap::new();
+    obj_type.insert("bool", SyntaxType::string());
+    obj_type.insert("float", SyntaxType::string());
+    obj_type.insert("integer", SyntaxType::string());
+    obj_type.insert("resolution", SyntaxType::string());
+    obj_type.insert("session", SyntaxType::string());
+    obj_type.insert("source", SyntaxType::string());
+    obj_type.insert("string", SyntaxType::string());
+    obj_type.insert("symbol", SyntaxType::string());
+    let syntax_type = SyntaxType::ObjectFunction(
+        Rc::new(obj_type),
+        Rc::new(FunctionTypes(vec![
+            gen_int_type(),
+            gen_float_type(),
+            gen_bool_type(),
+            gen_string_type(),
+            gen_source_type(),
+        ])),
+    );
     VarResult::new(value, syntax_type, VAR_NAME)
 }
 
@@ -629,6 +671,40 @@ mod tests {
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(3, 0)),
             Some(PineRef::new_rc(Series::from_vec(vec![Some(10f64)])))
+        );
+    }
+
+    #[test]
+    fn input_fields_test() {
+        use crate::types::Tuple;
+
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![("close", SyntaxType::float_series())],
+        );
+        let src = r"m = [
+            input.bool, input.float, input.integer, input.resolution, 
+            input.session, input.source, input.string, input.symbol
+        ]";
+
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        runner.run(&vec![("close", vec![Some(1f64)])]).unwrap();
+        let tuple_res =
+            downcast_pf::<Tuple>(runner.get_context().move_var(VarIndex::new(2, 0)).unwrap());
+        assert_eq!(
+            tuple_res.unwrap().into_inner(),
+            Tuple(vec![
+                PineRef::new_rc(String::from(BOOL_TYPE_STR)),
+                PineRef::new_rc(String::from(FLOAT_TYPE_STR)),
+                PineRef::new_rc(String::from(INT_TYPE_STR)),
+                PineRef::new_rc(String::from(STRING_TYPE_STR)),
+                PineRef::new_rc(String::from(STRING_TYPE_STR)),
+                PineRef::new_rc(String::from(SOURCE_TYPE_STR)),
+                PineRef::new_rc(String::from(STRING_TYPE_STR)),
+                PineRef::new_rc(String::from(STRING_TYPE_STR)),
+            ])
         );
     }
 }

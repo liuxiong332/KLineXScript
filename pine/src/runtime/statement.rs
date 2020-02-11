@@ -10,9 +10,9 @@ use crate::ast::stat_expr_types::{
     VarAssignment, VarIndex,
 };
 use crate::types::{
-    downcast_pf, Bool, Callable, CallableFactory, Color, DataType as FirstType, Float, Int,
-    PineFrom, PineRef, PineStaticType, PineType, RefData, RuntimeErr, SecondType, Series, Tuple,
-    NA,
+    downcast_pf, Bool, Callable, CallableFactory, CallableObject, Color, DataType as FirstType,
+    Float, Int, PineFrom, PineRef, PineStaticType, PineType, RefData, RuntimeErr, SecondType,
+    Series, Tuple, NA,
 };
 use std::fmt::Debug;
 
@@ -510,12 +510,19 @@ impl<'a> Runner<'a> for FunctionCall<'a> {
                 context.create_callable(callable);
                 result
             }
-            (FirstType::CallableFactory, SecondType::Simple) => {
+            (FirstType::CallableFactory, SecondType::Simple)
+            | (FirstType::CallableObject, SecondType::Simple) => {
                 let mut opt_instance = context.move_fun_instance(self.ctxid);
                 if opt_instance.is_none() {
-                    let factory = downcast_pf::<CallableFactory>(result).unwrap();
-                    context.create_fun_instance(self.ctxid, RefData::new_rc(factory.create()));
-                    opt_instance = context.move_fun_instance(self.ctxid);
+                    if result.get_type().0 == FirstType::CallableFactory {
+                        let factory = downcast_pf::<CallableFactory>(result).unwrap();
+                        context.create_fun_instance(self.ctxid, RefData::new_rc(factory.create()));
+                        opt_instance = context.move_fun_instance(self.ctxid);
+                    } else {
+                        let factory = downcast_pf::<CallableObject>(result).unwrap();
+                        context.create_fun_instance(self.ctxid, RefData::new_rc(factory.create()));
+                        opt_instance = context.move_fun_instance(self.ctxid);
+                    }
                 }
                 let mut callable = opt_instance.unwrap();
 
@@ -593,7 +600,7 @@ mod tests {
     use crate::runtime::context::Context;
     use crate::runtime::exp::Exp;
     use crate::syntax::SyntaxParser;
-    use crate::types::RefData;
+    use crate::types::{PineClass, RefData};
 
     #[test]
     fn assignment_test() {
@@ -939,6 +946,31 @@ mod tests {
         context.init_vars(vec![Some(PineRef::new_rc(CallableFactory::new(|| {
             Callable::new(Some(test_func), None)
         })))]);
+        let res = downcast_pf::<Bool>(exp.run(&mut context).unwrap()).unwrap();
+        assert_eq!(res, RefData::new_box(true));
+        assert!(context.move_fun_instance(0).is_some());
+
+        struct MyPineClass {}
+
+        impl<'a> PineClass<'a> for MyPineClass {
+            fn custom_type(&self) -> &str {
+                "my pine"
+            }
+            fn get(&self, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
+                Ok(PineRef::new_box(Some(1)))
+            }
+            fn copy(&self) -> Box<dyn PineClass<'a> + 'a> {
+                Box::new(MyPineClass {})
+            }
+        }
+
+        // Test for CallableObject
+        let mut context = Context::new(None, ContextType::Normal);
+        context.init(1, 1, 1);
+        context.init_vars(vec![Some(PineRef::new_rc(CallableObject::new(
+            Box::new(MyPineClass {}),
+            || Callable::new(Some(test_func), None),
+        )))]);
         let res = downcast_pf::<Bool>(exp.run(&mut context).unwrap()).unwrap();
         assert_eq!(res, RefData::new_box(true));
         assert!(context.move_fun_instance(0).is_some());

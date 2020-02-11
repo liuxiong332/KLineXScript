@@ -146,7 +146,7 @@ pub trait PineClass<'a> {
         Err(RuntimeErr::NotSupportOperator)
     }
 
-    fn copy(&self) -> PineRef<'a>;
+    fn copy(&self) -> Box<dyn PineClass<'a> + 'a>;
 }
 
 impl<'a> fmt::Debug for dyn PineClass<'a> + 'a {

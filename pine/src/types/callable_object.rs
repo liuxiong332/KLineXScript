@@ -31,9 +31,10 @@ impl<'a> PineType<'a> for CallableObject<'a> {
     }
 
     fn copy(&self) -> PineRef<'a> {
-        self.obj.copy()
+        PineRef::new_rc(CallableObject::new(self.obj.copy(), self.create_func))
     }
 }
+
 impl<'a> PineFrom<'a, CallableObject<'a>> for CallableObject<'a> {}
 
 impl<'a> ComplexType for CallableObject<'a> {}
@@ -88,8 +89,8 @@ mod tests {
             Err(RuntimeErr::NotSupportOperator)
         }
 
-        fn copy(&self) -> PineRef<'a> {
-            PineRef::new_rc(Object::new(Box::new(A)))
+        fn copy(&self) -> Box<dyn PineClass<'a> + 'a> {
+            Box::new(A)
         }
     }
 

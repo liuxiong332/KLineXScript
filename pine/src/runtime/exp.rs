@@ -6,9 +6,9 @@ pub use crate::ast::stat_expr_types::{
     Condition, DataType, Exp, FunctionCall, PrefixExp, RefCall, Statement, TypeCast,
 };
 use crate::types::{
-    downcast_pf, downcast_pf_ref, Bool, Color, DataType as FirstType, Evaluate, Float, Int, Object,
-    PineFrom, PineRef, PineStaticType, PineType, PineVar, RefData, RuntimeErr, SecondType, Series,
-    Tuple, NA,
+    downcast_pf, downcast_pf_ref, Bool, CallableObject, Color, DataType as FirstType, Evaluate,
+    Float, Int, Object, PineFrom, PineRef, PineStaticType, PineType, PineVar, RefData, RuntimeErr,
+    SecondType, Series, Tuple, NA,
 };
 use std::fmt::Debug;
 
@@ -123,30 +123,22 @@ impl<'a> Runner<'a> for PrefixExp<'a> {
     fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
         let var = self.left_exp.rv_run(context)?;
         // let var = context.move_var(self.var_index).unwrap();
-        if var.get_type() != (FirstType::Object, SecondType::Simple) {
-            return Err(PineRuntimeError::new(
+        match var.get_type() {
+            (FirstType::Object, SecondType::Simple) => {
+                let object = downcast_pf::<Object>(var).unwrap();
+                let subobj = object.get(self.right_name.value).unwrap();
+                Ok(subobj)
+            }
+            (FirstType::CallableObject, SecondType::Simple) => {
+                let object = downcast_pf::<CallableObject>(var).unwrap();
+                let subobj = object.get(self.right_name.value).unwrap();
+                Ok(subobj)
+            }
+            _ => Err(PineRuntimeError::new(
                 RuntimeErr::UnknownRuntimeErr,
                 self.range,
-            ));
+            )),
         }
-        let object = downcast_pf::<Object>(var).unwrap();
-        let subobj = object.get(self.right_name.value).unwrap();
-        // for name in self.var_chain[2..].iter() {
-        //     match subobj.get_type() {
-        //         (FirstType::Object, SecondType::Simple) => {
-        //             let obj = downcast_pf::<Object>(subobj).unwrap();
-        //             subobj = obj.get(name.value).unwrap();
-        //         }
-        //         _ => {
-        //             return Err(PineRuntimeError::new(
-        //                 RuntimeErr::NotSupportOperator,
-        //                 self.range,
-        //             ))
-        //         }
-        //     }
-        // }
-        // context.update_var(self.var_index, object.into_pf());
-        Ok(subobj)
     }
 }
 
@@ -221,8 +213,8 @@ mod tests {
     use crate::ast::num::Numeral;
     use crate::ast::stat_expr_types::{BoolNode, NaNode, RVVarName, TupleNode, VarIndex};
     use crate::ast::string::StringNode;
-    use crate::runtime::context::{Context, ContextType, VarOperate};
-    use crate::types::PineClass;
+    use crate::runtime::context::{Context, ContextType};
+    use crate::types::{Callable, PineClass};
     use std::fmt::Debug;
 
     #[test]
@@ -241,12 +233,12 @@ mod tests {
                 }
             }
 
-            fn copy(&self) -> PineRef<'a> {
-                PineRef::new_rc(Object::new(Box::new(A)))
+            fn copy(&self) -> Box<dyn PineClass<'a> + 'a> {
+                Box::new(A)
             }
         }
 
-        let mut exp = PrefixExp::new_no_input(
+        let exp = PrefixExp::new_no_input(
             Exp::PrefixExp(Box::new(PrefixExp::new_no_input(
                 Exp::VarName(RVVarName::new_no_range("obja")),
                 VarName::new_no_input("object"),
@@ -262,7 +254,17 @@ mod tests {
             downcast_pf::<Int>(exp.run(&mut context).unwrap()),
             Ok(RefData::new_box(Some(1)))
         );
-        // Context::new()
+
+        // For CallableObject
+        let mut context = Context::new(None, ContextType::Normal);
+        context.init_vars(vec![Some(PineRef::new_rc(CallableObject::new(
+            Box::new(A),
+            || Callable::new(None, None),
+        )))]);
+        assert_eq!(
+            downcast_pf::<Int>(exp.run(&mut context).unwrap()),
+            Ok(RefData::new_box(Some(1)))
+        );
     }
 
     #[test]

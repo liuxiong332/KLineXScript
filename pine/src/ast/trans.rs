@@ -327,14 +327,14 @@ mod tests {
             )
         );
 
-        fn int_oe2(int_lit: i32, lit_str: &'static str, pos: Position) -> OpOrExp2<'static> {
+        fn int_oe2(int_lit: i64, lit_str: &'static str, pos: Position) -> OpOrExp2<'static> {
             OpOrExp2::Exp2(Exp2::Num(Numeral::Int(IntNode::new(
                 int_lit,
                 StrRange::from_start(lit_str, pos),
             ))))
         }
 
-        fn int_exp(int_lit: i32, lit_str: &'static str, pos: Position) -> Exp<'static> {
+        fn int_exp(int_lit: i64, lit_str: &'static str, pos: Position) -> Exp<'static> {
             Exp::Num(Numeral::Int(IntNode::new(
                 int_lit,
                 StrRange::from_start(lit_str, pos),

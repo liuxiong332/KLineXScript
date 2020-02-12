@@ -46,7 +46,7 @@ pub fn gen_prefix_exp<'a>(var1: Exp<'a>, var2: VarName<'a>, range: StrRange) -> 
     Exp::PrefixExp(Box::new(PrefixExp::new(var1, var2, range)))
 }
 
-pub fn gen_int(num: i32, range: StrRange) -> Exp<'static> {
+pub fn gen_int(num: i64, range: StrRange) -> Exp<'static> {
     Exp::Num(Numeral::Int(IntNode { value: num, range }))
 }
 

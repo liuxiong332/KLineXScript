@@ -107,7 +107,7 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
                 let var_index = VarIndex::new(self.input_index + bar_index as i32, 0);
                 let series = self.context.move_var(var_index).unwrap();
                 let mut index_s: RefData<Series<Int>> = Series::implicity_from(series).unwrap();
-                index_s.update(Some(i as i32 + 1));
+                index_s.update(Some(i as i64 + 1));
                 self.context.update_var(var_index, index_s.into_pf());
             }
 

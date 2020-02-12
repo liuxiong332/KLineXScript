@@ -3,7 +3,7 @@ use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, Syn
 use crate::helper::err_msgs::*;
 use crate::helper::str_replace;
 use crate::helper::{
-    move_element, pine_ref_to_bool, pine_ref_to_color, pine_ref_to_f64, pine_ref_to_i32,
+    move_element, pine_ref_to_bool, pine_ref_to_color, pine_ref_to_f64, pine_ref_to_i64,
     pine_ref_to_string,
 };
 use crate::runtime::context::{downcast_ctx, Ctx};
@@ -56,16 +56,16 @@ fn pine_plot<'a>(
         let plot_info = PlotInfo {
             title: pine_ref_to_string(title),
             color: pine_ref_to_color(color),
-            linewidth: pine_ref_to_i32(linewidth),
+            linewidth: pine_ref_to_i64(linewidth),
             style: pine_ref_to_string(style),
-            transp: pine_ref_to_i32(transp),
+            transp: pine_ref_to_i64(transp),
             trackprice: pine_ref_to_bool(trackprice),
             histbase: pine_ref_to_f64(histbase),
-            offset: pine_ref_to_i32(offset),
+            offset: pine_ref_to_i64(offset),
             join: pine_ref_to_bool(join),
             editable: pine_ref_to_bool(editable),
-            show_last: pine_ref_to_i32(show_last),
-            display: pine_ref_to_i32(display),
+            show_last: pine_ref_to_i64(show_last),
+            display: pine_ref_to_i64(display),
         };
         downcast_ctx(context).push_output_info(OutputInfo::Plot(plot_info));
     }

@@ -9,7 +9,7 @@ use super::traits::{
 };
 
 // pine int type
-pub type Int = Option<i32>;
+pub type Int = Option<i64>;
 
 impl Negative<Int> for Int {
     fn negative(self) -> Int {
@@ -89,7 +89,7 @@ impl<'a> PineFrom<'a, Int> for Int {
             (DataType::Float, SecondType::Simple) => {
                 let f: RefData<Float> = downcast_pf::<Float>(t).unwrap();
                 let i: Int = match *f {
-                    Some(f) => Some(f as i32),
+                    Some(f) => Some(f as i64),
                     None => None,
                 };
                 Ok(RefData::new_box(i))
@@ -97,7 +97,7 @@ impl<'a> PineFrom<'a, Int> for Int {
             (DataType::Float, SecondType::Series) => {
                 let s = downcast_pf::<Series<Float>>(t).unwrap();
                 let i: Int = match s.get_current() {
-                    Some(f) => Some(f as i32),
+                    Some(f) => Some(f as i64),
                     None => None,
                 };
                 Ok(RefData::new_box(i))
@@ -526,11 +526,11 @@ mod tests {
             Ok(RefData::new(Some(3f64)))
         );
         assert_eq!(
-            Float::implicity_from(PineRef::new_box(Some(3i32))),
+            Float::implicity_from(PineRef::new_box(Some(3i64))),
             Ok(RefData::new(Some(3f64)))
         );
         assert_eq!(
-            Float::implicity_from(PineRef::new(Series::from(Some(3i32)))),
+            Float::implicity_from(PineRef::new(Series::from(Some(3i64)))),
             Ok(RefData::new_box(Some(3f64)))
         );
 
@@ -551,11 +551,11 @@ mod tests {
             Ok(RefData::new(Some(3f64)))
         );
         assert_eq!(
-            Float::explicity_from(PineRef::new_box(Some(3i32))),
+            Float::explicity_from(PineRef::new_box(Some(3i64))),
             Ok(RefData::new(Some(3f64)))
         );
         assert_eq!(
-            Float::explicity_from(PineRef::new(Series::from(Some(3i32)))),
+            Float::explicity_from(PineRef::new(Series::from(Some(3i64)))),
             Ok(RefData::new_box(Some(3f64)))
         );
     }
@@ -592,10 +592,10 @@ mod tests {
         assert_eq!(from_bool(NA), Ok(RefData::new_box(false)));
         assert_eq!(from_bool(Series::from(NA)), Ok(RefData::new_box(false)));
 
-        assert_eq!(from_bool(Some(3i32)), Ok(RefData::new_box(true)));
+        assert_eq!(from_bool(Some(3i64)), Ok(RefData::new_box(true)));
         assert_eq!(from_bool(None as Int), Ok(RefData::new_box(false)));
         assert_eq!(
-            from_bool(Series::from(Some(3i32))),
+            from_bool(Series::from(Some(3i64))),
             Ok(RefData::new_box(true))
         );
 
@@ -613,10 +613,10 @@ mod tests {
         assert_eq!(ex_from_bool(NA), Ok(RefData::new_box(false)));
         assert_eq!(ex_from_bool(Series::from(NA)), Ok(RefData::new_box(false)));
 
-        assert_eq!(ex_from_bool(Some(3i32)), Ok(RefData::new_box(true)));
+        assert_eq!(ex_from_bool(Some(3i64)), Ok(RefData::new_box(true)));
         assert_eq!(ex_from_bool(None as Int), Ok(RefData::new_box(false)));
         assert_eq!(
-            ex_from_bool(Series::from(Some(3i32))),
+            ex_from_bool(Series::from(Some(3i64))),
             Ok(RefData::new_box(true))
         );
 

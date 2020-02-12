@@ -15,12 +15,12 @@ use super::utils::skip_ws;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct IntNode {
-    pub value: i32,
+    pub value: i64,
     pub range: StrRange,
 }
 
 impl IntNode {
-    pub fn new(value: i32, range: StrRange) -> IntNode {
+    pub fn new(value: i64, range: StrRange) -> IntNode {
         IntNode { value, range }
     }
 }
@@ -44,7 +44,7 @@ pub enum Numeral {
 }
 
 impl Numeral {
-    pub fn from_i32(val: i32) -> Numeral {
+    pub fn from_i64(val: i64) -> Numeral {
         Numeral::Int(IntNode::new(
             val,
             StrRange::new(Position::new(0, 0), Position::max()),
@@ -83,10 +83,10 @@ pub fn underscore_digit_str(s: Input) -> PineResult<String> {
 //     }
 // }
 
-pub fn decimal(input: Input) -> PineResult<i32> {
+pub fn decimal(input: Input) -> PineResult<i64> {
     let (next_s, num_str) = underscore_digit_str(input).unwrap();
     // let (next_s, num_str) = digit1(input)?;
-    match i32::from_str_radix(&num_str, 10) {
+    match i64::from_str_radix(&num_str, 10) {
         Ok(num) => Ok((next_s, num)),
         _ => Err(Err::Error(PineError::from_pine_kind(
             input,
@@ -95,7 +95,7 @@ pub fn decimal(input: Input) -> PineResult<i32> {
     }
 }
 
-pub fn int_lit(input: Input) -> PineResult<i32> {
+pub fn int_lit(input: Input) -> PineResult<i64> {
     let (input, (sign, lit)) =
         tuple((opt(terminated(alt((tag("+"), tag("-"))), skip_ws)), decimal))(input)?;
     match sign {
@@ -105,16 +105,16 @@ pub fn int_lit(input: Input) -> PineResult<i32> {
     }
 }
 
-pub fn int_lit_ws(input: Input) -> PineResult<i32> {
+pub fn int_lit_ws(input: Input) -> PineResult<i64> {
     let (input, _) = skip_ws(input)?;
     int_lit(input)
 }
 
-pub fn float_mag(input: Input) -> PineResult<i32> {
+pub fn float_mag(input: Input) -> PineResult<i64> {
     preceded(alt((tag("e"), tag("E"))), float_sgn_suffix)(input)
 }
 
-pub fn float_sgn_suffix(input: Input) -> PineResult<i32> {
+pub fn float_sgn_suffix(input: Input) -> PineResult<i64> {
     let (input, sign) = opt(alt((tag("+"), tag("-"))))(input)?;
     let (input, num) = decimal(input)?;
     match sign {
@@ -130,7 +130,7 @@ pub fn num_lit(input: Input) -> PineResult<Numeral> {
         opt(preceded(tag("."), decimal)),
         opt(float_mag),
     )))(input)?;
-    if let Ok(n) = i32::from_str_radix(out.src, 10) {
+    if let Ok(n) = i64::from_str_radix(out.src, 10) {
         Ok((
             input,
             Numeral::Int(IntNode::new(n, StrRange::from_input(&out))),
@@ -184,7 +184,7 @@ mod tests {
 
     #[test]
     fn int_test() {
-        fn test_int_ws(s: &str, res: i32) {
+        fn test_int_ws(s: &str, res: i64) {
             let test_input = Input::new_with_str(s);
             let input_len: u32 = test_input.len().try_into().unwrap();
             assert_eq!(
@@ -197,8 +197,8 @@ mod tests {
         }
 
         test_int_ws("121", 121);
-        test_int_ws(" + 121", 121i32);
-        test_int_ws(" - 121", -121i32);
+        test_int_ws(" + 121", 121i64);
+        test_int_ws(" - 121", -121i64);
         test_int_ws(" 121", 121);
     }
 }

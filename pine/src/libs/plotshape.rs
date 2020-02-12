@@ -3,7 +3,7 @@ use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, Syn
 use crate::helper::err_msgs::*;
 use crate::helper::str_replace;
 use crate::helper::{
-    move_element, pine_ref_to_bool, pine_ref_to_color, pine_ref_to_i32, pine_ref_to_string,
+    move_element, pine_ref_to_bool, pine_ref_to_color, pine_ref_to_i64, pine_ref_to_string,
 };
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::output::{OutputData, OutputInfo, PlotShapeInfo};
@@ -30,16 +30,16 @@ fn pine_plot<'a>(
             style: pine_ref_to_string(style),
             location: pine_ref_to_string(location),
             color: pine_ref_to_color(color),
-            transp: pine_ref_to_i32(transp),
-            offset: pine_ref_to_i32(offset),
+            transp: pine_ref_to_i64(transp),
+            offset: pine_ref_to_i64(offset),
             text: pine_ref_to_string(text),
             textcolor: pine_ref_to_color(textcolor),
 
             editable: pine_ref_to_bool(editable),
             size: pine_ref_to_string(size),
 
-            show_last: pine_ref_to_i32(show_last),
-            display: pine_ref_to_i32(display),
+            show_last: pine_ref_to_i64(show_last),
+            display: pine_ref_to_i64(display),
         };
         downcast_ctx(context).push_output_info(OutputInfo::PlotShape(plot_info));
     }

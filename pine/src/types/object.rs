@@ -64,8 +64,8 @@ mod tests {
 
         fn get(&self, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
             match name {
-                "int1" => Ok(PineRef::new_box(Some(1i32))),
-                "int2" => Ok(PineRef::new_box(Some(2i32))),
+                "int1" => Ok(PineRef::new_box(Some(1i64))),
+                "int2" => Ok(PineRef::new_box(Some(2i64))),
                 "float1" => Ok(PineRef::new_box(Some(1f64))),
                 "float2" => Ok(PineRef::new_box(Some(2f64))),
                 _ => Err(RuntimeErr::NotSupportOperator),

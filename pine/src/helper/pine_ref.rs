@@ -30,7 +30,7 @@ pub fn pine_ref_to_color<'a>(val: Option<PineRef<'a>>) -> Option<String> {
     }
 }
 
-pub fn pine_ref_to_i32<'a>(val: Option<PineRef<'a>>) -> Option<i32> {
+pub fn pine_ref_to_i64<'a>(val: Option<PineRef<'a>>) -> Option<i64> {
     if val.is_none() {
         return None;
     }

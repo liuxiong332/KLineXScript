@@ -1200,8 +1200,8 @@ mod tests {
     const INT_TYPE: SyntaxType = SyntaxType::Simple(SimpleSyntaxType::Int);
     const FLOAT_TYPE: SyntaxType = SyntaxType::Simple(SimpleSyntaxType::Float);
 
-    fn int_exp<'a>(i: i32) -> Exp<'a> {
-        Exp::Num(Numeral::from_i32(i))
+    fn int_exp<'a>(i: i64) -> Exp<'a> {
+        Exp::Num(Numeral::from_i64(i))
     }
 
     fn float_exp<'a>(i: f64) -> Exp<'a> {
@@ -1536,7 +1536,7 @@ mod tests {
         );
 
         assert_eq!(
-            parser.parse_exp(&mut Exp::Num(Numeral::from_i32(1))),
+            parser.parse_exp(&mut Exp::Num(Numeral::from_i64(1))),
             Ok(ParseValue::new_with_type(SyntaxType::Simple(
                 SimpleSyntaxType::Int
             )))
@@ -1713,9 +1713,9 @@ mod tests {
 
         assert_eq!(
             parser.parse_exp(&mut Exp::Condition(Box::new(Condition::new_no_input(
-                Exp::Num(Numeral::from_i32(1)),
-                Exp::Num(Numeral::from_i32(2)),
-                Exp::Num(Numeral::from_i32(3))
+                Exp::Num(Numeral::from_i64(1)),
+                Exp::Num(Numeral::from_i64(2)),
+                Exp::Num(Numeral::from_i64(3))
             )))),
             Ok(ParseValue::new_with_type(SyntaxType::Series(
                 SimpleSyntaxType::Int

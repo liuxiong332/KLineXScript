@@ -368,8 +368,8 @@ mod tests {
         let call_res = callable.call(
             &mut context,
             vec![
-                PineRef::Box(Box::new(Some(1)) as Box<dyn PineType>),
-                PineRef::Box(Box::new(Some(2)) as Box<dyn PineType>),
+                PineRef::Box(Box::new(Some(1i64)) as Box<dyn PineType>),
+                PineRef::Box(Box::new(Some(2i64)) as Box<dyn PineType>),
             ],
             vec![],
             FunctionType::new((vec![("arg1", INT_TYPE), ("arg2", INT_TYPE)], INT_TYPE)),

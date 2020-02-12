@@ -356,7 +356,7 @@ impl<'a> StmtRunner<'a> for IfThenElse<'a> {
     }
 }
 
-fn extract_int(val: Int, range: StrRange) -> Result<i32, PineRuntimeError> {
+fn extract_int(val: Int, range: StrRange) -> Result<i64, PineRuntimeError> {
     match val {
         Some(ival) => Ok(ival),
         None => Err(PineRuntimeError::new(RuntimeErr::ForRangeIndexIsNA, range)),
@@ -611,21 +611,21 @@ mod tests {
         };
         let assign1 = Statement::Assignment(Box::new(Assignment::new_with_varids(
             vec![VarName::new_no_input("hello")],
-            Exp::Num(Numeral::from_i32(12)),
+            Exp::Num(Numeral::from_i64(12)),
             false,
             None,
             vec![1],
         )));
         let assign2 = Statement::Assignment(Box::new(Assignment::new_with_varids(
             vec![VarName::new_no_input("hello")],
-            Exp::Num(Numeral::from_i32(23)),
+            Exp::Num(Numeral::from_i64(23)),
             true,
             None,
             vec![1],
         )));
         let assign3 = Statement::Assignment(Box::new(Assignment::new_with_varids(
             vec![VarName::new_no_input("hello")],
-            Exp::Num(Numeral::from_i32(23)),
+            Exp::Num(Numeral::from_i64(23)),
             false,
             Some(DataType::Int),
             vec![1],
@@ -749,12 +749,12 @@ mod tests {
         let newvar_index = VarIndex::new(1, 0);
         let assign1 = VarAssignment::new_with_index(
             VarName::new_no_input("hello"),
-            Exp::Num(Numeral::from_i32(24)),
+            Exp::Num(Numeral::from_i64(24)),
             hello_index,
         );
         let assign2 = VarAssignment::new_with_index(
             VarName::new_no_input("hello"),
-            Exp::Num(Numeral::from_i32(36)),
+            Exp::Num(Numeral::from_i64(36)),
             hello_index,
         );
         let assign3 = VarAssignment::new_with_index(
@@ -831,15 +831,15 @@ mod tests {
 
         let assign = Statement::Assignment(Box::new(Assignment::new_no_input(
             vec![VarName::new_no_input("a")],
-            Exp::Num(Numeral::from_i32(1)),
+            Exp::Num(Numeral::from_i64(1)),
             false,
             None,
         )));
-        let block = Block::new_no_input(vec![assign], Some(Exp::Num(Numeral::from_i32(10))));
+        let block = Block::new_no_input(vec![assign], Some(Exp::Num(Numeral::from_i64(10))));
         let mut for_range = ForRange::new_no_ctxid(
             VarName::new_no_input("i"),
-            Exp::Num(Numeral::from_i32(1)),
-            Exp::Num(Numeral::from_i32(10)),
+            Exp::Num(Numeral::from_i64(1)),
+            Exp::Num(Numeral::from_i64(10)),
             None,
             block,
             StrRange::new_empty(),
@@ -865,13 +865,13 @@ mod tests {
     fn for_range_exp_test() {
         let assign = Statement::Assignment(Box::new(Assignment::new_with_varids(
             vec![VarName::new_no_input("a")],
-            Exp::Num(Numeral::from_i32(1)),
+            Exp::Num(Numeral::from_i64(1)),
             false,
             None,
             vec![1],
         )));
         let block =
-            Block::new_with_count(vec![assign], Some(Exp::Num(Numeral::from_i32(10))), 2, 0, 0);
+            Block::new_with_count(vec![assign], Some(Exp::Num(Numeral::from_i64(10))), 2, 0, 0);
         let for_range = ForRange::new_with_ctxid(
             VarName::new_no_input("i"),
             Exp::VarName(RVVarName::new_with_index("start", VarIndex::new(0, 0))),
@@ -1059,8 +1059,8 @@ mod tests {
         );
         let for_range = ForRange::new_with_ctxid(
             VarName::new_no_input("i"),
-            Exp::Num(Numeral::from_i32(1)),
-            Exp::Num(Numeral::from_i32(10)),
+            Exp::Num(Numeral::from_i64(1)),
+            Exp::Num(Numeral::from_i64(10)),
             None,
             block,
             StrRange::new_empty(),
@@ -1096,8 +1096,8 @@ mod tests {
         );
         let for_range = ForRange::new_with_ctxid(
             VarName::new_no_input("i"),
-            Exp::Num(Numeral::from_i32(1)),
-            Exp::Num(Numeral::from_i32(10)),
+            Exp::Num(Numeral::from_i64(1)),
+            Exp::Num(Numeral::from_i64(10)),
             None,
             block,
             StrRange::new_empty(),

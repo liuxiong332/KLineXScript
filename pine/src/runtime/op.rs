@@ -270,7 +270,7 @@ mod tests {
 
     #[test]
     fn unary_op_test() {
-        let exp = Exp::Num(Numeral::from_i32(1));
+        let exp = Exp::Num(Numeral::from_i64(1));
         let exp2 = Exp::Bool(BoolNode::new(true, StrRange::new_empty()));
 
         let minus_exp = UnaryExp::new(UnaryOp::Minus, exp, StrRange::new_empty());
@@ -288,8 +288,8 @@ mod tests {
         );
     }
 
-    fn int_exp<'a>(int: i32) -> Exp<'a> {
-        Exp::Num(Numeral::from_i32(int))
+    fn int_exp<'a>(int: i64) -> Exp<'a> {
+        Exp::Num(Numeral::from_i64(int))
     }
 
     fn float_exp<'a>(f: f64) -> Exp<'a> {
@@ -347,7 +347,7 @@ mod tests {
             Ok(RefData::new_box(Some(3f64)))
         );
         assert_eq!(
-            biop_runner(BinaryOp::Plus, int_exp(1i32), float_exp(2f64)),
+            biop_runner(BinaryOp::Plus, int_exp(1i64), float_exp(2f64)),
             Ok(RefData::new_box(Some(3f64)))
         );
         assert_eq!(
@@ -374,16 +374,16 @@ mod tests {
             Ok(RefData::new_box(Some(1f64)))
         );
         assert_eq!(
-            biop_runner(BinaryOp::Mul, int_exp(2i32), int_exp(3i32)),
-            Ok(RefData::new_box(Some(6i32)))
+            biop_runner(BinaryOp::Mul, int_exp(2i64), int_exp(3i64)),
+            Ok(RefData::new_box(Some(6i64)))
         );
         assert_eq!(
             biop_runner(BinaryOp::Mul, float_exp(2f64), float_exp(3f64)),
             Ok(RefData::new_box(Some(6f64)))
         );
         assert_eq!(
-            biop_runner(BinaryOp::Div, int_exp(5i32), int_exp(2i32)),
-            Ok(RefData::new_box(Some(2i32)))
+            biop_runner(BinaryOp::Div, int_exp(5i64), int_exp(2i64)),
+            Ok(RefData::new_box(Some(2i64)))
         );
         assert_eq!(
             biop_runner(BinaryOp::Div, float_exp(5f64), float_exp(2f64)),
@@ -391,8 +391,8 @@ mod tests {
         );
 
         assert_eq!(
-            biop_runner(BinaryOp::Mod, int_exp(12i32), int_exp(5i32)),
-            Ok(RefData::new_box(Some(2i32)))
+            biop_runner(BinaryOp::Mod, int_exp(12i64), int_exp(5i64)),
+            Ok(RefData::new_box(Some(2i64)))
         );
         assert_eq!(
             biop_runner(BinaryOp::Mod, float_exp(12f64), float_exp(5f64)),

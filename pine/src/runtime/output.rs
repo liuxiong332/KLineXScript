@@ -8,14 +8,14 @@ pub struct BoolInputInfo {
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct IntInputInfo {
-    pub defval: Option<i32>,
+    pub defval: Option<i64>,
     pub title: Option<String>,
     pub input_type: String,
-    pub minval: Option<i32>,
-    pub maxval: Option<i32>,
+    pub minval: Option<i64>,
+    pub maxval: Option<i64>,
     pub confirm: Option<bool>,
-    pub step: Option<i32>,
-    pub options: Option<Vec<i32>>,
+    pub step: Option<i64>,
+    pub options: Option<Vec<i64>>,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
@@ -60,16 +60,16 @@ pub enum InputInfo {
 pub struct PlotInfo {
     pub title: Option<String>,
     pub color: Option<String>,
-    pub linewidth: Option<i32>,
+    pub linewidth: Option<i64>,
     pub style: Option<String>,
-    pub transp: Option<i32>,
+    pub transp: Option<i64>,
     pub trackprice: Option<bool>,
     pub histbase: Option<f64>,
-    pub offset: Option<i32>,
+    pub offset: Option<i64>,
     pub join: Option<bool>,
     pub editable: Option<bool>,
-    pub show_last: Option<i32>,
-    pub display: Option<i32>,
+    pub show_last: Option<i64>,
+    pub display: Option<i64>,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
@@ -77,13 +77,13 @@ pub struct PlotArrowInfo {
     pub title: Option<String>,
     pub colorup: Option<String>,
     pub colordown: Option<String>,
-    pub transp: Option<i32>,
-    pub offset: Option<i32>,
-    pub minheight: Option<i32>,
-    pub maxheight: Option<i32>,
+    pub transp: Option<i64>,
+    pub offset: Option<i64>,
+    pub minheight: Option<i64>,
+    pub maxheight: Option<i64>,
     pub editable: Option<bool>,
-    pub show_last: Option<i32>,
-    pub display: Option<i32>,
+    pub show_last: Option<i64>,
+    pub display: Option<i64>,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
@@ -91,8 +91,8 @@ pub struct PlotBarInfo {
     pub title: Option<String>,
     pub color: Option<String>,
     pub editable: Option<bool>,
-    pub show_last: Option<i32>,
-    pub display: Option<i32>,
+    pub show_last: Option<i64>,
+    pub display: Option<i64>,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
@@ -102,8 +102,8 @@ pub struct PlotCandleInfo {
     pub wickcolor: Option<String>,
     pub bordercolor: Option<String>,
     pub editable: Option<bool>,
-    pub show_last: Option<i32>,
-    pub display: Option<i32>,
+    pub show_last: Option<i64>,
+    pub display: Option<i64>,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
@@ -112,14 +112,14 @@ pub struct PlotCharInfo {
     pub char: Option<String>,
     pub location: Option<String>,
     pub color: Option<String>,
-    pub transp: Option<i32>,
-    pub offset: Option<i32>,
+    pub transp: Option<i64>,
+    pub offset: Option<i64>,
     pub text: Option<String>,
     pub textcolor: Option<String>,
     pub editable: Option<bool>,
     pub size: Option<String>,
-    pub show_last: Option<i32>,
-    pub display: Option<i32>,
+    pub show_last: Option<i64>,
+    pub display: Option<i64>,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
@@ -128,14 +128,14 @@ pub struct PlotShapeInfo {
     pub style: Option<String>,
     pub location: Option<String>,
     pub color: Option<String>,
-    pub transp: Option<i32>,
-    pub offset: Option<i32>,
+    pub transp: Option<i64>,
+    pub offset: Option<i64>,
     pub text: Option<String>,
     pub textcolor: Option<String>,
     pub editable: Option<bool>,
     pub size: Option<String>,
-    pub show_last: Option<i32>,
-    pub display: Option<i32>,
+    pub show_last: Option<i64>,
+    pub display: Option<i64>,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
@@ -248,7 +248,7 @@ impl OutputDataCollect {
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "content")]
 pub enum InputVal {
-    Int(i32),
+    Int(i64),
     Float(f64),
     Bool(bool),
     String(String),

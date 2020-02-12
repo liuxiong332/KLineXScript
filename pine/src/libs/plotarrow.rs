@@ -1,7 +1,7 @@
 use super::VarResult;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
 use crate::helper::{
-    move_element, pine_ref_to_bool, pine_ref_to_color, pine_ref_to_f64, pine_ref_to_i32,
+    move_element, pine_ref_to_bool, pine_ref_to_color, pine_ref_to_f64, pine_ref_to_i64,
     pine_ref_to_string,
 };
 use crate::runtime::context::{downcast_ctx, Ctx};
@@ -28,13 +28,13 @@ fn pine_plot<'a>(
             title: pine_ref_to_string(title),
             colorup: pine_ref_to_color(colorup),
             colordown: pine_ref_to_color(colordown),
-            transp: pine_ref_to_i32(transp),
-            offset: pine_ref_to_i32(offset),
-            minheight: pine_ref_to_i32(minheight),
-            maxheight: pine_ref_to_i32(maxheight),
+            transp: pine_ref_to_i64(transp),
+            offset: pine_ref_to_i64(offset),
+            minheight: pine_ref_to_i64(minheight),
+            maxheight: pine_ref_to_i64(maxheight),
             editable: pine_ref_to_bool(editable),
-            show_last: pine_ref_to_i32(show_last),
-            display: pine_ref_to_i32(display),
+            show_last: pine_ref_to_i64(show_last),
+            display: pine_ref_to_i64(display),
         };
         downcast_ctx(context).push_output_info(OutputInfo::PlotArrow(plot_info));
     }

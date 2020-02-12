@@ -227,7 +227,7 @@ mod tests {
 
             fn get(&self, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
                 match name {
-                    "int" => Ok(PineRef::new_box(Some(1i32))),
+                    "int" => Ok(PineRef::new_box(Some(1i64))),
                     "object" => Ok(PineRef::new_rc(Object::new(Box::new(A)))),
                     _ => Err(RuntimeErr::NotSupportOperator),
                 }
@@ -273,8 +273,8 @@ mod tests {
 
         let mut cond_exp = Condition::new_no_input(
             Exp::Bool(BoolNode::new(true, StrRange::new_empty())),
-            Exp::Num(Numeral::from_i32(1)),
-            Exp::Num(Numeral::from_i32(2)),
+            Exp::Num(Numeral::from_i64(1)),
+            Exp::Num(Numeral::from_i64(2)),
         );
         SyntaxParser::new().parse_condition(&mut cond_exp).unwrap();
 
@@ -325,7 +325,7 @@ mod tests {
     fn ref_call_test() {
         let mut hello_name = RVVarName::new_no_range("hello");
         hello_name.var_index = VarIndex::new(0, 0);
-        let exp = RefCall::new_no_input(Exp::VarName(hello_name), Exp::Num(Numeral::from_i32(1)));
+        let exp = RefCall::new_no_input(Exp::VarName(hello_name), Exp::Num(Numeral::from_i64(1)));
 
         let mut context = Context::new(None, ContextType::Normal);
         let mut series: Series<Int> = Series::from(Some(1));
@@ -370,7 +370,7 @@ mod tests {
             false,
         );
         simple_exp(Exp::Num(Numeral::from_f64(0f64)), Some(0f64));
-        simple_exp(Exp::Num(Numeral::from_i32(1)), Some(1));
+        simple_exp(Exp::Num(Numeral::from_i64(1)), Some(1));
         simple_exp(
             Exp::Str(StringNode::new(
                 String::from("hello"),
@@ -415,7 +415,7 @@ mod tests {
             false,
         );
         simple_rv_exp(Exp::Num(Numeral::from_f64(0f64)), Some(0f64));
-        simple_rv_exp(Exp::Num(Numeral::from_i32(1)), Some(1));
+        simple_rv_exp(Exp::Num(Numeral::from_i64(1)), Some(1));
         simple_rv_exp(
             Exp::Str(StringNode::new(
                 String::from("hello"),

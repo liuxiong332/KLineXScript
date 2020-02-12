@@ -3,7 +3,7 @@ use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, Syn
 use crate::helper::err_msgs::*;
 use crate::helper::str_replace;
 use crate::helper::{
-    move_element, pine_ref_to_bool, pine_ref_to_color, pine_ref_to_f64, pine_ref_to_i32,
+    move_element, pine_ref_to_bool, pine_ref_to_color, pine_ref_to_f64, pine_ref_to_i64,
     pine_ref_to_string,
 };
 use crate::runtime::context::{downcast_ctx, Ctx};

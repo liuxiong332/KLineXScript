@@ -4,7 +4,7 @@ use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, Syn
 use crate::helper::err_msgs::*;
 use crate::helper::str_replace;
 use crate::helper::{
-    move_element, pine_ref_to_bool, pine_ref_to_f64, pine_ref_to_i32, pine_ref_to_string,
+    move_element, pine_ref_to_bool, pine_ref_to_f64, pine_ref_to_i64, pine_ref_to_string,
 };
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::output::{
@@ -226,8 +226,8 @@ where
     }
 }
 
-pub fn pine_ref_to_i32_list<'a>(val: Option<PineRef<'a>>) -> Option<Vec<i32>> {
-    pine_ref_to_list(val, pine_ref_to_i32)
+pub fn pine_ref_to_i64_list<'a>(val: Option<PineRef<'a>>) -> Option<Vec<i64>> {
+    pine_ref_to_list(val, pine_ref_to_i64)
 }
 
 pub fn pine_ref_to_f64_list<'a>(val: Option<PineRef<'a>>) -> Option<Vec<f64>> {
@@ -257,14 +257,14 @@ fn input_for_int<'a>(
             )));
         }
         ctx_ins.push_input_info(InputInfo::Int(IntInputInfo {
-            defval: pine_ref_to_i32(defval.clone()),
+            defval: pine_ref_to_i64(defval.clone()),
             title: pine_ref_to_string(title),
             input_type: String::from(INT_TYPE_STR),
-            minval: pine_ref_to_i32(minval),
-            maxval: pine_ref_to_i32(maxval),
+            minval: pine_ref_to_i64(minval),
+            maxval: pine_ref_to_i64(maxval),
             confirm: pine_ref_to_bool(confirm),
-            step: pine_ref_to_i32(step),
-            options: pine_ref_to_i32_list(options),
+            step: pine_ref_to_i64(step),
+            options: pine_ref_to_i64_list(options),
         }));
     }
 

@@ -123,6 +123,22 @@ pub struct PlotCharInfo {
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub struct PlotShapeInfo {
+    pub title: Option<String>,
+    pub style: Option<String>,
+    pub location: Option<String>,
+    pub color: Option<String>,
+    pub transp: Option<i32>,
+    pub offset: Option<i32>,
+    pub text: Option<String>,
+    pub textcolor: Option<String>,
+    pub editable: Option<bool>,
+    pub size: Option<String>,
+    pub show_last: Option<i32>,
+    pub display: Option<i32>,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum OutputInfo {
     Plot(PlotInfo),
@@ -130,6 +146,7 @@ pub enum OutputInfo {
     PlotBar(PlotBarInfo),
     PlotCandle(PlotCandleInfo),
     PlotChar(PlotCharInfo),
+    PlotShape(PlotShapeInfo),
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]

@@ -34,7 +34,7 @@ use libs::{declare_vars, VarResult};
 use runtime::context::{Context, PineRuntimeError};
 use runtime::data_src::{Callback, DataSrc};
 use runtime::error_format::{ErrorFormater, PineFormatError};
-use runtime::output::{IOInfo, InputVal, OutputData};
+use runtime::output::{IOInfo, InputVal, OutputData, OutputDataCollect};
 use std::mem;
 use types::{Float, PineRef};
 
@@ -286,15 +286,17 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
         }
     }
 
-    fn move_output_data(&mut self) -> Vec<Option<OutputData>> {
-        self.get_runner().get_context().move_output_data()
+    fn move_output_data(&mut self) -> OutputDataCollect {
+        let context = self.get_runner().get_context();
+        let (start, end) = context.get_data_range();
+        OutputDataCollect::new(start.unwrap(), end.unwrap(), context.move_output_data())
     }
 
     // Run the script with new input settings and old data
     pub fn run_with_input(
         &mut self,
         input: Vec<Option<InputVal>>,
-    ) -> Result<Vec<Option<OutputData>>, PineFormatError> {
+    ) -> Result<OutputDataCollect, PineFormatError> {
         let runner = self.get_runner();
         runner.change_inputs(input);
         match self.runner.as_mut().unwrap().run(&self.data) {
@@ -307,7 +309,7 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
     pub fn run_with_data(
         &mut self,
         data: Vec<(&'static str, Vec<Float>)>,
-    ) -> Result<Vec<Option<OutputData>>, PineFormatError>
+    ) -> Result<OutputDataCollect, PineFormatError>
     where
         'li: 'ra,
         'pa: 'ra,
@@ -325,7 +327,7 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
         &mut self,
         input: Vec<Option<InputVal>>,
         data: Vec<(&'static str, Vec<Float>)>,
-    ) -> Result<Vec<Option<OutputData>>, PineFormatError>
+    ) -> Result<OutputDataCollect, PineFormatError>
     where
         'li: 'ra,
         'pa: 'ra,
@@ -356,7 +358,7 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
     pub fn update(
         &mut self,
         data: Vec<(&'static str, Vec<Float>)>,
-    ) -> Result<Vec<Option<OutputData>>, PineFormatError> {
+    ) -> Result<OutputDataCollect, PineFormatError> {
         self.merge_data(&data, self.data[0].1.len() - 1);
         match self.runner.as_mut().unwrap().update(&data) {
             Ok(_) => Ok(self.move_output_data()),
@@ -368,7 +370,7 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
         &mut self,
         data: Vec<(&'static str, Vec<Float>)>,
         from: i32,
-    ) -> Result<Vec<Option<OutputData>>, PineFormatError> {
+    ) -> Result<OutputDataCollect, PineFormatError> {
         self.merge_data(&data, from as usize);
         match self.runner.as_mut().unwrap().update_from(&data, from) {
             Ok(_) => Ok(self.move_output_data()),
@@ -522,55 +524,55 @@ mod tests {
         let data = vec![("close", vec![Some(1f64), Some(2f64)])];
         assert_eq!(
             parser.run_with_data(data.clone()),
-            Ok(vec![Some(OutputData::new(
-                Some(0),
-                Some(2),
+            Ok(OutputDataCollect::new_with_one(
+                0,
+                2,
                 vec![Some(2f64), Some(3f64)]
-            ))])
+            ))
         );
 
         assert_eq!(
             parser.run_with_input(vec![Some(InputVal::Int(10))]),
-            Ok(vec![Some(OutputData::new(
-                Some(0),
-                Some(2),
+            Ok(OutputDataCollect::new_with_one(
+                0,
+                2,
                 vec![Some(11f64), Some(12f64)]
-            ))])
+            ))
         );
 
         assert_eq!(
             parser.run_with_data(data.clone()),
-            Ok(vec![Some(OutputData::new(
-                Some(0),
-                Some(2),
+            Ok(OutputDataCollect::new_with_one(
+                0,
+                2,
                 vec![Some(11f64), Some(12f64)]
-            ))])
+            ))
         );
 
         assert_eq!(
             parser.update(vec![("close", vec![Some(10f64), Some(11f64)])]),
-            Ok(vec![Some(OutputData::new(
-                Some(1),
-                Some(3),
+            Ok(OutputDataCollect::new_with_one(
+                1,
+                3,
                 vec![Some(20f64), Some(21f64)]
-            ))])
+            ))
         );
         assert_eq!(
             parser.update_from(vec![("close", vec![Some(10f64), Some(11f64)])], 2),
-            Ok(vec![Some(OutputData::new(
-                Some(2),
-                Some(4),
+            Ok(OutputDataCollect::new_with_one(
+                2,
+                4,
                 vec![Some(20f64), Some(21f64)]
-            ))])
+            ))
         );
 
         assert_eq!(
             parser.run_with_input(vec![Some(InputVal::Int(100))]),
-            Ok(vec![Some(OutputData::new(
-                Some(0),
-                Some(4),
+            Ok(OutputDataCollect::new_with_one(
+                0,
+                4,
                 vec![Some(101f64), Some(110f64), Some(110f64), Some(111f64)]
-            ))])
+            ))
         );
     }
 }

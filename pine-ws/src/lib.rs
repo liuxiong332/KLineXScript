@@ -32,7 +32,9 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 //     JsValue::from_serde(&example).unwrap()
 // }
 
-use pine::runtime::{InputVal, NoneCallback, OutputData, OutputInfo, PineFormatError, PlotInfo};
+use pine::runtime::{
+    InputVal, NoneCallback, OutputData, OutputDataCollect, OutputInfo, PineFormatError, PlotInfo,
+};
 use pine::PineScript;
 use std::convert::TryInto;
 use std::f64;
@@ -80,20 +82,24 @@ pub fn gen_io_info(runner: &mut ExportPineRunner) -> Result<JsValue, JsValue> {
     }
 }
 
-fn output_data_to_slice(output: Vec<Option<OutputData>>) -> *mut f64 {
+fn output_data_to_slice(output: OutputDataCollect) -> *mut f64 {
     let mut res: Vec<f64> = Vec::new();
-    for data in output {
+    // push [from, to] as float64 to result array.
+    let bytes = [output.from.to_le_bytes(), output.to.to_le_bytes()].concat();
+    let dest_bytes: [u8; 8] = bytes.as_slice().try_into().unwrap();
+    res.push(f64::from_le_bytes(dest_bytes));
+
+    for data in output.data_list {
         match data {
             Some(v) => {
-                let from = v.from.unwrap();
-                let to = v.to.unwrap();
-                let bytes = [from.to_le_bytes(), to.to_le_bytes()].concat();
-                let dest_bytes: [u8; 8] = bytes.as_slice().try_into().unwrap();
-                res.push(f64::from_le_bytes(dest_bytes));
-                for element in v.series {
-                    match element {
-                        Some(fv) => res.push(fv),
-                        None => res.push(f64::NAN),
+                // For every output data, first push the length of data vec
+                res.push(v.series.len() as f64);
+                for ones in v.series {
+                    for element in ones {
+                        match element {
+                            Some(fv) => res.push(fv),
+                            None => res.push(f64::NAN),
+                        }
                     }
                 }
             }

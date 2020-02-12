@@ -72,9 +72,7 @@ fn pine_plot<'a>(
     match series {
         Some(item_val) => {
             let data = plot_val(item_val, context)?;
-            let ctx_ins = downcast_ctx(context);
-            let data_range = ctx_ins.get_data_range();
-            ctx_ins.push_output_data(Some(OutputData::new(data_range.0, data_range.1, data)));
+            downcast_ctx(context).push_output_data(Some(OutputData::new(vec![data])));
             Ok(())
         }
         _ => Err(RuntimeErr::NotSupportOperator),
@@ -175,16 +173,8 @@ mod tests {
         assert_eq!(
             runner.get_context().move_output_data(),
             vec![
-                Some(OutputData::new(
-                    Some(0),
-                    Some(2),
-                    vec![Some(1f64), Some(2f64)]
-                )),
-                Some(OutputData::new(
-                    Some(0),
-                    Some(2),
-                    vec![Some(2f64), Some(3f64)]
-                ))
+                Some(OutputData::new(vec![vec![Some(1f64), Some(2f64)]])),
+                Some(OutputData::new(vec![vec![Some(2f64), Some(3f64)]]))
             ]
         );
         assert_eq!(runner.get_context().get_io_info().get_outputs().len(), 2);
@@ -195,16 +185,8 @@ mod tests {
         assert_eq!(
             runner.get_context().move_output_data(),
             vec![
-                Some(OutputData::new(
-                    Some(1),
-                    Some(3),
-                    vec![Some(10f64), Some(11f64)]
-                )),
-                Some(OutputData::new(
-                    Some(1),
-                    Some(3),
-                    vec![Some(11f64), Some(12f64)]
-                )),
+                Some(OutputData::new(vec![vec![Some(10f64), Some(11f64)]])),
+                Some(OutputData::new(vec![vec![Some(11f64), Some(12f64)]])),
             ]
         );
         assert_eq!(runner.get_context().get_io_info().get_outputs().len(), 2);
@@ -218,16 +200,16 @@ mod tests {
         assert_eq!(
             runner.get_context().move_output_data(),
             vec![
-                Some(OutputData::new(
-                    Some(1),
-                    Some(4),
-                    vec![Some(100f64), Some(101f64), Some(102f64)]
-                )),
-                Some(OutputData::new(
-                    Some(1),
-                    Some(4),
-                    vec![Some(101f64), Some(102f64), Some(103f64)]
-                )),
+                Some(OutputData::new(vec![vec![
+                    Some(100f64),
+                    Some(101f64),
+                    Some(102f64)
+                ]])),
+                Some(OutputData::new(vec![vec![
+                    Some(101f64),
+                    Some(102f64),
+                    Some(103f64)
+                ]])),
             ]
         );
     }

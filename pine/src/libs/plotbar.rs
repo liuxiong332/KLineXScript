@@ -44,14 +44,14 @@ fn pine_plot<'a>(
             let data = items.move_history();
             let ctx_ins = downcast_ctx(context);
             let data_range = ctx_ins.get_data_range();
-            ctx_ins.push_output_data(Some(OutputData::new(vec![data])));
+            ctx_ins.push_output_data(Some(OutputData::new(data_range.0, data_range.1, data)));
             Ok(())
         }
         _ => Err(RuntimeErr::NotSupportOperator),
     }
 }
 
-pub const VAR_NAME: &'static str = "plotarrow";
+pub const VAR_NAME: &'static str = "plotbar";
 
 pub fn declare_var<'a>() -> VarResult<'a> {
     let value = PineRef::new(CallableFactory::new(|| {
@@ -62,14 +62,12 @@ pub fn declare_var<'a>() -> VarResult<'a> {
 
     let func_type = FunctionTypes(vec![FunctionType::new((
         vec![
-            ("series", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("open", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("high", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("low", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("close", SyntaxType::Series(SimpleSyntaxType::Float)),
             ("title", SyntaxType::string()),
-            ("colorup", SyntaxType::color()),
-            ("colordown", SyntaxType::color()),
-            ("transp", SyntaxType::int()),
-            ("offset", SyntaxType::int()),
-            ("minheight", SyntaxType::int()),
-            ("maxheight", SyntaxType::int()),
+            ("color", SyntaxType::color()),
             ("editable", SyntaxType::bool()),
             ("show_last", SyntaxType::int()),
             ("display", SyntaxType::bool()),
@@ -106,7 +104,11 @@ mod tests {
 
         assert_eq!(
             runner.get_context().move_output_data(),
-            vec![Some(OutputData::new(vec![vec![Some(1f64), Some(2f64)]])),]
+            vec![Some(OutputData::new(
+                Some(0),
+                Some(2),
+                vec![Some(1f64), Some(2f64)]
+            )),]
         );
         assert_eq!(
             runner.get_context().get_io_info().get_outputs(),

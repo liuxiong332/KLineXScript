@@ -153,14 +153,39 @@ impl IOInfo {
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct OutputData {
-    pub from: Option<i32>,
-    pub to: Option<i32>,
-    pub series: Vec<Option<f64>>,
+    // pub from: Option<i32>,
+    // pub to: Option<i32>,
+    pub series: Vec<Vec<Option<f64>>>,
 }
 
 impl OutputData {
-    pub fn new(from: Option<i32>, to: Option<i32>, series: Vec<Option<f64>>) -> OutputData {
-        OutputData { from, to, series }
+    pub fn new(series: Vec<Vec<Option<f64>>>) -> OutputData {
+        OutputData { series }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub struct OutputDataCollect {
+    pub from: i32,
+    pub to: i32,
+    pub data_list: Vec<Option<OutputData>>,
+}
+
+impl OutputDataCollect {
+    pub fn new(from: i32, to: i32, data_list: Vec<Option<OutputData>>) -> OutputDataCollect {
+        OutputDataCollect {
+            from,
+            to,
+            data_list,
+        }
+    }
+
+    pub fn new_with_one(from: i32, to: i32, data: Vec<Option<f64>>) -> OutputDataCollect {
+        OutputDataCollect {
+            from,
+            to,
+            data_list: vec![Some(OutputData::new(vec![data]))],
+        }
     }
 }
 

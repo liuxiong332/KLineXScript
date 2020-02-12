@@ -59,6 +59,7 @@ static ERROR_MAP: &[(&'static str, &'static str)] = &[
     ("NotImplement", "The operation has not implemented now."),
     ("InvalidTypeCast", "The type cast is not valid."),
     ("InvalidNADeclarer", "The variable cann't be declared with na."),
+    ("InvalidParameters", "The parameters are not valid."),
     ("MissingParameters", "Missing parameters. {}"),
     ("FuncCallParamNotValid", "The function call's parameters is not valid, {}."),
     ("VarNotFound", "The variable doesn't exist in this cotnext."),
@@ -150,6 +151,9 @@ impl ErrorFormater {
             RuntimeErr::NotImplement(_) => String::from(self.error_map["NotImplement"]),
             RuntimeErr::InvalidTypeCast => String::from(self.error_map["InvalidTypeCast"]),
             RuntimeErr::InvalidNADeclarer => String::from(self.error_map["InvalidNADeclarer"]),
+            RuntimeErr::InvalidParameters(s) => {
+                str_replace(self.error_map["InvalidParameters"], vec![s])
+            }
             RuntimeErr::MissingParameters(s) => {
                 str_replace(self.error_map["MissingParameters"], vec![s])
             }

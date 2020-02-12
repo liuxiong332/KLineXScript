@@ -141,6 +141,10 @@ impl<'a> SyntaxType<'a> {
         SyntaxType::Simple(SimpleSyntaxType::Color)
     }
 
+    pub fn int_series() -> SyntaxType<'a> {
+        SyntaxType::Series(SimpleSyntaxType::Int)
+    }
+
     pub fn float_series() -> SyntaxType<'a> {
         SyntaxType::Series(SimpleSyntaxType::Float)
     }

@@ -6,6 +6,7 @@ pub enum RuntimeErr {
     InvalidTypeCast,
     InvalidNADeclarer,
     MissingParameters(String), // The parameter is required.
+    InvalidParameters(String), // The parameters are invalid.
 
     FuncCallParamNotValid(String), // The function call parameters is not valid.
 

@@ -1,6 +1,6 @@
 use super::data_src::Callback;
 use super::output::InputVal;
-use super::output::{IOInfo, InputInfo, OutputData, OutputInfo};
+use super::output::{IOInfo, InputInfo, OutputData, OutputInfo, ScriptPurpose};
 use crate::ast::input::{Position, StrRange};
 use crate::ast::stat_expr_types::VarIndex;
 use crate::types::{
@@ -278,6 +278,10 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
     }
 
     // io_info related methods
+    pub fn set_script_type(&mut self, script_type: ScriptPurpose) {
+        self.io_info.set_script_type(script_type);
+    }
+
     pub fn push_input_info(&mut self, input: InputInfo) {
         self.io_info.push_input(input);
     }

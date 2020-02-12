@@ -1,4 +1,19 @@
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub struct StudyScript {
+    pub title: String,
+    pub shorttitle: Option<String>,
+    pub overlay: Option<bool>,
+    pub format: Option<String>,
+    pub precision: Option<i64>,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum ScriptPurpose {
+    Study(StudyScript),
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct BoolInputInfo {
     pub defval: Option<bool>,
     pub title: Option<String>,
@@ -151,6 +166,7 @@ pub enum OutputInfo {
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct IOInfo {
+    script_type: Option<ScriptPurpose>,
     inputs: Vec<InputInfo>,
     input_srcs: Vec<String>,
     outputs: Vec<OutputInfo>,
@@ -168,6 +184,7 @@ impl IOInfo {
 
     pub fn new() -> IOInfo {
         IOInfo {
+            script_type: None,
             inputs: vec![],
             input_srcs: IOInfo::gen_srcs(),
             outputs: vec![],
@@ -180,6 +197,7 @@ impl IOInfo {
         input_srcs: Vec<String>,
     ) -> IOInfo {
         IOInfo {
+            script_type: None,
             inputs,
             outputs,
             input_srcs,
@@ -194,6 +212,10 @@ impl IOInfo {
         self.outputs.push(output);
     }
 
+    pub fn set_script_type(&mut self, script_type: ScriptPurpose) {
+        self.script_type = Some(script_type);
+    }
+
     pub fn set_input_srcs(&mut self, input_srcs: Vec<String>) {
         self.input_srcs = input_srcs;
     }
@@ -204,6 +226,10 @@ impl IOInfo {
 
     pub fn get_outputs(&self) -> &Vec<OutputInfo> {
         &self.outputs
+    }
+
+    pub fn get_script_type(&self) -> &Option<ScriptPurpose> {
+        &self.script_type
     }
 }
 

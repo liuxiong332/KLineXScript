@@ -7,6 +7,7 @@ pub mod plotcandle;
 pub mod plotchar;
 pub mod plotshape;
 pub mod print;
+pub mod study;
 use crate::ast::syntax_type::SyntaxType;
 use crate::types::PineRef;
 use std::collections::HashSet;
@@ -53,6 +54,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         plotchar::declare_var(),
         plotshape::declare_var(),
         color::declare_var(),
+        study::declare_var(),
     ];
     debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());

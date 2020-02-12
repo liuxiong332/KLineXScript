@@ -26,7 +26,7 @@ fn pine_plot<'a>(
             color: pine_ref_to_color(color),
             editable: pine_ref_to_bool(editable),
             show_last: pine_ref_to_i32(show_last),
-            display: pine_ref_to_bool(display),
+            display: pine_ref_to_i32(display),
         };
         downcast_ctx(context).push_output_info(OutputInfo::PlotBar(plot_info));
     }
@@ -85,7 +85,7 @@ pub fn declare_var<'a>() -> VarResult<'a> {
             ("color", SyntaxType::color()),
             ("editable", SyntaxType::bool()),
             ("show_last", SyntaxType::int()),
-            ("display", SyntaxType::bool()),
+            ("display", SyntaxType::int()),
         ],
         SyntaxType::Void,
     ))]);
@@ -113,7 +113,7 @@ mod tests {
             ],
         );
         let src = r"plotbar(open, high, low, close, title='Title', color=#ff0000, 
-            editable=true, show_last=100, display=true) ";
+            editable=true, show_last=100, display=1) ";
         let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
 
@@ -142,7 +142,7 @@ mod tests {
                 color: Some(String::from("#ff0000")),
                 editable: Some(true),
                 show_last: Some(100),
-                display: Some(true)
+                display: Some(1)
             })]
         );
     }

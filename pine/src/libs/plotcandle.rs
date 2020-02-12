@@ -3,14 +3,13 @@ use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, Syn
 use crate::helper::err_msgs::*;
 use crate::helper::str_replace;
 use crate::helper::{
-    move_element, pine_ref_to_bool, pine_ref_to_color, pine_ref_to_f64, pine_ref_to_i32,
-    pine_ref_to_string,
+    move_element, pine_ref_to_bool, pine_ref_to_color, pine_ref_to_i32, pine_ref_to_string,
 };
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::{OutputData, OutputInfo, PlotCandleInfo};
 use crate::types::{
-    Bool, Callable, CallableFactory, CallableObject, DataType, Float, Int, ParamCollectCall,
-    PineClass, PineFrom, PineRef, PineType, RefData, RuntimeErr, SecondType, Series, NA,
+    Callable, CallableFactory, Float, ParamCollectCall, PineFrom, PineRef, RefData, RuntimeErr,
+    Series,
 };
 use std::rc::Rc;
 
@@ -42,7 +41,7 @@ fn pine_plot<'a>(
             editable: pine_ref_to_bool(editable),
             show_last: pine_ref_to_i32(show_last),
             bordercolor: pine_ref_to_color(bordercolor),
-            display: pine_ref_to_bool(display),
+            display: pine_ref_to_i32(display),
         };
         downcast_ctx(context).push_output_info(OutputInfo::PlotCandle(plot_info));
     }
@@ -101,7 +100,7 @@ pub fn declare_var<'a>() -> VarResult<'a> {
             ("editable", SyntaxType::bool()),
             ("show_last", SyntaxType::int()),
             ("bordercolor", SyntaxType::color()),
-            ("display", SyntaxType::bool()),
+            ("display", SyntaxType::int()),
         ],
         SyntaxType::Void,
     ))]);
@@ -129,7 +128,7 @@ mod tests {
             ],
         );
         let src = r"plotcandle(open, high, low, close, title='Title', color=#ff0000, 
-            wickcolor=#000000, editable=true, show_last=100, bordercolor=#111111, display=true) ";
+            wickcolor=#000000, editable=true, show_last=100, bordercolor=#111111, display=1) ";
         let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
 
@@ -160,7 +159,7 @@ mod tests {
                 editable: Some(true),
                 show_last: Some(100),
                 bordercolor: Some(String::from("#111111")),
-                display: Some(true),
+                display: Some(1),
             })]
         );
     }

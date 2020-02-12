@@ -1,11 +1,13 @@
 use super::VarResult;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
+use crate::helper::err_msgs::*;
+use crate::helper::str_replace;
 use crate::helper::{
     move_element, pine_ref_to_bool, pine_ref_to_color, pine_ref_to_f64, pine_ref_to_i32,
     pine_ref_to_string,
 };
 use crate::runtime::context::{downcast_ctx, Ctx};
-use crate::runtime::{OutputData, OutputInfo, PlotArrowInfo};
+use crate::runtime::{OutputData, OutputInfo, PlotBarInfo};
 use crate::types::{
     Bool, Callable, CallableFactory, CallableObject, DataType, Float, Int, ParamCollectCall,
     PineClass, PineFrom, PineRef, PineType, RefData, RuntimeErr, SecondType, Series, NA,
@@ -17,37 +19,50 @@ fn pine_plot<'a>(
     mut param: Vec<Option<PineRef<'a>>>,
     _func_type: FunctionType<'a>,
 ) -> Result<(), RuntimeErr> {
-    move_tuplet!(
-        (
-            series, title, colorup, colordown, transp, offset, minheight, maxheight, editable,
-            show_last, display
-        ) = param
-    );
+    move_tuplet!((open, high, low, close, title, color, editable, show_last, display) = param);
     if !downcast_ctx(context).check_is_output_info_ready() {
-        let plot_info = PlotArrowInfo {
+        let plot_info = PlotBarInfo {
             title: pine_ref_to_string(title),
-            colorup: pine_ref_to_color(colorup),
-            colordown: pine_ref_to_color(colordown),
-            transp: pine_ref_to_i32(transp),
-            offset: pine_ref_to_i32(offset),
-            minheight: pine_ref_to_i32(minheight),
-            maxheight: pine_ref_to_i32(maxheight),
+            color: pine_ref_to_color(color),
             editable: pine_ref_to_bool(editable),
             show_last: pine_ref_to_i32(show_last),
             display: pine_ref_to_bool(display),
         };
-        downcast_ctx(context).push_output_info(OutputInfo::PlotArrow(plot_info));
+        downcast_ctx(context).push_output_info(OutputInfo::PlotBar(plot_info));
     }
-    match series {
-        Some(item_val) => {
-            let mut items: RefData<Series<Float>> = Series::implicity_from(item_val).unwrap();
-            let data = items.move_history();
-            let ctx_ins = downcast_ctx(context);
-            let data_range = ctx_ins.get_data_range();
-            ctx_ins.push_output_data(Some(OutputData::new(data_range.0, data_range.1, data)));
+    match (open, high, low, close) {
+        (Some(open_v), Some(high_v), Some(low_v), Some(close_v)) => {
+            let mut open_items: RefData<Series<Float>> = Series::implicity_from(open_v).unwrap();
+            let mut high_items: RefData<Series<Float>> = Series::implicity_from(high_v).unwrap();
+            let mut low_items: RefData<Series<Float>> = Series::implicity_from(low_v).unwrap();
+            let mut close_items: RefData<Series<Float>> = Series::implicity_from(close_v).unwrap();
+            downcast_ctx(context).push_output_data(Some(OutputData::new(vec![
+                open_items.move_history(),
+                high_items.move_history(),
+                low_items.move_history(),
+                close_items.move_history(),
+            ])));
             Ok(())
         }
-        _ => Err(RuntimeErr::NotSupportOperator),
+        (o, h, l, c) => {
+            let mut missings: Vec<String> = vec![];
+            if o.is_none() {
+                missings.push(String::from("open"));
+            }
+            if h.is_none() {
+                missings.push(String::from("high"));
+            }
+            if l.is_none() {
+                missings.push(String::from("low"));
+            }
+            if c.is_none() {
+                missings.push(String::from("close"));
+            }
+            Err(RuntimeErr::MissingParameters(str_replace(
+                REQUIRED_PARAMETERS,
+                vec![missings.join(", ")],
+            )))
+        }
     }
 }
 
@@ -85,45 +100,50 @@ mod tests {
     use crate::{LibInfo, PineParser, PineRunner};
 
     #[test]
-    fn plotarrow_info_test() {
+    fn plotbar_info_test() {
         use crate::runtime::OutputInfo;
 
         let lib_info = LibInfo::new(
             vec![declare_var()],
-            vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+            vec![
+                ("close", SyntaxType::Series(SimpleSyntaxType::Float)),
+                ("high", SyntaxType::Series(SimpleSyntaxType::Float)),
+                ("low", SyntaxType::Series(SimpleSyntaxType::Float)),
+                ("open", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ],
         );
-        let src = r"plotarrow(close, title='Title', colorup=#00ffaa, colordown=#00ffbb, 
-            transp=70, offset=15, minheight=1, maxheight=10, 
-            editable=true, show_last=100, display=true)";
+        let src = r"plotbar(open, high, low, close, title='Title', color=#ff0000, 
+            editable=true, show_last=100, display=true) ";
         let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
 
         runner
-            .run(&vec![("close", vec![Some(1f64), Some(2f64)])])
+            .run(&vec![
+                ("close", vec![Some(1f64), Some(2f64)]),
+                ("open", vec![Some(0f64), Some(10f64)]),
+                ("high", vec![Some(1f64), Some(12f64)]),
+                ("low", vec![Some(0f64), Some(1f64)]),
+            ])
             .unwrap();
 
         assert_eq!(
             runner.get_context().move_output_data(),
-            vec![Some(OutputData::new(
-                Some(0),
-                Some(2),
-                vec![Some(1f64), Some(2f64)]
-            )),]
+            vec![Some(OutputData::new(vec![
+                vec![Some(0f64), Some(10f64)],
+                vec![Some(1f64), Some(12f64)],
+                vec![Some(0f64), Some(1f64)],
+                vec![Some(1f64), Some(2f64)],
+            ])),]
         );
         assert_eq!(
             runner.get_context().get_io_info().get_outputs(),
-            &vec![OutputInfo::PlotArrow(PlotArrowInfo {
+            &vec![OutputInfo::PlotBar(PlotBarInfo {
                 title: Some(String::from("Title")),
-                colorup: Some(String::from("#00ffaa")),
-                colordown: Some(String::from("#00ffbb")),
-                transp: Some(70),
-                offset: Some(15),
-                minheight: Some(1),
-                maxheight: Some(10),
+                color: Some(String::from("#ff0000")),
                 editable: Some(true),
                 show_last: Some(100),
                 display: Some(true)
             })]
-        )
+        );
     }
 }

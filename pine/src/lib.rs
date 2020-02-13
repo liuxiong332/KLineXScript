@@ -193,6 +193,8 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
                 ("open", SERIES_FLOAT.clone()),
                 ("high", SERIES_FLOAT.clone()),
                 ("low", SERIES_FLOAT.clone()),
+                ("volume", SERIES_INT.clone()),
+                ("_time", SERIES_INT.clone()),
                 (BAR_INDEX, SERIES_INT.clone()),
             ],
         );
@@ -279,6 +281,8 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
             ("open", vec![Some(0f64)]),
             ("high", vec![Some(0f64)]),
             ("low", vec![Some(0f64)]),
+            ("volume", vec![Some(1f64)]),
+            ("_time", vec![Some(0f64)]),
         ]) {
             Err(err) => Err(PineFormatError::from_runtime_error(&self.error_format, err)),
             Ok(_) => {

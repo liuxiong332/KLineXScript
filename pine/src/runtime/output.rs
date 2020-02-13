@@ -279,3 +279,17 @@ pub enum InputVal {
     Bool(bool),
     String(String),
 }
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub struct SymbolInfo {
+    pub symbol_type: String,
+    pub timezone: String,
+    pub ticker: String,
+    pub session: String, // regular or extended
+    pub trade_start: String,
+    pub trade_end: String,
+    pub root: Option<String>, // Root for derivatives like futures contract.
+    pub currency: String,     // "USD", "EUR", etc.
+    pub description: String,
+    pub mintick: f64, // Min tick value for current symbol
+}

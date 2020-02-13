@@ -11,6 +11,8 @@ extern crate assert_matches;
 #[macro_use]
 extern crate serde_derive;
 
+extern crate regex;
+
 pub mod ast;
 
 #[macro_use]

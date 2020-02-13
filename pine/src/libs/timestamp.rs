@@ -8,6 +8,7 @@ use crate::runtime::{ScriptPurpose, StudyScript};
 use crate::types::{Callable, CallableFactory, Int, PineFrom, PineRef, RuntimeErr, Series, NA};
 use chrono::TimeZone;
 use chrono_tz::Tz;
+use regex::Regex;
 use std::rc::Rc;
 
 pub fn pine_ref_to_i64_or<'a>(val: Option<PineRef<'a>>, defval: i64) -> i64 {
@@ -63,10 +64,49 @@ pub fn get_ymd_dm_require<'a>(
 pub fn get_timezone(tz: String) -> Result<Tz, RuntimeErr> {
     match tz.parse() {
         Ok(tz) => Ok(tz),
-        _ => Err(RuntimeErr::InvalidParameters(str_replace(
-            UNRECONGNIZED_TZ,
-            vec![String::from("timezone")],
-        ))),
+        _ => {
+            let re = Regex::new(r"GMT([+-])(\d+)").unwrap();
+            match re.captures(&tz) {
+                Some(caps) => {
+                    match (caps.get(1).unwrap().as_str(), caps.get(2).unwrap().as_str()) {
+                        ("-", "0") => Ok(Tz::Etc__GMTPlus0),
+                        ("-", "1") => Ok(Tz::Etc__GMTPlus1),
+                        ("-", "2") => Ok(Tz::Etc__GMTPlus2),
+                        ("-", "3") => Ok(Tz::Etc__GMTPlus3),
+                        ("-", "4") => Ok(Tz::Etc__GMTPlus4),
+                        ("-", "5") => Ok(Tz::Etc__GMTPlus5),
+                        ("-", "6") => Ok(Tz::Etc__GMTPlus6),
+                        ("-", "7") => Ok(Tz::Etc__GMTPlus7),
+                        ("-", "8") => Ok(Tz::Etc__GMTPlus8),
+                        ("-", "9") => Ok(Tz::Etc__GMTPlus9),
+                        ("-", "10") => Ok(Tz::Etc__GMTPlus10),
+                        ("-", "11") => Ok(Tz::Etc__GMTPlus11),
+                        ("-", "12") => Ok(Tz::Etc__GMTPlus12),
+                        ("+", "0") => Ok(Tz::Etc__GMTMinus0),
+                        ("+", "1") => Ok(Tz::Etc__GMTMinus1),
+                        ("+", "2") => Ok(Tz::Etc__GMTMinus2),
+                        ("+", "3") => Ok(Tz::Etc__GMTMinus3),
+                        ("+", "4") => Ok(Tz::Etc__GMTMinus4),
+                        ("+", "5") => Ok(Tz::Etc__GMTMinus5),
+                        ("+", "6") => Ok(Tz::Etc__GMTMinus6),
+                        ("+", "7") => Ok(Tz::Etc__GMTMinus7),
+                        ("+", "8") => Ok(Tz::Etc__GMTMinus8),
+                        ("+", "9") => Ok(Tz::Etc__GMTMinus9),
+                        ("+", "10") => Ok(Tz::Etc__GMTMinus10),
+                        ("+", "11") => Ok(Tz::Etc__GMTMinus11),
+                        ("+", "12") => Ok(Tz::Etc__GMTMinus12),
+                        _ => Err(RuntimeErr::InvalidParameters(str_replace(
+                            UNRECONGNIZED_TZ,
+                            vec![String::from("timezone")],
+                        ))),
+                    }
+                }
+                _ => Err(RuntimeErr::InvalidParameters(str_replace(
+                    UNRECONGNIZED_TZ,
+                    vec![String::from("timezone")],
+                ))),
+            }
+        }
     }
 }
 
@@ -219,7 +259,7 @@ mod tests {
         let src2 = "month=2\nm = timestamp('Asia/Shanghai', 2020, 02, 12, 0, 0)";
         let src3 = "month=true ? 2 : 1\nm = timestamp(2020, month, 12, 0, 0)";
         let src4 = "month=true ? 2 : 1\nm = timestamp('Asia/Shanghai', 2020, month, 12, 0, 0)";
-        // let src5 = "month=2\nm = timestamp('Asia/Shanghai2', 2020, month, 12, 0, 0)";
+        let src5 = "month=2\nm = timestamp('GMT+8', 2020, 02, 12, 0, 0)";
 
         fn run_src<'a>(src: &'a str, lib_info: &LibInfo<'a>, res: PineRef<'a>) {
             let blk = PineParser::new(src, lib_info).parse_blk().unwrap();
@@ -243,5 +283,6 @@ mod tests {
             &lib_info,
             PineRef::new_rc(Series::from_vec(vec![Some(1581436800000)])),
         );
+        run_src(src5, &lib_info, PineRef::new_box(Some(1581436800000)));
     }
 }

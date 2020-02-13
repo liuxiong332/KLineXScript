@@ -33,7 +33,8 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 // }
 
 use pine::runtime::{
-    InputVal, NoneCallback, OutputData, OutputDataCollect, OutputInfo, PineFormatError, PlotInfo,
+    AnySeries, InputVal, NoneCallback, OutputData, OutputDataCollect, OutputInfo, PineFormatError,
+    PlotInfo,
 };
 use pine::PineScript;
 use std::convert::TryInto;
@@ -139,19 +140,31 @@ fn transfer_input_data(
     src_strs: Vec<String>,
     count: usize,
     data: &[f64],
-) -> Vec<(&'static str, Vec<Option<f64>>)> {
+) -> Vec<(&'static str, AnySeries)> {
     src_strs
         .into_iter()
         .enumerate()
         .map(|(i, s)| {
             if s == "close" {
-                ("close", slice_input_data(data, i, count))
+                (
+                    "close",
+                    AnySeries::from_float_vec(slice_input_data(data, i, count)),
+                )
             } else if s == "open" {
-                ("open", slice_input_data(data, i, count))
+                (
+                    "open",
+                    AnySeries::from_float_vec(slice_input_data(data, i, count)),
+                )
             } else if s == "high" {
-                ("high", slice_input_data(data, i, count))
+                (
+                    "high",
+                    AnySeries::from_float_vec(slice_input_data(data, i, count)),
+                )
             } else if s == "low" {
-                ("low", slice_input_data(data, i, count))
+                (
+                    "low",
+                    AnySeries::from_float_vec(slice_input_data(data, i, count)),
+                )
             } else {
                 unreachable!();
             }

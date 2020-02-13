@@ -1,8 +1,11 @@
 use super::context::{Context, Ctx, PineRuntimeError, Runner, VarOperate};
 // use super::ctxid_parser::CtxIdParser;
 use super::output::InputVal;
+use super::{AnySeries, AnySeriesType};
 use crate::ast::stat_expr_types::{Block, VarIndex};
-use crate::types::{Float, Int, PineFrom, PineRef, RefData, RuntimeErr, Series};
+use crate::types::{
+    DataType, Float, Int, PineFrom, PineRef, PineType, RefData, RuntimeErr, Series,
+};
 
 pub trait Callback {
     fn print(&self, _str: String) {}
@@ -17,11 +20,11 @@ pub struct DataSrc<'a, 'b, 'c> {
     context: Context<'a, 'b, 'c>,
     blk: &'a Block<'a>,
     input_index: i32,
-    input_names: Vec<&'a str>,
+    input_names: Vec<(&'a str, AnySeriesType)>,
     pub callback: &'a dyn Callback,
 }
 
-fn get_len(data: &Vec<(&'static str, Vec<Float>)>) -> Result<usize, PineRuntimeError> {
+fn get_len(data: &Vec<(&'static str, AnySeries)>) -> Result<usize, PineRuntimeError> {
     let lens: Vec<usize> = data.iter().map(|(_, v)| v.len()).collect();
     if lens.len() == 0 {
         return Err(PineRuntimeError::new_no_range(RuntimeErr::NotValidParam));
@@ -38,7 +41,7 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
     pub fn new(
         blk: &'a Block<'a>,
         lib_vars: Vec<(&'a str, PineRef<'a>)>,
-        input_names: Vec<&'a str>,
+        input_names: Vec<(&'a str, AnySeriesType)>,
         callback: &'a dyn Callback,
     ) -> DataSrc<'a, 'b, 'c> {
         let mut context = Context::new_with_callback(callback);
@@ -52,15 +55,18 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
         }
 
         // Create variable from the hash map
-        for (i, name) in input_names.iter().enumerate() {
-            if *name == "bar_index" {
-                let s: Series<Int> = Series::new();
-                context.create_var(input_index + i as i32, PineRef::new_rc(s));
-                context.set_varname_index(*name, input_index + i as i32);
-            } else {
-                let s: Series<Float> = Series::new();
-                context.create_var(input_index + i as i32, PineRef::new_rc(s));
-                context.set_varname_index(*name, input_index + i as i32);
+        for (i, (name, input_type)) in input_names.iter().enumerate() {
+            match input_type {
+                AnySeriesType::Int => {
+                    let s: Series<Int> = Series::new();
+                    context.create_var(input_index + i as i32, PineRef::new_rc(s));
+                    context.set_varname_index(*name, input_index + i as i32);
+                }
+                AnySeriesType::Float => {
+                    let s: Series<Float> = Series::new();
+                    context.create_var(input_index + i as i32, PineRef::new_rc(s));
+                    context.set_varname_index(*name, input_index + i as i32);
+                }
             }
         }
         DataSrc {
@@ -82,13 +88,13 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
 
     fn run_data(
         &mut self,
-        data: &Vec<(&'static str, Vec<Float>)>,
+        data: &Vec<(&'static str, AnySeries)>,
         len: usize,
     ) -> Result<(), PineRuntimeError> {
-        let bar_index = self.input_names.iter().position(|s| *s == "bar_index");
+        let bar_index = self.input_names.iter().position(|(s, _)| *s == "bar_index");
         let name_indexs: Vec<Option<usize>> = data
             .iter()
-            .map(|(k, _)| self.input_names.iter().position(|&s| s == *k))
+            .map(|(k, _)| self.input_names.iter().position(|(s, _)| *s == *k))
             .collect();
         for i in 0..len {
             // Extract data into context
@@ -96,10 +102,21 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
                 if let Some(name_index) = name_indexs[index] {
                     let var_index = VarIndex::new(self.input_index + name_index as i32, 0);
                     let series = self.context.move_var(var_index).unwrap();
-                    let mut float_s: RefData<Series<Float>> =
-                        Series::implicity_from(series).unwrap();
-                    float_s.update(v[i]);
-                    self.context.update_var(var_index, float_s.into_pf());
+                    match series.get_type().0 {
+                        DataType::Float => {
+                            let mut float_s: RefData<Series<Float>> =
+                                Series::implicity_from(series).unwrap();
+                            float_s.update(v.index(i as isize));
+                            self.context.update_var(var_index, float_s.into_pf());
+                        }
+                        DataType::Int => {
+                            let mut int_s: RefData<Series<Int>> =
+                                Series::implicity_from(series).unwrap();
+                            int_s.update(v.index(i as isize));
+                            self.context.update_var(var_index, int_s.into_pf());
+                        }
+                        _ => unreachable!(),
+                    }
                 }
             }
 
@@ -127,7 +144,7 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
         }
     }
 
-    pub fn run(&mut self, data: &Vec<(&'static str, Vec<Float>)>) -> Result<(), PineRuntimeError> {
+    pub fn run(&mut self, data: &Vec<(&'static str, AnySeries)>) -> Result<(), PineRuntimeError> {
         let len = get_len(data)?;
         // Update the range of data.
         self.context.update_data_range((Some(0), Some(len as i32)));
@@ -136,7 +153,7 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
 
     pub fn update(
         &mut self,
-        data: &Vec<(&'static str, Vec<Float>)>,
+        data: &Vec<(&'static str, AnySeries)>,
     ) -> Result<(), PineRuntimeError> {
         let len = get_len(data)?;
 
@@ -152,7 +169,7 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
 
     pub fn update_from(
         &mut self,
-        data: &Vec<(&'static str, Vec<Float>)>,
+        data: &Vec<(&'static str, AnySeries)>,
         from: i32,
     ) -> Result<(), PineRuntimeError> {
         let len = get_len(data)?;
@@ -207,10 +224,18 @@ mod tests {
         assert_eq!(blk.var_count, 2);
         assert_eq!(blk.subctx_count, 0);
 
-        let mut datasrc = DataSrc::new(&blk, vec![], vec!["close"], &MyCallback);
+        let mut datasrc = DataSrc::new(
+            &blk,
+            vec![],
+            vec![("close", AnySeriesType::Float)],
+            &MyCallback,
+        );
         assert_eq!(datasrc.context.var_len(), 2);
 
-        let data = vec![("close", vec![Some(10f64), Some(100f64)])];
+        let data = vec![(
+            "close",
+            AnySeries::from_float_vec(vec![Some(10f64), Some(100f64)]),
+        )];
 
         assert_eq!(datasrc.run(&data), Ok(()));
         datasrc.context.map_var(VarIndex::new(1, 0), |hv| match hv {

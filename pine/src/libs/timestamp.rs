@@ -245,8 +245,7 @@ mod tests {
     use super::*;
     use crate::ast::stat_expr_types::VarIndex;
     use crate::ast::syntax_type::SimpleSyntaxType;
-    use crate::runtime::context::VarOperate;
-    use crate::runtime::data_src::NoneCallback;
+    use crate::runtime::{AnySeries, NoneCallback, VarOperate};
     use crate::{LibInfo, PineParser, PineRunner};
 
     #[test]
@@ -265,7 +264,12 @@ mod tests {
             let blk = PineParser::new(src, lib_info).parse_blk().unwrap();
             let mut runner = PineRunner::new(lib_info, &blk, &NoneCallback());
 
-            runner.run(&vec![("close", vec![Some(2f64)])]).unwrap();
+            runner
+                .run(&vec![(
+                    "close",
+                    AnySeries::from_float_vec(vec![Some(2f64)]),
+                )])
+                .unwrap();
             assert_eq!(
                 runner.get_context().move_var(VarIndex::new(3, 0)),
                 Some(res)

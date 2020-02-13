@@ -1,3 +1,4 @@
+pub mod any_series;
 pub mod context;
 pub mod data_src;
 pub mod error_format;
@@ -8,6 +9,7 @@ pub mod output;
 pub mod runtime_convert;
 pub mod statement;
 
+pub use any_series::*;
 pub use context::*;
 pub use data_src::*;
 pub use error_format::*;

@@ -83,7 +83,7 @@ pub fn declare_var<'a>() -> VarResult<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runtime::data_src::NoneCallback;
+    use crate::runtime::{AnySeries, NoneCallback};
     use crate::{LibInfo, PineParser, PineRunner};
 
     #[test]
@@ -105,7 +105,12 @@ mod tests {
         let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
 
-        runner.run(&vec![("close", vec![Some(1f64)])]).unwrap();
+        runner
+            .run(&vec![(
+                "close",
+                AnySeries::from_float_vec(vec![Some(1f64)]),
+            )])
+            .unwrap();
         let tuple_res =
             downcast_pf::<Tuple>(runner.get_context().move_var(VarIndex::new(2, 0)).unwrap());
         let tuple_vec = tuple_res.unwrap().into_inner().0;

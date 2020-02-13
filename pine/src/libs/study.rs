@@ -59,7 +59,7 @@ pub fn declare_var<'a>() -> VarResult<'a> {
 mod tests {
     use super::*;
     use crate::ast::syntax_type::SimpleSyntaxType;
-    use crate::runtime::data_src::NoneCallback;
+    use crate::runtime::{AnySeries, NoneCallback};
     use crate::{LibInfo, PineParser, PineRunner};
 
     #[test]
@@ -73,7 +73,10 @@ mod tests {
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
 
         runner
-            .run(&vec![("close", vec![Some(1f64), Some(2f64)])])
+            .run(&vec![(
+                "close",
+                AnySeries::from_float_vec(vec![Some(1f64), Some(2f64)]),
+            )])
             .unwrap();
 
         assert_eq!(

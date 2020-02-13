@@ -111,7 +111,7 @@ pub fn declare_var<'a>() -> VarResult<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runtime::data_src::NoneCallback;
+    use crate::runtime::{AnySeries, NoneCallback};
     use crate::{LibInfo, PineParser, PineRunner};
 
     #[test]
@@ -134,10 +134,22 @@ mod tests {
 
         runner
             .run(&vec![
-                ("close", vec![Some(1f64), Some(2f64)]),
-                ("open", vec![Some(0f64), Some(10f64)]),
-                ("high", vec![Some(1f64), Some(12f64)]),
-                ("low", vec![Some(0f64), Some(1f64)]),
+                (
+                    "close",
+                    AnySeries::from_float_vec(vec![Some(1f64), Some(2f64)]),
+                ),
+                (
+                    "open",
+                    AnySeries::from_float_vec(vec![Some(0f64), Some(10f64)]),
+                ),
+                (
+                    "high",
+                    AnySeries::from_float_vec(vec![Some(1f64), Some(12f64)]),
+                ),
+                (
+                    "low",
+                    AnySeries::from_float_vec(vec![Some(0f64), Some(1f64)]),
+                ),
             ])
             .unwrap();
 

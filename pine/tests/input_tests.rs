@@ -3,6 +3,7 @@ use pine::ast::syntax_type::{SimpleSyntaxType, SyntaxType};
 use pine::libs::input;
 use pine::libs::print;
 use pine::runtime::data_src::{Callback, DataSrc};
+use pine::runtime::AnySeries;
 
 const INPUT_SCRIPT: &str = "
 val1 = input(true, 'hello', 'bool', false)
@@ -24,6 +25,6 @@ fn datasrc_test() {
     );
     let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&MyCallback));
     parser.parse_src(INPUT_SCRIPT).unwrap();
-    let data = vec![("close", vec![Some(1f64)])];
+    let data = vec![("close", AnySeries::from_float_vec(vec![Some(1f64)]))];
     assert!(parser.run_with_data(data).is_ok());
 }

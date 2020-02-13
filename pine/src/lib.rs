@@ -37,15 +37,16 @@ use runtime::context::{Context, PineRuntimeError};
 use runtime::data_src::{Callback, DataSrc};
 use runtime::error_format::{ErrorFormater, PineFormatError};
 use runtime::output::{IOInfo, InputVal, OutputData, OutputDataCollect};
+use runtime::{AnySeries, AnySeriesType};
 use std::mem;
-use types::{Float, PineRef};
+use types::{Float, Int, PineRef};
 
 #[derive(Debug, Clone)]
 pub struct LibInfo<'a> {
     var_types: Vec<(&'a str, SyntaxType<'a>)>,
     var_values: Vec<(&'a str, PineRef<'a>)>,
-    input_names: Vec<&'a str>, // The input varnames include bar_index
-    client_input_names: Vec<&'a str>, // The input varnames user client should pass in
+    input_names: Vec<(&'a str, AnySeriesType)>, // The input varnames include bar_index
+    client_input_names: Vec<&'a str>,           // The input varnames user client should pass in
 }
 
 const BAR_INDEX: &'static str = "bar_index";
@@ -139,20 +140,20 @@ impl<'a, 'b, 'c> PineRunner<'a, 'b, 'c> {
         PineRunner { datasrc }
     }
 
-    pub fn run(&mut self, data: &Vec<(&'static str, Vec<Float>)>) -> Result<(), PineRuntimeError> {
+    pub fn run(&mut self, data: &Vec<(&'static str, AnySeries)>) -> Result<(), PineRuntimeError> {
         self.datasrc.run(data)
     }
 
     pub fn update(
         &mut self,
-        data: &Vec<(&'static str, Vec<Float>)>,
+        data: &Vec<(&'static str, AnySeries)>,
     ) -> Result<(), PineRuntimeError> {
         self.datasrc.update(data)
     }
 
     pub fn update_from(
         &mut self,
-        data: &Vec<(&'static str, Vec<Float>)>,
+        data: &Vec<(&'static str, AnySeries)>,
         from: i32,
     ) -> Result<(), PineRuntimeError> {
         self.datasrc.update_from(data, from)
@@ -177,7 +178,7 @@ pub struct PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
     syntax_parser: Option<SyntaxParser<'pa>>,
     callback: Option<&'ra dyn Callback>,
     runner: Option<PineRunner<'ra, 'rb, 'rc>>,
-    data: Vec<(&'static str, Vec<Float>)>,
+    data: Vec<(&'static str, AnySeries)>,
     error_format: ErrorFormater,
 }
 
@@ -277,12 +278,12 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
     // Run the script with the experimental data to generate IOInfo data
     pub fn gen_io_info(&mut self) -> Result<IOInfo, PineFormatError> {
         match self.get_runner().run(&vec![
-            ("close", vec![Some(0f64)]),
-            ("open", vec![Some(0f64)]),
-            ("high", vec![Some(0f64)]),
-            ("low", vec![Some(0f64)]),
-            ("volume", vec![Some(1f64)]),
-            ("_time", vec![Some(0f64)]),
+            ("close", AnySeries::from_float_vec(vec![Some(0f64)])),
+            ("open", AnySeries::from_float_vec(vec![Some(0f64)])),
+            ("high", AnySeries::from_float_vec(vec![Some(0f64)])),
+            ("low", AnySeries::from_float_vec(vec![Some(0f64)])),
+            ("volume", AnySeries::from_int_vec(vec![Some(1i64)])),
+            ("_time", AnySeries::from_int_vec(vec![Some(0i64)])),
         ]) {
             Err(err) => Err(PineFormatError::from_runtime_error(&self.error_format, err)),
             Ok(_) => {
@@ -314,7 +315,7 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
     // Run the script with new data
     pub fn run_with_data(
         &mut self,
-        data: Vec<(&'static str, Vec<Float>)>,
+        data: Vec<(&'static str, AnySeries)>,
     ) -> Result<OutputDataCollect, PineFormatError>
     where
         'li: 'ra,
@@ -332,7 +333,7 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
     pub fn run(
         &mut self,
         input: Vec<Option<InputVal>>,
-        data: Vec<(&'static str, Vec<Float>)>,
+        data: Vec<(&'static str, AnySeries)>,
     ) -> Result<OutputDataCollect, PineFormatError>
     where
         'li: 'ra,
@@ -346,16 +347,27 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
         }
     }
 
-    fn merge_data(&mut self, new_data: &Vec<(&'static str, Vec<Float>)>, from: usize) {
+    fn merge_data(&mut self, new_data: &Vec<(&'static str, AnySeries)>, from: usize) {
         let origin_data = mem::replace(&mut self.data, vec![]);
 
         self.data = origin_data
             .into_iter()
-            .zip(new_data.clone())
-            .map(|(mut v1, v2)| {
+            .zip(new_data)
+            .map(|(v1, v2)| {
                 debug_assert!(v1.0 == v2.0);
-                v1.1.splice(from..v1.1.len(), vec![]);
-                (v1.0, [v1.1, v2.1].concat())
+                let series = match v1.1.get_type() {
+                    AnySeriesType::Int => {
+                        let mut vec = v1.1.into_vec::<Int>();
+                        vec.splice(from.., v2.1.as_vec::<Int>().iter().cloned());
+                        AnySeries::from_int_vec(vec)
+                    }
+                    AnySeriesType::Float => {
+                        let mut vec = v1.1.into_vec::<Float>();
+                        vec.splice(from.., v2.1.as_vec::<Float>().iter().cloned());
+                        AnySeries::from_float_vec(vec)
+                    }
+                };
+                (v1.0, series)
             })
             .collect();
     }
@@ -363,7 +375,7 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
     // Run the script with updated data(The last data included).
     pub fn update(
         &mut self,
-        data: Vec<(&'static str, Vec<Float>)>,
+        data: Vec<(&'static str, AnySeries)>,
     ) -> Result<OutputDataCollect, PineFormatError> {
         self.merge_data(&data, self.data[0].1.len() - 1);
         match self.runner.as_mut().unwrap().update(&data) {
@@ -374,7 +386,7 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
 
     pub fn update_from(
         &mut self,
-        data: Vec<(&'static str, Vec<Float>)>,
+        data: Vec<(&'static str, AnySeries)>,
         from: i32,
     ) -> Result<OutputDataCollect, PineFormatError> {
         self.merge_data(&data, from as usize);
@@ -449,7 +461,7 @@ pub fn extract_vars<'a>(
 ) -> (
     Vec<(&'a str, SyntaxType<'a>)>,
     Vec<(&'a str, PineRef<'a>)>,
-    Vec<&'a str>,
+    Vec<(&'a str, AnySeriesType)>,
     Vec<&'a str>,
 ) {
     let mut types = Vec::with_capacity(vars.len() + input_vars.len());
@@ -461,7 +473,14 @@ pub fn extract_vars<'a>(
         values.push((var.name, var.value));
     }
     for (n, t) in input_vars {
-        input_names.push(n);
+        match n {
+            BAR_INDEX | "volume" | "_time" => {
+                input_names.push((n, AnySeriesType::Int));
+            }
+            _ => {
+                input_names.push((n, AnySeriesType::Float));
+            }
+        }
         types.push((n, t));
         if n != BAR_INDEX {
             user_input_names.push(n);
@@ -527,7 +546,10 @@ mod tests {
                 vec![String::from("close")]
             ))
         );
-        let data = vec![("close", vec![Some(1f64), Some(2f64)])];
+        let data = vec![(
+            "close",
+            AnySeries::from_float_vec(vec![Some(1f64), Some(2f64)]),
+        )];
         assert_eq!(
             parser.run_with_data(data.clone()),
             Ok(OutputDataCollect::new_with_one(
@@ -556,7 +578,10 @@ mod tests {
         );
 
         assert_eq!(
-            parser.update(vec![("close", vec![Some(10f64), Some(11f64)])]),
+            parser.update(vec![(
+                "close",
+                AnySeries::from_float_vec(vec![Some(10f64), Some(11f64)])
+            )]),
             Ok(OutputDataCollect::new_with_one(
                 1,
                 3,
@@ -564,7 +589,13 @@ mod tests {
             ))
         );
         assert_eq!(
-            parser.update_from(vec![("close", vec![Some(10f64), Some(11f64)])], 2),
+            parser.update_from(
+                vec![(
+                    "close",
+                    AnySeries::from_float_vec(vec![Some(10f64), Some(11f64)])
+                )],
+                2
+            ),
             Ok(OutputDataCollect::new_with_one(
                 2,
                 4,

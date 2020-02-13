@@ -479,8 +479,7 @@ pub fn declare_var<'a>() -> VarResult<'a> {
 mod tests {
     use super::*;
     use crate::ast::stat_expr_types::VarIndex;
-    use crate::runtime::context::VarOperate;
-    use crate::runtime::data_src::NoneCallback;
+    use crate::runtime::{AnySeries, NoneCallback, VarOperate};
     use crate::types::PineRef;
     use crate::{LibInfo, PineParser, PineRunner};
 
@@ -526,14 +525,24 @@ mod tests {
         let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
 
-        runner.run(&vec![("close", vec![Some(1f64)])]).unwrap();
+        runner
+            .run(&vec![(
+                "close",
+                AnySeries::from_float_vec(vec![Some(1f64)]),
+            )])
+            .unwrap();
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(2, 0)),
             Some(PineRef::new_box(true))
         );
 
         runner.change_inputs(vec![Some(InputVal::Bool(false))]);
-        runner.run(&vec![("close", vec![Some(1f64)])]).unwrap();
+        runner
+            .run(&vec![(
+                "close",
+                AnySeries::from_float_vec(vec![Some(1f64)]),
+            )])
+            .unwrap();
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(2, 0)),
             Some(PineRef::new_box(false))
@@ -560,14 +569,24 @@ mod tests {
         let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
 
-        runner.run(&vec![("close", vec![Some(1f64)])]).unwrap();
+        runner
+            .run(&vec![(
+                "close",
+                AnySeries::from_float_vec(vec![Some(1f64)]),
+            )])
+            .unwrap();
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(2, 0)),
             Some(PineRef::new_box(Some(1)))
         );
 
         runner.change_inputs(vec![Some(InputVal::Int(4))]);
-        runner.run(&vec![("close", vec![Some(1f64)])]).unwrap();
+        runner
+            .run(&vec![(
+                "close",
+                AnySeries::from_float_vec(vec![Some(1f64)]),
+            )])
+            .unwrap();
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(2, 0)),
             Some(PineRef::new_box(Some(4)))
@@ -598,7 +617,12 @@ mod tests {
         let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
         runner.change_inputs(vec![Some(InputVal::Int(4))]);
-        runner.run(&vec![("close", vec![Some(1f64)])]).unwrap();
+        runner
+            .run(&vec![(
+                "close",
+                AnySeries::from_float_vec(vec![Some(1f64)]),
+            )])
+            .unwrap();
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(2, 0)),
             Some(PineRef::new_box(Some(4)))
@@ -616,7 +640,12 @@ mod tests {
         let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
 
-        runner.run(&vec![("close", vec![Some(1f64)])]).unwrap();
+        runner
+            .run(&vec![(
+                "close",
+                AnySeries::from_float_vec(vec![Some(1f64)]),
+            )])
+            .unwrap();
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(2, 0)),
             Some(PineRef::new_box(Some(1.5f64)))
@@ -634,7 +663,12 @@ mod tests {
         let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
 
-        runner.run(&vec![("close", vec![Some(1f64)])]).unwrap();
+        runner
+            .run(&vec![(
+                "close",
+                AnySeries::from_float_vec(vec![Some(1f64)]),
+            )])
+            .unwrap();
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(2, 0)),
             Some(PineRef::new_rc(String::from("defval")))
@@ -657,8 +691,8 @@ mod tests {
 
         runner
             .run(&vec![
-                ("close", vec![Some(1f64)]),
-                ("open", vec![Some(2f64)]),
+                ("close", AnySeries::from_float_vec(vec![Some(1f64)])),
+                ("open", AnySeries::from_float_vec(vec![Some(2f64)])),
             ])
             .unwrap();
         assert_eq!(
@@ -667,7 +701,12 @@ mod tests {
         );
 
         runner.change_inputs(vec![Some(InputVal::String(String::from("open")))]);
-        runner.run(&vec![("open", vec![Some(10f64)])]).unwrap();
+        runner
+            .run(&vec![(
+                "open",
+                AnySeries::from_float_vec(vec![Some(10f64)]),
+            )])
+            .unwrap();
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(3, 0)),
             Some(PineRef::new_rc(Series::from_vec(vec![Some(10f64)])))
@@ -690,7 +729,12 @@ mod tests {
         let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
 
-        runner.run(&vec![("close", vec![Some(1f64)])]).unwrap();
+        runner
+            .run(&vec![(
+                "close",
+                AnySeries::from_float_vec(vec![Some(1f64)]),
+            )])
+            .unwrap();
         let tuple_res =
             downcast_pf::<Tuple>(runner.get_context().move_var(VarIndex::new(2, 0)).unwrap());
         assert_eq!(

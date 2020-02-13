@@ -2,6 +2,7 @@ extern crate pine;
 use pine::ast::syntax_type::{SimpleSyntaxType, SyntaxType};
 use pine::libs::print;
 use pine::runtime::data_src::{Callback, DataSrc};
+use pine::runtime::AnySeries;
 
 const MA_SCRIPT: &str = "
 N = 5
@@ -30,7 +31,13 @@ fn datasrc_test() {
     parser.parse_src(MA_SCRIPT).unwrap();
     let data = vec![(
         "close",
-        vec![Some(1f64), Some(2f64), Some(3f64), Some(4f64), Some(5f64)],
+        AnySeries::from_float_vec(vec![
+            Some(1f64),
+            Some(2f64),
+            Some(3f64),
+            Some(4f64),
+            Some(5f64),
+        ]),
     )];
     assert!(parser.run_with_data(data).is_ok());
 }
@@ -60,7 +67,13 @@ fn func_call_test() {
     parser.parse_src(FUNC_SCRIPT).unwrap();
     let data = vec![(
         "close",
-        vec![Some(2f64), Some(4f64), Some(8f64), Some(16f64), Some(32f64)],
+        AnySeries::from_float_vec(vec![
+            Some(2f64),
+            Some(4f64),
+            Some(8f64),
+            Some(16f64),
+            Some(32f64),
+        ]),
     )];
     assert!(parser.run_with_data(data).is_ok());
 }
@@ -96,11 +109,23 @@ fn if_else_test() {
     let data = vec![
         (
             "close",
-            vec![Some(1f64), Some(3f64), Some(5f64), Some(7f64), Some(9f64)],
+            AnySeries::from_float_vec(vec![
+                Some(1f64),
+                Some(3f64),
+                Some(5f64),
+                Some(7f64),
+                Some(9f64),
+            ]),
         ),
         (
             "open",
-            vec![Some(0f64), Some(4f64), Some(4f64), Some(8f64), Some(8f64)],
+            AnySeries::from_float_vec(vec![
+                Some(0f64),
+                Some(4f64),
+                Some(4f64),
+                Some(8f64),
+                Some(8f64),
+            ]),
         ),
     ];
     assert!(parser.run_with_data(data).is_ok());
@@ -130,7 +155,10 @@ fn for_range_test() {
     );
     let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&MyCallback));
     parser.parse_src(FOR_RANGE_SCRIPT).unwrap();
-    let data = vec![("close", vec![Some(1f64), Some(3f64)])];
+    let data = vec![(
+        "close",
+        AnySeries::from_float_vec(vec![Some(1f64), Some(3f64)]),
+    )];
     assert!(parser.run_with_data(data).is_ok());
 }
 
@@ -158,7 +186,10 @@ fn ema_test() {
     );
     let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&MyCallback));
     parser.parse_src(EMA_SCRIPT).unwrap();
-    let data = vec![("close", vec![Some(2f64), Some(4f64)])];
+    let data = vec![(
+        "close",
+        AnySeries::from_float_vec(vec![Some(2f64), Some(4f64)]),
+    )];
 
     assert!(parser.run_with_data(data).is_ok());
 }
@@ -197,7 +228,10 @@ fn macd_test() {
     );
     let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&MyCallback));
     parser.parse_src(MACD_SCRIPT).unwrap();
-    let data = vec![("close", vec![Some(200f64), Some(400f64)])];
+    let data = vec![(
+        "close",
+        AnySeries::from_float_vec(vec![Some(200f64), Some(400f64)]),
+    )];
 
     assert!(parser.run_with_data(data).is_ok());
 }

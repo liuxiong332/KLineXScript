@@ -12,35 +12,75 @@ use crate::types::{
     Bool, Callable, Color, DataType, Float, Int, Object, ParamCollectCall, PineClass, PineFrom,
     PineRef, PineType, RefData, RuntimeErr, SecondType, Series, NA,
 };
+use regex::Regex;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-struct ColorProps;
+struct SymInfoProps;
 
-impl<'a> PineClass<'a> for ColorProps {
+impl<'a> PineClass<'a> for SymInfoProps {
     fn custom_type(&self) -> &str {
-        "color"
+        "syminfo"
     }
 
-    fn get(&self, context: &mut dyn Ctx<'a>, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
+    fn get(&self, ctx: &mut dyn Ctx<'a>, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
+        let ctx_ins = downcast_ctx(ctx);
         match name {
-            "aqua" => Ok(PineRef::new_box(Color("#00BCD4"))),
-            "black" => Ok(PineRef::new_box(Color("#363A45"))),
-            "blue" => Ok(PineRef::new_box(Color("#2196F3"))),
-            "fuchsia" => Ok(PineRef::new_box(Color("#E040FB"))),
-            "gray" => Ok(PineRef::new_box(Color("#787B86"))),
-            "green" => Ok(PineRef::new_box(Color("#4CAF50"))),
-            "lime" => Ok(PineRef::new_box(Color("#00E676"))),
-            "maroon" => Ok(PineRef::new_box(Color("#880E4F"))),
-            "navy" => Ok(PineRef::new_box(Color("#311B92"))),
-            "olive" => Ok(PineRef::new_box(Color("#808000"))),
-            "orange" => Ok(PineRef::new_box(Color("#FF9800"))),
-            "purple" => Ok(PineRef::new_box(Color("#9C27B0"))),
-            "red" => Ok(PineRef::new_box(Color("#FF5252"))),
-            "silver" => Ok(PineRef::new_box(Color("#B2B5BE"))),
-            "teal" => Ok(PineRef::new_box(Color("#00897B"))),
-            "white" => Ok(PineRef::new_box(Color("#FFFFFF"))),
-            "yellow" => Ok(PineRef::new_box(Color("#FFEB3B"))),
+            "currency" => match ctx_ins.get_syminfo() {
+                Some(syminfo) => Ok(PineRef::new_rc(syminfo.currency.clone())),
+                _ => Ok(PineRef::new_rc(String::from(""))),
+            },
+            "description" => match ctx_ins.get_syminfo() {
+                Some(syminfo) => Ok(PineRef::new_rc(syminfo.description.clone())),
+                _ => Ok(PineRef::new_rc(String::from(""))),
+            },
+            "mintick" => match ctx_ins.get_syminfo() {
+                Some(syminfo) => Ok(PineRef::new_box(Some(syminfo.mintick))),
+                _ => Ok(PineRef::new_box(Float::from(None))),
+            },
+            "pointvalue" => Ok(PineRef::new_box(Some(1f64))),
+            "prefix" => match ctx_ins.get_syminfo() {
+                Some(syminfo) => {
+                    let re = Regex::new(r"(\w+):\w+").unwrap();
+                    match re.captures(&syminfo.ticker) {
+                        Some(caps) => Ok(PineRef::new_rc(String::from(&caps[1]))),
+                        _ => Ok(PineRef::new_rc(String::from(""))),
+                    }
+                }
+                _ => Ok(PineRef::new_rc(String::from(""))),
+            },
+            "root" => match ctx_ins.get_syminfo() {
+                Some(syminfo) => Ok(PineRef::new_rc(
+                    syminfo.root.clone().unwrap_or(String::from("")),
+                )),
+                _ => Ok(PineRef::new_rc(String::from(""))),
+            },
+            "session" => match ctx_ins.get_syminfo() {
+                Some(syminfo) => Ok(PineRef::new_rc(syminfo.session.clone())),
+                _ => Ok(PineRef::new_rc(String::from(""))),
+            },
+            "ticker" => match ctx_ins.get_syminfo() {
+                Some(syminfo) => {
+                    let re = Regex::new(r"\w+:(\w+)").unwrap();
+                    match re.captures(&syminfo.ticker) {
+                        Some(caps) => Ok(PineRef::new_rc(String::from(&caps[1]))),
+                        _ => Ok(PineRef::new_rc(String::from(""))),
+                    }
+                }
+                _ => Ok(PineRef::new_rc(String::from(""))),
+            },
+            "tickerid" => match ctx_ins.get_syminfo() {
+                Some(syminfo) => Ok(PineRef::new_rc(syminfo.ticker.clone())),
+                _ => Ok(PineRef::new_rc(String::from(""))),
+            },
+            "timezone" => match ctx_ins.get_syminfo() {
+                Some(syminfo) => Ok(PineRef::new_rc(syminfo.timezone.clone())),
+                _ => Ok(PineRef::new_rc(String::from(""))),
+            },
+            "type" => match ctx_ins.get_syminfo() {
+                Some(syminfo) => Ok(PineRef::new_rc(syminfo.symbol_type.clone())),
+                _ => Ok(PineRef::new_rc(String::from(""))),
+            },
             _ => Err(RuntimeErr::NotImplement(str_replace(
                 NO_FIELD_IN_OBJECT,
                 vec![String::from(name), String::from("color")],
@@ -49,14 +89,14 @@ impl<'a> PineClass<'a> for ColorProps {
     }
 
     fn copy(&self) -> Box<dyn PineClass<'a> + 'a> {
-        Box::new(ColorProps)
+        Box::new(SymInfoProps)
     }
 }
 
 pub const VAR_NAME: &'static str = "syminfo";
 
 pub fn declare_var<'a>() -> VarResult<'a> {
-    let value = PineRef::new(Object::new(Box::new(ColorProps)));
+    let value = PineRef::new(Object::new(Box::new(SymInfoProps)));
 
     let mut obj_type = BTreeMap::new();
     obj_type.insert("currency", SyntaxType::string());
@@ -77,11 +117,11 @@ pub fn declare_var<'a>() -> VarResult<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runtime::{AnySeries, NoneCallback};
+    use crate::runtime::{AnySeries, NoneCallback, SymbolInfo};
     use crate::{LibInfo, PineParser, PineRunner};
 
     #[test]
-    fn plot_fields_test() {
+    fn syminfo_fields_test() {
         use crate::ast::stat_expr_types::VarIndex;
         use crate::runtime::VarOperate;
         use crate::types::{downcast_pf, Tuple};
@@ -91,9 +131,8 @@ mod tests {
             vec![("close", SyntaxType::float_series())],
         );
         let src = r"m = [
-            color.aqua, color.black, color.blue, color.fuchsia, color.gray, color.green,
-            color.lime, color.maroon, color.navy, color.olive, color.orange, color.purple,
-            color.red, color.silver, color.teal, color.white, color.yellow
+            syminfo.currency, syminfo.description, syminfo.mintick, syminfo.pointvalue, syminfo.prefix,
+            syminfo.root, syminfo.session, syminfo.ticker, syminfo.tickerid, syminfo.timezone, syminfo.type
         ]";
 
         let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
@@ -102,7 +141,18 @@ mod tests {
         runner
             .run(
                 &vec![("close", AnySeries::from_float_vec(vec![Some(1f64)]))],
-                None,
+                Some(Rc::new(SymbolInfo {
+                    symbol_type: String::from("future"),
+                    timezone: String::from("GTC+8"),
+                    ticker: String::from("BATS:MSFT"),
+                    session: String::from("regular"),
+                    trade_start: String::from(""),
+                    trade_end: String::from(""),
+                    root: Some(String::from("le")),
+                    currency: String::from("USD"),
+                    description: String::from("des"),
+                    mintick: 1f64,
+                })),
             )
             .unwrap();
         let tuple_res =
@@ -111,23 +161,17 @@ mod tests {
         assert_eq!(
             tuple_vec,
             vec![
-                PineRef::new_box(Color("#00BCD4")),
-                PineRef::new_box(Color("#363A45")),
-                PineRef::new_box(Color("#2196F3")),
-                PineRef::new_box(Color("#E040FB")),
-                PineRef::new_box(Color("#787B86")),
-                PineRef::new_box(Color("#4CAF50")),
-                PineRef::new_box(Color("#00E676")),
-                PineRef::new_box(Color("#880E4F")),
-                PineRef::new_box(Color("#311B92")),
-                PineRef::new_box(Color("#808000")),
-                PineRef::new_box(Color("#FF9800")),
-                PineRef::new_box(Color("#9C27B0")),
-                PineRef::new_box(Color("#FF5252")),
-                PineRef::new_box(Color("#B2B5BE")),
-                PineRef::new_box(Color("#00897B")),
-                PineRef::new_box(Color("#FFFFFF")),
-                PineRef::new_box(Color("#FFEB3B")),
+                PineRef::new_rc(String::from("USD")),
+                PineRef::new_rc(String::from("des")),
+                PineRef::new_box(Some(1f64)),
+                PineRef::new_box(Some(1f64)),
+                PineRef::new_rc(String::from("BATS")),
+                PineRef::new_rc(String::from("le")),
+                PineRef::new_rc(String::from("regular")),
+                PineRef::new_rc(String::from("MSFT")),
+                PineRef::new_rc(String::from("BATS:MSFT")),
+                PineRef::new_rc(String::from("GTC+8")),
+                PineRef::new_rc(String::from("future")),
             ]
         );
     }

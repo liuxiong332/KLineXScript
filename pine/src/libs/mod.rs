@@ -8,6 +8,7 @@ pub mod plotchar;
 pub mod plotshape;
 pub mod print;
 pub mod study;
+pub mod syminfo;
 pub mod timestamp;
 use crate::ast::syntax_type::SyntaxType;
 use crate::types::PineRef;
@@ -56,6 +57,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         plotshape::declare_var(),
         color::declare_var(),
         study::declare_var(),
+        syminfo::declare_var(),
     ];
     debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());

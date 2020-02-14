@@ -39,7 +39,7 @@ fn datasrc_test() {
             Some(5f64),
         ]),
     )];
-    assert!(parser.run_with_data(data).is_ok());
+    assert!(parser.run_with_data(data, None).is_ok());
 }
 
 const FUNC_SCRIPT: &str = "
@@ -75,7 +75,7 @@ fn func_call_test() {
             Some(32f64),
         ]),
     )];
-    assert!(parser.run_with_data(data).is_ok());
+    assert!(parser.run_with_data(data, None).is_ok());
 }
 
 const IF_ELSE_SCRIPT: &str = "
@@ -128,7 +128,7 @@ fn if_else_test() {
             ]),
         ),
     ];
-    assert!(parser.run_with_data(data).is_ok());
+    assert!(parser.run_with_data(data, None).is_ok());
 }
 
 const FOR_RANGE_SCRIPT: &str = "
@@ -159,7 +159,7 @@ fn for_range_test() {
         "close",
         AnySeries::from_float_vec(vec![Some(1f64), Some(3f64)]),
     )];
-    assert!(parser.run_with_data(data).is_ok());
+    assert!(parser.run_with_data(data, None).is_ok());
 }
 
 const EMA_SCRIPT: &str = "
@@ -191,7 +191,7 @@ fn ema_test() {
         AnySeries::from_float_vec(vec![Some(2f64), Some(4f64)]),
     )];
 
-    assert!(parser.run_with_data(data).is_ok());
+    assert!(parser.run_with_data(data, None).is_ok());
 }
 
 const MACD_SCRIPT: &str = "
@@ -233,5 +233,5 @@ fn macd_test() {
         AnySeries::from_float_vec(vec![Some(200f64), Some(400f64)]),
     )];
 
-    assert!(parser.run_with_data(data).is_ok());
+    assert!(parser.run_with_data(data, None).is_ok());
 }

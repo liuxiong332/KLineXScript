@@ -1,11 +1,12 @@
 use super::context::{Context, Ctx, PineRuntimeError, Runner, VarOperate};
 // use super::ctxid_parser::CtxIdParser;
-use super::output::InputVal;
+use super::output::{InputVal, SymbolInfo};
 use super::{AnySeries, AnySeriesType};
 use crate::ast::stat_expr_types::{Block, VarIndex};
 use crate::types::{
     DataType, Float, Int, PineFrom, PineRef, PineType, RefData, RuntimeErr, Series,
 };
+use std::rc::Rc;
 
 pub trait Callback {
     fn print(&self, _str: String) {}
@@ -144,10 +145,17 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
         }
     }
 
-    pub fn run(&mut self, data: &Vec<(&'static str, AnySeries)>) -> Result<(), PineRuntimeError> {
+    pub fn run(
+        &mut self,
+        data: &Vec<(&'static str, AnySeries)>,
+        syminfo: Option<Rc<SymbolInfo>>,
+    ) -> Result<(), PineRuntimeError> {
         let len = get_len(data)?;
         // Update the range of data.
         self.context.update_data_range((Some(0), Some(len as i32)));
+        if let Some(syminfo) = syminfo {
+            self.context.set_syminfo(syminfo);
+        }
         self.run_data(data, len)
     }
 
@@ -237,7 +245,7 @@ mod tests {
             AnySeries::from_float_vec(vec![Some(10f64), Some(100f64)]),
         )];
 
-        assert_eq!(datasrc.run(&data), Ok(()));
+        assert_eq!(datasrc.run(&data, None), Ok(()));
         datasrc.context.map_var(VarIndex::new(1, 0), |hv| match hv {
             None => None,
             Some(v) => {

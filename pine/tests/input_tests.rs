@@ -26,5 +26,5 @@ fn datasrc_test() {
     let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&MyCallback));
     parser.parse_src(INPUT_SCRIPT).unwrap();
     let data = vec![("close", AnySeries::from_float_vec(vec![Some(1f64)]))];
-    assert!(parser.run_with_data(data).is_ok());
+    assert!(parser.run_with_data(data, None).is_ok());
 }

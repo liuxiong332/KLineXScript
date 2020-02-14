@@ -2,6 +2,7 @@ use super::{
     Callable, Category, ComplexType, DataType, PineClass, PineFrom, PineRef, PineStaticType,
     PineType, RuntimeErr, SecondType,
 };
+use crate::runtime::Ctx;
 
 #[derive(Debug)]
 pub struct CallableObject<'a> {
@@ -47,8 +48,8 @@ impl<'a> CallableObject<'a> {
         CallableObject { obj, create_func }
     }
 
-    pub fn get(&self, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
-        self.obj.get(name)
+    pub fn get(&self, context: &mut dyn Ctx<'a>, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
+        self.obj.get(context, name)
     }
 
     pub fn set(&self, name: &str, property: PineRef<'a>) -> Result<(), RuntimeErr> {
@@ -75,7 +76,7 @@ mod tests {
             "Custom A"
         }
 
-        fn get(&self, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
+        fn get(&self, context: &mut dyn Ctx<'a>, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
             match name {
                 "int1" => Ok(PineRef::new_box(Some(1i64))),
                 "int2" => Ok(PineRef::new_box(Some(2i64))),
@@ -106,16 +107,17 @@ mod tests {
     #[test]
     fn object_test() {
         let obj = CallableObject::new(Box::new(A), || Callable::new(Some(test_func), None));
+        let mut context = Context::new(None, ContextType::Normal);
+
         assert_eq!(
             obj.get_type(),
             (DataType::CallableObject, SecondType::Simple)
         );
         assert_eq!(
-            downcast_pf::<Int>(obj.get("int1").unwrap()).unwrap(),
+            downcast_pf::<Int>(obj.get(&mut context, "int1").unwrap()).unwrap(),
             RefData::new_box(Some(1))
         );
         let mut callable = obj.create();
-        let mut context = Context::new(None, ContextType::Normal);
 
         assert_eq!(
             downcast_pf::<Int>(

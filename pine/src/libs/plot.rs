@@ -86,7 +86,7 @@ impl<'a> PineClass<'a> for PlotProps {
         "input"
     }
 
-    fn get(&self, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
+    fn get(&self, _ctx: &mut dyn Ctx<'a>, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
         match name {
             "style_area" => Ok(PineRef::new_rc(String::from("area"))),
             "style_areabr" => Ok(PineRef::new_rc(String::from("areabr"))),
@@ -167,10 +167,13 @@ mod tests {
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
 
         runner
-            .run(&vec![(
-                "close",
-                AnySeries::from_float_vec(vec![Some(1f64), Some(2f64)]),
-            )])
+            .run(
+                &vec![(
+                    "close",
+                    AnySeries::from_float_vec(vec![Some(1f64), Some(2f64)]),
+                )],
+                None,
+            )
             .unwrap();
 
         assert_eq!(
@@ -238,10 +241,13 @@ mod tests {
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
 
         runner
-            .run(&vec![(
-                "close",
-                AnySeries::from_float_vec(vec![Some(1f64), Some(2f64)]),
-            )])
+            .run(
+                &vec![(
+                    "close",
+                    AnySeries::from_float_vec(vec![Some(1f64), Some(2f64)]),
+                )],
+                None,
+            )
             .unwrap();
         assert_eq!(
             runner.get_context().get_io_info().get_outputs(),
@@ -282,10 +288,10 @@ mod tests {
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
 
         runner
-            .run(&vec![(
-                "close",
-                AnySeries::from_float_vec(vec![Some(1f64)]),
-            )])
+            .run(
+                &vec![("close", AnySeries::from_float_vec(vec![Some(1f64)]))],
+                None,
+            )
             .unwrap();
         let tuple_res =
             downcast_pf::<Tuple>(runner.get_context().move_var(VarIndex::new(2, 0)).unwrap());

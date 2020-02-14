@@ -2,6 +2,7 @@ use super::downcast::downcast_ref;
 use super::error::RuntimeErr;
 use super::pine_ref::PineRef;
 use super::ref_data::RefData;
+use crate::runtime::Ctx;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 
@@ -140,7 +141,7 @@ impl<'a> PartialEq for dyn PineType<'a> + 'a {
 pub trait PineClass<'a> {
     fn custom_type(&self) -> &str;
 
-    fn get(&self, name: &str) -> Result<PineRef<'a>, RuntimeErr>;
+    fn get(&self, context: &mut dyn Ctx<'a>, name: &str) -> Result<PineRef<'a>, RuntimeErr>;
 
     fn set(&self, _name: &str, _property: PineRef<'a>) -> Result<(), RuntimeErr> {
         Err(RuntimeErr::NotSupportOperator)

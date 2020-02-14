@@ -2,6 +2,7 @@ use super::{
     Category, ComplexType, DataType, PineClass, PineFrom, PineRef, PineStaticType, PineType,
     RuntimeErr, SecondType,
 };
+use crate::runtime::Ctx;
 
 #[derive(Debug)]
 pub struct Object<'a> {
@@ -42,8 +43,8 @@ impl<'a> Object<'a> {
         Object { obj }
     }
 
-    pub fn get(&self, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
-        self.obj.get(name)
+    pub fn get(&self, context: &mut dyn Ctx<'a>, name: &'a str) -> Result<PineRef<'a>, RuntimeErr> {
+        self.obj.get(context, name)
     }
 
     pub fn set(&self, name: &str, property: PineRef<'a>) -> Result<(), RuntimeErr> {
@@ -55,6 +56,7 @@ impl<'a> Object<'a> {
 mod tests {
     use super::super::{downcast_pf, Int, RefData};
     use super::*;
+    use crate::runtime::context::{Context, ContextType};
 
     struct A;
     impl<'a> PineClass<'a> for A {
@@ -62,7 +64,7 @@ mod tests {
             "Custom A"
         }
 
-        fn get(&self, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
+        fn get(&self, context: &mut dyn Ctx<'a>, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
             match name {
                 "int1" => Ok(PineRef::new_box(Some(1i64))),
                 "int2" => Ok(PineRef::new_box(Some(2i64))),
@@ -85,8 +87,11 @@ mod tests {
     fn object_test() {
         let obj = Object::new(Box::new(A));
         assert_eq!(obj.get_type(), (DataType::Object, SecondType::Simple));
+
+        let mut context = Context::new(None, ContextType::Normal);
+
         assert_eq!(
-            downcast_pf::<Int>(obj.get("int1").unwrap()).unwrap(),
+            downcast_pf::<Int>(obj.get(&mut context, "int1").unwrap()).unwrap(),
             RefData::new_box(Some(1))
         );
     }

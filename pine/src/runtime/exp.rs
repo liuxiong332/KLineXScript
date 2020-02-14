@@ -126,12 +126,12 @@ impl<'a> Runner<'a> for PrefixExp<'a> {
         match var.get_type() {
             (FirstType::Object, SecondType::Simple) => {
                 let object = downcast_pf::<Object>(var).unwrap();
-                let subobj = object.get(self.right_name.value).unwrap();
+                let subobj = object.get(context, self.right_name.value).unwrap();
                 Ok(subobj)
             }
             (FirstType::CallableObject, SecondType::Simple) => {
                 let object = downcast_pf::<CallableObject>(var).unwrap();
-                let subobj = object.get(self.right_name.value).unwrap();
+                let subobj = object.get(context, self.right_name.value).unwrap();
                 Ok(subobj)
             }
             _ => Err(PineRuntimeError::new(
@@ -225,7 +225,11 @@ mod tests {
                 "Custom A"
             }
 
-            fn get(&self, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
+            fn get(
+                &self,
+                context: &mut dyn Ctx<'a>,
+                name: &str,
+            ) -> Result<PineRef<'a>, RuntimeErr> {
                 match name {
                     "int" => Ok(PineRef::new_box(Some(1i64))),
                     "object" => Ok(PineRef::new_rc(Object::new(Box::new(A)))),

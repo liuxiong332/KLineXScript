@@ -107,10 +107,13 @@ mod tests {
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
 
         runner
-            .run(&vec![(
-                "close",
-                AnySeries::from_float_vec(vec![Some(1f64), Some(2f64)]),
-            )])
+            .run(
+                &vec![(
+                    "close",
+                    AnySeries::from_float_vec(vec![Some(1f64), Some(2f64)]),
+                )],
+                None,
+            )
             .unwrap();
         assert_eq!(
             runner.get_context().get_io_info().get_outputs(),

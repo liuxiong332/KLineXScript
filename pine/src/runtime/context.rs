@@ -1,6 +1,6 @@
 use super::data_src::Callback;
 use super::output::InputVal;
-use super::output::{IOInfo, InputInfo, OutputData, OutputInfo, ScriptPurpose};
+use super::output::{IOInfo, InputInfo, OutputData, OutputInfo, ScriptPurpose, SymbolInfo};
 use crate::ast::input::{Position, StrRange};
 use crate::ast::stat_expr_types::VarIndex;
 use crate::types::{
@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::mem;
+use std::rc::Rc;
 
 pub trait VarOperate<'a> {
     fn create_var(&mut self, index: i32, val: PineRef<'a>) -> Option<PineRef<'a>>;
@@ -104,6 +105,9 @@ pub struct Context<'a, 'b, 'c> {
     // Check if input_info is ready
     is_output_info_ready: bool,
 
+    // The symbol information
+    syminfo: Option<Rc<SymbolInfo>>,
+
     // The range of data
     data_range: (Option<i32>, Option<i32>),
 
@@ -190,6 +194,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             io_info: IOInfo::new(),
             is_input_info_ready: false,
             is_output_info_ready: false,
+            syminfo: None,
             data_range: (Some(0), Some(0)),
             first_commit: false,
             is_run: false,
@@ -214,6 +219,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             io_info: IOInfo::new(),
             is_input_info_ready: false,
             is_output_info_ready: false,
+            syminfo: None,
             data_range: (Some(0), Some(0)),
             first_commit: false,
             is_run: false,
@@ -321,6 +327,14 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
     pub fn move_output_data(&mut self) -> Vec<Option<OutputData>> {
         debug_assert_eq!(self.outputs.len(), self.io_info.get_outputs().len());
         mem::replace(&mut self.outputs, vec![])
+    }
+
+    pub fn set_syminfo(&mut self, syminfo: Rc<SymbolInfo>) {
+        self.syminfo = Some(syminfo);
+    }
+
+    pub fn get_syminfo(&self) -> &Option<Rc<SymbolInfo>> {
+        &self.syminfo
     }
 
     pub fn get_data_range(&self) -> (Option<i32>, Option<i32>) {

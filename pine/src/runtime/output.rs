@@ -170,6 +170,7 @@ pub struct IOInfo {
     inputs: Vec<InputInfo>,
     input_srcs: Vec<String>,
     outputs: Vec<OutputInfo>,
+    want_syminfo: bool,
 }
 
 impl IOInfo {
@@ -188,6 +189,7 @@ impl IOInfo {
             inputs: vec![],
             input_srcs: IOInfo::gen_srcs(),
             outputs: vec![],
+            want_syminfo: false,
         }
     }
 
@@ -201,6 +203,7 @@ impl IOInfo {
             inputs,
             outputs,
             input_srcs,
+            want_syminfo: false,
         }
     }
 

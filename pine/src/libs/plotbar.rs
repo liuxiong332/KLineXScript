@@ -118,24 +118,27 @@ mod tests {
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
 
         runner
-            .run(&vec![
-                (
-                    "close",
-                    AnySeries::from_float_vec(vec![Some(1f64), Some(2f64)]),
-                ),
-                (
-                    "open",
-                    AnySeries::from_float_vec(vec![Some(0f64), Some(10f64)]),
-                ),
-                (
-                    "high",
-                    AnySeries::from_float_vec(vec![Some(1f64), Some(12f64)]),
-                ),
-                (
-                    "low",
-                    AnySeries::from_float_vec(vec![Some(0f64), Some(1f64)]),
-                ),
-            ])
+            .run(
+                &vec![
+                    (
+                        "close",
+                        AnySeries::from_float_vec(vec![Some(1f64), Some(2f64)]),
+                    ),
+                    (
+                        "open",
+                        AnySeries::from_float_vec(vec![Some(0f64), Some(10f64)]),
+                    ),
+                    (
+                        "high",
+                        AnySeries::from_float_vec(vec![Some(1f64), Some(12f64)]),
+                    ),
+                    (
+                        "low",
+                        AnySeries::from_float_vec(vec![Some(0f64), Some(1f64)]),
+                    ),
+                ],
+                None,
+            )
             .unwrap();
 
         assert_eq!(

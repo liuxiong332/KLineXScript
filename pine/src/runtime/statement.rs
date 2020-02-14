@@ -956,7 +956,11 @@ mod tests {
             fn custom_type(&self) -> &str {
                 "my pine"
             }
-            fn get(&self, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
+            fn get(
+                &self,
+                context: &mut dyn Ctx<'a>,
+                name: &str,
+            ) -> Result<PineRef<'a>, RuntimeErr> {
                 Ok(PineRef::new_box(Some(1)))
             }
             fn copy(&self) -> Box<dyn PineClass<'a> + 'a> {

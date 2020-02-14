@@ -22,7 +22,7 @@ impl<'a> PineClass<'a> for ColorProps {
         "color"
     }
 
-    fn get(&self, _ctx: &mut dyn Ctx<'a>, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
+    fn get(&self, context: &mut dyn Ctx<'a>, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
         match name {
             "aqua" => Ok(PineRef::new_box(Color("#00BCD4"))),
             "black" => Ok(PineRef::new_box(Color("#363A45"))),
@@ -53,29 +53,23 @@ impl<'a> PineClass<'a> for ColorProps {
     }
 }
 
-pub const VAR_NAME: &'static str = "color";
+pub const VAR_NAME: &'static str = "syminfo";
 
 pub fn declare_var<'a>() -> VarResult<'a> {
     let value = PineRef::new(Object::new(Box::new(ColorProps)));
 
     let mut obj_type = BTreeMap::new();
-    obj_type.insert("aqua", SyntaxType::color());
-    obj_type.insert("black", SyntaxType::color());
-    obj_type.insert("blue", SyntaxType::color());
-    obj_type.insert("fuchsia", SyntaxType::color());
-    obj_type.insert("gray", SyntaxType::color());
-    obj_type.insert("green", SyntaxType::color());
-    obj_type.insert("lime", SyntaxType::color());
-    obj_type.insert("maroon", SyntaxType::color());
-    obj_type.insert("navy", SyntaxType::color());
-    obj_type.insert("olive", SyntaxType::color());
-    obj_type.insert("orange", SyntaxType::color());
-    obj_type.insert("purple", SyntaxType::color());
-    obj_type.insert("red", SyntaxType::color());
-    obj_type.insert("silver", SyntaxType::color());
-    obj_type.insert("teal", SyntaxType::color());
-    obj_type.insert("white", SyntaxType::color());
-    obj_type.insert("yellow", SyntaxType::color());
+    obj_type.insert("currency", SyntaxType::string());
+    obj_type.insert("description", SyntaxType::string());
+    obj_type.insert("mintick", SyntaxType::float());
+    obj_type.insert("pointvalue", SyntaxType::float());
+    obj_type.insert("prefix", SyntaxType::string());
+    obj_type.insert("root", SyntaxType::string());
+    obj_type.insert("session", SyntaxType::string());
+    obj_type.insert("ticker", SyntaxType::string());
+    obj_type.insert("tickerid", SyntaxType::string());
+    obj_type.insert("timezone", SyntaxType::string());
+    obj_type.insert("type", SyntaxType::string());
     let syntax_type = SyntaxType::Object(Rc::new(obj_type));
     VarResult::new(value, syntax_type, VAR_NAME)
 }

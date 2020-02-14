@@ -36,9 +36,10 @@ use libs::{declare_vars, VarResult};
 use runtime::context::{Context, PineRuntimeError};
 use runtime::data_src::{Callback, DataSrc};
 use runtime::error_format::{ErrorFormater, PineFormatError};
-use runtime::output::{IOInfo, InputVal, OutputData, OutputDataCollect};
+use runtime::output::{IOInfo, InputVal, OutputDataCollect, SymbolInfo};
 use runtime::{AnySeries, AnySeriesType};
 use std::mem;
+use std::rc::Rc;
 use types::{Float, Int, PineRef};
 
 #[derive(Debug, Clone)]
@@ -140,8 +141,12 @@ impl<'a, 'b, 'c> PineRunner<'a, 'b, 'c> {
         PineRunner { datasrc }
     }
 
-    pub fn run(&mut self, data: &Vec<(&'static str, AnySeries)>) -> Result<(), PineRuntimeError> {
-        self.datasrc.run(data)
+    pub fn run(
+        &mut self,
+        data: &Vec<(&'static str, AnySeries)>,
+        syminfo: Option<Rc<SymbolInfo>>,
+    ) -> Result<(), PineRuntimeError> {
+        self.datasrc.run(data, syminfo)
     }
 
     pub fn update(
@@ -179,6 +184,7 @@ pub struct PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
     callback: Option<&'ra dyn Callback>,
     runner: Option<PineRunner<'ra, 'rb, 'rc>>,
     data: Vec<(&'static str, AnySeries)>,
+    syminfo: Option<Rc<SymbolInfo>>,
     error_format: ErrorFormater,
 }
 
@@ -206,6 +212,7 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
             callback,
             runner: None,
             data: vec![],
+            syminfo: None,
             error_format: ErrorFormater::new(),
         }
     }
@@ -221,6 +228,7 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
             callback,
             runner: None,
             data: vec![],
+            syminfo: None,
             error_format: ErrorFormater::new(),
         }
     }
@@ -277,14 +285,17 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
 
     // Run the script with the experimental data to generate IOInfo data
     pub fn gen_io_info(&mut self) -> Result<IOInfo, PineFormatError> {
-        match self.get_runner().run(&vec![
-            ("close", AnySeries::from_float_vec(vec![Some(0f64)])),
-            ("open", AnySeries::from_float_vec(vec![Some(0f64)])),
-            ("high", AnySeries::from_float_vec(vec![Some(0f64)])),
-            ("low", AnySeries::from_float_vec(vec![Some(0f64)])),
-            ("volume", AnySeries::from_int_vec(vec![Some(1i64)])),
-            ("_time", AnySeries::from_int_vec(vec![Some(0i64)])),
-        ]) {
+        match self.get_runner().run(
+            &vec![
+                ("close", AnySeries::from_float_vec(vec![Some(0f64)])),
+                ("open", AnySeries::from_float_vec(vec![Some(0f64)])),
+                ("high", AnySeries::from_float_vec(vec![Some(0f64)])),
+                ("low", AnySeries::from_float_vec(vec![Some(0f64)])),
+                ("volume", AnySeries::from_int_vec(vec![Some(1i64)])),
+                ("_time", AnySeries::from_int_vec(vec![Some(0i64)])),
+            ],
+            None,
+        ) {
             Err(err) => Err(PineFormatError::from_runtime_error(&self.error_format, err)),
             Ok(_) => {
                 self.move_output_data();
@@ -299,6 +310,10 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
         OutputDataCollect::new(start.unwrap(), end.unwrap(), context.move_output_data())
     }
 
+    pub fn change_inputs(&mut self, inputs: Vec<Option<InputVal>>) {
+        self.get_runner().change_inputs(inputs);
+    }
+
     // Run the script with new input settings and old data
     pub fn run_with_input(
         &mut self,
@@ -306,7 +321,7 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
     ) -> Result<OutputDataCollect, PineFormatError> {
         let runner = self.get_runner();
         runner.change_inputs(input);
-        match self.runner.as_mut().unwrap().run(&self.data) {
+        match self.runner.as_mut().unwrap().run(&self.data, None) {
             Ok(_) => Ok(self.move_output_data()),
             Err(err) => Err(PineFormatError::from_runtime_error(&self.error_format, err)),
         }
@@ -316,14 +331,16 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
     pub fn run_with_data(
         &mut self,
         data: Vec<(&'static str, AnySeries)>,
+        syminfo: Option<Rc<SymbolInfo>>,
     ) -> Result<OutputDataCollect, PineFormatError>
     where
         'li: 'ra,
         'pa: 'ra,
     {
         self.data = data;
+        self.syminfo = syminfo.clone();
         self.get_runner();
-        match self.runner.as_mut().unwrap().run(&self.data) {
+        match self.runner.as_mut().unwrap().run(&self.data, syminfo) {
             Ok(_) => Ok(self.move_output_data()),
             Err(err) => Err(PineFormatError::from_runtime_error(&self.error_format, err)),
         }
@@ -334,14 +351,29 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
         &mut self,
         input: Vec<Option<InputVal>>,
         data: Vec<(&'static str, AnySeries)>,
+        syminfo: Option<Rc<SymbolInfo>>,
     ) -> Result<OutputDataCollect, PineFormatError>
     where
         'li: 'ra,
         'pa: 'ra,
     {
         self.data = data;
+        self.syminfo = syminfo.clone();
         self.get_runner().change_inputs(input);
-        match self.runner.as_mut().unwrap().run(&self.data) {
+        match self.runner.as_mut().unwrap().run(&self.data, syminfo) {
+            Ok(_) => Ok(self.move_output_data()),
+            Err(err) => Err(PineFormatError::from_runtime_error(&self.error_format, err)),
+        }
+    }
+
+    // Run the script with old data and input
+    pub fn run_with_odi(&mut self) -> Result<OutputDataCollect, PineFormatError>
+    where
+        'li: 'ra,
+        'pa: 'ra,
+    {
+        let syminfo = self.syminfo.clone();
+        match self.runner.as_mut().unwrap().run(&self.data, syminfo) {
             Ok(_) => Ok(self.move_output_data()),
             Err(err) => Err(PineFormatError::from_runtime_error(&self.error_format, err)),
         }
@@ -551,7 +583,7 @@ mod tests {
             AnySeries::from_float_vec(vec![Some(1f64), Some(2f64)]),
         )];
         assert_eq!(
-            parser.run_with_data(data.clone()),
+            parser.run_with_data(data.clone(), None),
             Ok(OutputDataCollect::new_with_one(
                 0,
                 2,
@@ -569,7 +601,7 @@ mod tests {
         );
 
         assert_eq!(
-            parser.run_with_data(data.clone()),
+            parser.run_with_data(data.clone(), None),
             Ok(OutputDataCollect::new_with_one(
                 0,
                 2,

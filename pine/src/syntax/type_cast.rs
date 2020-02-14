@@ -5,6 +5,7 @@ pub fn explicity_type_cast<'a>(
     cur_type: &SyntaxType<'a>,
     dest_type: &DataType,
 ) -> (bool, SyntaxType<'a>) {
+    let cur_type = cur_type.get_v_for_vf();
     let (mut is_cast_err, mut result) = implicity_type_cast(cur_type, dest_type);
     match dest_type {
         DataType::Int => match cur_type {
@@ -29,6 +30,7 @@ pub fn implicity_type_cast<'a>(
     dest_type: &DataType,
 ) -> (bool, SyntaxType<'a>) {
     let mut is_cast_err = false;
+    let cur_type = cur_type.get_v_for_vf();
     let result = match dest_type {
         DataType::Bool => match cur_type {
             SyntaxType::Series(SimpleSyntaxType::Int)

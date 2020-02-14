@@ -1,19 +1,30 @@
 use crate::runtime::context::{Ctx, PineRuntimeError};
-use crate::syntax::SyntaxCtx;
 use crate::types::traits::{Category, ComplexType, DataType, PineStaticType, PineType, SecondType};
 use crate::types::PineRef;
 use std::fmt;
 
 pub trait EvaluateVal<'a> {
-    fn prepare(&mut self, syntax_ctx: &mut dyn SyntaxCtx<'a>);
+    fn custom_name(&self) -> &str;
 
-    fn run(&self, ctx: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError>;
+    fn run(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError>;
 
     fn copy(&self) -> Box<dyn EvaluateVal<'a>>;
+}
 
-    fn eq(&self, other: &dyn EvaluateVal<'a>) -> bool;
+impl<'a> fmt::Debug for dyn EvaluateVal<'a> + 'a {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Evalute value {}", self.custom_name())
+    }
+}
 
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
+impl<'a> PartialEq for dyn EvaluateVal<'a> + 'a {
+    fn eq(&self, other: &(dyn EvaluateVal<'a> + 'a)) -> bool {
+        if self.custom_name() == other.custom_name() {
+            true
+        } else {
+            false
+        }
+    }
 }
 
 pub fn downcast_evaluate_val_ref<'a, 'b, T: EvaluateVal<'a>>(
@@ -35,11 +46,7 @@ impl<'a> Evaluate<'a> {
         Evaluate { val }
     }
 
-    pub fn prepare(&mut self, syntax_ctx: &mut dyn SyntaxCtx<'a>) {
-        self.val.prepare(syntax_ctx)
-    }
-
-    pub fn run(&self, ctx: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
+    pub fn run(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
         self.val.run(ctx)
     }
 }
@@ -70,7 +77,7 @@ impl<'a> ComplexType for Evaluate<'a> {}
 
 impl<'a> PartialEq for Evaluate<'a> {
     fn eq(&self, other: &Self) -> bool {
-        self.val.eq(&*other.val)
+        self.val.eq(&other.val)
     }
 }
 
@@ -85,9 +92,8 @@ mod tests {
     use super::*;
     use crate::ast::stat_expr_types::VarIndex;
     use crate::runtime::context::{Context, ContextType as RunContextType, VarOperate};
-    use crate::syntax::{ContextType, SyntaxContext};
     use crate::types::downcast_pf_ref;
-    use crate::types::{Arithmetic, Float, PineFrom, RefData, RuntimeErr, Series};
+    use crate::types::{Arithmetic, Float, RuntimeErr, Series};
 
     #[derive(Debug, Clone, PartialEq)]
     struct MyVal {
@@ -105,12 +111,13 @@ mod tests {
     }
 
     impl<'a> EvaluateVal<'a> for MyVal {
-        fn prepare(&mut self, syntax_ctx: &mut dyn SyntaxCtx<'a>) {
-            self.close_index = syntax_ctx.get_var_index("close");
-            self.open_index = syntax_ctx.get_var_index("open");
+        fn custom_name(&self) -> &str {
+            "test"
         }
 
-        fn run(&self, ctx: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
+        fn run(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
+            self.close_index = VarIndex::new(*ctx.get_varname_index("close").unwrap(), 0);
+            self.open_index = VarIndex::new(*ctx.get_varname_index("open").unwrap(), 0);
             match (ctx.get_var(self.close_index), ctx.get_var(self.open_index)) {
                 (Some(close_val), Some(open_val)) => {
                     let close = downcast_pf_ref::<Series<Float>>(close_val).unwrap();
@@ -126,28 +133,15 @@ mod tests {
         fn copy(&self) -> Box<dyn EvaluateVal<'a>> {
             Box::new(self.clone())
         }
-
-        fn eq(&self, other: &dyn EvaluateVal<'a>) -> bool {
-            PartialEq::eq(self, downcast_evaluate_val_ref::<MyVal>(other))
-        }
-
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            fmt::Debug::fmt(self, f)
-        }
     }
 
     #[test]
     fn evaluate_test() {
         let mut evaluate = Evaluate::new(Box::new(MyVal::new()));
-
-        let mut syntax_ctx = SyntaxContext::new(None, ContextType::Normal);
-        syntax_ctx.gen_var_index("close");
-        syntax_ctx.gen_var_index("open");
-
-        evaluate.prepare(&mut syntax_ctx);
-
         let mut context = Context::new(None, RunContextType::Normal);
         context.init(2, 0, 0);
+        context.set_varname_index("close", 0);
+        context.set_varname_index("open", 1);
         context.create_var(0, PineRef::new(Series::from(Some(1f64))));
         context.create_var(1, PineRef::new(Series::from(Some(2f64))));
 

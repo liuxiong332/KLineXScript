@@ -30,7 +30,8 @@ pub enum DataType {
     Function, // The function defined by the script
     Object,
     CallableObject,
-    Evaluate, // The variable need lazy evaluate.
+    Evaluate,         // The variable need lazy evaluate.
+    CallableEvaluate, // The variable need lazy evaluate.
 }
 
 #[derive(Debug, PartialEq)]

@@ -76,7 +76,7 @@ mod tests {
             "Custom A"
         }
 
-        fn get(&self, context: &mut dyn Ctx<'a>, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
+        fn get(&self, _ctx: &mut dyn Ctx<'a>, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
             match name {
                 "int1" => Ok(PineRef::new_box(Some(1i64))),
                 "int2" => Ok(PineRef::new_box(Some(2i64))),

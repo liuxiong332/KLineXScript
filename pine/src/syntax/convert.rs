@@ -2,6 +2,9 @@ use super::{SimpleSyntaxType, SyntaxType};
 
 // Series variable can only be implicity converted to Series, Simple can be implicity converted to Simple and Series
 pub fn implicity_convert<'a>(origin_type: &SyntaxType<'a>, dest_type: &SyntaxType<'a>) -> bool {
+    let origin_type = origin_type.get_v_for_vf();
+    let dest_type = dest_type.get_v_for_vf();
+
     if origin_type == dest_type {
         return true;
     }
@@ -144,6 +147,8 @@ fn common_simple_type(
 
 // Get the common type of type1 and type2
 pub fn common_type<'a>(type1: &SyntaxType<'a>, type2: &SyntaxType<'a>) -> Option<SyntaxType<'a>> {
+    let type1 = type1.get_v_for_vf();
+    let type2 = type2.get_v_for_vf();
     match (type1, type2) {
         (SyntaxType::Simple(t1), SyntaxType::Simple(t2)) => {
             let simple_type = common_simple_type(t1, t2);
@@ -180,6 +185,8 @@ pub fn similar_simple_type(
 }
 
 pub fn similar_type<'a>(type1: &SyntaxType<'a>, type2: &SyntaxType<'a>) -> Option<SyntaxType<'a>> {
+    let type1 = type1.get_v_for_vf();
+    let type2 = type2.get_v_for_vf();
     match (type1, type2) {
         (SyntaxType::Simple(t1), SyntaxType::Simple(t2)) => {
             let simple_type = similar_simple_type(t1, t2);
@@ -202,9 +209,9 @@ pub fn similar_type<'a>(type1: &SyntaxType<'a>, type2: &SyntaxType<'a>) -> Optio
 }
 
 pub fn simple_to_series<'a>(origin_type: SyntaxType<'a>) -> SyntaxType<'a> {
-    match origin_type {
+    match origin_type.into_v_for_vf() {
         SyntaxType::Simple(t) => SyntaxType::Series(t),
-        _ => origin_type,
+        vtype => vtype,
     }
 }
 

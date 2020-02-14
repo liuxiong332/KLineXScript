@@ -474,6 +474,8 @@ impl<'a> SyntaxParser<'a> {
             self.parse_std_func_call(func_call, &fun_type)
         } else if let SyntaxType::ObjectFunction(_, fun_type) = method_type.syntax_type {
             self.parse_std_func_call(func_call, &fun_type)
+        } else if let SyntaxType::ValFunction(_, fun_type) = method_type.syntax_type {
+            self.parse_std_func_call(func_call, &fun_type)
         } else if let SyntaxType::UserFunction(names) = method_type.syntax_type {
             self.parse_user_func_call(func_call, &names.0, method_type.varname.unwrap())
         } else {
@@ -625,10 +627,6 @@ impl<'a> SyntaxParser<'a> {
         self.context = if_ctx.parent.unwrap().as_ptr();
 
         downcast_ctx(self.context).subctxs.push(if_ctx);
-        println!(
-            "if now context len {}",
-            downcast_ctx(self.context).subctxs.len()
-        );
         Ok(then_res)
     }
 
@@ -649,10 +647,6 @@ impl<'a> SyntaxParser<'a> {
         self.context = else_ctx.parent.unwrap().as_ptr();
 
         downcast_ctx(self.context).subctxs.push(else_ctx);
-        println!(
-            "now context len {}",
-            downcast_ctx(self.context).subctxs.len()
-        );
         Ok(else_res)
     }
 

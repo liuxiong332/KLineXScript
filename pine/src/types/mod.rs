@@ -1,5 +1,6 @@
 pub mod array;
 pub mod callable;
+pub mod callable_evaluate;
 pub mod callable_object;
 pub mod downcast;
 pub mod error;
@@ -12,6 +13,7 @@ pub mod series;
 pub mod traits;
 
 pub use callable::*;
+pub use callable_evaluate::*;
 pub use callable_object::*;
 pub use downcast::*;
 pub use error::*;

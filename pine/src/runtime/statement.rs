@@ -10,9 +10,9 @@ use crate::ast::stat_expr_types::{
     VarAssignment, VarIndex,
 };
 use crate::types::{
-    downcast_pf, Bool, Callable, CallableFactory, CallableObject, Color, DataType as FirstType,
-    Float, Int, PineFrom, PineRef, PineStaticType, PineType, RefData, RuntimeErr, SecondType,
-    Series, Tuple, NA,
+    downcast_pf, Bool, Callable, CallableEvaluate, CallableFactory, CallableObject, Color,
+    DataType as FirstType, Float, Int, PineFrom, PineRef, PineStaticType, PineType, RefData,
+    RuntimeErr, SecondType, Series, Tuple, NA,
 };
 use std::fmt::Debug;
 
@@ -511,17 +511,30 @@ impl<'a> Runner<'a> for FunctionCall<'a> {
                 result
             }
             (FirstType::CallableFactory, SecondType::Simple)
-            | (FirstType::CallableObject, SecondType::Simple) => {
+            | (FirstType::CallableObject, SecondType::Simple)
+            | (FirstType::CallableEvaluate, SecondType::Simple) => {
                 let mut opt_instance = context.move_fun_instance(self.ctxid);
                 if opt_instance.is_none() {
-                    if result.get_type().0 == FirstType::CallableFactory {
-                        let factory = downcast_pf::<CallableFactory>(result).unwrap();
-                        context.create_fun_instance(self.ctxid, RefData::new_rc(factory.create()));
-                        opt_instance = context.move_fun_instance(self.ctxid);
-                    } else {
-                        let factory = downcast_pf::<CallableObject>(result).unwrap();
-                        context.create_fun_instance(self.ctxid, RefData::new_rc(factory.create()));
-                        opt_instance = context.move_fun_instance(self.ctxid);
+                    match result.get_type().0 {
+                        FirstType::CallableFactory => {
+                            let factory = downcast_pf::<CallableFactory>(result).unwrap();
+                            context
+                                .create_fun_instance(self.ctxid, RefData::new_rc(factory.create()));
+                            opt_instance = context.move_fun_instance(self.ctxid);
+                        }
+                        FirstType::CallableObject => {
+                            let factory = downcast_pf::<CallableObject>(result).unwrap();
+                            context
+                                .create_fun_instance(self.ctxid, RefData::new_rc(factory.create()));
+                            opt_instance = context.move_fun_instance(self.ctxid);
+                        }
+                        FirstType::CallableEvaluate => {
+                            let factory = downcast_pf::<CallableEvaluate>(result).unwrap();
+                            context
+                                .create_fun_instance(self.ctxid, RefData::new_rc(factory.create()));
+                            opt_instance = context.move_fun_instance(self.ctxid);
+                        }
+                        _ => unreachable!(),
                     }
                 }
                 let mut callable = opt_instance.unwrap();

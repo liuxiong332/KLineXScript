@@ -667,7 +667,6 @@ impl<'a> SyntaxParser<'a> {
             ));
         }
         if let Some(else_blk) = &mut ite.else_blk {
-            println!("parser else block");
             // Create new context for if block
             let else_res = self.parse_ifthenelse_else(else_blk, &mut ite.else_ctxid)?;
 

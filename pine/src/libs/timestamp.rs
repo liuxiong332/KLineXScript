@@ -155,7 +155,6 @@ fn timestamp<'a>(
         .and_hms(result.4 as u32, result.5 as u32, result.6 as u32);
 
     let ts = dt.timestamp() * 1000;
-    println!("is series {}", is_series);
     if is_series {
         Ok(PineRef::new(Series::from(Some(ts))))
     } else {

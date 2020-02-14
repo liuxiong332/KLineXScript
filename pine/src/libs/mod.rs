@@ -9,7 +9,9 @@ pub mod plotshape;
 pub mod print;
 pub mod study;
 pub mod syminfo;
+pub mod time;
 pub mod timestamp;
+
 use crate::ast::syntax_type::SyntaxType;
 use crate::types::PineRef;
 use std::collections::HashSet;

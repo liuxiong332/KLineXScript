@@ -5,9 +5,9 @@ pub enum RuntimeErr {
     NotImplement(String),
     InvalidTypeCast,
     InvalidNADeclarer,
-    MissingParameters(String), // The parameter is required.
-    InvalidParameters(String), // The parameters are invalid.
-
+    MissingParameters(String),     // The parameter is required.
+    InvalidParameters(String),     // The parameters are invalid.
+    UnrecongnizedSession,          // The session string is invalid.
     FuncCallParamNotValid(String), // The function call parameters is not valid.
 
     VarNotFound, // The variable not found in context

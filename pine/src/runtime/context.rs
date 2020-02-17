@@ -601,6 +601,11 @@ pub trait RVRunner<'a> {
     fn rv_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError>;
 }
 
+// the expression with right-value.
+pub trait RunnerForFunc<'a> {
+    fn run_for_func(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError>;
+}
+
 pub trait StmtRunner<'a> {
     fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), PineRuntimeError>;
 }

@@ -1,5 +1,6 @@
 use super::context::{
-    downcast_ctx, ContextType, Ctx, PineRuntimeError, RVRunner, Runner, StmtRunner, VarOperate,
+    downcast_ctx, ContextType, Ctx, PineRuntimeError, RVRunner, Runner, RunnerForFunc, StmtRunner,
+    VarOperate,
 };
 use super::function::Function;
 use super::runtime_convert::convert;
@@ -496,7 +497,7 @@ pub fn get_sub_ctx<'a, 'b, 'c>(
 
 impl<'a> Runner<'a> for FunctionCall<'a> {
     fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
-        let result = self.method.rv_run(context)?;
+        let result = self.method.run_for_func(context)?;
 
         let (pos_args, dict_args) = extract_args(context, self)?;
 

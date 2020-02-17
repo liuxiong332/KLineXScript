@@ -116,7 +116,6 @@ fn timestamp<'a>(
     _func_type: FunctionType<'a>,
 ) -> Result<PineRef<'a>, RuntimeErr> {
     let mut is_series = false;
-    println!("func type {:?}", _func_type);
     let result = if param.len() == 7 {
         if _func_type == gen_sig4_type() {
             is_series = true;

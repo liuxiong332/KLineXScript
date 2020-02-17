@@ -138,8 +138,8 @@ impl Session {
         ]
     }
 
-    pub fn parse(sstr: String) -> Result<Session, RuntimeErr> {
-        if &sstr == "24x7" {
+    pub fn parse(sstr: &str) -> Result<Session, RuntimeErr> {
+        if sstr == "24x7" {
             let session = Session {
                 spans: vec![TradeTimeSpan {
                     start: DayTime::new(0, 0),
@@ -151,7 +151,7 @@ impl Session {
         }
         let re = Regex::new(r"(\d{2})(\d{2})-(\d{2})(\d{2})").unwrap();
         let spans: Vec<TradeTimeSpan> = re
-            .captures_iter(&sstr)
+            .captures_iter(sstr)
             .into_iter()
             .map(|caps| {
                 TradeTimeSpan::parse(
@@ -174,7 +174,7 @@ impl Session {
         })
     }
 
-    pub fn is_in(&self, millseconds: i64, tz: Tz) -> bool {
+    pub fn is_in(&self, millseconds: i64, tz: &Tz) -> bool {
         let dt = tz.timestamp(millseconds / 1000, 0);
         let mut wk = dt.date().weekday();
         let time = dt.time();
@@ -210,14 +210,14 @@ mod tests {
     #[test]
     fn session_test() {
         assert_eq!(
-            Session::parse(String::from("0000-0000")),
+            Session::parse(&String::from("0000-0000")),
             Ok(Session {
                 spans: vec![TradeTimeSpan::new(0, 0, 24, 0)],
                 weekdays: Session::def_weekdays(),
             })
         );
         assert_eq!(
-            Session::parse(String::from("0900-1600,1700-2000")),
+            Session::parse(&String::from("0900-1600,1700-2000")),
             Ok(Session {
                 spans: vec![
                     TradeTimeSpan::new(9, 0, 16, 0),
@@ -228,7 +228,7 @@ mod tests {
         );
 
         assert_eq!(
-            Session::parse(String::from("2000-1630:1234567")),
+            Session::parse(&String::from("2000-1630:1234567")),
             Ok(Session {
                 spans: vec![TradeTimeSpan::new(-4, 0, 16, 30),],
                 weekdays: Session::all_weekdays(),
@@ -236,7 +236,7 @@ mod tests {
         );
 
         assert_eq!(
-            Session::parse(String::from("0930-1700:146")),
+            Session::parse(&String::from("0930-1700:146")),
             Ok(Session {
                 spans: vec![TradeTimeSpan::new(9, 30, 17, 0),],
                 weekdays: vec![Weekday::Sun, Weekday::Wed, Weekday::Fri],
@@ -244,7 +244,7 @@ mod tests {
         );
 
         assert_eq!(
-            Session::parse(String::from("24x7")),
+            Session::parse(&String::from("24x7")),
             Ok(Session {
                 spans: vec![TradeTimeSpan::new(0, 0, 24, 0),],
                 weekdays: Session::all_weekdays(),
@@ -252,7 +252,7 @@ mod tests {
         );
 
         assert_eq!(
-            Session::parse(String::from("0000-0000:1234567")),
+            Session::parse(&String::from("0000-0000:1234567")),
             Ok(Session {
                 spans: vec![TradeTimeSpan::new(0, 0, 24, 0),],
                 weekdays: Session::all_weekdays(),
@@ -260,7 +260,7 @@ mod tests {
         );
 
         assert_eq!(
-            Session::parse(String::from("0000-0000:23456")),
+            Session::parse(&String::from("0000-0000:23456")),
             Ok(Session {
                 spans: vec![TradeTimeSpan::new(0, 0, 24, 0),],
                 weekdays: Session::def_weekdays(),
@@ -268,7 +268,7 @@ mod tests {
         );
 
         assert_eq!(
-            Session::parse(String::from("1700-1700:23456")),
+            Session::parse(&String::from("1700-1700:23456")),
             Ok(Session {
                 spans: vec![TradeTimeSpan::new(-7, 0, 17, 0),],
                 weekdays: Session::def_weekdays(),
@@ -276,7 +276,7 @@ mod tests {
         );
 
         assert_eq!(
-            Session::parse(String::from("1000-1001:26")),
+            Session::parse(&String::from("1000-1001:26")),
             Ok(Session {
                 spans: vec![TradeTimeSpan::new(10, 0, 10, 01),],
                 weekdays: vec![Weekday::Mon, Weekday::Fri],
@@ -289,22 +289,23 @@ mod tests {
         let tz = Tz::UTC;
         let ts = tz.ymd(2020, 2, 14).and_hms(9, 48, 0).timestamp() * 1000;
         assert_eq!(
-            Session::parse(String::from("0100-1000"))
+            Session::parse(&String::from("0100-1000"))
                 .unwrap()
-                .is_in(ts, tz),
+                .is_in(ts, &tz),
             true
         );
 
         assert_eq!(
-            Session::parse(String::from("0900-0100"))
+            Session::parse(&String::from("0900-0100"))
                 .unwrap()
-                .is_in(ts, tz),
+                .is_in(ts, &tz),
             false
         );
         assert_eq!(
-            Session::parse(String::from("0900-0100"))
-                .unwrap()
-                .is_in(tz.ymd(2020, 2, 13).and_hms(9, 48, 0).timestamp() * 1000, tz),
+            Session::parse(&String::from("0900-0100")).unwrap().is_in(
+                tz.ymd(2020, 2, 13).and_hms(9, 48, 0).timestamp() * 1000,
+                &tz
+            ),
             true
         );
     }

@@ -1,4 +1,4 @@
-use super::context::{Ctx, PineRuntimeError, RVRunner, Runner};
+use super::context::{Ctx, PineRuntimeError, RVRunner, Runner, RunnerForFunc};
 use super::op::{binary_op_run, unary_op_run};
 use super::runtime_convert::convert;
 use crate::ast::num::Numeral;
@@ -73,6 +73,27 @@ impl<'a> RVRunner<'a> for Exp<'a> {
                 Ok(PineRef::new_box(Tuple(col)))
             }
             _ => self.run(context),
+        }
+    }
+}
+
+impl<'a> RunnerForFunc<'a> for Exp<'a> {
+    fn run_for_func(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
+        match self {
+            Exp::VarName(name) => match context.move_var(name.var_index) {
+                None => Err(PineRuntimeError::new(RuntimeErr::VarNotFound, self.range())),
+                Some(mut s) => {
+                    let ret = match s.get_type() {
+                        (FirstType::Evaluate, SecondType::Simple) => {
+                            downcast_pf_mut::<Evaluate>(&mut s).unwrap().run(context)
+                        }
+                        _ => Ok(s.copy()),
+                    };
+                    context.update_var(name.var_index, s);
+                    ret
+                }
+            },
+            _ => self.rv_run(context),
         }
     }
 }

@@ -5,6 +5,7 @@ use chrono::Timelike;
 use chrono::Weekday;
 use chrono_tz::Tz;
 use regex::Regex;
+use std::ops::Sub;
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -25,6 +26,36 @@ impl DayTime {
     pub fn sub_hour(mut self, h: i32) -> DayTime {
         self.hour -= h;
         self
+    }
+
+    pub fn sub(mut self, h: i32, m: i32) -> DayTime {
+        if self.minute < m {
+            self.minute = self.minute + 60 - m;
+            self.hour -= h + 1;
+        } else {
+            self.minute = self.minute - m;
+            self.hour -= h;
+        }
+        self
+    }
+
+    pub fn from_m(m: i32) -> DayTime {
+        DayTime {
+            hour: m / 60,
+            minute: m % 60,
+        }
+    }
+
+    pub fn to_m(&self) -> i32 {
+        self.hour * 60 + self.minute
+    }
+}
+
+impl Sub for DayTime {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self::Output {
+        self.sub(self.hour, self.minute)
     }
 }
 
@@ -53,6 +84,10 @@ impl TradeTimeSpan {
             start = start.sub_hour(24);
         }
         TradeTimeSpan { start, end }
+    }
+
+    pub fn is_between(&self, time: &DayTime) -> bool {
+        time >= &self.start && time < &self.end
     }
 }
 

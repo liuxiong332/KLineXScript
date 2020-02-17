@@ -4,7 +4,6 @@ use chrono::TimeZone;
 use chrono::Timelike;
 use chrono::Weekday;
 use chrono_tz::Tz;
-use num_traits::cast::FromPrimitive;
 use regex::Regex;
 use std::str::FromStr;
 
@@ -64,9 +63,10 @@ pub struct Session {
 }
 
 impl Session {
-    pub fn parse_wk(wks: &str) -> Vec<Weekday> {
-        wks.chars()
-            .map(|c| match c {
+    pub fn parse_wk(wks: &str) -> Result<Vec<Weekday>, RuntimeErr> {
+        let mut res: Vec<Weekday> = vec![];
+        for c in wks.chars() {
+            let v = match c {
                 '1' => Weekday::Sun,
                 '2' => Weekday::Mon,
                 '3' => Weekday::Tue,
@@ -74,9 +74,11 @@ impl Session {
                 '5' => Weekday::Thu,
                 '6' => Weekday::Fri,
                 '7' => Weekday::Sat,
-                _ => unreachable!(),
-            })
-            .collect()
+                _ => return Err(RuntimeErr::UnrecongnizedSession),
+            };
+            res.push(v);
+        }
+        Ok(res)
     }
 
     fn all_weekdays() -> Vec<Weekday> {
@@ -128,7 +130,7 @@ impl Session {
 
         let wk_re = Regex::new(r":([1-7]+)").unwrap();
         let wks = match wk_re.captures(&sstr) {
-            Some(caps) => Session::parse_wk(&caps[1]),
+            Some(caps) => Session::parse_wk(&caps[1])?,
             _ => Self::def_weekdays(),
         };
         Ok(Session {
@@ -148,7 +150,6 @@ impl Session {
 
             if !between && timespan.start.is_negative() {
                 let pre_day = day_time.sub_hour(24);
-                println!("pre day {:?} {:?}", pre_day, timespan);
                 if pre_day >= timespan.start && pre_day < timespan.end {
                     day_time = pre_day; // This day is belongs to next day.
                     wk = wk.succ();

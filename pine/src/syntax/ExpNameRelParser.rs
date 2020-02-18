@@ -315,7 +315,10 @@ impl<'a> ExpNameRelParser<'a> {
         (names, func_def)
     }
 
-    pub fn gen_dep_stmts(&mut self, stmt: &Statement<'a>) -> (Vec<&'a str>, FunctionDef<'a>) {
+    pub fn gen_dep_stmts_for_exp(
+        &mut self,
+        stmt: &Statement<'a>,
+    ) -> (Vec<&'a str>, FunctionDef<'a>) {
         let (names, stmts) = self._gen_dep_stmts(stmt);
         println!("Now names {:?}", names);
         self._gen_block(names, stmts)
@@ -529,7 +532,7 @@ mod tests {
         res.stmts.iter().for_each(|m| {
             parser.parse_stmt(m);
         });
-        let (names, new_blk) = parser.gen_dep_stmts(&res.stmts[3]);
+        let (names, new_blk) = parser.gen_dep_stmts_for_exp(&res.stmts[3]);
         assert_eq!(names, vec!["_time", "close"]);
         assert_eq!(
             new_blk.params.iter().map(|v| v.value).collect::<Vec<_>>(),

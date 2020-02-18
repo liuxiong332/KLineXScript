@@ -280,6 +280,7 @@ pub struct SyntaxParser<'a> {
 
     name_rel_parser: ExpNameRelParser<'a>,
 
+    func_defs: Vec<FunctionDef<'a>>,
     // user defined function name to function definition map
     user_funcs: HashMap<&'a str, *mut FunctionDef<'a>>,
     // The types id generator that generate same id for the same types.
@@ -319,6 +320,7 @@ impl<'a> SyntaxParser<'a> {
             context: &mut *_root_ctx,
             _root_ctx,
             name_rel_parser,
+            func_defs: vec![],
             user_funcs: HashMap::new(),
             types_id_gen: TypesIdGen::new(),
             errors: vec![],
@@ -338,6 +340,7 @@ impl<'a> SyntaxParser<'a> {
             context: &mut *_root_ctx,
             _root_ctx,
             name_rel_parser,
+            func_defs: vec![],
             user_funcs: HashMap::new(),
             types_id_gen: TypesIdGen::new(),
             errors: vec![],
@@ -379,6 +382,32 @@ impl<'a> SyntaxParser<'a> {
         )
     }
 
+    fn build_dynamic_exp(&mut self, exp: &Exp<'a>) -> Result<Exp<'a>, PineInputError> {
+        // First parse the target expression
+        self.name_rel_parser.parse_exp(exp);
+
+        let (names, mut def) = self.name_rel_parser.gen_dep_stmts_for_exp(exp);
+        let mut sub_ctx = Box::new(SyntaxContext::new(
+            unsafe { Some(NonNull::new_unchecked(self.context)) },
+            ContextType::FuncDefBlock,
+        ));
+        // Run this new function definition by simulating the function call.
+        names.iter().for_each(|n| {
+            let ctx = downcast_ctx(self.context);
+            sub_ctx.declare_var(n, ctx.get_var(n).unwrap().clone())
+        });
+        let varids: Vec<_> = names.iter().map(|n| sub_ctx.gen_var_index(n)).collect();
+        def.varids = Some(varids);
+
+        self.context = &mut *sub_ctx;
+        self.parse_blk(&mut def.body)?;
+        self.context = sub_ctx.parent.unwrap().as_ptr();
+
+        let var_exp = Exp::VarName(RVVarName::new(def.name.clone()));
+        self.func_defs.push(def);
+        Ok(var_exp)
+    }
+
     fn parse_std_func_call(
         &mut self,
         func_call: &mut FunctionCall<'a>,
@@ -390,7 +419,7 @@ impl<'a> SyntaxParser<'a> {
         }
         let mut dict_arg_type = vec![];
         for (name, exp) in func_call.dict_args.iter_mut() {
-            dict_arg_type.push((name, self.parse_exp(exp)?));
+            dict_arg_type.push((name.clone(), self.parse_exp(exp)?));
         }
 
         let res_fun = fun_type.0.iter().find(|func| {
@@ -412,6 +441,23 @@ impl<'a> SyntaxParser<'a> {
                 false
             }
         });
+
+        for (i, arg_type) in pos_arg_type.iter().enumerate() {
+            if let SyntaxType::DynamicExpr(_) = arg_type.syntax_type {
+                let new_exp = self.build_dynamic_exp(&func_call.pos_args[i])?;
+                // Replace the original expression with the new generated function definition variable name.
+                func_call.pos_args[i] = new_exp;
+            }
+        }
+
+        for (i, (name, arg_type)) in dict_arg_type.into_iter().enumerate() {
+            if let SyntaxType::DynamicExpr(_) = arg_type.syntax_type {
+                let new_exp = self.build_dynamic_exp(&func_call.pos_args[i])?;
+                // Replace the original expression with the new generated function definition variable name.
+                func_call.dict_args[i] = (name, new_exp);
+            }
+        }
+
         func_call.ctxid = downcast_ctx(self.context).gen_lib_func_index();
         match res_fun {
             None => Err(PineInputError::new(
@@ -1214,7 +1260,9 @@ impl<'a> SyntaxParser<'a> {
             self.name_rel_parser.parse_stmt(stmt);
         }
         let result = if let Some(ref mut exp) = blk.ret_stmt {
-            self.parse_exp(exp)
+            let res = self.parse_exp(exp);
+            self.name_rel_parser.parse_exp(exp);
+            res
         } else {
             Ok(ParseValue::new_with_type(SyntaxType::Void))
         };
@@ -1222,6 +1270,16 @@ impl<'a> SyntaxParser<'a> {
         blk.var_count = context.max_var_index + 1;
         blk.subctx_count = context.max_child_ctx_index + 1;
         blk.libfun_count = context.max_lib_func_index + 1;
+
+        // If top context, insert all the function definition to the header.
+        if self.context == &mut *self._root_ctx {
+            let defs = mem::replace(&mut self.func_defs, vec![]);
+            let new_stmts: Vec<_> = defs
+                .into_iter()
+                .map(|d| Statement::FuncDef(Box::new(d)))
+                .collect();
+            blk.stmts = [new_stmts, mem::replace(&mut blk.stmts, vec![])].concat();
+        }
         result
     }
 }

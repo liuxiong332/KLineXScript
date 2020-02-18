@@ -79,6 +79,7 @@ pub enum SyntaxType<'a> {
     ObjectFunction(Rc<BTreeMap<&'a str, SyntaxType<'a>>>, Rc<FunctionTypes<'a>>),
     ValFunction(Box<SyntaxType<'a>>, Rc<FunctionTypes<'a>>),
     UserFunction(Rc<(Vec<&'a str>, SyntaxType<'a>)>),
+    DynamicExpr(Box<SyntaxType<'a>>), // dynamic expression that can be invoked as function
     Any,
 }
 
@@ -94,6 +95,14 @@ impl<'a> SyntaxType<'a> {
     pub fn into_v_for_vf(self) -> Self {
         match self {
             SyntaxType::ValFunction(t, _) => *t,
+            t => t,
+        }
+    }
+
+    // Get the value type from DynamicExpr type.
+    pub fn get_v_for_de(&self) -> &Self {
+        match self {
+            SyntaxType::DynamicExpr(t) => &*t,
             t => t,
         }
     }

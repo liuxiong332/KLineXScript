@@ -3,7 +3,7 @@ use super::{SimpleSyntaxType, SyntaxType};
 // Series variable can only be implicity converted to Series, Simple can be implicity converted to Simple and Series
 pub fn implicity_convert<'a>(origin_type: &SyntaxType<'a>, dest_type: &SyntaxType<'a>) -> bool {
     let origin_type = origin_type.get_v_for_vf();
-    let dest_type = dest_type.get_v_for_vf();
+    let dest_type = dest_type.get_v_for_vf().get_v_for_de();
 
     if origin_type == dest_type {
         return true;

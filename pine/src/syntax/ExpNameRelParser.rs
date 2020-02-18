@@ -277,7 +277,11 @@ impl<'a> ExpNameRelParser<'a> {
             .filter_map(|n| {
                 let ctx = downcast_ctx(self.ctx.unwrap());
                 if n.ctxid == 0 && ctx.is_input_option(n.name) {
-                    Some(ctx.get_input_name_mapper().unwrap()(n.name))
+                    if let Some(mapper) = ctx.get_input_name_mapper() {
+                        Some(mapper(n.name))
+                    } else {
+                        Some(n.name)
+                    }
                 } else {
                     None
                 }
@@ -493,5 +497,30 @@ mod tests {
         let gennames = [];
         assert_eq!(parser.stmt_dep_names, depnames.iter().cloned().collect());
         assert_eq!(parser.name_gen_stmts, gennames.iter().cloned().collect());
+    }
+
+    #[test]
+    fn gen_stmt_test() {
+        let mut syntax_parser = SyntaxParser::new();
+        syntax_parser.init_input_options(vec!["close", "time"]);
+        syntax_parser.set_input_name_mapper(|n| match n {
+            "time" => "_time",
+            n => n,
+        });
+        let mut parser = ExpNameRelParser::new();
+        let ctx = downcast_ctx(syntax_parser.get_context());
+        ctx.declare_var_with_index("close", SyntaxType::int_series());
+        ctx.declare_var_with_index("time", SyntaxType::int_series());
+        parser.enter_ctx(ctx, 0);
+
+        let src = "m=1\nn = close[m]\nn=1\nm+n";
+        let (_, mut res) = block(Input::new_with_str(src), &AstState::new()).unwrap();
+        assert!(syntax_parser.parse_blk(&mut res).is_ok());
+
+        res.stmts.iter().for_each(|m| {
+            parser.parse_stmt(m);
+        });
+        let (names, new_blk) = parser.gen_dep_stmts(&res.stmts[3]);
+        assert_eq!(names, vec!["close", "_time"]);
     }
 }

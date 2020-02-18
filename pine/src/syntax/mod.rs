@@ -16,10 +16,13 @@ use std::mem;
 use std::ptr::NonNull;
 use std::rc::Rc;
 
+mod ExpNameRelParser;
 mod convert;
 pub mod ctxid_parser;
 mod type_cast;
 pub mod types_id_gen;
+
+use ExpNameRelParser::*;
 
 use convert::{common_type, implicity_convert, similar_type, simple_to_series};
 use type_cast::{explicity_type_cast, implicity_type_cast};
@@ -79,6 +82,9 @@ pub struct SyntaxContext<'a> {
     input_options: Option<Vec<&'a str>>,
     // The input varname(e.g. close, open etc) that the script use
     input_varnames: Vec<&'a str>,
+
+    // map the varname to true name. for example, time map to _time.
+    input_name_mapper: Option<fn(&'a str) -> &'a str>,
 
     // The variable name to index map that can transfer the map lookup to vector getter.
     var_indexs: HashMap<String, i32>,
@@ -220,6 +226,7 @@ impl<'a> SyntaxContext<'a> {
             vars: HashMap::new(),
             input_options: None,
             input_varnames: vec![],
+            input_name_mapper: None,
             var_indexs: HashMap::new(),
             max_var_index: -1,
             max_child_ctx_index: -1,
@@ -243,6 +250,27 @@ impl<'a> SyntaxContext<'a> {
 
     pub fn get_type(&self) -> ContextType {
         self.context_type
+    }
+
+    pub fn get_parent(&self) -> Option<*mut (dyn SyntaxCtx<'a> + 'a)> {
+        match self.parent {
+            Some(p) => Some(p.as_ptr()),
+            None => None,
+        }
+    }
+
+    pub fn get_input_name_mapper(&self) -> Option<fn(&'a str) -> &'a str> {
+        if let Some(mapper) = self.input_name_mapper {
+            Some(mapper)
+        } else if let Some(p) = self.get_parent() {
+            downcast_ctx(p).get_input_name_mapper()
+        } else {
+            None
+        }
+    }
+
+    pub fn set_input_name_mapper(&mut self, mapper: fn(&'a str) -> &'a str) {
+        self.input_name_mapper = Some(mapper);
     }
 }
 
@@ -313,6 +341,14 @@ impl<'a> SyntaxParser<'a> {
 
     pub fn get_inputnames(&self) -> Vec<&'a str> {
         downcast_ctx(self.context).get_inputnames()
+    }
+
+    pub fn set_input_name_mapper(&mut self, mapper: fn(&'a str) -> &'a str) {
+        downcast_ctx(self.context).set_input_name_mapper(mapper);
+    }
+
+    pub fn get_context(&mut self) -> *mut (dyn SyntaxCtx<'a> + 'a) {
+        self.context
     }
 
     pub fn catch(&mut self, err: PineInputError) {

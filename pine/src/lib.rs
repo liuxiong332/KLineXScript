@@ -464,6 +464,13 @@ pub fn parse_ast(in_str: &str) -> Result<Block, (Option<Block>, Vec<PineInputErr
     }
 }
 
+fn map_input_name(name: &str) -> &str {
+    match name {
+        "time" => "_time",
+        n => n,
+    }
+}
+
 pub fn parse_syntax<'a>(
     blk: &mut Block<'a>,
     vars: &Vec<(&'a str, SyntaxType<'a>)>,
@@ -471,6 +478,7 @@ pub fn parse_syntax<'a>(
 ) -> Result<SyntaxParser<'a>, (Option<SyntaxParser<'a>>, Vec<PineInputError>)> {
     let mut syntax_parser = SyntaxParser::new_with_vars(vars);
     syntax_parser.init_input_options(input_names.clone());
+    syntax_parser.set_input_name_mapper(map_input_name);
     match syntax_parser.parse_blk(blk) {
         Ok(_) => {
             if syntax_parser.is_ok() {

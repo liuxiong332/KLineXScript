@@ -162,6 +162,7 @@ pub struct ExpNameRelParser<'a> {
     pub name_gen_stmts: HashMap<CtxVarName<'a>, Vec<*const Statement<'a>>>,
     pub ctxid_stack: Vec<i32>,
     pub ctx: Option<*mut (dyn SyntaxCtx<'a> + 'a)>,
+    pub exp_stmt: HashMap<*const Exp<'a>, Box<Statement<'a>>>,
 }
 
 impl<'a> ExpNameRelParser<'a> {
@@ -171,6 +172,7 @@ impl<'a> ExpNameRelParser<'a> {
             name_gen_stmts: HashMap::new(),
             ctxid_stack: vec![],
             ctx: None,
+            exp_stmt: HashMap::new(),
         }
     }
 
@@ -184,6 +186,14 @@ impl<'a> ExpNameRelParser<'a> {
         self.ctx = downcast_ctx(self.ctx.unwrap()).get_parent();
     }
 
+    pub fn gen_stmt_from_exp(&mut self, exp: *const Exp<'a>) -> Box<Statement<'a>> {
+        if !self.exp_stmt.contains_key(&exp) {
+            let new_exp = unsafe { exp.as_ref().unwrap().clone() };
+            self.exp_stmt.insert(exp, Box::new(Statement::Exp(new_exp)));
+        }
+        self.exp_stmt.remove(&exp).unwrap()
+    }
+
     fn get_ctx_varname(&self, ctx: *mut (dyn SyntaxCtx<'a> + 'a), name: &'a str) -> CtxVarName<'a> {
         match downcast_ctx(ctx).get_var_scope(name) {
             Some(_) => CtxVarName::new(*self.ctxid_stack.last().unwrap(), name),
@@ -192,6 +202,12 @@ impl<'a> ExpNameRelParser<'a> {
                 self.get_ctx_varname(parent, name)
             }
         }
+    }
+
+    pub fn parse_exp(&mut self, exp: &Exp<'a>) {
+        let stmt = self.gen_stmt_from_exp(exp);
+        self.parse_stmt(&*stmt);
+        self.exp_stmt.insert(exp, stmt);
     }
 
     pub fn parse_stmt(&mut self, stmt: &Statement<'a>) {
@@ -301,7 +317,6 @@ impl<'a> ExpNameRelParser<'a> {
             .collect();
 
         let expr_st = new_stmts.pop().unwrap();
-        println!("expr st {:?}", expr_st);
         let expr = match expr_st {
             Statement::Exp(e) => e,
             _ => unreachable!(),
@@ -315,12 +330,15 @@ impl<'a> ExpNameRelParser<'a> {
         (names, func_def)
     }
 
-    pub fn gen_dep_stmts_for_exp(
-        &mut self,
-        stmt: &Statement<'a>,
-    ) -> (Vec<&'a str>, FunctionDef<'a>) {
+    pub fn gen_dep_stmts_for_exp(&mut self, exp: &Exp<'a>) -> (Vec<&'a str>, FunctionDef<'a>) {
+        let stmt = self.gen_stmt_from_exp(exp);
+        let (names, stmts) = self._gen_dep_stmts(&*stmt);
+        self.exp_stmt.insert(exp, stmt);
+        self._gen_block(names, stmts)
+    }
+
+    pub fn gen_dep_stmts(&mut self, stmt: &Statement<'a>) -> (Vec<&'a str>, FunctionDef<'a>) {
         let (names, stmts) = self._gen_dep_stmts(stmt);
-        println!("Now names {:?}", names);
         self._gen_block(names, stmts)
     }
 }
@@ -532,7 +550,7 @@ mod tests {
         res.stmts.iter().for_each(|m| {
             parser.parse_stmt(m);
         });
-        let (names, new_blk) = parser.gen_dep_stmts_for_exp(&res.stmts[3]);
+        let (names, new_blk) = parser.gen_dep_stmts(&res.stmts[3]);
         assert_eq!(names, vec!["_time", "close"]);
         assert_eq!(
             new_blk.params.iter().map(|v| v.value).collect::<Vec<_>>(),

@@ -16,13 +16,13 @@ use std::mem;
 use std::ptr::NonNull;
 use std::rc::Rc;
 
-mod ExpNameRelParser;
 mod convert;
 pub mod ctxid_parser;
+mod name_rel_parser;
 mod type_cast;
 pub mod types_id_gen;
 
-use ExpNameRelParser::*;
+use name_rel_parser::*;
 
 use convert::{common_type, implicity_convert, similar_type, simple_to_series};
 use type_cast::{explicity_type_cast, implicity_type_cast};
@@ -278,6 +278,8 @@ pub struct SyntaxParser<'a> {
     _root_ctx: Box<SyntaxContext<'a>>,
     context: *mut (dyn SyntaxCtx<'a> + 'a),
 
+    name_rel_parser: ExpNameRelParser<'a>,
+
     // user defined function name to function definition map
     user_funcs: HashMap<&'a str, *mut FunctionDef<'a>>,
     // The types id generator that generate same id for the same types.
@@ -311,9 +313,12 @@ type ParseResult<'a> = Result<ParseValue<'a>, PineInputError>;
 impl<'a> SyntaxParser<'a> {
     pub fn new() -> SyntaxParser<'a> {
         let mut _root_ctx = Box::new(SyntaxContext::new(None, ContextType::Normal));
+        let mut name_rel_parser = ExpNameRelParser::new();
+        name_rel_parser.enter_ctx(&mut *_root_ctx, 0);
         SyntaxParser {
             context: &mut *_root_ctx,
             _root_ctx,
+            name_rel_parser,
             user_funcs: HashMap::new(),
             types_id_gen: TypesIdGen::new(),
             errors: vec![],
@@ -326,9 +331,13 @@ impl<'a> SyntaxParser<'a> {
             _root_ctx.gen_var_index(k);
         }
         _root_ctx.vars = vars.iter().cloned().collect();
+        let mut name_rel_parser = ExpNameRelParser::new();
+        name_rel_parser.enter_ctx(&mut *_root_ctx, 0);
+
         SyntaxParser {
             context: &mut *_root_ctx,
             _root_ctx,
+            name_rel_parser,
             user_funcs: HashMap::new(),
             types_id_gen: TypesIdGen::new(),
             errors: vec![],
@@ -445,11 +454,16 @@ impl<'a> SyntaxParser<'a> {
         spec_def.varids = Some(varids);
 
         self.context = &mut *sub_ctx;
+
+        self.name_rel_parser
+            .enter_ctx(self.context, func_call.ctxid);
+
         let parse_res = self.parse_blk(&mut spec_def.body)?;
         // Push the specific function definition to spec_defs.
         func_def.spec_defs.as_mut().unwrap().push(spec_def);
         let spec_index = func_def.spec_defs.as_ref().unwrap().len() as i32 - 1;
 
+        self.name_rel_parser.exit_ctx();
         self.context = sub_ctx.parent.unwrap().as_ptr();
 
         let parent_context = downcast_ctx(self.context);
@@ -658,8 +672,11 @@ impl<'a> SyntaxParser<'a> {
             ContextType::IfElseBlock,
         ));
         self.context = &mut *if_ctx;
+        self.name_rel_parser.enter_ctx(self.context, ite.then_ctxid);
 
         let then_res = self.parse_blk(&mut ite.then_blk)?;
+
+        self.name_rel_parser.exit_ctx();
         self.context = if_ctx.parent.unwrap().as_ptr();
 
         downcast_ctx(self.context).subctxs.push(if_ctx);
@@ -678,8 +695,11 @@ impl<'a> SyntaxParser<'a> {
             ContextType::IfElseBlock,
         ));
         self.context = &mut *else_ctx;
+        self.name_rel_parser.enter_ctx(self.context, *ctxid);
 
         let else_res = self.parse_blk(else_blk)?;
+
+        self.name_rel_parser.exit_ctx();
         self.context = else_ctx.parent.unwrap().as_ptr();
 
         downcast_ctx(self.context).subctxs.push(else_ctx);
@@ -780,8 +800,12 @@ impl<'a> SyntaxParser<'a> {
         );
         self.context = &mut *for_ctx;
         for_range.varid = for_ctx.gen_var_index(for_range.var.value);
+        self.name_rel_parser
+            .enter_ctx(self.context, for_range.ctxid);
 
         let blk_res = self.parse_blk(&mut for_range.do_blk)?;
+
+        self.name_rel_parser.exit_ctx();
         self.context = for_ctx.parent.unwrap().as_ptr();
 
         downcast_ctx(self.context).subctxs.push(for_ctx);
@@ -1187,6 +1211,7 @@ impl<'a> SyntaxParser<'a> {
     pub fn parse_blk(&mut self, blk: &mut Block<'a>) -> ParseResult<'a> {
         for stmt in blk.stmts.iter_mut() {
             self.parse_stmt(stmt)?;
+            self.name_rel_parser.parse_stmt(stmt);
         }
         let result = if let Some(ref mut exp) = blk.ret_stmt {
             self.parse_exp(exp)

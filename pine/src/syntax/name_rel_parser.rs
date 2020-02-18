@@ -62,7 +62,7 @@ impl<'a> DepNameFinder<'a> for FunctionCall<'a> {
                 .collect(),
             self.dict_args
                 .iter()
-                .map(|(n, e)| [vec![n.value], e.find_names()].concat())
+                .map(|(_, e)| e.find_names())
                 .flatten()
                 .collect(),
         ]
@@ -195,6 +195,7 @@ impl<'a> ExpNameRelParser<'a> {
     }
 
     fn get_ctx_varname(&self, ctx: *mut (dyn SyntaxCtx<'a> + 'a), name: &'a str) -> CtxVarName<'a> {
+        println!("name {:?}", name);
         match downcast_ctx(ctx).get_var_scope(name) {
             Some(_) => CtxVarName::new(*self.ctxid_stack.last().unwrap(), name),
             None => {

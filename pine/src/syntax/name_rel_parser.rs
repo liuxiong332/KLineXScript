@@ -163,6 +163,7 @@ pub struct ExpNameRelParser<'a> {
     pub ctxid_stack: Vec<i32>,
     pub ctx: Option<*mut (dyn SyntaxCtx<'a> + 'a)>,
     pub exp_stmt: HashMap<*const Exp<'a>, Box<Statement<'a>>>,
+    pub gen_index: i32,
 }
 
 impl<'a> ExpNameRelParser<'a> {
@@ -173,6 +174,7 @@ impl<'a> ExpNameRelParser<'a> {
             ctxid_stack: vec![],
             ctx: None,
             exp_stmt: HashMap::new(),
+            gen_index: -1,
         }
     }
 
@@ -194,13 +196,19 @@ impl<'a> ExpNameRelParser<'a> {
         self.exp_stmt.remove(&exp).unwrap()
     }
 
-    fn get_ctx_varname(&self, ctx: *mut (dyn SyntaxCtx<'a> + 'a), name: &'a str) -> CtxVarName<'a> {
-        println!("name {:?}", name);
+    fn get_ctx_varname(
+        &self,
+        ctx: *mut (dyn SyntaxCtx<'a> + 'a),
+        name: &'a str,
+    ) -> Option<CtxVarName<'a>> {
         match downcast_ctx(ctx).get_var_scope(name) {
-            Some(_) => CtxVarName::new(*self.ctxid_stack.last().unwrap(), name),
+            Some(_) => Some(CtxVarName::new(*self.ctxid_stack.last().unwrap(), name)),
             None => {
-                let parent = downcast_ctx(ctx).get_parent().unwrap();
-                self.get_ctx_varname(parent, name)
+                if let Some(parent) = downcast_ctx(ctx).get_parent() {
+                    self.get_ctx_varname(parent, name)
+                } else {
+                    None
+                }
             }
         }
     }
@@ -217,20 +225,22 @@ impl<'a> ExpNameRelParser<'a> {
         depnames.dedup();
         let nameset: Vec<_> = depnames
             .into_iter()
-            .map(|n| self.get_ctx_varname(self.ctx.unwrap(), n))
+            .filter_map(|n| self.get_ctx_varname(self.ctx.unwrap(), n))
             .collect();
 
         self.stmt_dep_names.insert(stmt, nameset);
 
         stmt.find_gen_names().into_iter().for_each(|n| {
             let n = self.get_ctx_varname(self.ctx.unwrap(), n);
-            match self.name_gen_stmts.get_mut(&n) {
-                Some(vec) => {
-                    vec.push(stmt);
-                }
-                None => {
-                    self.name_gen_stmts
-                        .insert(n, vec![stmt as *const Statement<'a>]);
+            if let Some(n) = n {
+                match self.name_gen_stmts.get_mut(&n) {
+                    Some(vec) => {
+                        vec.push(stmt);
+                    }
+                    None => {
+                        self.name_gen_stmts
+                            .insert(n, vec![stmt as *const Statement<'a>]);
+                    }
                 }
             }
         });
@@ -292,7 +302,7 @@ impl<'a> ExpNameRelParser<'a> {
     }
 
     fn _gen_block(
-        &self,
+        &mut self,
         lib_names: Vec<CtxVarName<'a>>,
         stmts: Vec<*const Statement<'a>>,
     ) -> (Vec<&'a str>, FunctionDef<'a>) {
@@ -322,8 +332,10 @@ impl<'a> ExpNameRelParser<'a> {
             Statement::Exp(e) => e,
             _ => unreachable!(),
         };
-        let func_def = FunctionDef::new(
-            VarName::new("gen", StrRange::new_empty()),
+
+        self.gen_index += 1;
+        let func_def = FunctionDef::new_with_gen_name(
+            format!("gen@{}", self.gen_index),
             names.iter().map(|n| VarName::new_no_input(n)).collect(),
             Block::new(new_stmts, Some(expr), StrRange::new_empty()),
             StrRange::new_empty(),

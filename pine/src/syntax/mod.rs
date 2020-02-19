@@ -57,6 +57,8 @@ pub trait SyntaxCtx<'a> {
 
     fn gen_var_index(&mut self, name: &str) -> i32;
 
+    fn gen_var_index_only(&mut self) -> i32;
+
     fn get_var_index(&mut self, name: &str) -> VarIndex;
 
     fn contain_var_index(&self, name: &str) -> bool;
@@ -173,6 +175,11 @@ impl<'a> SyntaxCtx<'a> for SyntaxContext<'a> {
         debug_assert!(!self.var_indexs.contains_key(name));
         self.var_indexs
             .insert(String::from(name), self.max_var_index);
+        self.max_var_index
+    }
+
+    fn gen_var_index_only(&mut self) -> i32 {
+        self.max_var_index += 1;
         self.max_var_index
     }
 
@@ -400,10 +407,17 @@ impl<'a> SyntaxParser<'a> {
         def.varids = Some(varids);
 
         self.context = &mut *sub_ctx;
-        self.parse_blk(&mut def.body)?;
+        self.parse_blk_only(&mut def.body)?;
         self.context = sub_ctx.parent.unwrap().as_ptr();
 
-        let var_exp = Exp::VarName(RVVarName::new(def.name.clone()));
+        // Insert function definition
+        let def_ctxid = self._root_ctx.gen_var_index_only();
+        let var_exp = Exp::VarName(RVVarName::new_with_index(
+            "@gen",
+            VarIndex::new(def_ctxid, 0),
+        ));
+
+        def.name_varid = def_ctxid;
         self.func_defs.push(def);
         Ok(var_exp)
     }
@@ -442,22 +456,6 @@ impl<'a> SyntaxParser<'a> {
             }
         });
 
-        for (i, arg_type) in pos_arg_type.iter().enumerate() {
-            if let SyntaxType::DynamicExpr(_) = arg_type.syntax_type {
-                let new_exp = self.build_dynamic_exp(&func_call.pos_args[i])?;
-                // Replace the original expression with the new generated function definition variable name.
-                func_call.pos_args[i] = new_exp;
-            }
-        }
-
-        for (i, (name, arg_type)) in dict_arg_type.into_iter().enumerate() {
-            if let SyntaxType::DynamicExpr(_) = arg_type.syntax_type {
-                let new_exp = self.build_dynamic_exp(&func_call.pos_args[i])?;
-                // Replace the original expression with the new generated function definition variable name.
-                func_call.dict_args[i] = (name, new_exp);
-            }
-        }
-
         func_call.ctxid = downcast_ctx(self.context).gen_lib_func_index();
         match res_fun {
             None => Err(PineInputError::new(
@@ -465,6 +463,20 @@ impl<'a> SyntaxParser<'a> {
                 func_call.range,
             )),
             Some(d) => {
+                for i in 0..pos_arg_type.len() {
+                    if let Some(&SyntaxType::DynamicExpr(_)) = d.get_type(i) {
+                        let new_exp = self.build_dynamic_exp(&func_call.pos_args[i])?;
+                        // Replace the original expression with the new generated function definition variable name.
+                        func_call.pos_args[i] = new_exp;
+                    }
+                }
+                for (i, (name, _)) in dict_arg_type.into_iter().enumerate() {
+                    if let Some(&SyntaxType::DynamicExpr(_)) = d.get_type_by_name(&name.value) {
+                        let new_exp = self.build_dynamic_exp(&func_call.pos_args[i])?;
+                        // Replace the original expression with the new generated function definition variable name.
+                        func_call.dict_args[i] = (name, new_exp);
+                    }
+                }
                 func_call.func_type = Some(d.clone());
                 Ok(ParseValue::new_with_type((d.signature).1.clone()))
             }
@@ -993,7 +1005,7 @@ impl<'a> SyntaxParser<'a> {
                 }
                 if let Some(result_type) = similar_type(&exp1_type, &exp2_type) {
                     binary.result_type = result_type.clone();
-                    Ok(ParseValue::new_with_type(exp2_type))
+                    Ok(ParseValue::new_with_type(result_type))
                 } else {
                     Err(PineInputError::new(
                         PineErrorKind::TypeMismatch,
@@ -1252,6 +1264,22 @@ impl<'a> SyntaxParser<'a> {
             Statement::None(_) => Ok(ParseValue::new_with_type(SyntaxType::Void)),
             Statement::Exp(exp) => self.parse_exp(exp),
         }
+    }
+
+    pub fn parse_blk_only(&mut self, blk: &mut Block<'a>) -> ParseResult<'a> {
+        for stmt in blk.stmts.iter_mut() {
+            self.parse_stmt(stmt)?;
+        }
+        let result = if let Some(ref mut exp) = blk.ret_stmt {
+            self.parse_exp(exp)
+        } else {
+            Ok(ParseValue::new_with_type(SyntaxType::Void))
+        };
+        let context = downcast_ctx(self.context);
+        blk.var_count = context.max_var_index + 1;
+        blk.subctx_count = context.max_child_ctx_index + 1;
+        blk.libfun_count = context.max_lib_func_index + 1;
+        result
     }
 
     pub fn parse_blk(&mut self, blk: &mut Block<'a>) -> ParseResult<'a> {
@@ -2070,6 +2098,24 @@ mod tests {
             SyntaxType::Series(SimpleSyntaxType::Int)
         );
 
+        context.declare_var_with_index("sfloat", SyntaxType::Series(SimpleSyntaxType::Int));
+        let mut f_i_add_exp = BinaryExp::new(
+            BinaryOp::Plus,
+            float_exp(1f64),
+            Exp::VarName(rvarname("sfloat")),
+            StrRange::new_empty(),
+        );
+        assert_eq!(
+            parser.parse_binary(&mut f_i_add_exp),
+            Ok(ParseValue::new_with_type(SyntaxType::Series(
+                SimpleSyntaxType::Float
+            )))
+        );
+        assert_eq!(
+            f_i_add_exp.result_type,
+            SyntaxType::Series(SimpleSyntaxType::Float)
+        );
+
         let mut na_add_exp = BinaryExp::new(
             BinaryOp::Plus,
             int_exp(1),
@@ -2424,5 +2470,65 @@ mod tests {
         assert_eq!(blk.var_count, 3);
         assert_eq!(blk.subctx_count, 5);
         assert_eq!(blk.libfun_count, 0);
+    }
+
+    #[test]
+    fn dynamic_expr_test() {
+        use crate::ast::stat_expr::block;
+        use crate::ast::state::AstState;
+
+        let mut parser = SyntaxParser::new();
+        let context = downcast_ctx(parser.context);
+        context.declare_var_with_index(
+            "security",
+            SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType::new((
+                vec![(
+                    "m",
+                    SyntaxType::DynamicExpr(Box::new(SyntaxType::float_series())),
+                )],
+                SyntaxType::float_series(),
+            ))]))),
+        );
+        context.declare_var_with_index("close", SyntaxType::float_series());
+
+        let blk_str: &str = "a = close + 1\nsecurity(close + a)";
+
+        let input = Input::new_with_str(blk_str);
+        let myblk = block(input, &AstState::new());
+        let mut blk = myblk.unwrap().1;
+        assert_eq!(
+            parser.parse_blk(&mut blk),
+            Ok(ParseValue::new_with_type(SyntaxType::Void))
+        );
+        assert_eq!(blk.stmts.len(), 3);
+        assert_eq!(blk.var_count, 4);
+        assert_eq!(blk.subctx_count, 0);
+        assert_eq!(blk.libfun_count, 1);
+
+        fn get_funcall<'a, 'b>(s: &'b Statement<'a>) -> &'b FunctionCall<'a> {
+            match s {
+                Statement::FuncCall(m) => &*m,
+                Statement::Exp(Exp::FuncCall(m)) => &*m,
+                _ => unreachable!(),
+            }
+        }
+
+        fn get_fundef<'a, 'b>(s: &'b Statement<'a>) -> &'b FunctionDef<'a> {
+            match s {
+                Statement::FuncDef(m) => &*m,
+                _ => unreachable!(),
+            }
+        }
+
+        fn get_varname<'a, 'b>(s: &'b Exp<'a>) -> &'b RVVarName<'a> {
+            match s {
+                Exp::VarName(m) => &*m,
+                _ => unreachable!(),
+            }
+        }
+        assert_eq!(
+            get_varname(&get_funcall(&blk.stmts[2]).pos_args[0]).var_index,
+            VarIndex::new(get_fundef(&blk.stmts[0]).name_varid, 0)
+        );
     }
 }

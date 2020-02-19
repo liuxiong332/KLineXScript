@@ -17,6 +17,20 @@ impl<'a> FunctionType<'a> {
     pub fn arg_names(&self) -> Vec<&'a str> {
         (self.signature).0.iter().map(|s| s.0).collect()
     }
+
+    pub fn get_type_by_name(&self, name: &str) -> Option<&SyntaxType<'a>> {
+        self.signature
+            .0
+            .iter()
+            .find_map(|s| if s.0 == name { Some(&s.1) } else { None })
+    }
+
+    pub fn get_type(&self, index: usize) -> Option<&SyntaxType<'a>> {
+        match self.signature.0.get(index) {
+            Some(v) => Some(&v.1),
+            None => None,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]

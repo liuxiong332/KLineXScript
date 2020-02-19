@@ -1,8 +1,11 @@
 use super::data_src::Callback;
 use super::output::InputVal;
-use super::output::{IOInfo, InputInfo, OutputData, OutputInfo, ScriptPurpose, SymbolInfo};
+use super::output::{
+    IOInfo, InputInfo, InputSrc, OutputData, OutputInfo, ScriptPurpose, SymbolInfo,
+};
 use crate::ast::input::{Position, StrRange};
 use crate::ast::stat_expr_types::VarIndex;
+use crate::runtime::AnySeries;
 use crate::types::{
     Bool, Callable, Color, DataType, Float, Int, PineFrom, PineRef, PineStaticType, PineType,
     RefData, RuntimeErr, SecondType, Series, NA,
@@ -97,7 +100,10 @@ pub struct Context<'a, 'b, 'c> {
     // The input index will increment after input function is invoked
     input_index: i32,
 
-    outputs: Vec<Option<OutputData>>,
+    // Input data for some external ticker.
+    input_data: HashMap<String, AnySeries>,
+    // The output data that will be exported.
+    output_data: Vec<Option<OutputData>>,
 
     io_info: IOInfo,
     // Check if input_info is ready
@@ -190,7 +196,8 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             callback: None,
             inputs: vec![],
             input_index: -1,
-            outputs: vec![],
+            input_data: HashMap::new(),
+            output_data: vec![],
             io_info: IOInfo::new(),
             is_input_info_ready: false,
             is_output_info_ready: false,
@@ -215,7 +222,8 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             callback: Some(callback),
             inputs: vec![],
             input_index: -1,
-            outputs: vec![],
+            input_data: HashMap::new(),
+            output_data: vec![],
             io_info: IOInfo::new(),
             is_input_info_ready: false,
             is_output_info_ready: false,
@@ -296,8 +304,8 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
         self.io_info.push_output(output);
     }
 
-    pub fn set_input_srcs(&mut self, srcs: Vec<String>) {
-        self.io_info.set_input_srcs(srcs);
+    pub fn add_input_src(&mut self, src: InputSrc) {
+        self.io_info.add_input_src(src);
     }
 
     pub fn get_io_info(&self) -> &IOInfo {
@@ -320,13 +328,17 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
         self.is_output_info_ready = true;
     }
 
+    pub fn insert_input_data(&mut self, name: String, data: AnySeries) {
+        self.input_data.insert(name, data);
+    }
+
     pub fn push_output_data(&mut self, data: Option<OutputData>) {
-        self.outputs.push(data);
+        self.output_data.push(data);
     }
 
     pub fn move_output_data(&mut self) -> Vec<Option<OutputData>> {
-        debug_assert_eq!(self.outputs.len(), self.io_info.get_outputs().len());
-        mem::replace(&mut self.outputs, vec![])
+        debug_assert_eq!(self.output_data.len(), self.io_info.get_outputs().len());
+        mem::replace(&mut self.output_data, vec![])
     }
 
     pub fn set_syminfo(&mut self, syminfo: Rc<SymbolInfo>) {

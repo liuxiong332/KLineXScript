@@ -165,22 +165,37 @@ pub enum OutputInfo {
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub struct InputSrc {
+    pub ticker: Option<String>, // The ticker name e.g. NASDAQ:FB
+    pub srcs: Vec<String>,
+}
+
+impl InputSrc {
+    pub fn new(ticker: Option<String>, srcs: Vec<String>) -> InputSrc {
+        InputSrc { ticker, srcs }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct IOInfo {
     script_type: Option<ScriptPurpose>,
     inputs: Vec<InputInfo>,
-    input_srcs: Vec<String>,
+    input_srcs: Vec<InputSrc>,
     outputs: Vec<OutputInfo>,
     want_syminfo: bool,
 }
 
 impl IOInfo {
-    fn gen_srcs() -> Vec<String> {
-        vec![
-            String::from("close"),
-            String::from("open"),
-            String::from("high"),
-            String::from("low"),
-        ]
+    fn gen_srcs() -> Vec<InputSrc> {
+        vec![InputSrc {
+            ticker: None,
+            srcs: vec![
+                String::from("close"),
+                String::from("open"),
+                String::from("high"),
+                String::from("low"),
+            ],
+        }]
     }
 
     pub fn new() -> IOInfo {
@@ -196,7 +211,7 @@ impl IOInfo {
     pub fn new_with_io(
         inputs: Vec<InputInfo>,
         outputs: Vec<OutputInfo>,
-        input_srcs: Vec<String>,
+        input_srcs: Vec<InputSrc>,
     ) -> IOInfo {
         IOInfo {
             script_type: None,
@@ -219,8 +234,15 @@ impl IOInfo {
         self.script_type = Some(script_type);
     }
 
-    pub fn set_input_srcs(&mut self, input_srcs: Vec<String>) {
-        self.input_srcs = input_srcs;
+    pub fn add_input_src(&mut self, input_src: InputSrc) {
+        let item = self
+            .input_srcs
+            .iter_mut()
+            .find(|d| d.ticker == input_src.ticker);
+        match item {
+            Some(d) => d.srcs = input_src.srcs,
+            None => self.input_srcs.push(input_src),
+        }
     }
 
     pub fn get_inputs(&self) -> &Vec<InputInfo> {

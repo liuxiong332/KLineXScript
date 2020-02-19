@@ -1,6 +1,6 @@
 use super::context::{Context, Ctx, PineRuntimeError, Runner, VarOperate};
 // use super::ctxid_parser::CtxIdParser;
-use super::output::{InputVal, SymbolInfo};
+use super::output::{InputSrc, InputVal, SymbolInfo};
 use super::{AnySeries, AnySeriesType};
 use crate::ast::stat_expr_types::{Block, VarIndex};
 use crate::types::{
@@ -84,7 +84,7 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
     }
 
     pub fn set_input_srcs(&mut self, srcs: Vec<String>) {
-        self.context.set_input_srcs(srcs);
+        self.context.add_input_src(InputSrc::new(None, srcs));
     }
 
     fn run_data(
@@ -118,6 +118,9 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
                         }
                         _ => unreachable!(),
                     }
+                } else {
+                    // TODO: Remove this data copy.
+                    self.context.insert_input_data(String::from(*_k), v.clone());
                 }
             }
 

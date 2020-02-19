@@ -538,7 +538,7 @@ mod tests {
     use crate::libs::input;
     use crate::libs::plot;
     use crate::runtime::data_src::NoneCallback;
-    use crate::runtime::output::{InputInfo, IntInputInfo, OutputInfo, PlotInfo};
+    use crate::runtime::output::{InputInfo, InputSrc, IntInputInfo, OutputInfo, PlotInfo};
 
     #[test]
     fn script_test() {
@@ -583,7 +583,7 @@ mod tests {
                     show_last: None,
                     display: None,
                 })],
-                vec![String::from("close")]
+                vec![InputSrc::new(None, vec![String::from("close")])]
             ))
         );
         let data = vec![(

@@ -1136,4 +1136,81 @@ mod tests {
 
         // assert!(context.move_var("a").is_none());
     }
+
+    #[test]
+    fn dynamic_exp_func_call_test() {
+        use crate::ast::input::*;
+        use crate::ast::stat_expr::block;
+        use crate::ast::state::AstState;
+        use crate::ast::syntax_type::*;
+        use crate::syntax::SyntaxParser;
+        use std::mem;
+        use std::rc::Rc;
+
+        let mut parser = SyntaxParser::new_with_vars(&vec![
+            (
+                "security",
+                SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType::new((
+                    vec![(
+                        "m",
+                        SyntaxType::DynamicExpr(Box::new(SyntaxType::float_series())),
+                    )],
+                    SyntaxType::float_series(),
+                ))]))),
+            ),
+            ("close", SyntaxType::float_series()),
+        ]);
+        parser.init_input_options(vec!["close"]);
+        let blk_str: &str = "a = close + 1\np = security(close + a)";
+        let myblk = block(Input::new_with_str(blk_str), &AstState::new());
+        let mut blk = myblk.unwrap().1;
+        assert!(parser.parse_blk(&mut blk).is_ok());
+
+        let mut context = Context::new(None, ContextType::Normal);
+
+        fn test_func<'a>(
+            _context: &mut dyn Ctx<'a>,
+            mut h: Vec<Option<PineRef<'a>>>,
+            _type: FunctionType<'a>,
+        ) -> Result<PineRef<'a>, RuntimeErr> {
+            let arg1 = mem::replace(&mut h[0], None);
+            let callable = downcast_pf::<Function>(arg1.unwrap()).unwrap();
+            let names: Vec<_> = callable.get_def().params.iter().map(|s| s.value).collect();
+            assert_eq!(names, vec!["close"]);
+            // println!("start new context {:?}", callable.get_def());
+            let mut subctx = Box::new(Context::new(Some(_context), ContextType::FuncDefBlock));
+            subctx.init(
+                callable.get_var_count(),
+                callable.get_subctx_count(),
+                callable.get_libfun_count(),
+            );
+            let result = callable.call(
+                &mut *subctx,
+                vec![PineRef::new_rc(Series::from(Some(10f64)))],
+                vec![],
+                StrRange::new_empty(),
+            );
+            match result {
+                Ok(val) => Ok(val),
+                Err(e) => Err(e.code),
+            }
+        }
+
+        context.init(5, 0, 1);
+        context.init_vars(vec![
+            Some(PineRef::new_rc(Callable::new(Some(test_func), None))),
+            Some(PineRef::new_rc(Series::from(Some(1f64)))),
+            None,
+            None,
+            None,
+        ]);
+
+        let result = Runner::run(&blk, &mut context);
+        // println!("result {:?}", result);
+        assert!(result.is_ok());
+        assert_eq!(
+            context.move_var(VarIndex::new(4, 0)),
+            Some(PineRef::new_rc(Series::from(Some(21f64))))
+        );
+    }
 }

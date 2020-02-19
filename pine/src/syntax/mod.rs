@@ -2531,6 +2531,10 @@ mod tests {
             VarIndex::new(get_fundef(&blk.stmts[0]).name_varid, 0)
         );
         assert_eq!(get_fundef(&blk.stmts[0]).body.stmts.len(), 1);
-        assert_eq!(get_fundef(&blk.stmts[0]).body.ret_stmt.len(), 1);
+
+        match get_fundef(&blk.stmts[0]).body.ret_stmt.as_ref().unwrap() {
+            Exp::BinaryExp(_) => assert!(true),
+            _ => assert!(false),
+        };
     }
 }

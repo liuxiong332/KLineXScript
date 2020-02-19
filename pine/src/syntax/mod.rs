@@ -2530,5 +2530,7 @@ mod tests {
             get_varname(&get_funcall(&blk.stmts[2]).pos_args[0]).var_index,
             VarIndex::new(get_fundef(&blk.stmts[0]).name_varid, 0)
         );
+        assert_eq!(get_fundef(&blk.stmts[0]).body.stmts.len(), 1);
+        assert_eq!(get_fundef(&blk.stmts[0]).body.ret_stmt.len(), 1);
     }
 }

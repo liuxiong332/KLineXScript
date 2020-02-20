@@ -8,7 +8,9 @@ use crate::helper::{
     move_element, pine_ref_to_bool, pine_ref_to_color, pine_ref_to_f64, pine_ref_to_i64,
     pine_ref_to_string,
 };
-use crate::runtime::context::{downcast_ctx, Context, ContextType, Ctx, VarOperate};
+use crate::runtime::context::{
+    downcast_ctx, downcast_ctx_const, Context, ContextType, Ctx, VarOperate,
+};
 use crate::runtime::function::Function;
 use crate::runtime::output::InputSrc;
 use crate::runtime::{AnySeries, AnySeriesType};
@@ -114,6 +116,47 @@ impl<'a> SecurityInfo<'a> {
         let ctx = unsafe { mem::transmute::<Box<dyn Ctx<'a>>, Box<dyn Ctx<'a>>>(s) };
         self.ctx = Some(ctx);
     }
+
+    fn get_subctx(&mut self) -> &mut dyn Ctx<'a> {
+        &mut **self.ctx.as_mut().unwrap()
+    }
+
+    fn get_input_at(&self, data_name: &str, i: isize) -> PineRef<'a> {
+        let subctx = &**self.ctx.as_ref().unwrap();
+
+        match downcast_ctx_const(subctx).get_input_data(data_name) {
+            None => PineRef::new_rc(Series::from(Int::from(None))),
+            Some(origin_data) => match origin_data.get_type() {
+                AnySeriesType::Int => {
+                    PineRef::new_rc(Series::from(origin_data.index::<Int>(i as isize)))
+                }
+                AnySeriesType::Float => {
+                    PineRef::new_rc(Series::from(origin_data.index::<Float>(i as isize)))
+                }
+            },
+        }
+    }
+
+    fn run_one_index(&mut self, i: isize) -> Result<PineRef<'a>, RuntimeErr> {
+        let input_params: Vec<PineRef<'a>> = self
+            .data_names
+            .iter()
+            .map(|data_name| self.get_input_at(data_name, i))
+            .collect();
+
+        // TODO: bar_index need be handled specially.
+        let result = self.fun_def.as_mut().unwrap().call(
+            &mut **self.ctx.as_mut().unwrap(),
+            input_params,
+            vec![],
+            StrRange::new_empty(),
+        );
+        downcast_ctx(self.get_subctx()).commit();
+        match result {
+            Ok(val) => Ok(val),
+            Err(e) => Err(e.code),
+        }
+    }
 }
 
 fn find_nearest_index(data: &ManuallyDrop<Vec<Int>>, val: &Int, is_ge: bool) -> isize {
@@ -126,6 +169,25 @@ fn find_nearest_index(data: &ManuallyDrop<Vec<Int>>, val: &Int, is_ge: bool) -> 
                 index as isize - 1
             }
         }
+    }
+}
+
+fn gen_def_val<'a>(func_type: &FunctionType<'a>) -> Option<PineRef<'a>> {
+    match &func_type.signature.1 {
+        &SyntaxType::Series(SimpleSyntaxType::Int) => {
+            Some(PineRef::new_rc(Series::from(Int::from(None))))
+        }
+        &SyntaxType::Series(SimpleSyntaxType::Float) => {
+            Some(PineRef::new_rc(Series::from(Float::from(None))))
+        }
+        &SyntaxType::Series(SimpleSyntaxType::Bool) => Some(PineRef::new_rc(Series::from(false))),
+        &SyntaxType::Series(SimpleSyntaxType::Color) => {
+            Some(PineRef::new_rc(Series::from(Color(""))))
+        }
+        &SyntaxType::Series(SimpleSyntaxType::String) => {
+            Some(PineRef::new_rc(Series::from(String::from(""))))
+        }
+        _ => unreachable!(),
     }
 }
 
@@ -149,19 +211,14 @@ impl<'a> SeriesCall<'a> for SecurityInfo<'a> {
         let lookahead = pine_ref_to_bool(lookahead).unwrap_or(false);
         // let func_ins = self.fun_def.as_ref().unwrap();
 
-        let subctx = &mut **self.ctx.as_mut().unwrap();
-        let time = pine_ref_to_i64(
-            subctx
-                .get_top_ctx()
-                .get_var(self.time_index.clone().unwrap())
-                .clone(),
-        );
+        let time_index = self.time_index.clone().unwrap();
+        let time = pine_ref_to_i64(self.get_subctx().get_top_ctx().get_var(time_index).clone());
+
         match time {
             None => Ok(PineRef::new_box(NA)),
             Some(cur_time) => {
-                match downcast_ctx(subctx)
-                    .get_input_data(&format!("{}-_time", self.ticker.as_ref().unwrap()))
-                {
+                let time_name = format!("{}-_time", self.ticker.as_ref().unwrap());
+                match downcast_ctx(self.get_subctx()).get_input_data(&time_name) {
                     Some(series) => {
                         let time_data = series.as_vec::<Int>();
                         // If the lookahead is false, we will find the point that the time is equal or less thant current time.
@@ -173,44 +230,7 @@ impl<'a> SeriesCall<'a> for SecurityInfo<'a> {
                         if end_index > self.start_time_data_index {
                             let mut results: Vec<PineRef<'a>> = vec![];
                             for i in self.start_time_data_index..end_index {
-                                let mut input_params: Vec<PineRef<'a>> = vec![];
-
-                                for data_name in &self.data_names {
-                                    match downcast_ctx(subctx).get_input_data(data_name) {
-                                        None => {
-                                            input_params.push(PineRef::new_rc(Series::from(
-                                                Int::from(None),
-                                            )));
-                                        }
-                                        Some(origin_data) => match origin_data.get_type() {
-                                            AnySeriesType::Int => {
-                                                input_params.push(PineRef::new_rc(Series::from(
-                                                    origin_data.index::<Int>(i as isize),
-                                                )));
-                                            }
-                                            AnySeriesType::Float => {
-                                                input_params.push(PineRef::new_rc(Series::from(
-                                                    origin_data.index::<Float>(i as isize),
-                                                )));
-                                            }
-                                        },
-                                    }
-                                }
-
-                                // TODO: bar_index need be handled specially.
-                                let result = self.fun_def.as_mut().unwrap().call(
-                                    subctx,
-                                    input_params,
-                                    vec![],
-                                    StrRange::new_empty(),
-                                );
-                                downcast_ctx(subctx).commit();
-                                match result {
-                                    Ok(val) => {
-                                        results.push(val);
-                                    }
-                                    Err(e) => return Err(e.code),
-                                }
+                                results.push(self.run_one_index(i)?);
                             }
                             self.start_time_data_index = end_index;
                             self.last_result = Some(results.last().unwrap().clone());
@@ -220,30 +240,12 @@ impl<'a> SeriesCall<'a> for SecurityInfo<'a> {
                                 return Ok(results[0].clone());
                             }
                         } else {
+                            // If this time has no data, then return na value for gaps=true.
+                            if gaps {
+                                return Ok(gen_def_val(&_func_type).unwrap());
+                            }
                             if self.last_result.is_none() {
-                                match _func_type.signature.1 {
-                                    SyntaxType::Series(SimpleSyntaxType::Int) => {
-                                        self.last_result =
-                                            Some(PineRef::new_rc(Series::from(Int::from(None))));
-                                    }
-                                    SyntaxType::Series(SimpleSyntaxType::Float) => {
-                                        self.last_result =
-                                            Some(PineRef::new_rc(Series::from(Float::from(None))));
-                                    }
-                                    SyntaxType::Series(SimpleSyntaxType::Bool) => {
-                                        self.last_result =
-                                            Some(PineRef::new_rc(Series::from(false)));
-                                    }
-                                    SyntaxType::Series(SimpleSyntaxType::Color) => {
-                                        self.last_result =
-                                            Some(PineRef::new_rc(Series::from(Color(""))));
-                                    }
-                                    SyntaxType::Series(SimpleSyntaxType::String) => {
-                                        self.last_result =
-                                            Some(PineRef::new_rc(Series::from(String::from(""))));
-                                    }
-                                    _ => unreachable!(),
-                                }
+                                self.last_result = gen_def_val(&_func_type);
                             }
                             Ok(self.last_result.as_ref().unwrap().clone())
                         }
@@ -252,6 +254,12 @@ impl<'a> SeriesCall<'a> for SecurityInfo<'a> {
                 }
             }
         }
+    }
+
+    fn run(&mut self, _context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
+        self.start_time_data_index = 0;
+        self.last_result = None;
+        Ok(())
     }
 
     fn copy(&self) -> Box<dyn SeriesCall<'a> + 'a> {
@@ -334,6 +342,176 @@ mod tests {
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(5, 0)),
             Some(PineRef::new_rc(Series::from_vec(vec![None, Some(31f64)])))
+        );
+
+        // Second ticker resolution is less thant original ticker resolution
+        runner
+            .run(
+                &vec![
+                    (
+                        "close",
+                        AnySeries::from_float_vec(vec![Some(1f64), Some(2f64), Some(2f64)]),
+                    ),
+                    (
+                        "_time",
+                        AnySeries::from_int_vec(vec![Some(10i64), Some(20i64), Some(30i64)]),
+                    ),
+                    (
+                        "MSFT-1D-_time",
+                        AnySeries::from_int_vec(vec![Some(15i64), Some(30i64)]),
+                    ),
+                    (
+                        "MSFT-1D-close",
+                        AnySeries::from_float_vec(vec![Some(15f64), Some(20f64)]),
+                    ),
+                ],
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(5, 0)),
+            Some(PineRef::new_rc(Series::from_vec(vec![
+                None,
+                Some(31f64),
+                Some(41f64)
+            ])))
+        );
+
+        // Second ticker resolution is greater thant original ticker resolution
+        runner
+            .run(
+                &vec![
+                    (
+                        "close",
+                        AnySeries::from_float_vec(vec![Some(1f64), Some(2f64), Some(2f64)]),
+                    ),
+                    (
+                        "_time",
+                        AnySeries::from_int_vec(vec![Some(10i64), Some(20i64), Some(30i64)]),
+                    ),
+                    (
+                        "MSFT-1D-_time",
+                        AnySeries::from_int_vec(vec![
+                            Some(5i64),
+                            Some(10i64),
+                            Some(15i64),
+                            Some(25i64),
+                            Some(30i64),
+                        ]),
+                    ),
+                    (
+                        "MSFT-1D-close",
+                        AnySeries::from_float_vec(vec![
+                            Some(1f64),
+                            Some(2f64),
+                            Some(3f64),
+                            Some(4f64),
+                            Some(5f64),
+                        ]),
+                    ),
+                ],
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(5, 0)),
+            Some(PineRef::new_rc(Series::from_vec(vec![
+                Some(3f64),
+                Some(7f64),
+                Some(9f64)
+            ])))
+        );
+    }
+
+    #[test]
+    fn security_lookahead_test() {
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![
+                ("close", SyntaxType::Series(SimpleSyntaxType::Float)),
+                ("_time", SyntaxType::Series(SimpleSyntaxType::Int)),
+            ],
+        );
+        let src = "a = close + 1\nm = security('MSFT', '1D', close + a, lookahead=true)";
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        // Second ticker resolution is less thant original ticker resolution
+        runner
+            .run(
+                &vec![
+                    (
+                        "close",
+                        AnySeries::from_float_vec(vec![Some(1f64), Some(2f64), Some(2f64)]),
+                    ),
+                    (
+                        "_time",
+                        AnySeries::from_int_vec(vec![Some(10i64), Some(20i64), Some(30i64)]),
+                    ),
+                    (
+                        "MSFT-1D-_time",
+                        AnySeries::from_int_vec(vec![Some(15i64), Some(30i64)]),
+                    ),
+                    (
+                        "MSFT-1D-close",
+                        AnySeries::from_float_vec(vec![Some(15f64), Some(20f64)]),
+                    ),
+                ],
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(5, 0)),
+            Some(PineRef::new_rc(Series::from_vec(vec![
+                Some(31f64),
+                Some(41f64),
+                Some(41f64)
+            ])))
+        );
+
+        // Second ticker resolution is greater thant original ticker resolution
+        runner
+            .run(
+                &vec![
+                    (
+                        "close",
+                        AnySeries::from_float_vec(vec![Some(1f64), Some(2f64), Some(2f64)]),
+                    ),
+                    (
+                        "_time",
+                        AnySeries::from_int_vec(vec![Some(10i64), Some(20i64), Some(30i64)]),
+                    ),
+                    (
+                        "MSFT-1D-_time",
+                        AnySeries::from_int_vec(vec![
+                            Some(5i64),
+                            Some(10i64),
+                            Some(15i64),
+                            Some(25i64),
+                            Some(30i64),
+                        ]),
+                    ),
+                    (
+                        "MSFT-1D-close",
+                        AnySeries::from_float_vec(vec![
+                            Some(1f64),
+                            Some(2f64),
+                            Some(3f64),
+                            Some(4f64),
+                            Some(5f64),
+                        ]),
+                    ),
+                ],
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(5, 0)),
+            Some(PineRef::new_rc(Series::from_vec(vec![
+                Some(5f64),
+                Some(9f64),
+                Some(11f64)
+            ])))
         );
     }
 }

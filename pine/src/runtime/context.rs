@@ -54,6 +54,10 @@ pub trait Ctx<'a>: VarOperate<'a> {
 
     // fn any_declare(&self) -> bool;
 
+    fn has_parent(&self) -> bool;
+
+    fn get_top_ctx(&mut self) -> &mut dyn Ctx<'a>;
+
     fn set_is_run(&mut self, is_run: bool);
 
     fn get_is_run(&self) -> bool;
@@ -263,77 +267,144 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
     }
 
     pub fn change_inputs(&mut self, inputs: Vec<Option<InputVal>>) {
-        debug_assert!(
-            self.io_info.get_inputs().is_empty() || inputs.len() == self.io_info.get_inputs().len()
-        );
-        self.inputs = inputs;
+        if let Some(p) = &mut self.parent {
+            downcast_ctx(*p).change_inputs(inputs)
+        } else {
+            debug_assert!(
+                self.io_info.get_inputs().is_empty()
+                    || inputs.len() == self.io_info.get_inputs().len()
+            );
+            self.inputs = inputs;
+        }
     }
 
     pub fn get_inputs(&self) -> &Vec<Option<InputVal>> {
-        &self.inputs
+        if let Some(p) = &self.parent {
+            downcast_ctx_const(*p).get_inputs()
+        } else {
+            &self.inputs
+        }
     }
 
     pub fn copy_next_input(&mut self) -> Option<InputVal> {
-        self.input_index += 1;
-        if self.input_index as usize >= self.inputs.len() {
-            None
+        if let Some(p) = &mut self.parent {
+            downcast_ctx(*p).copy_next_input()
         } else {
-            self.inputs[self.input_index as usize].clone()
+            self.input_index += 1;
+            if self.input_index as usize >= self.inputs.len() {
+                None
+            } else {
+                self.inputs[self.input_index as usize].clone()
+            }
         }
     }
 
     pub fn get_next_input_index(&mut self) -> i32 {
-        self.input_index += 1;
-        self.input_index
+        if let Some(p) = &mut self.parent {
+            downcast_ctx(*p).get_next_input_index()
+        } else {
+            self.input_index += 1;
+            self.input_index
+        }
     }
 
     pub fn reset_input_index(&mut self) {
-        self.input_index = -1;
+        if let Some(p) = &mut self.parent {
+            downcast_ctx(*p).reset_input_index()
+        } else {
+            self.input_index = -1;
+        }
     }
 
     // io_info related methods
     pub fn set_script_type(&mut self, script_type: ScriptPurpose) {
-        self.io_info.set_script_type(script_type);
+        if let Some(p) = &mut self.parent {
+            downcast_ctx(*p).set_script_type(script_type)
+        } else {
+            self.io_info.set_script_type(script_type);
+        }
     }
 
     pub fn push_input_info(&mut self, input: InputInfo) {
-        self.io_info.push_input(input);
+        if let Some(p) = &mut self.parent {
+            downcast_ctx(*p).push_input_info(input)
+        } else {
+            self.io_info.push_input(input);
+        }
     }
 
     pub fn push_output_info(&mut self, output: OutputInfo) {
-        self.io_info.push_output(output);
+        if let Some(p) = &mut self.parent {
+            downcast_ctx(*p).push_output_info(output)
+        } else {
+            self.io_info.push_output(output);
+        }
     }
 
     pub fn add_input_src(&mut self, src: InputSrc) {
-        self.io_info.add_input_src(src);
+        if let Some(p) = &mut self.parent {
+            downcast_ctx(*p).add_input_src(src)
+        } else {
+            self.io_info.add_input_src(src);
+        }
     }
 
     pub fn get_io_info(&self) -> &IOInfo {
-        &self.io_info
+        if let Some(p) = &self.parent {
+            downcast_ctx_const(*p).get_io_info()
+        } else {
+            &self.io_info
+        }
     }
 
     pub fn check_is_input_info_ready(&self) -> bool {
-        self.is_input_info_ready
+        if let Some(p) = &self.parent {
+            downcast_ctx_const(*p).check_is_input_info_ready()
+        } else {
+            self.is_input_info_ready
+        }
     }
 
     pub fn let_input_info_ready(&mut self) {
+        debug_assert!(!self.has_parent());
         self.is_input_info_ready = true;
     }
 
     pub fn check_is_output_info_ready(&self) -> bool {
-        self.is_output_info_ready
+        if let Some(p) = &self.parent {
+            downcast_ctx_const(*p).check_is_output_info_ready()
+        } else {
+            self.is_output_info_ready
+        }
     }
 
     pub fn let_output_info_ready(&mut self) {
+        debug_assert!(!self.has_parent());
         self.is_output_info_ready = true;
     }
 
     pub fn insert_input_data(&mut self, name: String, data: AnySeries) {
-        self.input_data.insert(name, data);
+        if let Some(p) = &mut self.parent {
+            downcast_ctx(*p).insert_input_data(name, data)
+        } else {
+            self.input_data.insert(name, data);
+        }
+    }
+
+    pub fn get_input_data(&self, name: &str) -> Option<&AnySeries> {
+        if let Some(p) = &self.parent {
+            downcast_ctx_const(*p).get_input_data(name)
+        } else {
+            self.input_data.get(name)
+        }
     }
 
     pub fn push_output_data(&mut self, data: Option<OutputData>) {
-        self.output_data.push(data);
+        if let Some(p) = &mut self.parent {
+            downcast_ctx(*p).push_output_data(data)
+        } else {
+            self.output_data.push(data);
+        }
     }
 
     pub fn move_output_data(&mut self) -> Vec<Option<OutputData>> {
@@ -342,18 +413,25 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
     }
 
     pub fn set_syminfo(&mut self, syminfo: Rc<SymbolInfo>) {
-        self.syminfo = Some(syminfo);
+        if let Some(p) = &mut self.parent {
+            downcast_ctx(*p).set_syminfo(syminfo)
+        } else {
+            self.syminfo = Some(syminfo);
+        }
     }
 
     pub fn get_syminfo(&self) -> &Option<Rc<SymbolInfo>> {
+        debug_assert!(!self.has_parent());
         &self.syminfo
     }
 
     pub fn get_data_range(&self) -> (Option<i32>, Option<i32>) {
+        debug_assert!(!self.has_parent());
         self.data_range.clone()
     }
 
     pub fn update_data_range(&mut self, range: (Option<i32>, Option<i32>)) {
+        debug_assert!(!self.has_parent());
         self.data_range = range;
     }
 
@@ -437,8 +515,8 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             };
             self.update_var(index, ret_val);
         }
-        let callables = mem::replace(&mut self.callables, vec![]);
-        for callable in callables.iter() {
+        let mut callables = mem::replace(&mut self.callables, vec![]);
+        for callable in callables.iter_mut() {
             if let Err(code) = callable.back(self) {
                 return Err(PineRuntimeError::new_no_range(code));
             }
@@ -448,8 +526,8 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
     }
 
     pub fn run_callbacks(&mut self) -> Result<(), RuntimeErr> {
-        let callables = mem::replace(&mut self.callables, vec![]);
-        for callable in callables.iter() {
+        let mut callables = mem::replace(&mut self.callables, vec![]);
+        for callable in callables.iter_mut() {
             callable.run(self)?;
         }
         mem::replace(&mut self.callables, callables);
@@ -557,6 +635,18 @@ impl<'a, 'b, 'c> Ctx<'a> for Context<'a, 'b, 'c> {
 
     fn create_fun_instance(&mut self, index: i32, val: RefData<Callable<'a>>) {
         self.fun_instances[index as usize] = Some(val);
+    }
+
+    fn get_top_ctx(&mut self) -> &mut dyn Ctx<'a> {
+        let mut dest_ctx: &mut dyn Ctx<'a> = self;
+        while dest_ctx.has_parent() {
+            dest_ctx = *downcast_ctx(dest_ctx).parent.as_mut().unwrap();
+        }
+        dest_ctx
+    }
+
+    fn has_parent(&self) -> bool {
+        self.parent.is_some()
     }
 
     fn set_is_run(&mut self, is_run: bool) {

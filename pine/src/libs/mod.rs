@@ -7,6 +7,7 @@ pub mod plotcandle;
 pub mod plotchar;
 pub mod plotshape;
 pub mod print;
+pub mod security;
 pub mod study;
 pub mod syminfo;
 pub mod time;

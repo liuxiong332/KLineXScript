@@ -25,8 +25,17 @@ pub struct DataSrc<'a, 'b, 'c> {
     pub callback: &'a dyn Callback,
 }
 
-fn get_len(data: &Vec<(&'static str, AnySeries)>) -> Result<usize, PineRuntimeError> {
-    let lens: Vec<usize> = data.iter().map(|(_, v)| v.len()).collect();
+fn get_len<'a>(
+    data: &Vec<(&'static str, AnySeries)>,
+    names: &Vec<(&'a str, AnySeriesType)>,
+) -> Result<usize, PineRuntimeError> {
+    let lens: Vec<usize> = data
+        .iter()
+        .filter_map(|(name, v)| match names.iter().find(|(n, _)| n == name) {
+            Some(_) => Some(v.len()),
+            None => None,
+        })
+        .collect();
     if lens.len() == 0 {
         return Err(PineRuntimeError::new_no_range(RuntimeErr::NotValidParam));
     }
@@ -153,7 +162,7 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
         data: &Vec<(&'static str, AnySeries)>,
         syminfo: Option<Rc<SymbolInfo>>,
     ) -> Result<(), PineRuntimeError> {
-        let len = get_len(data)?;
+        let len = get_len(data, &self.input_names)?;
         // Update the range of data.
         self.context.update_data_range((Some(0), Some(len as i32)));
         if let Some(syminfo) = syminfo {
@@ -166,7 +175,7 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
         &mut self,
         data: &Vec<(&'static str, AnySeries)>,
     ) -> Result<(), PineRuntimeError> {
-        let len = get_len(data)?;
+        let len = get_len(data, &self.input_names)?;
 
         // Get the range of exist running data.
         let range = self.context.get_data_range();
@@ -183,7 +192,7 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
         data: &Vec<(&'static str, AnySeries)>,
         from: i32,
     ) -> Result<(), PineRuntimeError> {
-        let len = get_len(data)?;
+        let len = get_len(data, &self.input_names)?;
 
         let range = self.context.get_data_range();
         // Calculate the count of roll_back invocation

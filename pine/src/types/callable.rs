@@ -11,10 +11,10 @@ use std::fmt;
 use std::mem;
 
 pub trait SeriesCall<'a> {
-    fn init_param_len(&self, _len: usize) {}
+    fn init_param_len(&mut self, _len: usize) {}
 
     fn step(
-        &self,
+        &mut self,
         _context: &mut dyn Ctx<'a>,
         _p: Vec<Option<PineRef<'a>>>,
         _func_type: FunctionType<'a>,
@@ -22,11 +22,11 @@ pub trait SeriesCall<'a> {
         Ok(PineRef::Box(Box::new(NA)))
     }
 
-    fn run(&self, _context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
+    fn run(&mut self, _context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
         Ok(())
     }
 
-    fn back(&self, _context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
+    fn back(&mut self, _context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
         Ok(())
     }
 
@@ -103,14 +103,14 @@ impl<'a> VarOperate<'a> for Vec<Option<PineRef<'a>>> {
 }
 
 impl<'a> SeriesCall<'a> for ParamCollectCall<'a> {
-    fn init_param_len(&self, len: usize) {
+    fn init_param_len(&mut self, len: usize) {
         let mut params = Vec::with_capacity(len);
         params.resize_with(len, || None);
         self.params.replace(params);
     }
 
     fn step(
-        &self,
+        &mut self,
         _context: &mut dyn Ctx<'a>,
         pmap: Vec<Option<PineRef<'a>>>,
         func_type: FunctionType<'a>,
@@ -128,7 +128,7 @@ impl<'a> SeriesCall<'a> for ParamCollectCall<'a> {
         Ok(PineRef::Box(Box::new(NA)))
     }
 
-    fn run(&self, _context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
+    fn run(&mut self, _context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
         let val = self.params.borrow().clone();
         (self.func)(_context, val, self.func_type.take().unwrap())?;
         Ok(())
@@ -243,7 +243,7 @@ impl<'a> Callable<'a> {
     ) -> Result<PineRef<'a>, RuntimeErr> {
         if self.param_names.is_none() {
             self.param_names = Some(func_type.arg_names());
-            if let Some(ref caller) = self.caller {
+            if let Some(ref mut caller) = self.caller {
                 caller.init_param_len(self.param_names.as_ref().unwrap().len());
             }
         }
@@ -268,23 +268,23 @@ impl<'a> Callable<'a> {
         }
         if let Some(func) = self.func {
             func(context, all_args, func_type)
-        } else if let Some(ref caller) = self.caller {
+        } else if let Some(ref mut caller) = self.caller {
             caller.step(context, all_args, func_type)
         } else {
             Ok(PineRef::Box(Box::new(NA)))
         }
     }
 
-    pub fn back(&self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
-        if let Some(ref caller) = self.caller {
+    pub fn back(&mut self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
+        if let Some(ref mut caller) = self.caller {
             caller.back(context)
         } else {
             Ok(())
         }
     }
 
-    pub fn run(&self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
-        if let Some(ref caller) = self.caller {
+    pub fn run(&mut self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
+        if let Some(ref mut caller) = self.caller {
             caller.run(context)
         } else {
             Ok(())
@@ -439,7 +439,7 @@ mod tests {
         }
         let func_type = FunctionType::new((vec![("arg1", INT_TYPE)], INT_TYPE));
 
-        let call = ParamCollectCall::new(test_func);
+        let mut call = ParamCollectCall::new(test_func);
         call.init_param_len(1);
         let mut context = Context::new(None, ContextType::Normal);
 

@@ -60,7 +60,7 @@ impl TimeCallVal {
 
 impl<'a> SeriesCall<'a> for TimeCallVal {
     fn step(
-        &self,
+        &mut self,
         ctx: &mut dyn Ctx<'a>,
         _p: Vec<Option<PineRef<'a>>>,
         _func_type: FunctionType<'a>,

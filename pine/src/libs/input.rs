@@ -40,7 +40,7 @@ impl<'a> InputCall<'a> {
 
 impl<'a> SeriesCall<'a> for InputCall<'a> {
     fn step(
-        &self,
+        &mut self,
         context: &mut dyn Ctx<'a>,
         val: Vec<Option<PineRef<'a>>>,
         func_type: FunctionType<'a>,
@@ -57,7 +57,7 @@ impl<'a> SeriesCall<'a> for InputCall<'a> {
         }
     }
 
-    fn run(&self, _context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
+    fn run(&mut self, _context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
         self.val.replace(None);
         Ok(())
     }
@@ -174,7 +174,6 @@ fn input_for_source<'a>(
     context: &mut dyn Ctx<'a>,
     mut param: Vec<Option<PineRef<'a>>>,
 ) -> Result<PineRef<'a>, RuntimeErr> {
-    println!("input for source");
     if !downcast_ctx(context).check_is_input_info_ready() {
         let type_str = pine_ref_to_string(move_element(&mut param, 2));
 
@@ -189,7 +188,6 @@ fn input_for_source<'a>(
             )));
         }
         let name = get_name_from_source(context, &param[0]);
-        println!("get name {:?}", name);
         downcast_ctx(context).push_input_info(InputInfo::Source(SourceInputInfo {
             defval: name,
             title: pine_ref_to_string(move_element(&mut param, 1)),

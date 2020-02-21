@@ -456,6 +456,7 @@ mod tests {
         let src = "a = close + 1\nm = security('MSFT', '1D', close + a + time + bar_index)";
         let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+        runner.set_input_srcs(vec![String::from("close"), String::from("time")]);
 
         runner
             .run(
@@ -482,8 +483,14 @@ mod tests {
             Some(PineRef::new_rc(Series::from_vec(vec![None, Some(42f64)])))
         );
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(7, 0)),
-            Some(PineRef::new_rc(Series::from_vec(vec![None, Some(42f64)])))
+            runner.get_context().get_io_info().get_input_srcs(),
+            &vec![
+                InputSrc::new(None, vec![String::from("close"), String::from("time")]),
+                InputSrc::new(
+                    Some(String::from("MSFT-1D")),
+                    vec![String::from("time"), String::from("close")]
+                )
+            ]
         );
     }
 

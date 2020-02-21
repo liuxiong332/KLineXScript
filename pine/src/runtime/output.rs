@@ -253,6 +253,10 @@ impl IOInfo {
         &self.outputs
     }
 
+    pub fn get_input_srcs(&self) -> &Vec<InputSrc> {
+        &self.input_srcs
+    }
+
     pub fn get_script_type(&self) -> &Option<ScriptPurpose> {
         &self.script_type
     }

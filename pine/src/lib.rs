@@ -102,7 +102,7 @@ impl<'a> InputSrcDetector<'a> for LibInfo<'a> {
 pub struct PineParser<'a, 'b> {
     src: &'a str,
     var_types: &'b Vec<(&'a str, SyntaxType<'a>)>,
-    client_input_names: &'b Vec<&'a str>,
+    // client_input_names: &'b Vec<&'a str>,
     lib_info: &'b LibInfo<'a>,
 }
 
@@ -111,7 +111,7 @@ impl<'a, 'b> PineParser<'a, 'b> {
         PineParser {
             src,
             var_types: &lib_info.var_types,
-            client_input_names: &lib_info.client_input_names,
+            // client_input_names: &lib_info.client_input_names,
             lib_info,
         }
     }
@@ -129,15 +129,10 @@ impl<'a, 'b> PineParser<'a, 'b> {
             Err((None, errs)) => return Err(errs),
         };
         let syntax_parser;
-        match parse_syntax(
-            &mut blk,
-            &self.var_types,
-            &self.client_input_names,
-            unsafe {
-                let s: *const (dyn InputSrcDetector<'a> + 'b) = self.lib_info;
-                mem::transmute::<_, *const (dyn InputSrcDetector<'a>)>(s)
-            },
-        ) {
+        match parse_syntax(&mut blk, &self.var_types, unsafe {
+            let s: *const (dyn InputSrcDetector<'a> + 'b) = self.lib_info;
+            mem::transmute::<_, *const (dyn InputSrcDetector<'a>)>(s)
+        }) {
             Ok(parser) => syntax_parser = parser,
             Err((parser, errs)) => {
                 all_errs.extend(errs);
@@ -508,7 +503,6 @@ pub fn parse_ast(in_str: &str) -> Result<Block, (Option<Block>, Vec<PineInputErr
 pub fn parse_syntax<'a>(
     blk: &mut Block<'a>,
     vars: &Vec<(&'a str, SyntaxType<'a>)>,
-    input_names: &Vec<&'a str>,
     lib_info: *const dyn InputSrcDetector<'a>,
 ) -> Result<SyntaxParser<'a>, (Option<SyntaxParser<'a>>, Vec<PineInputError>)> {
     let mut syntax_parser = SyntaxParser::new_with_vars(vars);

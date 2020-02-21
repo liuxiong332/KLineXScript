@@ -310,12 +310,8 @@ impl<'a> ExpNameRelParser<'a> {
             .into_iter()
             .filter_map(|n| {
                 let ctx = downcast_ctx(self.ctx.unwrap());
-                if n.ctxid == 0 && ctx.is_input_option(n.name) {
-                    if let Some(mapper) = ctx.get_input_name_mapper() {
-                        Some(mapper(n.name))
-                    } else {
-                        Some(n.name)
-                    }
+                if n.ctxid == 0 {
+                    ctx.map_input_src(n.name)
                 } else {
                     None
                 }
@@ -363,6 +359,7 @@ mod tests {
     use crate::ast::stat_expr::*;
     use crate::ast::state::*;
     use crate::ast::syntax_type::*;
+    use crate::syntax::SimpleInputSrcDetector;
     use crate::syntax::{ContextType, SyntaxContext, SyntaxParser};
     use std::rc::Rc;
 
@@ -545,11 +542,9 @@ mod tests {
     #[test]
     fn gen_stmt_test() {
         let mut syntax_parser = SyntaxParser::new();
-        syntax_parser.init_input_options(vec!["close", "time"]);
-        syntax_parser.set_input_name_mapper(|n| match n {
-            "time" => "_time",
-            n => n,
-        });
+        let input_detector = SimpleInputSrcDetector::new(vec!["close", "time"]);
+        syntax_parser.init_input_detector(&input_detector);
+
         let mut parser = ExpNameRelParser::new();
         let ctx = downcast_ctx(syntax_parser.get_context());
         ctx.declare_var_with_index("close", SyntaxType::int_series());

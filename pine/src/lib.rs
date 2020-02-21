@@ -40,6 +40,7 @@ use runtime::output::{IOInfo, InputVal, OutputDataCollect, SymbolInfo};
 use runtime::{AnySeries, AnySeriesType};
 use std::mem;
 use std::rc::Rc;
+use syntax::InputSrcDetector;
 use types::{Float, Int, PineRef};
 
 #[derive(Debug, Clone)]
@@ -68,10 +69,41 @@ impl<'a> LibInfo<'a> {
     }
 }
 
+impl<'a> InputSrcDetector<'a> for LibInfo<'a> {
+    fn get_client_srcs(&self) -> Vec<&'a str> {
+        self.client_input_names.clone()
+    }
+
+    fn get_input_srcs(&self) -> Vec<&'a str> {
+        self.input_names.iter().map(|s| s.0).collect()
+    }
+
+    // Check if the src is input source for client.
+    fn map_client_src<'b>(&self, src: &'b str) -> Option<&'b str> {
+        if self.client_input_names.contains(&src) {
+            Some(src)
+        } else {
+            None
+        }
+    }
+
+    // Check if the src is input source and map to another source name.
+    fn map_input_src<'b>(&self, src: &'b str) -> Option<&'b str> {
+        if src == "time" {
+            return Some("_time");
+        }
+        match self.input_names.iter().find(|s| s.0 == src) {
+            Some(_) => Some(src),
+            None => None,
+        }
+    }
+}
+
 pub struct PineParser<'a, 'b> {
     src: &'a str,
     var_types: &'b Vec<(&'a str, SyntaxType<'a>)>,
     client_input_names: &'b Vec<&'a str>,
+    lib_info: &'b LibInfo<'a>,
 }
 
 impl<'a, 'b> PineParser<'a, 'b> {
@@ -80,6 +112,7 @@ impl<'a, 'b> PineParser<'a, 'b> {
             src,
             var_types: &lib_info.var_types,
             client_input_names: &lib_info.client_input_names,
+            lib_info,
         }
     }
 
@@ -96,7 +129,15 @@ impl<'a, 'b> PineParser<'a, 'b> {
             Err((None, errs)) => return Err(errs),
         };
         let syntax_parser;
-        match parse_syntax(&mut blk, &self.var_types, &self.client_input_names) {
+        match parse_syntax(
+            &mut blk,
+            &self.var_types,
+            &self.client_input_names,
+            unsafe {
+                let s: *const (dyn InputSrcDetector<'a> + 'b) = self.lib_info;
+                mem::transmute::<_, *const (dyn InputSrcDetector<'a>)>(s)
+            },
+        ) {
             Ok(parser) => syntax_parser = parser,
             Err((parser, errs)) => {
                 all_errs.extend(errs);
@@ -464,21 +505,16 @@ pub fn parse_ast(in_str: &str) -> Result<Block, (Option<Block>, Vec<PineInputErr
     }
 }
 
-fn map_input_name(name: &str) -> &str {
-    match name {
-        "time" => "_time",
-        n => n,
-    }
-}
-
 pub fn parse_syntax<'a>(
     blk: &mut Block<'a>,
     vars: &Vec<(&'a str, SyntaxType<'a>)>,
     input_names: &Vec<&'a str>,
+    lib_info: *const dyn InputSrcDetector<'a>,
 ) -> Result<SyntaxParser<'a>, (Option<SyntaxParser<'a>>, Vec<PineInputError>)> {
     let mut syntax_parser = SyntaxParser::new_with_vars(vars);
-    syntax_parser.init_input_options(input_names.clone());
-    syntax_parser.set_input_name_mapper(map_input_name);
+    // syntax_parser.init_input_options(input_names.clone());
+    // syntax_parser.set_input_name_mapper(map_input_name);
+    syntax_parser.init_input_detector(lib_info);
     match syntax_parser.parse_blk(blk) {
         Ok(_) => {
             if syntax_parser.is_ok() {
@@ -522,8 +558,10 @@ pub fn extract_vars<'a>(
             }
         }
         types.push((n, t));
-        if n != BAR_INDEX {
-            user_input_names.push(n);
+        match n {
+            BAR_INDEX => {}
+            "_time" => user_input_names.push("time"),
+            n => user_input_names.push(n),
         }
     }
     // debug_assert!(check_names(&types));
@@ -539,6 +577,47 @@ mod tests {
     use crate::libs::plot;
     use crate::runtime::data_src::NoneCallback;
     use crate::runtime::output::{InputInfo, InputSrc, IntInputInfo, OutputInfo, PlotInfo};
+
+    #[test]
+    fn lib_info_test() {
+        let lib_info = LibInfo::new(
+            vec![input::declare_var(), plot::declare_var()],
+            vec![
+                ("close", SERIES_FLOAT.clone()),
+                ("open", SERIES_FLOAT.clone()),
+                ("high", SERIES_FLOAT.clone()),
+                ("low", SERIES_FLOAT.clone()),
+                ("volume", SERIES_INT.clone()),
+                ("_time", SERIES_INT.clone()),
+                (BAR_INDEX, SERIES_INT.clone()),
+            ],
+        );
+
+        assert_eq!(
+            lib_info.client_input_names,
+            vec!["close", "open", "high", "low", "volume", "time"]
+        );
+        assert_eq!(
+            lib_info.var_values.iter().map(|s| s.0).collect::<Vec<_>>(),
+            vec!["input", "plot"]
+        );
+        assert_eq!(
+            lib_info.input_names.iter().map(|s| s.0).collect::<Vec<_>>(),
+            vec![
+                "close",
+                "open",
+                "high",
+                "low",
+                "volume",
+                "_time",
+                "bar_index"
+            ]
+        );
+        assert_eq!(lib_info.map_client_src("time"), Some("time"));
+        assert_eq!(lib_info.map_client_src("bar_index"), None);
+        assert_eq!(lib_info.map_input_src("bar_index"), Some("bar_index"));
+        assert_eq!(lib_info.map_input_src("time"), Some("_time"));
+    }
 
     #[test]
     fn script_test() {

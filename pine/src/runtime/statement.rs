@@ -1143,10 +1143,12 @@ mod tests {
         use crate::ast::stat_expr::block;
         use crate::ast::state::AstState;
         use crate::ast::syntax_type::*;
+        use crate::syntax::SimpleInputSrcDetector;
         use crate::syntax::SyntaxParser;
         use std::mem;
         use std::rc::Rc;
 
+        let input_detector = SimpleInputSrcDetector::new(vec!["close"]);
         let mut parser = SyntaxParser::new_with_vars(&vec![
             (
                 "security",
@@ -1160,7 +1162,8 @@ mod tests {
             ),
             ("close", SyntaxType::float_series()),
         ]);
-        parser.init_input_options(vec!["close"]);
+        // parser.init_input_options(vec!["close"]);
+        parser.init_input_detector(&input_detector);
         let blk_str: &str = "a = close + 1\np = security(close + a)";
         let myblk = block(Input::new_with_str(blk_str), &AstState::new());
         let mut blk = myblk.unwrap().1;

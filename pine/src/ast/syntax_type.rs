@@ -135,7 +135,7 @@ impl<'a> SyntaxType<'a> {
     }
 
     pub fn is_int(&self) -> bool {
-        match self {
+        match SyntaxType::get_v_for_vf(SyntaxType::get_v_for_vf(self)) {
             SyntaxType::Simple(SimpleSyntaxType::Int)
             | SyntaxType::Series(SimpleSyntaxType::Int) => true,
             _ => false,
@@ -143,7 +143,7 @@ impl<'a> SyntaxType<'a> {
     }
 
     pub fn is_num(&self) -> bool {
-        match self {
+        match SyntaxType::get_v_for_vf(SyntaxType::get_v_for_vf(self)) {
             SyntaxType::Simple(SimpleSyntaxType::Int)
             | SyntaxType::Series(SimpleSyntaxType::Int)
             | SyntaxType::Simple(SimpleSyntaxType::Float)
@@ -153,7 +153,7 @@ impl<'a> SyntaxType<'a> {
     }
 
     pub fn is_string(&self) -> bool {
-        match self {
+        match SyntaxType::get_v_for_vf(SyntaxType::get_v_for_vf(self)) {
             SyntaxType::Simple(SimpleSyntaxType::String)
             | SyntaxType::Series(SimpleSyntaxType::String) => true,
             _ => false,

@@ -94,8 +94,6 @@ pub struct Context<'a, 'b, 'c> {
     // function instances
     fun_instances: Vec<Option<RefData<Callable<'a>>>>,
 
-    // All the Series type variable name
-    _series: Vec<&'a str>,
     callables: Vec<RefData<Callable<'a>>>,
     // declare_vars: HashSet<&'a str>,
 
@@ -194,7 +192,6 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             vars: Vec::new(),
             varname_indexs: HashMap::new(),
             fun_instances: Vec::new(),
-            _series: vec![],
             callables: vec![],
             // declare_vars: HashSet::new(),
             callback: None,
@@ -220,7 +217,6 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             vars: Vec::new(),
             varname_indexs: HashMap::new(),
             fun_instances: Vec::new(),
-            _series: vec![],
             callables: vec![],
             // declare_vars: HashSet::new(),
             callback: Some(callback),

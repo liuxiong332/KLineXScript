@@ -18,10 +18,12 @@ use std::rc::Rc;
 
 mod convert;
 pub mod ctxid_parser;
+mod input_detector;
 mod name_rel_parser;
 mod type_cast;
 pub mod types_id_gen;
 
+pub use input_detector::*;
 use name_rel_parser::*;
 
 use convert::{common_type, implicity_convert, similar_type, simple_to_series};
@@ -80,13 +82,10 @@ pub struct SyntaxContext<'a> {
     // User defined function's type for the specific name, the name is like method_name@id
     user_func_types: HashMap<String, (SyntaxType<'a>, i32)>,
 
-    // all of the input varnames
-    input_options: Option<Vec<&'a str>>,
+    // input sources detector to scan input sources.
+    input_detector: Option<*const dyn InputSrcDetector<'a>>,
     // The input varname(e.g. close, open etc) that the script use
     input_varnames: Vec<&'a str>,
-
-    // map the varname to true name. for example, time map to _time.
-    input_name_mapper: Option<fn(&'a str) -> &'a str>,
 
     // The variable name to index map that can transfer the map lookup to vector getter.
     var_indexs: HashMap<String, i32>,
@@ -231,9 +230,8 @@ impl<'a> SyntaxContext<'a> {
             subctxs: vec![],
             user_func_types: HashMap::new(),
             vars: HashMap::new(),
-            input_options: None,
+            input_detector: None,
             input_varnames: vec![],
-            input_name_mapper: None,
             var_indexs: HashMap::new(),
             max_var_index: -1,
             max_child_ctx_index: -1,
@@ -241,17 +239,31 @@ impl<'a> SyntaxContext<'a> {
         }
     }
 
-    pub fn set_input_options(&mut self, input_options: Vec<&'a str>) {
-        self.input_options = Some(input_options);
+    pub fn set_input_detector(&mut self, detector: *const dyn InputSrcDetector<'a>) {
+        self.input_detector = Some(detector);
     }
 
-    pub fn is_input_option(&self, name: &'a str) -> bool {
+    pub fn is_client_input(&self, name: &'a str) -> bool {
         if let Some(p) = self.parent {
-            downcast_ctx(p.as_ptr()).is_input_option(name)
-        } else if let Some(ref options) = self.input_options {
-            options.iter().position(|&x| x == name).is_some()
+            downcast_ctx(p.as_ptr()).is_client_input(name)
+        } else if let Some(input_detector) = self.input_detector {
+            // options.iter().position(|&x| x == name).is_some()
+            let detector = unsafe { input_detector.as_ref().unwrap() };
+            detector.map_client_src(name).is_some()
         } else {
             false
+        }
+    }
+
+    pub fn map_input_src(&self, name: &'a str) -> Option<&'a str> {
+        if let Some(p) = self.parent {
+            downcast_ctx(p.as_ptr()).map_input_src(name)
+        } else if let Some(input_detector) = self.input_detector {
+            // options.iter().position(|&x| x == name).is_some()
+            let detector = unsafe { input_detector.as_ref().unwrap() };
+            detector.map_input_src(name)
+        } else {
+            None
         }
     }
 
@@ -264,20 +276,6 @@ impl<'a> SyntaxContext<'a> {
             Some(p) => Some(p.as_ptr()),
             None => None,
         }
-    }
-
-    pub fn get_input_name_mapper(&self) -> Option<fn(&'a str) -> &'a str> {
-        if let Some(mapper) = self.input_name_mapper {
-            Some(mapper)
-        } else if let Some(p) = self.get_parent() {
-            downcast_ctx(p).get_input_name_mapper()
-        } else {
-            None
-        }
-    }
-
-    pub fn set_input_name_mapper(&mut self, mapper: fn(&'a str) -> &'a str) {
-        self.input_name_mapper = Some(mapper);
     }
 }
 
@@ -354,16 +352,11 @@ impl<'a> SyntaxParser<'a> {
         }
     }
 
-    pub fn init_input_options(&mut self, input_options: Vec<&'a str>) {
-        downcast_ctx(self.context).set_input_options(input_options);
+    pub fn init_input_detector(&mut self, detector: *const dyn InputSrcDetector<'a>) {
+        downcast_ctx(self.context).set_input_detector(detector);
     }
-
     pub fn get_inputnames(&self) -> Vec<&'a str> {
         downcast_ctx(self.context).get_inputnames()
-    }
-
-    pub fn set_input_name_mapper(&mut self, mapper: fn(&'a str) -> &'a str) {
-        downcast_ctx(self.context).set_input_name_mapper(mapper);
     }
 
     pub fn get_context(&mut self) -> *mut (dyn SyntaxCtx<'a> + 'a) {
@@ -900,7 +893,7 @@ impl<'a> SyntaxParser<'a> {
         let name = varname.name.value;
         let ctx_ins = downcast_ctx(self.context);
         // If the input names are found, we should record this name.
-        if ctx_ins.is_input_option(name) {
+        if ctx_ins.is_client_input(name) {
             ctx_ins.declare_inputnames(name);
         }
         match downcast_ctx(self.context).get_var(name) {
@@ -1730,10 +1723,14 @@ mod tests {
 
     #[test]
     fn input_varname_test() {
+        use crate::syntax::SimpleInputSrcDetector;
+
+        let input_detector = SimpleInputSrcDetector::new(vec!["close", "open", "high", "low"]);
         let mut parser = SyntaxParser::new();
         downcast_ctx(parser.context).declare_var_with_index("close", INT_TYPE);
         downcast_ctx(parser.context).declare_var_with_index("open", INT_TYPE);
-        downcast_ctx(parser.context).set_input_options(vec!["close", "open", "high", "low"]);
+        downcast_ctx(parser.context).set_input_detector(&input_detector);
+        // downcast_ctx(parser.context).set_input_options(vec!["close", "open", "high", "low"]);
         let mut varname = rvarname("close");
         assert_eq!(
             parser.parse_varname(&mut varname),

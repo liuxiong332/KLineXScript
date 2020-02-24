@@ -86,8 +86,44 @@ impl TradeTimeSpan {
         TradeTimeSpan { start, end }
     }
 
+    // parse string like 9:10
+    pub fn parse_str(start: &str, end: &str) -> TradeTimeSpan {
+        let h1: i32;
+        let m1: i32;
+        let h2: i32;
+        let m2: i32;
+        let re = Regex::new(r"(\d+):(\d+)").unwrap();
+        match (re.captures(start), re.captures(end)) {
+            (Some(caps), Some(caps2)) => {
+                h1 = i32::from_str(&caps[1]).unwrap();
+                m1 = i32::from_str(&caps[2]).unwrap();
+                h2 = i32::from_str(&caps2[1]).unwrap();
+                m2 = i32::from_str(&caps2[2]).unwrap();
+            }
+            _ => unreachable!(),
+        }
+        TradeTimeSpan::parse(h1, m1, h2, m2)
+    }
+
     pub fn is_between(&self, time: &DayTime) -> bool {
         time >= &self.start && time < &self.end
+    }
+
+    pub fn is_in(&self, millseconds: i64, tz: &Tz) -> bool {
+        let dt = tz.timestamp(millseconds / 1000, 0);
+        let time = dt.time();
+        let mut day_time = DayTime::new(time.hour() as i32, time.minute() as i32);
+
+        let mut between = day_time >= self.start && day_time < self.end;
+
+        if !between && self.start.is_negative() {
+            let pre_day = day_time.sub_hour(24);
+            if pre_day >= self.start && pre_day < self.end {
+                // day_time = pre_day; // This day is belongs to next day.
+                between = true;
+            }
+        }
+        between
     }
 }
 
@@ -206,6 +242,24 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn trade_span_test() {
+        assert_eq!(
+            TradeTimeSpan::parse_str("9:10", "12:00"),
+            TradeTimeSpan {
+                start: DayTime::new(9, 10),
+                end: DayTime::new(12, 0),
+            }
+        );
+
+        let tz = Tz::UTC;
+        let ts = tz.ymd(2020, 2, 14).and_hms(9, 48, 0).timestamp() * 1000;
+        assert_eq!(
+            TradeTimeSpan::parse_str("9:10", "12:00").is_in(ts, &tz),
+            true
+        );
+    }
 
     #[test]
     fn session_test() {

@@ -11,6 +11,7 @@ pub mod security;
 pub mod study;
 pub mod syminfo;
 pub mod time;
+pub mod barstate;
 pub mod timestamp;
 
 use crate::ast::syntax_type::SyntaxType;
@@ -61,6 +62,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         color::declare_var(),
         study::declare_var(),
         syminfo::declare_var(),
+        barstate::declare_var(),
     ];
     debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());

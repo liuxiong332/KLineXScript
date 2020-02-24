@@ -99,6 +99,7 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
     fn run_data(
         &mut self,
         data: &Vec<(&'static str, AnySeries)>,
+        start: i64,
         len: usize,
     ) -> Result<(), PineRuntimeError> {
         let bar_index = self.input_names.iter().position(|(s, _)| *s == "bar_index");
@@ -137,7 +138,7 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
                 let var_index = VarIndex::new(self.input_index + bar_index as i32, 0);
                 let series = self.context.move_var(var_index).unwrap();
                 let mut index_s: RefData<Series<Int>> = Series::implicity_from(series).unwrap();
-                index_s.update(Some(i as i64 + 1));
+                index_s.update(Some(start + i as i64));
                 self.context.update_var(var_index, index_s.into_pf());
             }
 
@@ -168,7 +169,7 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
         if let Some(syminfo) = syminfo {
             self.context.set_syminfo(syminfo);
         }
-        self.run_data(data, len)
+        self.run_data(data, 0, len)
     }
 
     pub fn update(
@@ -184,7 +185,7 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
         self.context
             .update_data_range((Some(start), Some(start + len as i32)));
         self.context.roll_back()?;
-        self.run_data(data, len)
+        self.run_data(data, start as i64, len)
     }
 
     pub fn update_from(
@@ -203,7 +204,7 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
         for _ in 0..roll_count {
             self.context.roll_back()?;
         }
-        self.run_data(data, len)
+        self.run_data(data, from as i64, len)
     }
 
     pub fn get_context(&mut self) -> &mut Context<'a, 'b, 'c> {

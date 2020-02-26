@@ -186,7 +186,7 @@ pub fn run_with_data(
     let src_strs: Vec<String> = srcs.into_serde().unwrap();
     debug_assert_eq!(data.len(), src_strs.len() * count);
     let input_data = transfer_input_data(src_strs, count, data);
-    match runner_ins.run_with_data(input_data) {
+    match runner_ins.run_with_data(input_data, None) {
         Ok(output) => Ok(output_data_to_slice(output)),
         Err(err) => Err(JsValue::from_serde(&err).unwrap()),
     }
@@ -209,7 +209,7 @@ pub fn run(
 
     let input: Vec<Option<InputVal>> = input_val.into_serde().unwrap();
     let input_data = transfer_input_data(src_strs, count, data);
-    match runner_ins.run(input, input_data) {
+    match runner_ins.run(input, input_data, None) {
         Ok(output) => Ok(output_data_to_slice(output)),
         Err(err) => Err(JsValue::from_serde(&err).unwrap()),
     }

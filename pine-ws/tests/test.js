@@ -18,7 +18,7 @@ console.log("io info:", JSON.stringify(ioInfo));
 function getOutputData(dataPtr) {
     let outputData = [];
     let byteOffset = 0;
-    for (let i = 0; i < io_info.outputs.length; i += 1) {
+    for (let i = 0; i < ioInfo.outputs.length; i += 1) {
         const cells = new Int32Array(memory.buffer, dataPtr + byteOffset, 2);
         byteOffset += 4 * 2;
         if (cells[0] === 0 && cells[1] === 0) {

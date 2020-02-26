@@ -57,7 +57,7 @@ static ERROR_MAP: &[(&'static str, &'static str)] = &[
     ("NotValidParam", "The parameters are not valid."),
     ("NotSupportOperator", "The operation is not supported now."),
     ("NotImplement", "The operation has not implemented now."),
-    ("InvalidTypeCast", "The type cast is not valid."),
+    // ("InvalidTypeCast", "The type cast is not valid."),
     ("InvalidNADeclarer", "The variable cann't be declared with na."),
     ("UnrecongnizedSession", "Unrecognized session string."),
     ("InvalidParameters", "The parameters are not valid."),
@@ -109,7 +109,7 @@ impl ErrorFormater {
             PineErrorKind::BlockNoStmts => String::from(self.error_map["BlockNoStmts"]),
             PineErrorKind::VarNotDeclare => String::from(self.error_map["VarNotDeclare"]),
             PineErrorKind::InvalidTypeCast { origin, cast } => str_replace(
-                self.error_map["CannotInferType"],
+                self.error_map["InvalidTypeCast"],
                 vec![origin.to_string(), cast.to_string()],
             ),
             PineErrorKind::VarNotCallable => String::from(self.error_map["VarNotCallable"]),
@@ -150,7 +150,7 @@ impl ErrorFormater {
             RuntimeErr::NotValidParam => String::from(self.error_map["NotValidParam"]),
             RuntimeErr::NotSupportOperator => String::from(self.error_map["NotSupportOperator"]),
             RuntimeErr::NotImplement(_) => String::from(self.error_map["NotImplement"]),
-            RuntimeErr::InvalidTypeCast => String::from(self.error_map["InvalidTypeCast"]),
+            // RuntimeErr::InvalidTypeCast => String::from(self.error_map["InvalidTypeCast"]),
             RuntimeErr::InvalidNADeclarer => String::from(self.error_map["InvalidNADeclarer"]),
             RuntimeErr::UnrecongnizedSession => {
                 String::from(self.error_map["UnrecongnizedSession"])

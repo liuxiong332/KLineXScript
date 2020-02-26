@@ -3,7 +3,6 @@ pub enum RuntimeErr {
     NotValidParam,
     NotSupportOperator,
     NotImplement(String),
-    InvalidTypeCast,
     InvalidNADeclarer,
     MissingParameters(String),     // The parameter is required.
     InvalidParameters(String),     // The parameters are invalid.

@@ -1,7 +1,7 @@
 extern crate pine;
 use pine::ast::syntax_type::{SimpleSyntaxType, SyntaxType};
 use pine::libs::print;
-use pine::runtime::data_src::{Callback, DataSrc};
+use pine::runtime::data_src::{Callback, DataSrc, NoneCallback};
 use pine::runtime::AnySeries;
 
 const MA_SCRIPT: &str = "
@@ -234,4 +234,14 @@ fn macd_test() {
     )];
 
     assert!(parser.run_with_data(data, None).is_ok());
+}
+
+#[test]
+fn assign_test() {
+    let lib_info = pine::LibInfo::new(
+        vec![print::declare_var()],
+        vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+    assert!(parser.parse_src("m = close\nm := true").is_err());
 }

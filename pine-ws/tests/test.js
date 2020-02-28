@@ -18,13 +18,17 @@ console.log("io info:", JSON.stringify(ioInfo));
 function getOutputData(dataPtr) {
     let outputData = [];
     let byteOffset = 0;
+    // Get the length of data
+    let indexRange = new Int32Array(memory.buffer, dataPtr + byteOffset, 2);
+    byteOffset += 4 * 2;
+
     for (let i = 0; i < ioInfo.outputs.length; i += 1) {
-        const cells = new Int32Array(memory.buffer, dataPtr + byteOffset, 2);
-        byteOffset += 4 * 2;
-        if (cells[0] === 0 && cells[1] === 0) {
+        const countPtr = new Float64Array(memory.buffer, dataPtr + byteOffset, 1);
+        let count = Number(countPtr[0]);
+        byteOffset += 8;
+        if (count === 0) {
             outputData.push([]);
         } else {
-            let count = cells[1] - cells[0];
             outputData.push(new Float64Array(memory.buffer, dataPtr + byteOffset, count));
             byteOffset += 8 * count;
         }

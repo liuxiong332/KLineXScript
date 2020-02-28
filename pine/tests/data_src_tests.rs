@@ -1,5 +1,6 @@
 extern crate pine;
 use pine::ast::syntax_type::{SimpleSyntaxType, SyntaxType};
+use pine::libs::plot;
 use pine::libs::print;
 use pine::runtime::data_src::{Callback, DataSrc, NoneCallback};
 use pine::runtime::AnySeries;
@@ -244,4 +245,14 @@ fn assign_test() {
     );
     let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
     assert!(parser.parse_src("m = close\nm := true").is_err());
+}
+#[test]
+fn plot_only_test() {
+    let lib_info = pine::LibInfo::new(
+        vec![plot::declare_var()],
+        vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+    println!("{:?}", parser.parse_src("plot(close)"));
+    assert!(parser.parse_src("plot(close)").is_ok());
 }

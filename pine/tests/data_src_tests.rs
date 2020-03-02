@@ -29,7 +29,7 @@ fn datasrc_test() {
         vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
     );
     let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&MyCallback));
-    parser.parse_src(MA_SCRIPT).unwrap();
+    parser.parse_src(String::from(MA_SCRIPT)).unwrap();
     let data = vec![(
         "close",
         AnySeries::from_float_vec(vec![
@@ -65,7 +65,7 @@ fn func_call_test() {
         vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
     );
     let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&MyCallback));
-    parser.parse_src(FUNC_SCRIPT).unwrap();
+    parser.parse_src(String::from(FUNC_SCRIPT)).unwrap();
     let data = vec![(
         "close",
         AnySeries::from_float_vec(vec![
@@ -106,7 +106,7 @@ fn if_else_test() {
         ],
     );
     let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&MyCallback));
-    parser.parse_src(IF_ELSE_SCRIPT).unwrap();
+    parser.parse_src(String::from(IF_ELSE_SCRIPT)).unwrap();
     let data = vec![
         (
             "close",
@@ -155,7 +155,7 @@ fn for_range_test() {
         vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
     );
     let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&MyCallback));
-    parser.parse_src(FOR_RANGE_SCRIPT).unwrap();
+    parser.parse_src(String::from(FOR_RANGE_SCRIPT)).unwrap();
     let data = vec![(
         "close",
         AnySeries::from_float_vec(vec![Some(1f64), Some(3f64)]),
@@ -186,7 +186,7 @@ fn ema_test() {
         vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
     );
     let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&MyCallback));
-    parser.parse_src(EMA_SCRIPT).unwrap();
+    parser.parse_src(String::from(EMA_SCRIPT)).unwrap();
     let data = vec![(
         "close",
         AnySeries::from_float_vec(vec![Some(2f64), Some(4f64)]),
@@ -228,7 +228,7 @@ fn macd_test() {
         vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
     );
     let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&MyCallback));
-    parser.parse_src(MACD_SCRIPT).unwrap();
+    parser.parse_src(String::from(MACD_SCRIPT)).unwrap();
     let data = vec![(
         "close",
         AnySeries::from_float_vec(vec![Some(200f64), Some(400f64)]),
@@ -244,7 +244,9 @@ fn assign_test() {
         vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
     );
     let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
-    assert!(parser.parse_src("m = close\nm := true").is_err());
+    assert!(parser
+        .parse_src(String::from("m = close\nm := true"))
+        .is_err());
 }
 #[test]
 fn plot_only_test() {
@@ -253,6 +255,6 @@ fn plot_only_test() {
         vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
     );
     let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
-    println!("{:?}", parser.parse_src("plot(close)"));
-    assert!(parser.parse_src("plot(close)").is_ok());
+    println!("{:?}", parser.parse_src(String::from("plot(close)")));
+    assert!(parser.parse_src(String::from("plot(close)")).is_ok());
 }

@@ -214,6 +214,7 @@ impl<'a, 'b, 'c> PineRunner<'a, 'b, 'c> {
 }
 
 pub struct PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
+    source: String,
     lib_info: LibInfo<'li>,
     blk: Block<'pa>,
     syntax_parser: Option<SyntaxParser<'pa>>,
@@ -242,6 +243,7 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
             ],
         );
         PineScript {
+            source: String::from(""),
             lib_info,
             blk: Block::new_no_input(vec![], None),
             syntax_parser: None,
@@ -258,6 +260,7 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
         callback: Option<&'ra dyn Callback>,
     ) -> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
         PineScript {
+            source: String::from(""),
             lib_info,
             blk: Block::new_no_input(vec![], None),
             syntax_parser: None,
@@ -269,7 +272,7 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
         }
     }
 
-    pub fn parse_src<'s, 'a, 'pb>(&'s mut self, src: &'a str) -> Result<(), Vec<PineFormatError>>
+    pub fn parse_src<'s, 'a, 'pb>(&'s mut self, src: String) -> Result<(), Vec<PineFormatError>>
     where
         's: 'pb,
         'li: 'pa,
@@ -277,6 +280,8 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
     {
         let mut parser: PineParser<'pa, 'pb>;
         unsafe {
+            self.source = src;
+            let src: &'a str = mem::transmute::<_, &'a str>(self.source.as_str());
             let lib_ref = mem::transmute::<&LibInfo<'li>, &'pb LibInfo<'pa>>(&self.lib_info);
             let src_ref = mem::transmute::<&'a str, &'pa str>(src);
             parser = PineParser::new(src_ref, lib_ref);
@@ -627,7 +632,9 @@ mod tests {
         );
         let mut parser = PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
         parser
-            .parse_src("m = input(1, 'hello', 'int')\nplot(close + m)")
+            .parse_src(String::from(
+                "m = input(1, 'hello', 'int')\nplot(close + m)",
+            ))
             .unwrap();
         assert_eq!(
             parser.gen_io_info(),

@@ -60,7 +60,7 @@ pub fn new_runner() -> ExportPineRunner {
 }
 
 #[wasm_bindgen]
-pub fn parse_src(runner: &mut ExportPineRunner, src: &str) -> Result<(), JsValue> {
+pub fn parse_src(runner: &mut ExportPineRunner, src: String) -> Result<(), JsValue> {
     let runner_ins = unsafe {
         let script = transmute::<*mut (), *mut PineScript>(runner.script);
         script.as_mut().unwrap()

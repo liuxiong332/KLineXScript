@@ -17,7 +17,10 @@ fn runner_test() {
     // assert_eq!(1 + 1, 2);
     let mut runner = new_runner();
     assert_eq!(
-        parse_src(&mut runner, "m = input(1, 'hello', 'int')\nplot(close + m)"),
+        parse_src(
+            &mut runner,
+            String::from("m = input(1, 'hello', 'int')\nplot(close + m)")
+        ),
         Ok(())
     );
     assert!(gen_io_info(&mut runner).is_ok());
@@ -59,4 +62,13 @@ fn runner_test() {
         input_data.clone().into_boxed_slice().as_mut()
     )
     .is_ok());
+}
+
+#[wasm_bindgen_test]
+fn runner_simple_test() {
+    init_panic_hook();
+    // assert_eq!(1 + 1, 2);
+    let mut runner = new_runner();
+    assert_eq!(parse_src(&mut runner, String::from("plot(close)")), Ok(()));
+    assert!(gen_io_info(&mut runner).is_ok());
 }

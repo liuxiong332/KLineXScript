@@ -2,11 +2,10 @@ use super::VarResult;
 use crate::ast::stat_expr_types::VarIndex;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SyntaxType};
 use crate::helper::{move_element, pine_ref_to_i64, pine_ref_to_string, Resolution, Session};
-use crate::runtime::{downcast_ctx, Ctx, PineRuntimeError};
+use crate::runtime::{downcast_ctx, Ctx};
 use crate::types::{
     Callable, CallableEvaluate, EvaluateVal, Float, Int, PineRef, RuntimeErr, Series, SeriesCall,
 };
-use chrono::TimeZone;
 use chrono_tz::Tz;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -27,7 +26,7 @@ impl<'a> EvaluateVal<'a> for TimeVal {
         "time"
     }
 
-    fn run(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
+    fn call(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
         if self.time_index.is_none() {
             let i = downcast_ctx(ctx).get_varname_index("_time").unwrap();
             self.time_index = Some(VarIndex::new(*i, 0));
@@ -147,6 +146,7 @@ mod tests {
     use crate::ast::syntax_type::SimpleSyntaxType;
     use crate::runtime::{AnySeries, NoneCallback, SymbolInfo, VarOperate};
     use crate::{LibInfo, PineParser, PineRunner};
+    use chrono::TimeZone;
 
     #[test]
     fn time_test() {

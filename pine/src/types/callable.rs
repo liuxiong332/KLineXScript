@@ -1,6 +1,6 @@
 use super::{
     Bool, Category, ComplexType, DataType, Float, Int, PineFrom, PineRef, PineStaticType, PineType,
-    RefData, RuntimeErr, SecondType, NA,
+    RefData, Runnable, RuntimeErr, SecondType, NA,
 };
 use crate::ast::stat_expr_types::VarIndex;
 use crate::ast::syntax_type::FunctionType;
@@ -280,8 +280,10 @@ impl<'a> Callable<'a> {
             Ok(PineRef::Box(Box::new(NA)))
         }
     }
+}
 
-    pub fn back(&mut self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
+impl<'a> Runnable<'a> for Callable<'a> {
+    fn back(&mut self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
         if let Some(ref mut caller) = self.caller {
             caller.back(context)
         } else {
@@ -289,7 +291,7 @@ impl<'a> Callable<'a> {
         }
     }
 
-    pub fn run(&mut self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
+    fn run(&mut self, context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
         if let Some(ref mut caller) = self.caller {
             caller.run(context)
         } else {

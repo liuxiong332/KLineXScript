@@ -9,6 +9,7 @@ pub mod object;
 pub mod pine_ref;
 pub mod primitive;
 pub mod ref_data;
+pub mod runnable;
 pub mod series;
 pub mod traits;
 
@@ -22,5 +23,6 @@ pub use object::*;
 pub use pine_ref::*;
 pub use primitive::*;
 pub use ref_data::*;
+pub use runnable::*;
 pub use series::*;
 pub use traits::*;

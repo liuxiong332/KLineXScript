@@ -8,8 +8,9 @@ use crate::ast::stat_expr_types::VarIndex;
 use crate::runtime::AnySeries;
 use crate::types::{
     Bool, Callable, Color, DataType, Float, Int, PineFrom, PineRef, PineStaticType, PineType,
-    RefData, RuntimeErr, SecondType, Series, NA,
+    RefData, Runnable, RuntimeErr, SecondType, Series, NA,
 };
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Debug;
@@ -38,7 +39,7 @@ pub trait Ctx<'a>: VarOperate<'a> {
 
     fn get_varname_index(&self, name: &str) -> Option<&i32>;
 
-    fn create_callable(&mut self, call: RefData<Callable<'a>>);
+    fn create_runnable(&mut self, call: Rc<RefCell<dyn Runnable<'a> + 'a>>);
 
     fn move_fun_instance(&mut self, index: i32) -> Option<RefData<Callable<'a>>>;
 
@@ -94,7 +95,7 @@ pub struct Context<'a, 'b, 'c> {
     // function instances
     fun_instances: Vec<Option<RefData<Callable<'a>>>>,
 
-    callables: Vec<RefData<Callable<'a>>>,
+    runnables: Vec<Rc<RefCell<dyn Runnable<'a> + 'a>>>,
     // declare_vars: HashSet<&'a str>,
 
     // The input value from user
@@ -192,7 +193,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             vars: Vec::new(),
             varname_indexs: HashMap::new(),
             fun_instances: Vec::new(),
-            callables: vec![],
+            runnables: vec![],
             // declare_vars: HashSet::new(),
             callback: None,
             inputs: vec![],
@@ -217,7 +218,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             vars: Vec::new(),
             varname_indexs: HashMap::new(),
             fun_instances: Vec::new(),
-            callables: vec![],
+            runnables: vec![],
             // declare_vars: HashSet::new(),
             callback: Some(callback),
             inputs: vec![],
@@ -511,22 +512,22 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             };
             self.update_var(index, ret_val);
         }
-        let mut callables = mem::replace(&mut self.callables, vec![]);
+        let mut callables = mem::replace(&mut self.runnables, vec![]);
         for callable in callables.iter_mut() {
-            if let Err(code) = callable.back(self) {
+            if let Err(code) = callable.borrow_mut().back(self) {
                 return Err(PineRuntimeError::new_no_range(code));
             }
         }
-        mem::replace(&mut self.callables, callables);
+        mem::replace(&mut self.runnables, callables);
         Ok(())
     }
 
     pub fn run_callbacks(&mut self) -> Result<(), RuntimeErr> {
-        let mut callables = mem::replace(&mut self.callables, vec![]);
+        let mut callables = mem::replace(&mut self.runnables, vec![]);
         for callable in callables.iter_mut() {
-            callable.run(self)?;
+            callable.borrow_mut().run(self)?;
         }
-        mem::replace(&mut self.callables, callables);
+        mem::replace(&mut self.runnables, callables);
         Ok(())
     }
 
@@ -617,11 +618,11 @@ impl<'a, 'b, 'c> Ctx<'a> for Context<'a, 'b, 'c> {
         self.varname_indexs.get(name)
     }
 
-    fn create_callable(&mut self, call: RefData<Callable<'a>>) {
+    fn create_runnable(&mut self, call: Rc<RefCell<dyn Runnable<'a> + 'a>>) {
         if let Some(ref mut v) = self.parent {
-            v.create_callable(call);
+            v.create_runnable(call);
         } else if !self.first_commit {
-            self.callables.push(call);
+            self.runnables.push(call);
         }
     }
 
@@ -747,29 +748,29 @@ mod tests {
     fn callable_context_test() {
         // Parent context create callable
         let mut context1 = Context::new(None, ContextType::Normal);
-        context1.create_callable(RefData::new_rc(Callable::new(None, None)));
-        assert_eq!(context1.callables.len(), 1);
+        context1.create_runnable(RefData::new_rc(Callable::new(None, None)).into_rc());
+        assert_eq!(context1.runnables.len(), 1);
 
         {
             // Child context create callable
             let mut context2 = Context::new(Some(&mut context1), ContextType::Normal);
-            context2.create_callable(RefData::new_rc(Callable::new(None, None)));
+            context2.create_runnable(RefData::new_rc(Callable::new(None, None)).into_rc());
         }
-        assert_eq!(context1.callables.len(), 2);
+        assert_eq!(context1.runnables.len(), 2);
 
         context1.commit();
 
         // After commit, parent context and child context should not add callable by create callable
-        context1.create_callable(RefData::new_rc(Callable::new(None, None)));
+        context1.create_runnable(RefData::new_rc(Callable::new(None, None)).into_rc());
         {
             let mut context2 = Context::new(Some(&mut context1), ContextType::Normal);
-            context2.create_callable(RefData::new_rc(Callable::new(None, None)));
+            context2.create_runnable(RefData::new_rc(Callable::new(None, None)).into_rc());
         }
-        assert_eq!(context1.callables.len(), 2);
+        assert_eq!(context1.runnables.len(), 2);
 
         assert_eq!(context1.roll_back(), Ok(()));
         assert_eq!(context1.run_callbacks(), Ok(()));
-        assert_eq!(context1.callables.len(), 2);
+        assert_eq!(context1.runnables.len(), 2);
     }
 
     #[test]

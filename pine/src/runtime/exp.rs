@@ -49,20 +49,28 @@ impl<'a> RVRunner<'a> for Exp<'a> {
         match self {
             Exp::VarName(name) => match context.move_var(name.var_index) {
                 None => Err(PineRuntimeError::new(RuntimeErr::VarNotFound, self.range())),
-                Some(mut s) => {
+                Some(s) => {
                     let ret = match s.get_type() {
                         (FirstType::Evaluate, SecondType::Simple) => {
-                            downcast_pf_mut::<Evaluate>(&mut s).unwrap().run(context)
+                            let mut eval_val = downcast_pf::<Evaluate>(s.clone()).unwrap();
+                            context.create_runnable(RefData::clone(&eval_val).into_rc());
+                            // let eval_val = downcast_pf_mut::<Evaluate>(&mut s).unwrap();
+                            eval_val.call(context)
                         }
                         (FirstType::CallableEvaluate, SecondType::Simple) => {
-                            downcast_pf_mut::<CallableEvaluate>(&mut s)
-                                .unwrap()
-                                .run(context)
+                            let mut eval_val = downcast_pf::<CallableEvaluate>(s.clone()).unwrap();
+
+                            context.create_runnable(RefData::clone(&eval_val).into_rc());
+                            // downcast_pf_mut::<CallableEvaluate>(&mut s).unwrap()
+                            eval_val.call(context)
                         }
                         _ => Ok(s.copy()),
                     };
                     context.update_var(name.var_index, s);
-                    ret
+                    match ret {
+                        Ok(val) => Ok(val),
+                        Err(e) => Err(PineRuntimeError::new(e, self.range())),
+                    }
                 }
             },
             Exp::Tuple(tuple) => {
@@ -82,15 +90,21 @@ impl<'a> RunnerForFunc<'a> for Exp<'a> {
         match self {
             Exp::VarName(name) => match context.move_var(name.var_index) {
                 None => Err(PineRuntimeError::new(RuntimeErr::VarNotFound, self.range())),
-                Some(mut s) => {
+                Some(s) => {
                     let ret = match s.get_type() {
                         (FirstType::Evaluate, SecondType::Simple) => {
-                            downcast_pf_mut::<Evaluate>(&mut s).unwrap().run(context)
+                            let mut eval_val = downcast_pf::<Evaluate>(s.clone()).unwrap();
+                            context.create_runnable(RefData::clone(&eval_val).into_rc());
+                            // let eval_val = downcast_pf_mut::<Evaluate>(&mut s).unwrap();
+                            eval_val.call(context)
                         }
                         _ => Ok(s.copy()),
                     };
                     context.update_var(name.var_index, s);
-                    ret
+                    match ret {
+                        Ok(val) => Ok(val),
+                        Err(e) => Err(PineRuntimeError::new(e, self.range())),
+                    }
                 }
             },
             _ => self.rv_run(context),

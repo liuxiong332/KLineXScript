@@ -1,7 +1,8 @@
 use super::evaluate::EvaluateVal;
-use crate::runtime::context::{Ctx, PineRuntimeError};
+use super::Runnable;
+use crate::runtime::context::Ctx;
 use crate::types::traits::{Category, ComplexType, DataType, PineStaticType, PineType, SecondType};
-use crate::types::{Callable, PineRef};
+use crate::types::{Callable, PineRef, RuntimeErr};
 
 #[derive(Debug)]
 pub struct CallableEvaluate<'a> {
@@ -48,12 +49,31 @@ impl<'a> CallableEvaluate<'a> {
         CallableEvaluate { val, create_func }
     }
 
-    pub fn run(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
-        self.val.run(ctx)
+    pub fn call(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
+        self.val.call(ctx)
     }
 
     pub fn create(&self) -> Callable<'a> {
         (self.create_func)()
+    }
+}
+
+impl<'a> Runnable<'a> for CallableEvaluate<'a> {
+    fn back(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
+        self.val.back(ctx)
+    }
+
+    fn run(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
+        self.val.run(ctx)
+    }
+}
+
+impl<'a> Clone for CallableEvaluate<'a> {
+    fn clone(&self) -> CallableEvaluate<'a> {
+        CallableEvaluate {
+            val: self.val.copy(),
+            create_func: self.create_func,
+        }
     }
 }
 
@@ -74,11 +94,11 @@ mod tests {
             "test"
         }
 
-        fn run(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
+        fn call(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
             let close_index = VarIndex::new(*ctx.get_varname_index("close").unwrap(), 0);
             match ctx.get_var(close_index) {
                 Some(close_val) => Ok(close_val.copy()),
-                _ => Err(PineRuntimeError::new_no_range(RuntimeErr::VarNotFound)),
+                _ => Err(RuntimeErr::VarNotFound),
             }
         }
 
@@ -109,7 +129,7 @@ mod tests {
             (DataType::CallableEvaluate, SecondType::Simple)
         );
         assert_eq!(
-            evaluate.run(&mut context),
+            evaluate.call(&mut context),
             Ok(PineRef::new_rc(Series::from(Some(1f64))))
         );
     }

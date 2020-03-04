@@ -1,12 +1,21 @@
-use crate::runtime::context::{Ctx, PineRuntimeError};
+use super::Runnable;
+use crate::runtime::context::Ctx;
 use crate::types::traits::{Category, ComplexType, DataType, PineStaticType, PineType, SecondType};
-use crate::types::PineRef;
+use crate::types::{PineRef, RuntimeErr};
 use std::fmt;
 
 pub trait EvaluateVal<'a> {
     fn custom_name(&self) -> &str;
 
-    fn run(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError>;
+    fn call(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr>;
+
+    fn back(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
+        Ok(())
+    }
+
+    fn run(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
+        Ok(())
+    }
 
     fn copy(&self) -> Box<dyn EvaluateVal<'a>>;
 }
@@ -46,7 +55,17 @@ impl<'a> Evaluate<'a> {
         Evaluate { val }
     }
 
-    pub fn run(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
+    pub fn call(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
+        self.val.call(ctx)
+    }
+}
+
+impl<'a> Runnable<'a> for Evaluate<'a> {
+    fn back(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
+        self.val.back(ctx)
+    }
+
+    fn run(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
         self.val.run(ctx)
     }
 }
@@ -87,6 +106,14 @@ impl<'a> fmt::Debug for Evaluate<'a> {
     }
 }
 
+impl<'a> Clone for Evaluate<'a> {
+    fn clone(&self) -> Evaluate<'a> {
+        Evaluate {
+            val: self.val.copy(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -115,7 +142,7 @@ mod tests {
             "test"
         }
 
-        fn run(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
+        fn call(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
             self.close_index = VarIndex::new(*ctx.get_varname_index("close").unwrap(), 0);
             self.open_index = VarIndex::new(*ctx.get_varname_index("open").unwrap(), 0);
             match (ctx.get_var(self.close_index), ctx.get_var(self.open_index)) {
@@ -126,7 +153,7 @@ mod tests {
                         close.get_current().add(open.get_current()),
                     )))
                 }
-                _ => Err(PineRuntimeError::new_no_range(RuntimeErr::VarNotFound)),
+                _ => Err(RuntimeErr::VarNotFound),
             }
         }
 
@@ -146,7 +173,7 @@ mod tests {
         context.create_var(1, PineRef::new(Series::from(Some(2f64))));
 
         assert_eq!(
-            evaluate.run(&mut context),
+            evaluate.call(&mut context),
             Ok(PineRef::new_rc(Series::from(Some(3f64))))
         );
     }

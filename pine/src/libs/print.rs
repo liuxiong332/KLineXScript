@@ -146,7 +146,7 @@ mod tests {
     use super::*;
     use crate::runtime::context::Context;
     use crate::runtime::data_src::Callback;
-    use crate::types::{downcast_pf, PineRef};
+    use crate::types::{downcast_pf, PineRef, Runnable};
 
     fn new_func_type<'a>() -> FunctionType<'a> {
         FunctionType::new((

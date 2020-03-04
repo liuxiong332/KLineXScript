@@ -568,7 +568,7 @@ impl<'a> Runner<'a> for FunctionCall<'a> {
                 let func_type = self.func_type.as_ref().unwrap().clone();
                 let result = callable.call(context, pos_args, dict_args, func_type);
                 // ctx_ref.set_is_run(true);
-                context.create_callable(callable);
+                context.create_runnable(callable.into_rc());
                 result
             }
             (FirstType::CallableFactory, SecondType::Simple)
@@ -604,7 +604,7 @@ impl<'a> Runner<'a> for FunctionCall<'a> {
                 let result = callable.call(context, pos_args, dict_args, func_type);
 
                 context.create_fun_instance(self.ctxid, RefData::clone(&callable));
-                context.create_callable(callable);
+                context.create_runnable(callable.into_rc());
                 result
             }
             (FirstType::Function, SecondType::Simple) => {

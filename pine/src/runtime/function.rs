@@ -68,7 +68,7 @@ impl<'a> Function<'a> {
         // let mut new_context = Context::new(Some(context), ContextType::FuncDefBlock);
         for (i, v) in pos_args.into_iter().enumerate() {
             // context.create_var(k, v);
-            if let Err(err) = process_assign_val(v, downcast_ctx(context), i as i32) {
+            if let Err(err) = process_assign_val(v, downcast_ctx(context), i as i32, None) {
                 return Err(PineRuntimeError::new(err, range));
             }
         }

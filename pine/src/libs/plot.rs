@@ -20,11 +20,6 @@ fn plot_series<'a>(
     _context: &mut dyn Ctx<'a>,
 ) -> Result<Vec<Option<f64>>, RuntimeErr> {
     let mut items: RefData<Series<Float>> = Series::implicity_from(item_val).unwrap();
-    // let s: Vec<Option<f64>> = items.get_history().iter().cloned().collect();
-    // context.get_callback().unwrap().plot(s);
-    // downcast_ctx(context).push_output_data()
-
-    // Move out the series history
     Ok(items.move_history())
 }
 
@@ -32,13 +27,10 @@ fn plot_val<'a>(
     item_val: PineRef<'a>,
     context: &mut dyn Ctx<'a>,
 ) -> Result<Vec<Option<f64>>, RuntimeErr> {
-    match item_val.get_type() {
-        (DataType::Float, SecondType::Series) => plot_series(item_val, context),
-        t => Err(RuntimeErr::NotImplement(format!(
-            "The plot now only support int, float, bool type, but get {:?}",
-            t
-        ))),
-    }
+    // let item_data: RefData<Series<Float>> = Series::implicity_from(item_val).unwrap();
+    // plot_series(item_data.into_pf(), context)
+    let mut items: RefData<Series<Float>> = Series::implicity_from(item_val).unwrap();
+    Ok(items.move_history())
 }
 
 fn pine_plot<'a>(
@@ -155,6 +147,34 @@ mod tests {
     use super::*;
     use crate::runtime::{AnySeries, NoneCallback};
     use crate::{LibInfo, PineParser, PineRunner};
+
+    #[test]
+    fn plot_const_num() {
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+        );
+        let src = "plot(1000)";
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        runner
+            .run(
+                &vec![(
+                    "close",
+                    AnySeries::from_float_vec(vec![Some(1f64), Some(2f64)]),
+                )],
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            runner.get_context().move_output_data(),
+            vec![Some(OutputData::new(vec![vec![
+                Some(1000f64),
+                Some(1000f64)
+            ]])),]
+        );
+    }
 
     #[test]
     fn plot_test() {

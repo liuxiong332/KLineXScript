@@ -118,8 +118,14 @@ impl<'a> SeriesCall<'a> for ParamCollectCall<'a> {
         // self.params.set(map);
         for (i, v) in pmap.into_iter().enumerate() {
             if let Some(v) = v {
+                let syntax_type = &func_type.signature.0[i].1;
                 // Merge all of the series variable into the exists series variable
-                process_assign_val(v, &mut *self.params.borrow_mut(), i as i32)?;
+                process_assign_val(
+                    v,
+                    &mut *self.params.borrow_mut(),
+                    i as i32,
+                    Some(syntax_type),
+                )?;
             }
         }
         // Commit all of the series variables.
@@ -372,7 +378,13 @@ mod tests {
                 PineRef::Box(Box::new(Some(2i64)) as Box<dyn PineType>),
             ],
             vec![],
-            FunctionType::new((vec![("arg1", INT_TYPE), ("arg2", INT_TYPE)], INT_TYPE)),
+            FunctionType::new((
+                vec![
+                    ("arg1", SyntaxType::int_series()),
+                    ("arg2", SyntaxType::int_series()),
+                ],
+                SyntaxType::int_series(),
+            )),
         );
 
         let val = downcast_pf::<Int>(call_res.unwrap()).unwrap();
@@ -408,7 +420,13 @@ mod tests {
         };
 
         let mut context = Context::new(None, ContextType::Normal);
-        let func_type = FunctionType::new((vec![("arg1", INT_TYPE), ("arg2", INT_TYPE)], INT_TYPE));
+        let func_type = FunctionType::new((
+            vec![
+                ("arg1", SyntaxType::int_series()),
+                ("arg2", SyntaxType::int_series()),
+            ],
+            SyntaxType::int_series(),
+        ));
 
         let call_res = callable
             .call(&mut context, gen_params(1, 2), vec![], func_type.clone())
@@ -437,7 +455,10 @@ mod tests {
             assert_eq!(arg1_val.get_history(), &vec![Some(100), Some(10)]);
             Ok(())
         }
-        let func_type = FunctionType::new((vec![("arg1", INT_TYPE)], INT_TYPE));
+        let func_type = FunctionType::new((
+            vec![("arg1", SyntaxType::int_series())],
+            SyntaxType::int_series(),
+        ));
 
         let mut call = ParamCollectCall::new(test_func);
         call.init_param_len(1);

@@ -160,7 +160,7 @@ mod tests {
         struct MyCallback;
         impl Callback for MyCallback {
             fn print(&self, _str: String) {
-                assert_eq!(_str, String::from("2"));
+                assert_eq!(_str, String::from("1,2"));
             }
         }
 

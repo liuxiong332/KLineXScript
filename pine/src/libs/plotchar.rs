@@ -78,7 +78,7 @@ pub fn declare_var<'a>() -> VarResult<'a> {
             ("editable", SyntaxType::bool()),
             ("size", SyntaxType::string()),
             ("show_last", SyntaxType::int()),
-            ("display", SyntaxType::bool()),
+            ("display", SyntaxType::int()),
         ],
         SyntaxType::Void,
     ))]);

@@ -10,6 +10,7 @@ use crate::ast::stat_expr_types::{
     Assignment, Block, DataType, ForRange, FunctionCall, FunctionDef, IfThenElse, Statement,
     VarAssignment, VarIndex,
 };
+use crate::ast::syntax_type::{SimpleSyntaxType, SyntaxType};
 use crate::types::{
     downcast_pf, Bool, Callable, CallableEvaluate, CallableFactory, CallableObject, Color,
     DataType as FirstType, Float, Int, PineFrom, PineRef, PineStaticType, PineType, RefData,
@@ -59,18 +60,77 @@ trait RunnerForName<'a> {
 //     Ok(())
 // }
 
+fn convert_val_for_type<'a>(
+    true_val: PineRef<'a>,
+    syntax_type: &SyntaxType<'a>,
+) -> Result<PineRef<'a>, RuntimeErr> {
+    match syntax_type {
+        SyntaxType::Simple(SimpleSyntaxType::Bool) => {
+            Ok(Bool::implicity_from(true_val).unwrap().into_pf())
+        }
+        SyntaxType::Simple(SimpleSyntaxType::Int) => {
+            Ok(Int::implicity_from(true_val).unwrap().into_pf())
+        }
+        SyntaxType::Simple(SimpleSyntaxType::Float) => {
+            Ok(Float::implicity_from(true_val).unwrap().into_pf())
+        }
+        SyntaxType::Simple(SimpleSyntaxType::Na) => {
+            Ok(NA::implicity_from(true_val).unwrap().into_pf())
+        }
+        SyntaxType::Simple(SimpleSyntaxType::String) => {
+            Ok(String::implicity_from(true_val).unwrap().into_pf())
+        }
+        SyntaxType::Simple(SimpleSyntaxType::Color) => {
+            Ok(Color::implicity_from(true_val).unwrap().into_pf())
+        }
+
+        SyntaxType::Series(SimpleSyntaxType::Bool) => {
+            Ok(Series::<Bool>::implicity_from(true_val).unwrap().into_pf())
+        }
+        SyntaxType::Series(SimpleSyntaxType::Int) => {
+            Ok(Series::<Int>::implicity_from(true_val).unwrap().into_pf())
+        }
+        SyntaxType::Series(SimpleSyntaxType::Float) => {
+            Ok(Series::<Float>::implicity_from(true_val).unwrap().into_pf())
+        }
+        SyntaxType::Series(SimpleSyntaxType::Na) => {
+            Ok(Series::<NA>::implicity_from(true_val).unwrap().into_pf())
+        }
+        SyntaxType::Series(SimpleSyntaxType::Color) => {
+            Ok(Series::<Color>::implicity_from(true_val).unwrap().into_pf())
+        }
+        SyntaxType::Series(SimpleSyntaxType::String) => {
+            Ok(Series::<String>::implicity_from(true_val)
+                .unwrap()
+                .into_pf())
+        }
+        _ => Ok(true_val),
+    }
+    // context.create_var(varid, true_val.clone());
+    // Ok(true_val)
+}
+
 pub fn process_assign_val<'a>(
     true_val: PineRef<'a>,
     context: &mut dyn VarOperate<'a>,
     varid: i32,
+    syntax_type: Option<&SyntaxType<'a>>,
 ) -> Result<PineRef<'a>, RuntimeErr> {
     let index = VarIndex::new(varid, 0);
     match context.move_var(index) {
         None => {
-            // When assignment, must copy new variable.
-            let true_val = true_val.copy_inner();
-            context.create_var(varid, true_val.clone());
-            Ok(true_val)
+            // If the syntax type is specified, then we convert the val to this type
+            if let Some(syntax_type) = syntax_type {
+                let true_val = true_val.copy_inner();
+                let res_val = convert_val_for_type(true_val, syntax_type)?;
+                context.create_var(varid, res_val.clone());
+                Ok(res_val)
+            } else {
+                // When assignment, must copy new variable.
+                let true_val = true_val.copy_inner();
+                context.create_var(varid, true_val.clone());
+                Ok(true_val)
+            }
         }
         Some(current_val) => match (current_val.get_type(), true_val.get_type()) {
             ((FirstType::Bool, SecondType::Series), _)
@@ -223,7 +283,7 @@ impl<'a> RunnerForName<'a> for Assignment<'a> {
             return Err(RuntimeErr::InvalidNADeclarer);
         }
 
-        process_assign_val(true_val, downcast_ctx(context), varid)
+        process_assign_val(true_val, downcast_ctx(context), varid, None)
     }
 }
 

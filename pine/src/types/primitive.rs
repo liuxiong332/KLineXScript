@@ -190,7 +190,7 @@ impl<'a> PineType<'a> for Float {
     }
 }
 
-fn int2float<'a>(i: Int) -> Float {
+pub fn int2float<'a>(i: Int) -> Float {
     match i {
         Some(i) => Some(i as f64),
         None => None,

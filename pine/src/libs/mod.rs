@@ -1,3 +1,5 @@
+pub mod accdist;
+pub mod barstate;
 pub mod color;
 pub mod input;
 pub mod plot;
@@ -11,7 +13,6 @@ pub mod security;
 pub mod study;
 pub mod syminfo;
 pub mod time;
-pub mod barstate;
 pub mod timestamp;
 
 use crate::ast::syntax_type::SyntaxType;

@@ -1,16 +1,12 @@
+use super::VarResult;
+use crate::ast::stat_expr_types::VarIndex;
+use crate::ast::syntax_type::SyntaxType;
+use crate::runtime::Ctx;
 use crate::types::{
-    Bool, Callable, CallableFactory, DataType, Evaluate, EvaluateVal, Float, Int, Object,
-    ParamCollectCall, PineClass, PineFrom, PineRef, PineType, RefData, RuntimeErr, SecondType,
-    Series, NA,
+    downcast_pf_ref, int2float, Arithmetic, Bool, Callable, CallableFactory, DataType, Evaluate,
+    EvaluateVal, Float, Int, Object, ParamCollectCall, PineClass, PineFrom, PineRef, PineType,
+    RefData, RuntimeErr, SecondType, Series, NA,
 };
-
-fn timestamp<'a>(
-    _context: &mut dyn Ctx<'a>,
-    mut param: Vec<Option<PineRef<'a>>>,
-    _func_type: FunctionType<'a>,
-) -> Result<PineRef<'a>, RuntimeErr> {
-    Ok(PineRef::new(NA))
-}
 
 #[derive(Debug, Clone, PartialEq)]
 struct AccDistVal {
@@ -18,18 +14,20 @@ struct AccDistVal {
     low_index: VarIndex,
     high_index: VarIndex,
     volume_index: VarIndex,
+    ad_history: Vec<Float>,
     prev_cmfv: Float,
     is_init: bool,
 }
 
-impl MyVal {
+impl AccDistVal {
     pub fn new() -> AccDistVal {
         AccDistVal {
             close_index: VarIndex::new(0, 0),
             low_index: VarIndex::new(0, 0),
             high_index: VarIndex::new(0, 0),
             volume_index: VarIndex::new(0, 0),
-            prev_cmfv: None,
+            ad_history: vec![],
+            prev_cmfv: Some(0f64),
             is_init: false,
         }
     }
@@ -37,17 +35,21 @@ impl MyVal {
 
 // ref to https://www.investopedia.com/terms/a/accumulationdistribution.asp
 // CMFV=Current money flow volume = ((Pc - Pl) - (Ph - Pc)) / (Ph - Pl) * V
-impl<'a> EvaluateVal<'a> for MyVal {
+impl<'a> EvaluateVal<'a> for AccDistVal {
     fn custom_name(&self) -> &str {
         "accdist"
     }
 
-    fn run(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
-        if self.is_init {
+    fn call(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
+        if !self.is_init {
             self.close_index = VarIndex::new(*ctx.get_varname_index("close").unwrap(), 0);
             self.low_index = VarIndex::new(*ctx.get_varname_index("low").unwrap(), 0);
             self.high_index = VarIndex::new(*ctx.get_varname_index("high").unwrap(), 0);
             self.volume_index = VarIndex::new(*ctx.get_varname_index("volume").unwrap(), 0);
+            println!(
+                "{:?} {:?} {:?} {:?}",
+                self.close_index, self.low_index, self.high_index, self.volume_index
+            );
             self.is_init = true;
         }
         match (
@@ -57,17 +59,38 @@ impl<'a> EvaluateVal<'a> for MyVal {
             ctx.get_var(self.volume_index),
         ) {
             (Some(close_val), Some(low_val), Some(high_val), Some(volume_val)) => {
-                let close = downcast_pf_ref::<Series<Float>>(close_val).unwrap();
-                let low = downcast_pf_ref::<Series<Float>>(low_val).unwrap();
-                let high = downcast_pf_ref::<Series<Float>>(high_val).unwrap();
-                let volume = downcast_pf_ref::<Series<Int>>(volume_val).unwrap();
-                Ok(PineRef::new_rc(Series::from(
-                    close.get_current().add(open.get_current()),
-                )))
+                let close = downcast_pf_ref::<Series<Float>>(close_val)
+                    .unwrap()
+                    .get_current();
+                let low = downcast_pf_ref::<Series<Float>>(low_val)
+                    .unwrap()
+                    .get_current();
+                let high = downcast_pf_ref::<Series<Float>>(high_val)
+                    .unwrap()
+                    .get_current();
+                let volume = downcast_pf_ref::<Series<Int>>(volume_val)
+                    .unwrap()
+                    .get_current();
+
+                let val1 = (close.minus(low).minus(high.minus(close))).div(high.minus(low));
+                let cmfv = val1.mul(int2float(volume)).add(self.prev_cmfv);
+                self.ad_history.push(cmfv);
+                self.prev_cmfv = cmfv;
+                Ok(PineRef::new_rc(Series::from(cmfv)))
             }
-            _ => Err(PineRuntimeError::new_no_range(RuntimeErr::VarNotFound)),
+            _ => Ok(PineRef::new_rc(Series::from(Float::from(None)))),
         }
     }
+
+    fn back(&mut self, _ctx: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
+        self.ad_history.pop();
+        self.prev_cmfv = *self.ad_history.last().unwrap();
+        Ok(())
+    }
+
+    // fn run(&mut self, _ctx: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
+    //     Ok(())
+    // }
 
     fn copy(&self) -> Box<dyn EvaluateVal<'a>> {
         Box::new(self.clone())
@@ -76,10 +99,80 @@ impl<'a> EvaluateVal<'a> for MyVal {
 pub const VAR_NAME: &'static str = "accdist";
 
 pub fn declare_var<'a>() -> VarResult<'a> {
-    let value = PineRef::new(Evaluate::new(Box::new()));
+    let value = PineRef::new(Evaluate::new(Box::new(AccDistVal::new())));
 
     // plot(series, title, color, linewidth, style, trackprice, transp, histbase, offset, join, editable, show_last) → plot
 
     let syntax_type = SyntaxType::float_series();
     VarResult::new(value, syntax_type, VAR_NAME)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ast::syntax_type::SyntaxType;
+    use crate::runtime::VarOperate;
+    use crate::runtime::{AnySeries, NoneCallback};
+    use crate::types::Series;
+    use crate::{LibInfo, PineParser, PineRunner};
+
+    #[test]
+    fn accdist_test() {
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![
+                ("close", SyntaxType::float_series()),
+                ("high", SyntaxType::float_series()),
+                ("low", SyntaxType::float_series()),
+                ("volume", SyntaxType::int_series()),
+            ],
+        );
+        let src = "m = accdist";
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        runner
+            .run(
+                &vec![
+                    (
+                        "close",
+                        AnySeries::from_float_vec(vec![Some(10f64), Some(20f64)]),
+                    ),
+                    (
+                        "high",
+                        AnySeries::from_float_vec(vec![Some(15f64), Some(22f64)]),
+                    ),
+                    (
+                        "low",
+                        AnySeries::from_float_vec(vec![Some(1f64), Some(2f64)]),
+                    ),
+                    (
+                        "volume",
+                        AnySeries::from_int_vec(vec![Some(100i64), Some(200i64)]),
+                    ),
+                ],
+                None,
+            )
+            .unwrap();
+
+        let val1 = ((10f64 - 1f64) - (15f64 - 10f64)) / (15f64 - 1f64) * 100f64;
+        let val2 = ((20f64 - 2f64) - (22f64 - 20f64)) / (22f64 - 2f64) * 200f64 + val1;
+        assert_eq!(
+            runner.get_context().get_var(VarIndex::new(5, 0)),
+            &Some(PineRef::new(Series::from_vec(vec![Some(val1), Some(val2)])))
+        );
+
+        runner
+            .update(&vec![
+                ("close", AnySeries::from_float_vec(vec![Some(20f64)])),
+                ("high", AnySeries::from_float_vec(vec![Some(22f64)])),
+                ("low", AnySeries::from_float_vec(vec![Some(2f64)])),
+                ("volume", AnySeries::from_int_vec(vec![Some(200i64)])),
+            ])
+            .unwrap();
+        assert_eq!(
+            runner.get_context().get_var(VarIndex::new(5, 0)),
+            &Some(PineRef::new(Series::from_vec(vec![Some(val1), Some(val2)])))
+        );
+    }
 }

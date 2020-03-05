@@ -189,12 +189,7 @@ impl IOInfo {
     fn gen_srcs() -> Vec<InputSrc> {
         vec![InputSrc {
             ticker: None,
-            srcs: vec![
-                String::from("close"),
-                String::from("open"),
-                String::from("high"),
-                String::from("low"),
-            ],
+            srcs: vec![],
         }]
     }
 
@@ -235,13 +230,22 @@ impl IOInfo {
     }
 
     pub fn add_input_src(&mut self, input_src: InputSrc) {
-        let item = self
+        let exist_input = self
             .input_srcs
             .iter_mut()
-            .find(|d| d.ticker == input_src.ticker);
-        match item {
-            Some(d) => d.srcs = input_src.srcs,
-            None => self.input_srcs.push(input_src),
+            .find(|x| x.ticker == input_src.ticker);
+        match exist_input {
+            None => {
+                self.input_srcs.push(input_src);
+            }
+            Some(v) => {
+                let mut m: Vec<_> = input_src
+                    .srcs
+                    .into_iter()
+                    .filter(|x| !v.srcs.iter().any(|s| s == x))
+                    .collect();
+                v.srcs.append(&mut m);
+            }
         }
     }
 
@@ -321,4 +325,50 @@ pub struct SymbolInfo {
     pub currency: String,     // "USD", "EUR", etc.
     pub description: String,
     pub mintick: f64, // Min tick value for current symbol
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn input_src_test() {
+        let mut io_info = IOInfo::new();
+        io_info.input_srcs = vec![];
+        io_info.add_input_src(InputSrc::new(
+            None,
+            vec![String::from("close"), String::from("open")],
+        ));
+        io_info.add_input_src(InputSrc::new(
+            None,
+            vec![String::from("close"), String::from("low")],
+        ));
+        io_info.add_input_src(InputSrc::new(
+            None,
+            vec![String::from("close"), String::from("high")],
+        ));
+        io_info.add_input_src(InputSrc::new(
+            Some(String::from("AAPL")),
+            vec![String::from("close"), String::from("high")],
+        ));
+
+        assert_eq!(
+            io_info.get_input_srcs(),
+            &vec![
+                InputSrc::new(
+                    None,
+                    vec![
+                        String::from("close"),
+                        String::from("open"),
+                        String::from("low"),
+                        String::from("high")
+                    ]
+                ),
+                InputSrc::new(
+                    Some(String::from("AAPL")),
+                    vec![String::from("close"), String::from("high")]
+                )
+            ]
+        );
+    }
 }

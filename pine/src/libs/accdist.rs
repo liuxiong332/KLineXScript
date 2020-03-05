@@ -1,11 +1,11 @@
 use super::VarResult;
 use crate::ast::stat_expr_types::VarIndex;
 use crate::ast::syntax_type::SyntaxType;
-use crate::runtime::Ctx;
+use crate::runtime::context::{downcast_ctx, Ctx};
+use crate::runtime::InputSrc;
 use crate::types::{
-    downcast_pf_ref, int2float, Arithmetic, Bool, Callable, CallableFactory, DataType, Evaluate,
-    EvaluateVal, Float, Int, Object, ParamCollectCall, PineClass, PineFrom, PineRef, PineType,
-    RefData, RuntimeErr, SecondType, Series, NA,
+    downcast_pf_ref, int2float, Arithmetic, Evaluate, EvaluateVal, Float, Int, PineRef, RuntimeErr,
+    Series,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -41,6 +41,17 @@ impl<'a> EvaluateVal<'a> for AccDistVal {
     }
 
     fn call(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
+        if !downcast_ctx(ctx).check_is_input_info_ready() {
+            downcast_ctx(ctx).add_input_src(InputSrc::new(
+                None,
+                vec![
+                    String::from("close"),
+                    String::from("low"),
+                    String::from("high"),
+                    String::from("volume"),
+                ],
+            ));
+        }
         if !self.is_init {
             self.close_index = VarIndex::new(*ctx.get_varname_index("close").unwrap(), 0);
             self.low_index = VarIndex::new(*ctx.get_varname_index("low").unwrap(), 0);

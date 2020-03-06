@@ -72,6 +72,13 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         timestamp::declare_var(),
         security::declare_var(),
         year::declare_year_var(),
+        year::declare_month_var(),
+        year::declare_weekofyear_var(),
+        year::declare_dayofweek_var(),
+        year::declare_dayofmonth_var(),
+        year::declare_hour_var(),
+        year::declare_minute_var(),
+        year::declare_minute_var(),
     ];
     debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());

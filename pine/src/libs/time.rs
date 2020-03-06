@@ -133,9 +133,10 @@ pub fn declare_var<'a>() -> VarResult<'a> {
             ("resolution", SyntaxType::string()),
             ("session", SyntaxType::string()),
         ],
-        SyntaxType::Void,
+        SyntaxType::int_series(),
     ))]);
-    let syntax_type = SyntaxType::ValFunction(Box::new(SyntaxType::int()), Rc::new(func_type));
+    let syntax_type =
+        SyntaxType::ValFunction(Box::new(SyntaxType::int_series()), Rc::new(func_type));
     VarResult::new(value, syntax_type, VAR_NAME)
 }
 

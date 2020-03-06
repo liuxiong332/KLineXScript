@@ -15,6 +15,7 @@ pub mod syminfo;
 pub mod time;
 pub mod timenow;
 pub mod timestamp;
+pub mod year;
 
 use crate::ast::syntax_type::SyntaxType;
 use crate::types::PineRef;
@@ -70,6 +71,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         timenow::declare_var(),
         timestamp::declare_var(),
         security::declare_var(),
+        year::declare_year_var(),
     ];
     debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());

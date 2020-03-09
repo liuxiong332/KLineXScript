@@ -1,3 +1,4 @@
+pub mod abs;
 pub mod accdist;
 pub mod barstate;
 pub mod color;
@@ -79,6 +80,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         year::declare_hour_var(),
         year::declare_minute_var(),
         year::declare_minute_var(),
+        abs::declare_var(),
     ];
     debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());

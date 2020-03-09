@@ -700,9 +700,14 @@ pub trait RVRunner<'a> {
     fn rv_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError>;
 }
 
-// the expression with right-value.
+// evaluate the expression for the function call
 pub trait RunnerForFunc<'a> {
     fn run_for_func(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError>;
+}
+
+// evaluate the expression for the object.
+pub trait RunnerForObj<'a> {
+    fn run_for_obj(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError>;
 }
 
 pub trait StmtRunner<'a> {

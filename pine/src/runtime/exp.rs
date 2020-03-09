@@ -1,4 +1,4 @@
-use super::context::{Ctx, PineRuntimeError, RVRunner, Runner, RunnerForFunc};
+use super::context::{Ctx, PineRuntimeError, RVRunner, Runner, RunnerForFunc, RunnerForObj};
 use super::op::{binary_op_run, unary_op_run};
 use super::runtime_convert::convert;
 use crate::ast::num::Numeral;
@@ -6,7 +6,7 @@ pub use crate::ast::stat_expr_types::{
     Condition, DataType, Exp, FunctionCall, PrefixExp, RefCall, Statement, TypeCast,
 };
 use crate::types::{
-    downcast_pf, downcast_pf_mut, Bool, CallableEvaluate, CallableObject, Color,
+    downcast_pf, downcast_pf_mut, Bool, CallObjEval, CallableEvaluate, CallableObject, Color,
     DataType as FirstType, Evaluate, Float, Int, Object, PineFrom, PineRef, PineStaticType,
     PineType, PineVar, RefData, RuntimeErr, SecondType, Series, Tuple, NA,
 };
@@ -64,6 +64,13 @@ impl<'a> RVRunner<'a> for Exp<'a> {
                             // downcast_pf_mut::<CallableEvaluate>(&mut s).unwrap()
                             eval_val.call(context)
                         }
+                        (FirstType::CallableObjectEvaluate, SecondType::Simple) => {
+                            let mut eval_val = downcast_pf::<CallObjEval>(s.clone()).unwrap();
+
+                            context.create_runnable(RefData::clone(&eval_val).into_rc());
+                            // downcast_pf_mut::<CallableEvaluate>(&mut s).unwrap()
+                            eval_val.call(context)
+                        }
                         _ => Ok(s.copy()),
                     };
                     context.update_var(name.var_index, s);
@@ -96,6 +103,37 @@ impl<'a> RunnerForFunc<'a> for Exp<'a> {
                             let mut eval_val = downcast_pf::<Evaluate>(s.clone()).unwrap();
                             context.create_runnable(RefData::clone(&eval_val).into_rc());
                             // let eval_val = downcast_pf_mut::<Evaluate>(&mut s).unwrap();
+                            eval_val.call(context)
+                        }
+                        _ => Ok(s.copy()),
+                    };
+                    context.update_var(name.var_index, s);
+                    match ret {
+                        Ok(val) => Ok(val),
+                        Err(e) => Err(PineRuntimeError::new(e, self.range())),
+                    }
+                }
+            },
+            _ => self.rv_run(context),
+        }
+    }
+}
+
+impl<'a> RunnerForObj<'a> for Exp<'a> {
+    fn run_for_obj(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
+        match self {
+            Exp::VarName(name) => match context.move_var(name.var_index) {
+                None => Err(PineRuntimeError::new(RuntimeErr::VarNotFound, self.range())),
+                Some(s) => {
+                    let ret = match s.get_type() {
+                        (FirstType::Evaluate, SecondType::Simple) => {
+                            let mut eval_val = downcast_pf::<Evaluate>(s.clone()).unwrap();
+                            context.create_runnable(RefData::clone(&eval_val).into_rc());
+                            eval_val.call(context)
+                        }
+                        (FirstType::CallableEvaluate, SecondType::Simple) => {
+                            let mut eval_val = downcast_pf::<CallableEvaluate>(s.clone()).unwrap();
+                            context.create_runnable(RefData::clone(&eval_val).into_rc());
                             eval_val.call(context)
                         }
                         _ => Ok(s.copy()),
@@ -161,7 +199,7 @@ impl<'a> Runner<'a> for TypeCast<'a> {
 
 impl<'a> Runner<'a> for PrefixExp<'a> {
     fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
-        let var = self.left_exp.rv_run(context)?;
+        let var = self.left_exp.run_for_obj(context)?;
         // let var = context.move_var(self.var_index).unwrap();
         match var.get_type() {
             (FirstType::Object, SecondType::Simple) => {
@@ -171,6 +209,11 @@ impl<'a> Runner<'a> for PrefixExp<'a> {
             }
             (FirstType::CallableObject, SecondType::Simple) => {
                 let object = downcast_pf::<CallableObject>(var).unwrap();
+                let subobj = object.get(context, self.right_name.value).unwrap();
+                Ok(subobj)
+            }
+            (FirstType::CallableObjectEvaluate, SecondType::Simple) => {
+                let object = downcast_pf::<CallObjEval>(var).unwrap();
                 let subobj = object.get(context, self.right_name.value).unwrap();
                 Ok(subobj)
             }

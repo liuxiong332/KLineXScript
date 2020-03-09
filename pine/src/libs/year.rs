@@ -1,16 +1,19 @@
 use super::VarResult;
 use crate::ast::stat_expr_types::VarIndex;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SyntaxType};
+use crate::helper::err_msgs::*;
+use crate::helper::str_replace;
 use crate::helper::{move_element, pine_ref_to_i64, pine_ref_to_string, Resolution, Session};
 use crate::runtime::{downcast_ctx, Ctx};
 use crate::types::{
-    Callable, CallableEvaluate, EvaluateVal, Float, Int, PineFrom, PineRef, RefData, RuntimeErr,
-    Series, SeriesCall,
+    CallObjEval, Callable, CallableEvaluate, EvaluateVal, Float, Int, PineClass, PineFrom, PineRef,
+    RefData, RuntimeErr, Series, SeriesCall,
 };
 use chrono::Datelike;
 use chrono::TimeZone;
 use chrono::Timelike;
 use chrono_tz::Tz;
+use std::collections::BTreeMap;
 use std::mem::transmute;
 use std::rc::Rc;
 
@@ -251,13 +254,66 @@ pub fn declare_dayofmonth_var<'a>() -> VarResult<'a> {
     })
 }
 
+struct DayOfWeekProps;
+
+impl<'a> PineClass<'a> for DayOfWeekProps {
+    fn custom_type(&self) -> &str {
+        "dayofweek"
+    }
+
+    fn get(&self, _ctx: &mut dyn Ctx<'a>, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
+        match name {
+            "sunday" => Ok(PineRef::new_box(Some(1i64))),
+            "monday" => Ok(PineRef::new_box(Some(2i64))),
+            "tuesday" => Ok(PineRef::new_box(Some(3i64))),
+            "wednesday" => Ok(PineRef::new_box(Some(4i64))),
+            "thursday" => Ok(PineRef::new_box(Some(5i64))),
+            "friday" => Ok(PineRef::new_box(Some(6i64))),
+            "saturday" => Ok(PineRef::new_box(Some(7i64))),
+            _ => Err(RuntimeErr::NotImplement(str_replace(
+                NO_FIELD_IN_OBJECT,
+                vec![String::from(name), String::from("dayofweek")],
+            ))),
+        }
+    }
+
+    fn copy(&self) -> Box<dyn PineClass<'a> + 'a> {
+        Box::new(DayOfWeekProps)
+    }
+}
+
 pub fn declare_dayofweek_var<'a>() -> VarResult<'a> {
-    declare_time_var("dayofweek", get_dayofweek, || {
-        Callable::new(
-            None,
-            Some(Box::new(TimeCallVal::new(get_dayofweek as *mut ()))),
-        )
-    })
+    let value = PineRef::new(CallObjEval::new(
+        Box::new(TimeVal::new(get_dayofweek as *mut ())),
+        Box::new(DayOfWeekProps),
+        || {
+            Callable::new(
+                None,
+                Some(Box::new(TimeCallVal::new(get_dayofweek as *mut ()))),
+            )
+        },
+    ));
+
+    // plot(series, title, color, linewidth, style, trackprice, transp, histbase, offset, join, editable, show_last) → plot
+
+    let func_type = FunctionTypes(vec![FunctionType::new((
+        vec![("time", SyntaxType::int_series())],
+        SyntaxType::int_series(),
+    ))]);
+    let mut obj_type = BTreeMap::new();
+    obj_type.insert("sunday", SyntaxType::int());
+    obj_type.insert("monday", SyntaxType::int());
+    obj_type.insert("tuesday", SyntaxType::int());
+    obj_type.insert("wednesday", SyntaxType::int());
+    obj_type.insert("thursday", SyntaxType::int());
+    obj_type.insert("friday", SyntaxType::int());
+    obj_type.insert("saturday", SyntaxType::int());
+    let syntax_type = SyntaxType::ValObjectFunction(
+        Box::new(SyntaxType::int_series()),
+        Rc::new(obj_type),
+        Rc::new(func_type),
+    );
+    VarResult::new(value, syntax_type, "dayofweek")
 }
 
 pub fn declare_hour_var<'a>() -> VarResult<'a> {
@@ -440,6 +496,45 @@ mod tests {
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(stari + 15, 0)),
             Some(PineRef::new_rc(Series::from_vec(vec![Some(3)])))
+        );
+    }
+
+    #[test]
+    fn dayofweek_test() {
+        use crate::types::{downcast_pf, Tuple};
+
+        let lib_info = LibInfo::new(
+            vec![declare_dayofweek_var()],
+            vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+        );
+        let src = "m = [
+            dayofweek.sunday, dayofweek.monday, dayofweek.tuesday, dayofweek.wednesday, 
+            dayofweek.thursday, dayofweek.friday, dayofweek.saturday
+        ]";
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        runner
+            .run(
+                &vec![("close", AnySeries::from_float_vec(vec![Some(1f64)]))],
+                None,
+            )
+            .unwrap();
+        let tuple_res =
+            downcast_pf::<Tuple>(runner.get_context().move_var(VarIndex::new(2, 0)).unwrap());
+        let tuple_vec = tuple_res.unwrap().into_inner().0;
+
+        assert_eq!(
+            tuple_vec,
+            vec![
+                PineRef::new(Some(1i64)),
+                PineRef::new(Some(2i64)),
+                PineRef::new(Some(3i64)),
+                PineRef::new(Some(4i64)),
+                PineRef::new(Some(5i64)),
+                PineRef::new(Some(6i64)),
+                PineRef::new(Some(7i64))
+            ]
         );
     }
 }

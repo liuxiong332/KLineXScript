@@ -2,6 +2,7 @@ pub mod abs;
 pub mod accdist;
 pub mod barstate;
 pub mod color;
+pub mod cos;
 pub mod input;
 pub mod plot;
 pub mod plotarrow;
@@ -81,6 +82,12 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         year::declare_minute_var(),
         year::declare_minute_var(),
         abs::declare_var(),
+        cos::declare_cos_var(),
+        cos::declare_acos_var(),
+        cos::declare_sin_var(),
+        cos::declare_asin_var(),
+        cos::declare_tan_var(),
+        cos::declare_atan_var(),
     ];
     debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());

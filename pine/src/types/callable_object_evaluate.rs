@@ -22,7 +22,7 @@ impl<'a> PartialEq for CallObjEval<'a> {
 
 impl<'a> PineStaticType for CallObjEval<'a> {
     fn static_type() -> (DataType, SecondType) {
-        (DataType::CallObjEval, SecondType::Simple)
+        (DataType::CallableObjectEvaluate, SecondType::Simple)
     }
 }
 
@@ -36,7 +36,11 @@ impl<'a> PineType<'a> for CallObjEval<'a> {
     }
 
     fn copy(&self) -> PineRef<'a> {
-        PineRef::new_rc(CallObjEval::new(self.obj.copy(), self.create_func))
+        PineRef::new_rc(CallObjEval::new(
+            self.val.copy(),
+            self.obj.copy(),
+            self.create_func,
+        ))
     }
 }
 
@@ -98,9 +102,11 @@ impl<'a> Clone for CallObjEval<'a> {
 mod tests {
     use super::super::{downcast_pf, Callable, Int, Object, RefData};
     use super::*;
+    use crate::ast::stat_expr_types::VarIndex;
     use crate::ast::syntax_type::FunctionType;
     use crate::ast::syntax_type::{SimpleSyntaxType, SyntaxType};
-    use crate::runtime::context::{Context, ContextType, Ctx};
+    use crate::runtime::context::{Context, ContextType, Ctx, VarOperate};
+    use crate::types::{RuntimeErr, Series};
     use std::mem;
 
     #[derive(Debug, Clone, PartialEq)]
@@ -160,12 +166,13 @@ mod tests {
 
     #[test]
     fn object_test() {
-        let obj = CallObjEval::new(Box::new(MyVal()), Box::new(A), || {
+        let mut obj = CallObjEval::new(Box::new(MyVal()), Box::new(A), || {
             Callable::new(Some(test_func), None)
         });
         let mut context = Context::new(None, ContextType::Normal);
         context.init(2, 0, 0);
         context.set_varname_index("close", 0);
+        context.create_var(0, PineRef::new(Series::from(Some(1f64))));
 
         assert_eq!(
             obj.get_type(),
@@ -176,7 +183,7 @@ mod tests {
             RefData::new_box(Some(1))
         );
         assert_eq!(
-            evaluate.call(&mut context),
+            obj.call(&mut context),
             Ok(PineRef::new_rc(Series::from(Some(1f64))))
         );
         let mut callable = obj.create();

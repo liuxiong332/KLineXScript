@@ -571,24 +571,25 @@ impl<'a> SyntaxParser<'a> {
 
     fn parse_func_call(&mut self, func_call: &mut FunctionCall<'a>) -> ParseResult<'a> {
         let method_type = self.parse_exp(&mut func_call.method)?;
-        if let SyntaxType::Function(fun_type) = method_type.syntax_type {
-            self.parse_std_func_call(func_call, &fun_type)
-        } else if let SyntaxType::ObjectFunction(_, fun_type) = method_type.syntax_type {
-            self.parse_std_func_call(func_call, &fun_type)
-        } else if let SyntaxType::ValFunction(_, fun_type) = method_type.syntax_type {
-            self.parse_std_func_call(func_call, &fun_type)
-        } else if let SyntaxType::UserFunction(names) = method_type.syntax_type {
-            self.parse_user_func_call(func_call, &names.0, method_type.varname.unwrap())
-        } else {
-            // Err(PineInputError::new(
-            //     PineErrorKind::VarNotCallable,
-            //     func_call.range,
-            // ))
-            self.catch(PineInputError::new(
-                PineErrorKind::VarNotCallable,
-                func_call.range,
-            ));
-            Ok(ParseValue::new_with_type(SyntaxType::Any))
+        match method_type.syntax_type {
+            SyntaxType::Function(fun_type) => self.parse_std_func_call(func_call, &fun_type),
+            SyntaxType::ObjectFunction(_, fun_type) => {
+                self.parse_std_func_call(func_call, &fun_type)
+            }
+            SyntaxType::ValFunction(_, fun_type) => self.parse_std_func_call(func_call, &fun_type),
+            SyntaxType::ValObjectFunction(_, _, fun_type) => {
+                self.parse_std_func_call(func_call, &fun_type)
+            }
+            SyntaxType::UserFunction(names) => {
+                self.parse_user_func_call(func_call, &names.0, method_type.varname.unwrap())
+            }
+            _ => {
+                self.catch(PineInputError::new(
+                    PineErrorKind::VarNotCallable,
+                    func_call.range,
+                ));
+                Ok(ParseValue::new_with_type(SyntaxType::Any))
+            }
         }
     }
 
@@ -650,12 +651,13 @@ impl<'a> SyntaxParser<'a> {
         obj: &SyntaxType<'a>,
         keys: &[&'a str],
     ) -> Result<SyntaxType<'a>, PineErrorKind> {
-        let map = if let SyntaxType::Object(map) = obj {
-            map
-        } else if let SyntaxType::ObjectFunction(map, _) = obj {
-            map
-        } else {
-            return Err(PineErrorKind::RefObjTypeNotObj);
+        let map = match obj {
+            SyntaxType::Object(map) => map,
+            SyntaxType::ObjectFunction(map, _) => map,
+            SyntaxType::ValObjectFunction(_, map, _) => map,
+            _ => {
+                return Err(PineErrorKind::RefObjTypeNotObj);
+            }
         };
         match map.get(&keys[0]) {
             None => Err(PineErrorKind::RefKeyNotExist),

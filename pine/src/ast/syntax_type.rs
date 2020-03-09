@@ -89,9 +89,14 @@ pub enum SyntaxType<'a> {
     List(SimpleSyntaxType), // tuple list like [1, 2, 3]
     Tuple(Rc<Vec<SyntaxType<'a>>>),
     Object(Rc<BTreeMap<&'a str, SyntaxType<'a>>>),
-    Function(Rc<FunctionTypes<'a>>),
-    ObjectFunction(Rc<BTreeMap<&'a str, SyntaxType<'a>>>, Rc<FunctionTypes<'a>>),
-    ValFunction(Box<SyntaxType<'a>>, Rc<FunctionTypes<'a>>),
+    Function(Rc<FunctionTypes<'a>>), // function
+    ObjectFunction(Rc<BTreeMap<&'a str, SyntaxType<'a>>>, Rc<FunctionTypes<'a>>), // object + function
+    ValFunction(Box<SyntaxType<'a>>, Rc<FunctionTypes<'a>>), // value + function
+    ValObjectFunction(
+        Box<SyntaxType<'a>>,
+        Rc<BTreeMap<&'a str, SyntaxType<'a>>>,
+        Rc<FunctionTypes<'a>>,
+    ), // value + object + function
     UserFunction(Rc<(Vec<&'a str>, SyntaxType<'a>)>),
     DynamicExpr(Box<SyntaxType<'a>>), // dynamic expression that can be invoked as function
     Any,
@@ -102,6 +107,7 @@ impl<'a> SyntaxType<'a> {
     pub fn get_v_for_vf(&self) -> &Self {
         match self {
             SyntaxType::ValFunction(t, _) => &*t,
+            SyntaxType::ValObjectFunction(t, _, _) => &*t,
             t => t,
         }
     }
@@ -109,6 +115,7 @@ impl<'a> SyntaxType<'a> {
     pub fn into_v_for_vf(self) -> Self {
         match self {
             SyntaxType::ValFunction(t, _) => *t,
+            SyntaxType::ValObjectFunction(t, _, _) => *t,
             t => t,
         }
     }

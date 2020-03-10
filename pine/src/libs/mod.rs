@@ -1,5 +1,6 @@
 pub mod abs;
 pub mod accdist;
+pub mod avg;
 pub mod barstate;
 pub mod color;
 pub mod cos;
@@ -95,6 +96,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         nz::declare_var(),
         max::declare_max_var(),
         max::declare_min_var(),
+        avg::declare_var(),
     ];
     debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());

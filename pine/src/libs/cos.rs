@@ -135,6 +135,17 @@ pub fn declare_atan_var<'a>() -> VarResult<'a> {
     declare_math_var("atan", float_atan)
 }
 
+fn float_sqrt<'a>(xval: Option<PineRef<'a>>) -> Float {
+    match pine_ref_to_f64(xval) {
+        None => None,
+        Some(v) => Some(v.sqrt()),
+    }
+}
+
+pub fn declare_sqrt_var<'a>() -> VarResult<'a> {
+    declare_math_var("sqrt", float_sqrt)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -153,10 +164,16 @@ mod tests {
                 declare_asin_var(),
                 declare_tan_var(),
                 declare_atan_var(),
+                declare_sqrt_var(),
             ],
             vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
         );
-        let src = "m1 = cos(0)\nm2 = acos(1)\nm3 = sin(0)\nm4 = asin(0)\nm5 = tan(0)\nm6 = atan(0)";
+        let src = "
+        m1 = cos(0)\nm2 = acos(1)\n
+        m3 = sin(0)\nm4 = asin(0)\n
+        m5 = tan(0)\nm6 = atan(0)\n
+        m7 = sqrt(16)\n
+        ";
         let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
 
@@ -166,29 +183,35 @@ mod tests {
                 None,
             )
             .unwrap();
+
+        let starti = 8;
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(7, 0)),
+            runner.get_context().move_var(VarIndex::new(starti, 0)),
             Some(PineRef::new(Some(1f64)))
         );
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(8, 0)),
+            runner.get_context().move_var(VarIndex::new(starti + 1, 0)),
             Some(PineRef::new(Some(0f64)))
         );
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(9, 0)),
+            runner.get_context().move_var(VarIndex::new(starti + 2, 0)),
             Some(PineRef::new(Some(0f64)))
         );
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(10, 0)),
+            runner.get_context().move_var(VarIndex::new(starti + 3, 0)),
             Some(PineRef::new(Some(0f64)))
         );
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(11, 0)),
+            runner.get_context().move_var(VarIndex::new(starti + 4, 0)),
             Some(PineRef::new(Some(0f64)))
         );
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(12, 0)),
+            runner.get_context().move_var(VarIndex::new(starti + 5, 0)),
             Some(PineRef::new(Some(0f64)))
+        );
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(starti + 6, 0)),
+            Some(PineRef::new(Some(4f64)))
         );
     }
 }

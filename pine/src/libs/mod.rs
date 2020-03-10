@@ -92,6 +92,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         cos::declare_asin_var(),
         cos::declare_tan_var(),
         cos::declare_atan_var(),
+        cos::declare_sqrt_var(),
         na::declare_var(),
         nz::declare_var(),
         max::declare_max_var(),

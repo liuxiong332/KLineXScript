@@ -4,6 +4,7 @@ pub mod barstate;
 pub mod color;
 pub mod cos;
 pub mod input;
+pub mod max;
 pub mod na;
 pub mod nz;
 pub mod plot;
@@ -92,6 +93,8 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         cos::declare_atan_var(),
         na::declare_var(),
         nz::declare_var(),
+        max::declare_max_var(),
+        max::declare_min_var(),
     ];
     debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());

@@ -146,6 +146,53 @@ pub fn declare_sqrt_var<'a>() -> VarResult<'a> {
     declare_math_var("sqrt", float_sqrt)
 }
 
+fn float_exp<'a>(xval: Option<PineRef<'a>>) -> Float {
+    match pine_ref_to_f64(xval) {
+        None => None,
+        Some(v) => Some(v.exp()),
+    }
+}
+
+pub fn declare_exp_var<'a>() -> VarResult<'a> {
+    declare_math_var("exp", float_exp)
+}
+
+fn float_log<'a>(xval: Option<PineRef<'a>>) -> Float {
+    match pine_ref_to_f64(xval) {
+        None => None,
+        Some(v) => Some(v.log(std::f64::consts::E)),
+    }
+}
+
+pub fn declare_log_var<'a>() -> VarResult<'a> {
+    declare_math_var("log", float_log)
+}
+
+fn float_log10<'a>(xval: Option<PineRef<'a>>) -> Float {
+    match pine_ref_to_f64(xval) {
+        None => None,
+        Some(v) => Some(v.log10()),
+    }
+}
+
+pub fn declare_log10_var<'a>() -> VarResult<'a> {
+    declare_math_var("log10", float_log10)
+}
+
+fn float_sign<'a>(xval: Option<PineRef<'a>>) -> Float {
+    match pine_ref_to_f64(xval) {
+        None => None,
+        Some(v) if v > 0f64 => Some(1f64),
+        Some(v) if v == 0f64 => Some(0f64),
+        Some(v) if v < 0f64 => Some(-1f64),
+        Some(_) => unreachable!(),
+    }
+}
+
+pub fn declare_sign_var<'a>() -> VarResult<'a> {
+    declare_math_var("sign", float_sign)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -165,6 +212,10 @@ mod tests {
                 declare_tan_var(),
                 declare_atan_var(),
                 declare_sqrt_var(),
+                declare_exp_var(),
+                declare_log_var(),
+                declare_log10_var(),
+                declare_sign_var(),
             ],
             vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
         );
@@ -172,7 +223,9 @@ mod tests {
         m1 = cos(0)\nm2 = acos(1)\n
         m3 = sin(0)\nm4 = asin(0)\n
         m5 = tan(0)\nm6 = atan(0)\n
-        m7 = sqrt(16)\n
+        m7 = sqrt(16)\nm8 = exp(3)\n
+        m9 = log(exp(3))\nm10 = log10(100)\n
+        m11 = sign(12)\n
         ";
         let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
@@ -184,7 +237,7 @@ mod tests {
             )
             .unwrap();
 
-        let starti = 8;
+        let starti = 12;
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(starti, 0)),
             Some(PineRef::new(Some(1f64)))
@@ -212,6 +265,29 @@ mod tests {
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(starti + 6, 0)),
             Some(PineRef::new(Some(4f64)))
+        );
+
+        let result = runner.get_context().move_var(VarIndex::new(starti + 7, 0));
+        assert_eq!(
+            Float::implicity_from(result.unwrap())
+                .unwrap()
+                .into_inner()
+                .unwrap()
+                .floor(),
+            std::f64::consts::E.powf(3f64).floor()
+        );
+
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(starti + 8, 0)),
+            Some(PineRef::new(Some(3f64)))
+        );
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(starti + 9, 0)),
+            Some(PineRef::new(Some(2f64)))
+        );
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(starti + 10, 0)),
+            Some(PineRef::new(Some(1f64)))
         );
     }
 }

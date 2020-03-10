@@ -4,6 +4,7 @@ pub mod barstate;
 pub mod color;
 pub mod cos;
 pub mod input;
+pub mod na;
 pub mod plot;
 pub mod plotarrow;
 pub mod plotbar;
@@ -88,6 +89,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         cos::declare_asin_var(),
         cos::declare_tan_var(),
         cos::declare_atan_var(),
+        na::declare_var(),
     ];
     debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());

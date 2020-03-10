@@ -180,10 +180,14 @@ pub fn similar_simple_type(
     match (type1, type2) {
         (SimpleSyntaxType::Int, SimpleSyntaxType::Float)
         | (SimpleSyntaxType::Float, SimpleSyntaxType::Int) => Some(SimpleSyntaxType::Float),
+
+        (t, SimpleSyntaxType::Na) | (SimpleSyntaxType::Na, t) => Some(t.clone()),
+
         _ => None,
     }
 }
 
+// The variable types must be simalar.
 pub fn similar_type<'a>(type1: &SyntaxType<'a>, type2: &SyntaxType<'a>) -> Option<SyntaxType<'a>> {
     let type1 = type1.get_v_for_vf();
     let type2 = type2.get_v_for_vf();

@@ -194,4 +194,8 @@ impl<'a> SyntaxType<'a> {
     pub fn float_series() -> SyntaxType<'a> {
         SyntaxType::Series(SimpleSyntaxType::Float)
     }
+
+    pub fn bool_series() -> SyntaxType<'a> {
+        SyntaxType::Series(SimpleSyntaxType::Bool)
+    }
 }

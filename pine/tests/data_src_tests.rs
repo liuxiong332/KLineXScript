@@ -346,7 +346,7 @@ fn sma_test() {
     use pine::runtime::{NoneCallback, VarOperate};
 
     let lib_info = pine::LibInfo::new(
-        vec![sma::declare_var()],
+        vec![sma::declare_sma_var()],
         vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
     );
     let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));

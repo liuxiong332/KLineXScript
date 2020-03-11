@@ -30,14 +30,33 @@ fn ema_func<'a>(source: Float, length: i64, prev_val: Float) -> Result<Float, Ru
     Ok(Some(sum))
 }
 
+fn rma_func<'a>(source: Float, length: i64, prev_val: Float) -> Result<Float, RuntimeErr> {
+    let mut sum = 0f64;
+    let alpha = length as f64;
+    match source {
+        Some(val) => {
+            sum = val + (alpha - 1f64) * prev_val.unwrap_or(0f64);
+            sum /= alpha;
+        }
+        None => {
+            return Ok(None);
+        }
+    }
+    Ok(Some(sum))
+}
+
 #[derive(Debug, Clone, PartialEq)]
 struct EmaVal {
     prev_val: Float,
+    ma_func: *mut (),
 }
 
 impl EmaVal {
-    pub fn new() -> EmaVal {
-        EmaVal { prev_val: None }
+    pub fn new(ma_func: *mut ()) -> EmaVal {
+        EmaVal {
+            prev_val: None,
+            ma_func,
+        }
     }
 }
 
@@ -52,7 +71,11 @@ impl<'a> SeriesCall<'a> for EmaVal {
 
         let source = pine_ref_to_f64(source);
         let length = require_param("length", pine_ref_to_i64(length))?;
-        let val = ema_func(source, length, mem::replace(&mut self.prev_val, None))?;
+
+        let func = unsafe {
+            mem::transmute::<_, fn(Float, i64, Float) -> Result<Float, RuntimeErr>>(self.ma_func)
+        };
+        let val = func(source, length, mem::replace(&mut self.prev_val, None))?;
         self.prev_val = val;
         Ok(PineRef::new(Series::from(val)))
     }
@@ -64,10 +87,8 @@ impl<'a> SeriesCall<'a> for EmaVal {
 
 pub const VAR_NAME: &'static str = "ema";
 
-pub fn declare_var<'a>() -> VarResult<'a> {
-    let value = PineRef::new(CallableFactory::new(|| {
-        Callable::new(None, Some(Box::new(EmaVal::new())))
-    }));
+fn declare_ma_var<'a>(name: &'static str, factory: fn() -> Callable<'a>) -> VarResult<'a> {
+    let value = PineRef::new(CallableFactory::new(factory));
 
     let func_type = FunctionTypes(vec![FunctionType::new((
         vec![
@@ -77,7 +98,19 @@ pub fn declare_var<'a>() -> VarResult<'a> {
         SyntaxType::float_series(),
     ))]);
     let syntax_type = SyntaxType::Function(Rc::new(func_type));
-    VarResult::new(value, syntax_type, VAR_NAME)
+    VarResult::new(value, syntax_type, name)
+}
+
+pub fn declare_ema_var<'a>() -> VarResult<'a> {
+    declare_ma_var("ema", || {
+        Callable::new(None, Some(Box::new(EmaVal::new(ema_func as *mut ()))))
+    })
+}
+
+pub fn declare_rma_var<'a>() -> VarResult<'a> {
+    declare_ma_var("rma", || {
+        Callable::new(None, Some(Box::new(EmaVal::new(rma_func as *mut ()))))
+    })
 }
 
 #[cfg(test)]
@@ -93,10 +126,10 @@ mod tests {
     #[test]
     fn alma_test() {
         let lib_info = LibInfo::new(
-            vec![declare_var()],
+            vec![declare_ema_var(), declare_rma_var()],
             vec![("close", SyntaxType::float_series())],
         );
-        let src = "m = ema(close, 3)";
+        let src = "m1 = ema(close, 3)\nm2 = rma(close, 2)\n";
         let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
 
@@ -111,7 +144,14 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(2, 0)),
+            runner.get_context().move_var(VarIndex::new(3, 0)),
+            Some(PineRef::new(Series::from_vec(vec![
+                Some(5f64),
+                Some(12.5f64)
+            ])))
+        );
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(4, 0)),
             Some(PineRef::new(Series::from_vec(vec![
                 Some(5f64),
                 Some(12.5f64)

@@ -111,8 +111,10 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         ceil::declare_round_var(),
         alma::declare_var(),
         pow::declare_var(),
-        sma::declare_var(),
-        ema::declare_var(),
+        sma::declare_sma_var(),
+        sma::declare_wma_var(),
+        ema::declare_ema_var(),
+        ema::declare_rma_var(),
     ];
     debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());

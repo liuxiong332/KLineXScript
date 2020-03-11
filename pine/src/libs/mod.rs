@@ -6,6 +6,7 @@ pub mod barstate;
 pub mod ceil;
 pub mod color;
 pub mod cos;
+pub mod ema;
 pub mod input;
 pub mod max;
 pub mod na;
@@ -111,6 +112,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         alma::declare_var(),
         pow::declare_var(),
         sma::declare_var(),
+        ema::declare_var(),
     ];
     debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());

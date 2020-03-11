@@ -16,6 +16,7 @@ pub mod plotbar;
 pub mod plotcandle;
 pub mod plotchar;
 pub mod plotshape;
+pub mod pow;
 pub mod print;
 pub mod security;
 pub mod study;
@@ -107,6 +108,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         ceil::declare_floor_var(),
         ceil::declare_round_var(),
         alma::declare_var(),
+        pow::declare_var(),
     ];
     debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());

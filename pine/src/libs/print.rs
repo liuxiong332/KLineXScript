@@ -163,7 +163,8 @@ mod tests {
             }
         }
 
-        let mut callable = downcast_pf::<Callable>(declare_var().value).unwrap();
+        let factory = downcast_pf::<CallableFactory>(declare_var().value).unwrap();
+        let mut callable = factory.create();
         let mut ctx = Context::new_with_callback(&MyCallback);
         callable
             .call(

@@ -16,49 +16,31 @@ use crate::types::{
 use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
-struct AlmaVal;
+struct SmaVal;
 
-impl<'a> SeriesCall<'a> for AlmaVal {
+impl<'a> SeriesCall<'a> for SmaVal {
     fn step(
         &mut self,
         _ctx: &mut dyn Ctx<'a>,
         mut param: Vec<Option<PineRef<'a>>>,
         _func_type: FunctionType<'a>,
     ) -> Result<PineRef<'a>, RuntimeErr> {
-        move_tuplet!((series, length, offset, sigma) = param);
+        move_tuplet!((source, length) = param);
 
-        let series = require_param("series", pine_ref_to_f64_series(series))?;
-        let length = require_param("length", pine_ref_to_f64(length))?;
-        let offset = require_param("offset", pine_ref_to_f64(offset))?;
-        let sigma = require_param("sigma", pine_ref_to_f64(sigma))?;
-        // m = floor(offset * (windowsize - 1))
-        let m = (offset * (length - 1f64)).floor();
-
-        // s = windowsize / sigma
-        let s = length / sigma;
-
-        // norm = 0.0
-        // sum = 0.0
-        // for i = 0 to windowsize - 1
-        //     weight = exp(-1 * pow(i - m, 2) / (2 * pow(s, 2)))
-        //     norm := norm + weight
-        //     sum := sum + series[windowsize - i - 1] * weight
-        // sum / norm
-        let mut norm = 0f64;
+        let source = require_param("source", pine_ref_to_f64_series(source))?;
+        let length = require_param("length", pine_ref_to_i64(length))?;
         let mut sum = 0f64;
         for i in 0..length as usize {
-            let weight = ((-1f64 * (i as f64 - m).powi(2)) / (2f64 * s.powi(2))).exp();
-            norm += weight;
-            match series.index_value(length as usize - i - 1)? {
+            match source.index_value(i)? {
                 Some(val) => {
-                    sum += val * weight;
+                    sum += val / length as f64;
                 }
                 None => {
                     return Ok(PineRef::new_rc(Series::from(Float::from(None))));
                 }
             }
         }
-        Ok(PineRef::new(Series::from(Some(sum / norm))))
+        Ok(PineRef::new(Series::from(Some(sum))))
     }
 
     fn copy(&self) -> Box<dyn SeriesCall<'a> + 'a> {
@@ -66,17 +48,15 @@ impl<'a> SeriesCall<'a> for AlmaVal {
     }
 }
 
-pub const VAR_NAME: &'static str = "alma";
+pub const VAR_NAME: &'static str = "sma";
 
 pub fn declare_var<'a>() -> VarResult<'a> {
-    let value = PineRef::new(Callable::new(None, Some(Box::new(AlmaVal))));
+    let value = PineRef::new(Callable::new(None, Some(Box::new(SmaVal))));
 
     let func_type = FunctionTypes(vec![FunctionType::new((
         vec![
-            ("series", SyntaxType::float_series()),
-            ("length", SyntaxType::float()),
-            ("offset", SyntaxType::float()),
-            ("sigma", SyntaxType::float()),
+            ("source", SyntaxType::float_series()),
+            ("length", SyntaxType::int()),
         ],
         SyntaxType::float_series(),
     ))]);
@@ -100,7 +80,7 @@ mod tests {
             vec![declare_var()],
             vec![("close", SyntaxType::float_series())],
         );
-        let src = "alma(close, 9, 0.85, 6)";
+        let src = "m = sma(close, 2)";
         let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
 
@@ -113,5 +93,10 @@ mod tests {
                 None,
             )
             .unwrap();
+
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(2, 0)),
+            Some(PineRef::new(Series::from_vec(vec![None, Some(15f64)])))
+        );
     }
 }

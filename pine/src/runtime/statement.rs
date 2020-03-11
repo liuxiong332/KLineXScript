@@ -454,7 +454,8 @@ impl<'a> Runner<'a> for ForRange<'a> {
             self.get_libfun_count(),
             self.get_subctx_count(),
         );
-        while (step > 0 && iter < end) || (step < 0 && iter > end) {
+        // iterator index need contain end edge.
+        while (step > 0 && iter <= end) || (step < 0 && iter >= end) {
             subctx.create_var(self.varid, PineRef::new_box(Some(iter)));
 
             match self.do_blk.run(subctx) {
@@ -1198,7 +1199,7 @@ mod tests {
 
         assert_eq!(
             Int::implicity_from(result.unwrap()),
-            Ok(RefData::new_box(Some(9)))
+            Ok(RefData::new_box(Some(10)))
         );
 
         // assert!(context.move_var("a").is_none());

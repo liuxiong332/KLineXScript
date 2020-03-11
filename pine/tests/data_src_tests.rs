@@ -9,7 +9,7 @@ const MA_SCRIPT: &str = "
 N = 5
 ma = close
 // ma = (close + close[1] + close[2] + close[3] + close[4]) / 5
-for i = 1 to N
+for i = 1 to N - 1
     ma := ma + close[i] 
 ma := ma / N
 print(ma)
@@ -319,6 +319,56 @@ fn alma_test() {
         .move_var(VarIndex::new(8, 0));
     let val1 = pine_ref_to_f64_series(result1);
     let val2 = pine_ref_to_f64_series(result2);
+    assert_eq!(
+        val1.unwrap().index_value(1).unwrap().unwrap().floor(),
+        val2.unwrap().index_value(1).unwrap().unwrap().floor()
+    );
+    // println!("{:?} {:?}", result1, result2);
+}
+
+const SMA_SCRIPT: &str = "
+m1 = (sma(close, 2))
+
+// same on pine, but much less efficient
+pine_sma(x, y) =>
+    sum = 0.0
+    for i = 0 to y - 1
+        sum := sum + x[i] / y
+    sum
+m2 = (pine_sma(close, 2))
+";
+
+#[test]
+fn sma_test() {
+    use pine::ast::stat_expr_types::VarIndex;
+    use pine::helper::pine_ref_to_f64_series;
+    use pine::libs::sma;
+    use pine::runtime::{NoneCallback, VarOperate};
+
+    let lib_info = pine::LibInfo::new(
+        vec![sma::declare_var()],
+        vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+    parser.parse_src(String::from(SMA_SCRIPT)).unwrap();
+    let data = vec![(
+        "close",
+        AnySeries::from_float_vec(vec![Some(200f64), Some(400f64)]),
+    )];
+
+    assert!(parser.run_with_data(data, None).is_ok());
+
+    let result1 = parser
+        .get_runner()
+        .get_context()
+        .move_var(VarIndex::new(2, 0));
+    let result2 = parser
+        .get_runner()
+        .get_context()
+        .move_var(VarIndex::new(4, 0));
+    let val1 = pine_ref_to_f64_series(result1);
+    let val2 = pine_ref_to_f64_series(result2);
+    println!("val {:?} {:?}", val1, val2);
     assert_eq!(
         val1.unwrap().index_value(1).unwrap().unwrap().floor(),
         val2.unwrap().index_value(1).unwrap().unwrap().floor()

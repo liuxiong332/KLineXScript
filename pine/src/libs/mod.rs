@@ -19,6 +19,7 @@ pub mod plotshape;
 pub mod pow;
 pub mod print;
 pub mod security;
+pub mod sma;
 pub mod study;
 pub mod syminfo;
 pub mod time;
@@ -109,6 +110,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         ceil::declare_round_var(),
         alma::declare_var(),
         pow::declare_var(),
+        sma::declare_var(),
     ];
     debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());

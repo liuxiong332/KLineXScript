@@ -11,9 +11,24 @@ use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::InputSrc;
 use crate::types::{
     downcast_pf_ref, int2float, Arithmetic, Callable, Evaluate, EvaluateVal, Float, Int, PineRef,
-    RuntimeErr, Series, SeriesCall, NA,
+    RefData, RuntimeErr, Series, SeriesCall, NA,
 };
 use std::rc::Rc;
+
+fn sma_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<PineRef<'a>, RuntimeErr> {
+    let mut sum = 0f64;
+    for i in 0..length as usize {
+        match source.index_value(i)? {
+            Some(val) => {
+                sum += val / length as f64;
+            }
+            None => {
+                return Ok(PineRef::new_rc(Series::from(Float::from(None))));
+            }
+        }
+    }
+    Ok(PineRef::new(Series::from(Some(sum))))
+}
 
 #[derive(Debug, Clone, PartialEq)]
 struct SmaVal;
@@ -29,18 +44,7 @@ impl<'a> SeriesCall<'a> for SmaVal {
 
         let source = require_param("source", pine_ref_to_f64_series(source))?;
         let length = require_param("length", pine_ref_to_i64(length))?;
-        let mut sum = 0f64;
-        for i in 0..length as usize {
-            match source.index_value(i)? {
-                Some(val) => {
-                    sum += val / length as f64;
-                }
-                None => {
-                    return Ok(PineRef::new_rc(Series::from(Float::from(None))));
-                }
-            }
-        }
-        Ok(PineRef::new(Series::from(Some(sum))))
+        sma_func(source, length)
     }
 
     fn copy(&self) -> Box<dyn SeriesCall<'a> + 'a> {

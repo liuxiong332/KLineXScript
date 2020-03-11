@@ -82,6 +82,17 @@ impl<'a, D: Default + PineType<'a> + Clone + Debug + 'a> Series<'a, D> {
         Ok(Series::from(val))
     }
 
+    pub fn index_value(&self, i: usize) -> Result<D, RuntimeErr> {
+        let len = self.history.len();
+        let val = match i {
+            // m if m < 0 => Err(SeriesErr::Negative),
+            0 => self.current.clone(),
+            m if m >= 1 && m <= len => self.history[(len - i) as usize].clone(),
+            _ => D::default(),
+        };
+        Ok(val)
+    }
+
     pub fn update(&mut self, current: D) {
         self.current = current;
     }

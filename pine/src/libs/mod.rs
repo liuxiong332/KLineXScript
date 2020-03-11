@@ -1,5 +1,6 @@
 pub mod abs;
 pub mod accdist;
+pub mod alma;
 pub mod avg;
 pub mod barstate;
 pub mod ceil;
@@ -105,6 +106,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         ceil::declare_ceil_var(),
         ceil::declare_floor_var(),
         ceil::declare_round_var(),
+        alma::declare_var(),
     ];
     debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());

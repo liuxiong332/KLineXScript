@@ -308,7 +308,7 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
         }
     }
 
-    fn get_runner(&mut self) -> &mut PineRunner<'ra, 'rb, 'rc> {
+    pub fn get_runner(&mut self) -> &mut PineRunner<'ra, 'rb, 'rc> {
         if self.runner.is_none() {
             let mut runner: PineRunner<'ra, 'rb, 'rc>;
             unsafe {

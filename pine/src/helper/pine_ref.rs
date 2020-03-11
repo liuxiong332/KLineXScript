@@ -1,4 +1,4 @@
-use crate::types::{Bool, Color, Float, Int, PineFrom, PineRef, Series};
+use crate::types::{Bool, Color, Float, Int, PineFrom, PineRef, RefData, Series};
 
 pub fn pine_ref_to_bool<'a>(val: Option<PineRef<'a>>) -> Option<bool> {
     if val.is_none() {
@@ -50,12 +50,14 @@ pub fn pine_ref_to_f64<'a>(val: Option<PineRef<'a>>) -> Option<f64> {
     }
 }
 
-pub fn pine_ref_to_f64_series<'a>(val: Option<PineRef<'a>>) -> Option<Series<Option<f64>>> {
+pub fn pine_ref_to_f64_series<'a>(
+    val: Option<PineRef<'a>>,
+) -> Option<RefData<Series<Option<f64>>>> {
     if val.is_none() {
         return None;
     }
     match Series::implicity_from(val.unwrap()) {
-        Ok(res) => Some(res.into_inner()),
+        Ok(res) => Some(res),
         Err(_) => None,
     }
 }

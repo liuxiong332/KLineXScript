@@ -23,7 +23,6 @@ impl<'a> SeriesCall<'a> for MathCallVal {
         func_type: FunctionType<'a>,
     ) -> Result<PineRef<'a>, RuntimeErr> {
         move_tuplet!((base, exponent) = param);
-        println!("base exponent {:?} {:?}", base, exponent);
         match func_type.get_type(0).unwrap() {
             SyntaxType::Simple(_) => Ok(PineRef::new_box(float_pow(base, exponent))),
             SyntaxType::Series(_) => Ok(PineRef::new_rc(Series::from(float_pow(base, exponent)))),

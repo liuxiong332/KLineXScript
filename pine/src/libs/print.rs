@@ -2,8 +2,8 @@ use super::VarResult;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
 use crate::runtime::context::Ctx;
 use crate::types::{
-    Bool, Callable, DataType, Float, Int, ParamCollectCall, PineFrom, PineRef, PineStaticType,
-    PineType, RefData, RuntimeErr, SecondType, Series, NA,
+    Bool, Callable, CallableFactory, DataType, Float, Int, ParamCollectCall, PineFrom, PineRef,
+    PineStaticType, PineType, RefData, RuntimeErr, SecondType, Series, NA,
 };
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -130,10 +130,9 @@ fn pine_print<'a>(
 pub const VAR_NAME: &'static str = "print";
 
 pub fn declare_var<'a>() -> VarResult<'a> {
-    let value = PineRef::new(Callable::new(
-        None,
-        Some(Box::new(ParamCollectCall::new(pine_print))),
-    ));
+    let value = PineRef::new(CallableFactory::new(|| {
+        Callable::new(None, Some(Box::new(ParamCollectCall::new(pine_print))))
+    }));
     let syntax_type = SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType::new((
         vec![("item", SyntaxType::Series(SimpleSyntaxType::Float))],
         SyntaxType::Void,

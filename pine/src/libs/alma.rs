@@ -44,8 +44,8 @@ impl<'a> SeriesCall<'a> for AlmaVal {
         //     norm := norm + weight
         //     sum := sum + series[windowsize - i - 1] * weight
         // sum / norm
-        let mut norm = 0.0f64;
-        let mut sum = 0.0f64;
+        let mut norm = 0f64;
+        let mut sum = 0f64;
         for i in 0..length as usize {
             let weight = ((-1f64 * (i as f64 - m).powi(2)) / (2f64 * s.powi(2))).exp();
             norm += norm + weight;
@@ -93,23 +93,6 @@ mod tests {
     use crate::types::Series;
     use crate::{LibInfo, PineParser, PineRunner};
     // use crate::libs::{floor, exp, };
-
-    const ALMA_SCRIPT: &str = "
-    print(alma(close, 9, 0.85, 6))
-
-    // same on pine, but much less efficient
-    pine_alma(series, windowsize, offset, sigma) =>
-        m = floor(offset * (windowsize - 1))
-        s = windowsize / sigma
-        norm = 0.0
-        sum = 0.0
-        for i = 0 to windowsize - 1
-            weight = exp(-1 * pow(i - m, 2) / (2 * pow(s, 2)))
-            norm := norm + weight
-            sum := sum + series[windowsize - i - 1] * weight
-        sum / norm
-    print(pine_alma(close, 9, 0.85, 6))
-    ";
 
     #[test]
     fn alma_test() {

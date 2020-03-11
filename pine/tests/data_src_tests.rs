@@ -258,3 +258,70 @@ fn plot_only_test() {
     println!("{:?}", parser.parse_src(String::from("plot(close)")));
     assert!(parser.parse_src(String::from("plot(close)")).is_ok());
 }
+
+const ALMA_SCRIPT: &str = "
+m1 = (alma(close, 4, 0.85, 2.0))
+
+// same on pine, but much less efficient
+pine_alma(series, windowsize, offset, sigma) =>
+    m = floor(offset * (windowsize - 1))
+    s = windowsize / sigma
+    norm = 0.0
+    sum = 0.0
+    for i = 0 to windowsize - 1
+        weight = exp(-1 * pow(i - m, 2) / (2 * pow(s, 2)))
+        norm := norm + weight
+        sum := sum + series[windowsize - i - 1] * weight
+    sum / norm
+m2 = (pine_alma(close, 4, 0.85, 2.0))
+";
+
+#[test]
+fn alma_test() {
+    use pine::ast::stat_expr_types::VarIndex;
+    use pine::helper::pine_ref_to_f64_series;
+    use pine::libs::{alma, ceil, cos, pow};
+    use pine::runtime::{NoneCallback, VarOperate};
+
+    let lib_info = pine::LibInfo::new(
+        vec![
+            print::declare_var(),
+            cos::declare_exp_var(),
+            ceil::declare_floor_var(),
+            pow::declare_var(),
+            alma::declare_var(),
+        ],
+        vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+    parser.parse_src(String::from(ALMA_SCRIPT)).unwrap();
+    let data = vec![(
+        "close",
+        AnySeries::from_float_vec(vec![
+            Some(200f64),
+            Some(400f64),
+            Some(400f64),
+            Some(400f64),
+            Some(400f64),
+            Some(400f64),
+        ]),
+    )];
+
+    assert!(parser.run_with_data(data, None).is_ok());
+
+    let result1 = parser
+        .get_runner()
+        .get_context()
+        .move_var(VarIndex::new(6, 0));
+    let result2 = parser
+        .get_runner()
+        .get_context()
+        .move_var(VarIndex::new(8, 0));
+    let val1 = pine_ref_to_f64_series(result1);
+    let val2 = pine_ref_to_f64_series(result2);
+    assert_eq!(
+        val1.unwrap().index_value(1).unwrap().unwrap().floor(),
+        val2.unwrap().index_value(1).unwrap().unwrap().floor()
+    );
+    // println!("{:?} {:?}", result1, result2);
+}

@@ -13,6 +13,7 @@ use crate::types::{
     downcast_pf_ref, int2float, Arithmetic, Callable, Evaluate, EvaluateVal, Float, Int, PineRef,
     RefData, RuntimeErr, Series, SeriesCall, NA,
 };
+use std::f64;
 use std::mem;
 use std::rc::Rc;
 
@@ -47,6 +48,55 @@ fn wma_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<PineRef<'
         }
     }
     Ok(PineRef::new(Series::from(Some(sum / norm))))
+}
+
+fn deviation(values: Vec<f64>, avg: f64) -> f64 {
+    values.iter().fold(0f64, |mul, x| mul + (x - avg).abs())
+}
+
+fn variance(values: Vec<f64>, avg: f64) -> f64 {
+    let v = values.iter().fold(0f64, |mul, x| mul + (x - avg).powi(2)) / values.len() as f64;
+    v.sqrt()
+}
+
+fn stdev(values: Vec<f64>, avg: f64) -> f64 {
+    let v = values.iter().fold(0f64, |mul, x| mul + (x - avg).powi(2)) / (values.len() - 1) as f64;
+    v.sqrt()
+}
+
+fn generic_dev_func<'a>(
+    source: RefData<Series<Float>>,
+    length: i64,
+    func: fn(Vec<f64>, f64) -> f64,
+) -> Result<PineRef<'a>, RuntimeErr> {
+    let mut values = vec![];
+    for i in 0..length as usize {
+        if let Some(val) = source.index_value(i)? {
+            values.push(val);
+        }
+    }
+    if values.is_empty() {
+        return Ok(PineRef::new(Series::from(Float::from(None))));
+    }
+    let avg: f64 = values.iter().sum::<f64>() / values.len() as f64;
+    let val = func(values, avg);
+    let result = if val.is_nan() { None } else { Some(val) };
+    Ok(PineRef::new(Series::from(result)))
+}
+
+fn dev_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<PineRef<'a>, RuntimeErr> {
+    generic_dev_func(source, length, deviation)
+}
+
+fn variance_func<'a>(
+    source: RefData<Series<Float>>,
+    length: i64,
+) -> Result<PineRef<'a>, RuntimeErr> {
+    generic_dev_func(source, length, variance)
+}
+
+fn stdev_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<PineRef<'a>, RuntimeErr> {
+    generic_dev_func(source, length, stdev)
 }
 
 type HandleFunc<'a> = fn(RefData<Series<Float>>, i64) -> Result<PineRef<'a>, RuntimeErr>;
@@ -107,6 +157,18 @@ pub fn declare_wma_var<'a>() -> VarResult<'a> {
     declare_ma_var("wma", wma_func)
 }
 
+pub fn declare_dev_var<'a>() -> VarResult<'a> {
+    declare_ma_var("dev", dev_func)
+}
+
+pub fn declare_variance_var<'a>() -> VarResult<'a> {
+    declare_ma_var("variance", variance_func)
+}
+
+pub fn declare_stdev_var<'a>() -> VarResult<'a> {
+    declare_ma_var("stdev", stdev_func)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -120,10 +182,18 @@ mod tests {
     #[test]
     fn alma_test() {
         let lib_info = LibInfo::new(
-            vec![declare_sma_var(), declare_wma_var()],
+            vec![
+                declare_sma_var(),
+                declare_wma_var(),
+                declare_dev_var(),
+                declare_variance_var(),
+                declare_stdev_var(),
+            ],
             vec![("close", SyntaxType::float_series())],
         );
-        let src = "m = sma(close, 2)\nm2 = wma(close, 2)";
+        let src = "m = sma(close, 2)\nm2 = wma(close, 2)\n
+        m3 = dev(close, 2)\nm4 = variance(close, 2)\n
+        m5 = stdev(close, 2)";
         let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
 
@@ -138,12 +208,27 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(3, 0)),
+            runner.get_context().move_var(VarIndex::new(6, 0)),
             Some(PineRef::new(Series::from_vec(vec![None, Some(9f64)])))
         );
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(4, 0)),
+            runner.get_context().move_var(VarIndex::new(7, 0)),
             Some(PineRef::new(Series::from_vec(vec![None, Some(10f64)])))
+        );
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(8, 0)),
+            Some(PineRef::new(Series::from_vec(vec![Some(0f64), Some(6f64)])))
+        );
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(9, 0)),
+            Some(PineRef::new(Series::from_vec(vec![Some(0f64), Some(3f64)])))
+        );
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(10, 0)),
+            Some(PineRef::new(Series::from_vec(vec![
+                None,
+                Some(18f64.sqrt())
+            ])))
         );
     }
 }

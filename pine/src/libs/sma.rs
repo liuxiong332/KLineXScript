@@ -17,7 +17,7 @@ use std::f64;
 use std::mem;
 use std::rc::Rc;
 
-fn sma_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<PineRef<'a>, RuntimeErr> {
+pub fn sma_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<Float, RuntimeErr> {
     let mut sum = 0f64;
     for i in 0..length as usize {
         match source.index_value(i)? {
@@ -25,14 +25,14 @@ fn sma_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<PineRef<'
                 sum += val / length as f64;
             }
             None => {
-                return Ok(PineRef::new_rc(Series::from(Float::from(None))));
+                return Ok(Float::from(None));
             }
         }
     }
-    Ok(PineRef::new(Series::from(Some(sum))))
+    Ok(Some(sum))
 }
 
-fn wma_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<PineRef<'a>, RuntimeErr> {
+fn wma_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<Float, RuntimeErr> {
     let mut norm = 0f64;
     let mut sum = 0f64;
     for i in 0..length as usize {
@@ -43,11 +43,11 @@ fn wma_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<PineRef<'
                 sum += val * weight as f64;
             }
             None => {
-                return Ok(PineRef::new_rc(Series::from(Float::from(None))));
+                return Ok(Float::from(None));
             }
         }
     }
-    Ok(PineRef::new(Series::from(Some(sum / norm))))
+    Ok(Some(sum / norm))
 }
 
 fn deviation(values: Vec<f64>, avg: f64) -> f64 {
@@ -68,7 +68,7 @@ fn generic_dev_func<'a>(
     source: RefData<Series<Float>>,
     length: i64,
     func: fn(Vec<f64>, f64) -> f64,
-) -> Result<PineRef<'a>, RuntimeErr> {
+) -> Result<Float, RuntimeErr> {
     let mut values = vec![];
     for i in 0..length as usize {
         if let Some(val) = source.index_value(i)? {
@@ -76,30 +76,27 @@ fn generic_dev_func<'a>(
         }
     }
     if values.is_empty() {
-        return Ok(PineRef::new(Series::from(Float::from(None))));
+        return Ok(Float::from(None));
     }
     let avg: f64 = values.iter().sum::<f64>() / values.len() as f64;
     let val = func(values, avg);
     let result = if val.is_nan() { None } else { Some(val) };
-    Ok(PineRef::new(Series::from(result)))
+    Ok(result)
 }
 
-fn dev_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<PineRef<'a>, RuntimeErr> {
+fn dev_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<Float, RuntimeErr> {
     generic_dev_func(source, length, deviation)
 }
 
-fn variance_func<'a>(
-    source: RefData<Series<Float>>,
-    length: i64,
-) -> Result<PineRef<'a>, RuntimeErr> {
+fn variance_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<Float, RuntimeErr> {
     generic_dev_func(source, length, variance)
 }
 
-fn stdev_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<PineRef<'a>, RuntimeErr> {
+pub fn stdev_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<Float, RuntimeErr> {
     generic_dev_func(source, length, stdev)
 }
 
-type HandleFunc<'a> = fn(RefData<Series<Float>>, i64) -> Result<PineRef<'a>, RuntimeErr>;
+type HandleFunc = fn(RefData<Series<Float>>, i64) -> Result<Float, RuntimeErr>;
 
 #[derive(Debug, Clone, PartialEq)]
 struct SmaVal {
@@ -121,10 +118,10 @@ impl<'a> SeriesCall<'a> for SmaVal {
     ) -> Result<PineRef<'a>, RuntimeErr> {
         move_tuplet!((source, length) = param);
 
-        let func = unsafe { mem::transmute::<_, HandleFunc<'a>>(self.ma_func) };
+        let func = unsafe { mem::transmute::<_, HandleFunc>(self.ma_func) };
         let source = require_param("source", pine_ref_to_f64_series(source))?;
         let length = require_param("length", pine_ref_to_i64(length))?;
-        func(source, length)
+        Ok(PineRef::new(Series::from(func(source, length)?)))
     }
 
     fn copy(&self) -> Box<dyn SeriesCall<'a> + 'a> {
@@ -132,7 +129,7 @@ impl<'a> SeriesCall<'a> for SmaVal {
     }
 }
 
-fn declare_ma_var<'a>(name: &'static str, handle: HandleFunc<'a>) -> VarResult<'a> {
+fn declare_ma_var<'a>(name: &'static str, handle: HandleFunc) -> VarResult<'a> {
     let value = PineRef::new(Callable::new(
         None,
         Some(Box::new(SmaVal::new(handle as *mut ()))),

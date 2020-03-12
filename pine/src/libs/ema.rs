@@ -30,7 +30,7 @@ fn ema_func<'a>(source: Float, length: i64, prev_val: Float) -> Result<Float, Ru
     Ok(Some(sum))
 }
 
-fn rma_func<'a>(source: Float, length: i64, prev_val: Float) -> Result<Float, RuntimeErr> {
+pub fn rma_func<'a>(source: Float, length: i64, prev_val: Float) -> Result<Float, RuntimeErr> {
     let mut sum = 0f64;
     let alpha = length as f64;
     match source {

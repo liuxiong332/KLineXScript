@@ -1,6 +1,7 @@
 pub mod abs;
 pub mod accdist;
 pub mod alma;
+pub mod atr;
 pub mod avg;
 pub mod barstate;
 pub mod ceil;
@@ -115,6 +116,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         sma::declare_wma_var(),
         ema::declare_ema_var(),
         ema::declare_rma_var(),
+        atr::declare_var(),
     ];
     debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());

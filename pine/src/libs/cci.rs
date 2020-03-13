@@ -1,4 +1,6 @@
+use super::atr::series_index;
 use super::ema::rma_func;
+use super::sma::sma_func;
 use super::VarResult;
 use crate::ast::stat_expr_types::VarIndex;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
@@ -12,15 +14,9 @@ use crate::types::{
     downcast_pf_ref, int2float, Arithmetic, Callable, CallableFactory, Float, Int, PineRef,
     RefData, RuntimeErr, Series, SeriesCall,
 };
+use std::cmp;
 use std::mem;
 use std::rc::Rc;
-
-pub fn series_index(series: &Option<RefData<Series<Float>>>, index: usize) -> Float {
-    match series {
-        None => None,
-        Some(s) => s.index_value(index).unwrap(),
-    }
-}
 
 fn float_max(f1: Float, f2: Float, f3: Float) -> Float {
     vec![f1.unwrap_or(0f64), f2.unwrap_or(0f64), f3.unwrap_or(0f64)]
@@ -48,27 +44,26 @@ fn true_range(
 }
 
 #[derive(Debug, Clone, PartialEq)]
-struct AtrVal {
-    close_index: VarIndex,
+struct CciVal {
+    // close_index: VarIndex,
     low_index: VarIndex,
     high_index: VarIndex,
-    val_history: Vec<Float>,
-    prev_val: Float,
+    ma_history: Vec<Float>,
+    tp_history: Vec<Float>,
 }
 
-impl AtrVal {
-    pub fn new() -> AtrVal {
-        AtrVal {
-            close_index: VarIndex::new(0, 0),
+impl CciVal {
+    pub fn new() -> CciVal {
+        CciVal {
             low_index: VarIndex::new(0, 0),
             high_index: VarIndex::new(0, 0),
-            val_history: vec![],
-            prev_val: Some(0f64),
+            ma_history: vec![],
+            tp_history: vec![],
         }
     }
 }
 
-impl<'a> SeriesCall<'a> for AtrVal {
+impl<'a> SeriesCall<'a> for CciVal {
     fn step(
         &mut self,
         ctx: &mut dyn Ctx<'a>,
@@ -79,32 +74,62 @@ impl<'a> SeriesCall<'a> for AtrVal {
             downcast_ctx(ctx).add_input_src(InputSrc::new(
                 None,
                 vec![
-                    String::from("close"),
+                    // String::from("close"),
                     String::from("low"),
                     String::from("high"),
                 ],
             ));
 
-            self.close_index = VarIndex::new(*ctx.get_varname_index("close").unwrap(), 0);
+            // self.close_index = VarIndex::new(*ctx.get_varname_index("close").unwrap(), 0);
             self.low_index = VarIndex::new(*ctx.get_varname_index("low").unwrap(), 0);
             self.high_index = VarIndex::new(*ctx.get_varname_index("high").unwrap(), 0);
         }
 
-        let length = require_param("length", pine_ref_to_i64(mem::replace(&mut param[0], None)))?;
+        let series = pine_ref_to_f64_series(mem::replace(&mut param[0], None));
 
-        let close = pine_ref_to_f64_series(ctx.get_var(self.close_index).clone());
-        let low = pine_ref_to_f64_series(ctx.get_var(self.low_index).clone());
-        let high = pine_ref_to_f64_series(ctx.get_var(self.high_index).clone());
+        let length = require_param("length", pine_ref_to_i64(mem::replace(&mut param[1], None)))?;
 
-        let result = rma_func(true_range(&close, &high, &low), length, self.prev_val)?;
-        self.prev_val = result;
-        self.val_history.push(result);
-        Ok(PineRef::new(Series::from(result)))
+        let low = pine_ref_to_f64(ctx.get_var(self.low_index).clone());
+        let high = pine_ref_to_f64(ctx.get_var(self.high_index).clone());
+
+        // TP t ＝ ( 最高價t ＋ 最低價t ＋ 收盤價t  ) ／３
+        let tp = series_index(&series, 0).add(high).add(low).div(Some(3f64));
+        println!("tp val {:?}", tp);
+
+        let start_i = cmp::max(0, self.ma_history.len() as i64 - length + 1) as usize;
+
+        // MA t ＝(  TPt  +  TPt-1  + ．．． +  TP t-n+1 ) ／ ｎ
+        let ma_his = self.tp_history[start_i..]
+            .iter()
+            .fold(Some(0f64), |sum, v| sum.add(v.clone()));
+        let ma = tp.add(ma_his).div(Some(length as f64));
+        println!("ma val {:?}", ma);
+
+        // MD t ＝(｜MAt－TPt｜＋｜MAt-1－TPt-1 ｜＋．．．．＋｜MAt-n+1－TPt-n+1｜)／ｎ
+        let md_his = self.ma_history[start_i..]
+            .iter()
+            .zip(self.tp_history[start_i..].iter())
+            .fold(Some(0f64), |sum, (v1, v2)| {
+                sum.add(float_abs(v1.minus(v2.clone())))
+            });
+        let md = float_abs(tp.minus(ma)).add(md_his).div(Some(length as f64));
+        println!("md val {:?}", md);
+
+        self.tp_history.push(tp);
+        self.ma_history.push(ma);
+
+        // CCI t ＝ ( TP t－MA t ) ／ (  0.015 * MD t )
+        let cci = tp.minus(ma).div(md.mul(Some(0.015f64)));
+        // let result = rma_func(true_range(&close, &high, &low), length, self.prev_val)?;
+        // self.prev_val = result;
+        // self.val_history.push(result);
+
+        Ok(PineRef::new(Series::from(cci)))
     }
 
     fn back(&mut self, _context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
-        self.val_history.pop();
-        self.prev_val = *self.val_history.last().unwrap();
+        self.ma_history.pop();
+        self.tp_history.pop();
         Ok(())
     }
 
@@ -112,17 +137,20 @@ impl<'a> SeriesCall<'a> for AtrVal {
         Box::new(self.clone())
     }
 }
-pub const VAR_NAME: &'static str = "atr";
+pub const VAR_NAME: &'static str = "cci";
 
 pub fn declare_var<'a>() -> VarResult<'a> {
     let value = PineRef::new(CallableFactory::new(|| {
-        Callable::new(None, Some(Box::new(AtrVal::new())))
+        Callable::new(None, Some(Box::new(CciVal::new())))
     }));
 
     // plot(series, title, color, linewidth, style, trackprice, transp, histbase, offset, join, editable, show_last) → plot
 
     let func_type = FunctionTypes(vec![FunctionType::new((
-        vec![("length", SyntaxType::int())],
+        vec![
+            ("source", SyntaxType::float_series()),
+            ("length", SyntaxType::int()),
+        ],
         SyntaxType::float_series(),
     ))]);
     let syntax_type = SyntaxType::Function(Rc::new(func_type));
@@ -137,6 +165,7 @@ mod tests {
     use crate::runtime::{AnySeries, NoneCallback};
     use crate::types::Series;
     use crate::{LibInfo, PineParser, PineRunner};
+    use std::f64;
 
     #[test]
     fn accdist_test() {
@@ -148,7 +177,7 @@ mod tests {
                 ("low", SyntaxType::float_series()),
             ],
         );
-        let src = "m = atr(2)";
+        let src = "m = cci(close, 2)";
         let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
 
@@ -165,18 +194,19 @@ mod tests {
                     ),
                     (
                         "low",
-                        AnySeries::from_float_vec(vec![Some(1f64), Some(2f64)]),
+                        AnySeries::from_float_vec(vec![Some(2f64), Some(0f64)]),
                     ),
                 ],
                 None,
             )
             .unwrap();
-
-        let val1 = rma_func(Some(14f64), 2, None).unwrap();
-        let val2 = rma_func(Some(20f64), 2, val1).unwrap();
+        // tp 9  ma 4.5 md 2.25  14 11.5  3.5
         assert_eq!(
             runner.get_context().get_var(VarIndex::new(4, 0)),
-            &Some(PineRef::new(Series::from_vec(vec![val1, val2])))
+            &Some(PineRef::new(Series::from_vec(vec![
+                Some(4.5f64 / (2.25f64 * 0.015f64)),
+                Some(2.5f64 / (3.5f64 * 0.015f64))
+            ])))
         );
     }
 }

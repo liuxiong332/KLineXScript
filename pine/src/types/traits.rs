@@ -57,7 +57,7 @@ pub trait PineType<'a> {
 
 impl<'a> fmt::Debug for dyn PineType<'a> + 'a {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use super::{Bool, Color, Float, Int, Series};
+        use super::{Bool, Color, Float, Int, Series, Tuple};
 
         match self.get_type() {
             (DataType::Int, SecondType::Simple) => downcast_ref::<Int>(self).unwrap().fmt(f),
@@ -83,6 +83,8 @@ impl<'a> fmt::Debug for dyn PineType<'a> + 'a {
             (DataType::Color, SecondType::Series) => {
                 downcast_ref::<Series<Color>>(self).unwrap().fmt(f)
             }
+
+            (DataType::Tuple, SecondType::Simple) => downcast_ref::<Tuple>(self).unwrap().fmt(f),
 
             (DataType::Int, SecondType::Array) => downcast_ref::<Vec<Int>>(self).unwrap().fmt(f),
             (DataType::Float, SecondType::Array) => {

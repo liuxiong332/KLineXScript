@@ -1117,7 +1117,6 @@ mod tests {
         );
 
         context.create_var(series_index.varid, PineRef::new_rc(Series::from(Some(10))));
-        // println!("{:?}", context.move_var("series"));
         assert_eq!(
             series_exp.run(&mut context).unwrap(),
             PineRef::new(Series::from(Some(10)))

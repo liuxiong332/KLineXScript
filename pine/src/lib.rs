@@ -26,14 +26,14 @@ pub mod types;
 use ast::error::PineErrorKind;
 use ast::input::{Input, Position, StrRange};
 use ast::stat_expr::block;
-use ast::stat_expr_types::Block;
+use ast::stat_expr_types::{Block, VarIndex};
 use ast::state::{AstState, PineInputError};
 use ast::syntax_type::{SimpleSyntaxType, SyntaxType};
 
 use syntax::SyntaxParser;
 
 use libs::{declare_vars, VarResult};
-use runtime::context::{Context, PineRuntimeError};
+use runtime::context::{Context, PineRuntimeError, VarOperate};
 use runtime::data_src::{Callback, DataSrc};
 use runtime::error_format::{ErrorFormater, PineFormatError};
 use runtime::output::{IOInfo, InputVal, OutputDataCollect, SymbolInfo};
@@ -471,6 +471,13 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
 
     pub fn move_parser(&mut self) -> Option<SyntaxParser<'pa>> {
         mem::replace(&mut self.syntax_parser, None)
+    }
+
+    pub fn move_var(&mut self, var_index: VarIndex) -> Option<PineRef<'pa>> {
+        let runner: &mut PineRunner<'ra, 'rb, 'rc> = self.get_runner();
+
+        let context = runner.get_context();
+        unsafe { mem::transmute::<_, Option<PineRef<'pa>>>(context.move_var(var_index)) }
     }
 }
 

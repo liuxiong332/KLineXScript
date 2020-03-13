@@ -32,12 +32,9 @@ impl<'a> SeriesCall<'a> for BbVal {
         let basis = sma_func(RefData::clone(&series), length)?;
         let dev = Some(mult).mul(stdev_func(series, length)?);
 
-        //[basis, basis + dev, basis - dev]
-        Ok(PineRef::new(Tuple(vec![
-            PineRef::new(Series::from(basis)),
-            PineRef::new(Series::from(basis.add(dev))),
-            PineRef::new(Series::from(basis.minus(dev))),
-        ])))
+        // ((basis + dev) - (basis - dev)) / basis
+        let result = basis.add(dev).minus(basis.minus(dev)).div(basis);
+        Ok(PineRef::new(Series::from(result)))
     }
 
     fn copy(&self) -> Box<dyn SeriesCall<'a> + 'a> {
@@ -54,19 +51,16 @@ pub fn declare_var<'a>() -> VarResult<'a> {
             ("length", SyntaxType::int()),
             ("mult", SyntaxType::float()),
         ],
-        SyntaxType::Tuple(Rc::new(vec![
-            SyntaxType::float_series(),
-            SyntaxType::float_series(),
-            SyntaxType::float_series(),
-        ])),
+        SyntaxType::float_series(),
     ))]);
     let syntax_type = SyntaxType::Function(Rc::new(func_type));
-    VarResult::new(value, syntax_type, "bb")
+    VarResult::new(value, syntax_type, "bbw")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ast::stat_expr_types::VarIndex;
     use crate::ast::syntax_type::SyntaxType;
     use crate::runtime::VarOperate;
     use crate::runtime::{AnySeries, NoneCallback};
@@ -75,12 +69,12 @@ mod tests {
     // use crate::libs::{floor, exp, };
 
     #[test]
-    fn alma_test() {
+    fn bbw_test() {
         let lib_info = LibInfo::new(
             vec![declare_var()],
             vec![("close", SyntaxType::float_series())],
         );
-        let src = "[m1, m2, m3] = bb(close, 2, 1.2)";
+        let src = "m1 = bbw(close, 2, 1.2)";
         let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
 
@@ -93,10 +87,14 @@ mod tests {
                 None,
             )
             .unwrap();
-
-        assert_eq!(
-            runner.get_context().move_var(VarIndex::new(2, 0)),
-            Some(PineRef::new(Series::from_vec(vec![None, Some(9f64)])))
-        );
+        // 9 +   None, 3 * sqrt(2) * 1.2 * 2 / 9
+        let res = 18f64.sqrt() * 1.2f64 * 2f64 / 9f64;
+        let series = pine_ref_to_f64_series(runner.get_context().move_var(VarIndex::new(2, 0)));
+        let res_val = series.unwrap().index_value(1).unwrap().unwrap();
+        assert!((res_val - res).abs() < 0.1f64);
+        // assert_eq!(
+        //     ,
+        //     Some(PineRef::new(Series::from_vec(vec![None, Some(res)])))
+        // );
     }
 }

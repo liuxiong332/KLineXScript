@@ -9,7 +9,7 @@ use super::stat_expr_types::*;
 use super::state::{AstState, PineInputError};
 use super::string::string_lit_ws;
 use super::trans::flatexp_from_components;
-use super::utils::{eat_sep, eat_statement, statement_end, statement_indent};
+use super::utils::{eat_sep, eat_space, eat_statement, statement_end, statement_indent};
 use nom::{
     branch::alt,
     bytes::complete::tag,
@@ -228,7 +228,8 @@ fn search_prefix_ref_func<'a>(
     };
 
     match tuple((
-        eat_sep(tag("(")),
+        // eat_sep(tag("(")),
+        eat_space(tag("(")), // The function call cannot cross multi lines
         |s| func_call_args(s, state),
         eat_sep(tag(")")),
     ))(input)

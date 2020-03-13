@@ -3,12 +3,19 @@ use super::error::{PineError, PineErrorKind, PineResult};
 use super::input::Input;
 use nom::{
     branch::alt,
-    bytes::complete::{tag, take_while1},
+    bytes::complete::{tag, take_while, take_while1},
     combinator::recognize,
     multi::{count, many0},
     sequence::{delimited, preceded, tuple},
     Err,
 };
+
+pub fn is_space(c: char) -> bool {
+    match c {
+        ' ' | '\t' => true,
+        _ => false,
+    }
+}
 
 pub fn is_ws(c: char) -> bool {
     match c {
@@ -22,11 +29,23 @@ pub fn skip_ws(input: Input) -> PineResult {
     recognize(many0(ws_or_comment))(input)
 }
 
+pub fn skip_space(input: Input) -> PineResult {
+    let space = take_while(is_space);
+    recognize(space)(input)
+}
+
 pub fn eat_sep<'a, O, F>(fun: F) -> impl Fn(Input<'a>) -> PineResult<'a, O>
 where
     F: Fn(Input<'a>) -> PineResult<O>,
 {
     move |input: Input<'a>| preceded(skip_ws, &fun)(input)
+}
+
+pub fn eat_space<'a, O, F>(fun: F) -> impl Fn(Input<'a>) -> PineResult<'a, O>
+where
+    F: Fn(Input<'a>) -> PineResult<O>,
+{
+    move |input: Input<'a>| preceded(take_while(is_space), &fun)(input)
 }
 
 pub fn statement_indent<'a>(indent_count: usize) -> impl Fn(Input<'a>) -> PineResult {
@@ -83,6 +102,13 @@ mod tests {
         let test_in = Input::new_with_str("  hello");
         assert_eq!(
             eat_sep(tag("hello"))(test_in),
+            Ok((
+                Input::new("", Position::new(0, 7), Position::max()),
+                Input::new("hello", Position::new(0, 2), Position::new(0, 7))
+            ))
+        );
+        assert_eq!(
+            eat_space(tag("hello"))(test_in),
             Ok((
                 Input::new("", Position::new(0, 7), Position::max()),
                 Input::new("hello", Position::new(0, 2), Position::new(0, 7))

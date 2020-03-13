@@ -416,21 +416,71 @@ fn bb_test() {
     let upper = pine_ref_to_f64_series(parser.move_var(VarIndex::new(5, 0)));
     let lower = pine_ref_to_f64_series(parser.move_var(VarIndex::new(6, 0)));
 
-    let pineMiddle = pine_ref_to_f64_series(parser.move_var(VarIndex::new(8, 0)));
-    let pineUpper = pine_ref_to_f64_series(parser.move_var(VarIndex::new(9, 0)));
-    let pineLower = pine_ref_to_f64_series(parser.move_var(VarIndex::new(10, 0)));
+    let pine_middle = pine_ref_to_f64_series(parser.move_var(VarIndex::new(8, 0)));
+    let pine_upper = pine_ref_to_f64_series(parser.move_var(VarIndex::new(9, 0)));
+    let pine_lower = pine_ref_to_f64_series(parser.move_var(VarIndex::new(10, 0)));
     println!("val {:?} {:?} {:?}", middle, upper, lower);
     assert_eq!(
         middle.unwrap().index_value(1).unwrap().unwrap().floor(),
-        pineMiddle.unwrap().index_value(1).unwrap().unwrap().floor()
+        pine_middle
+            .unwrap()
+            .index_value(1)
+            .unwrap()
+            .unwrap()
+            .floor()
     );
     assert_eq!(
         upper.unwrap().index_value(1).unwrap().unwrap().floor(),
-        pineUpper.unwrap().index_value(1).unwrap().unwrap().floor()
+        pine_upper.unwrap().index_value(1).unwrap().unwrap().floor()
     );
     assert_eq!(
         lower.unwrap().index_value(1).unwrap().unwrap().floor(),
-        pineLower.unwrap().index_value(1).unwrap().unwrap().floor()
+        pine_lower.unwrap().index_value(1).unwrap().unwrap().floor()
     );
     // println!("{:?} {:?}", result1, result2);
+}
+
+const BBW_SCRIPT: &str = "
+m1 = (bbw(close, 2, 4))
+
+// the same on pine
+f_bbw(src, length, mult) =>
+    float basis = sma(src, length)
+    float dev = mult * stdev(src, length)
+    ((basis + dev) - (basis - dev)) / basis
+
+m2 = f_bbw(close, 2, 4)
+";
+
+#[test]
+fn bbw_test() {
+    use pine::ast::stat_expr_types::VarIndex;
+    use pine::helper::pine_ref_to_f64_series;
+    use pine::libs::{bbw, sma};
+    use pine::runtime::{NoneCallback, VarOperate};
+
+    let lib_info = pine::LibInfo::new(
+        vec![
+            bbw::declare_var(),
+            sma::declare_sma_var(),
+            sma::declare_stdev_var(),
+        ],
+        vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+    parser.parse_src(String::from(BBW_SCRIPT)).unwrap();
+    let data = vec![(
+        "close",
+        AnySeries::from_float_vec(vec![Some(200f64), Some(400f64)]),
+    )];
+
+    assert!(parser.run_with_data(data, None).is_ok());
+
+    let result1 = pine_ref_to_f64_series(parser.move_var(VarIndex::new(4, 0)));
+    let result2 = pine_ref_to_f64_series(parser.move_var(VarIndex::new(6, 0)));
+
+    assert_eq!(
+        result1.unwrap().index_value(1).unwrap().unwrap().floor(),
+        result2.unwrap().index_value(1).unwrap().unwrap().floor()
+    );
 }

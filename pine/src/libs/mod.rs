@@ -9,6 +9,7 @@ pub mod bbw;
 pub mod cci;
 pub mod ceil;
 pub mod change;
+pub mod cmo;
 pub mod color;
 pub mod cos;
 pub mod ema;
@@ -129,6 +130,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         cci::declare_var(),
         change::declare_mom_var(),
         change::declare_change_var(),
+        cmo::declare_var(),
     ];
     debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());

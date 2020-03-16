@@ -64,7 +64,7 @@ fn stdev(values: Vec<f64>, avg: f64) -> f64 {
     v.sqrt()
 }
 
-fn generic_dev_func<'a>(
+pub fn generic_dev_func<'a>(
     source: RefData<Series<Float>>,
     length: i64,
     func: fn(Vec<f64>, f64) -> f64,
@@ -129,7 +129,7 @@ impl<'a> SeriesCall<'a> for SmaVal {
     }
 }
 
-fn declare_ma_var<'a>(name: &'static str, handle: HandleFunc) -> VarResult<'a> {
+pub fn declare_ma_var<'a>(name: &'static str, handle: HandleFunc) -> VarResult<'a> {
     let value = PineRef::new(Callable::new(
         None,
         Some(Box::new(SmaVal::new(handle as *mut ()))),

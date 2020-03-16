@@ -28,6 +28,7 @@ pub mod print;
 pub mod security;
 pub mod sma;
 pub mod study;
+pub mod sum;
 pub mod syminfo;
 pub mod time;
 pub mod timenow;
@@ -131,6 +132,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         change::declare_mom_var(),
         change::declare_change_var(),
         cmo::declare_var(),
+        sum::declare_var(),
     ];
     debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());

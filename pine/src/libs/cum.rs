@@ -12,7 +12,6 @@ use crate::types::{
 };
 
 fn sum_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<Float, RuntimeErr> {
-    println!("Get sum val {:?}", source);
     let mut sum_val = Some(0f64);
     for i in 0..length {
         let val = source.index_value(i as usize).unwrap();
@@ -21,8 +20,21 @@ fn sum_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<Float, Ru
     Ok(sum_val)
 }
 
-pub fn declare_var<'a>() -> VarResult<'a> {
-    declare_ma_var("sum", sum_func)
+pub fn declare_var<'a>(name: &'static str, handle: HandleFunc) -> VarResult<'a> {
+    let value = PineRef::new(Callable::new(
+        None,
+        Some(Box::new(SmaVal::new(handle as *mut ()))),
+    ));
+
+    let func_type = FunctionTypes(vec![FunctionType::new((
+        vec![
+            ("source", SyntaxType::float_series()),
+            ("length", SyntaxType::int()),
+        ],
+        SyntaxType::float_series(),
+    ))]);
+    let syntax_type = SyntaxType::Function(Rc::new(func_type));
+    VarResult::new(value, syntax_type, "cum")
 }
 
 #[cfg(test)]
@@ -37,7 +49,7 @@ mod tests {
     // use crate::libs::{floor, exp, };
 
     #[test]
-    fn sum_test() {
+    fn cmo_test() {
         let lib_info = LibInfo::new(
             vec![declare_var()],
             vec![("close", SyntaxType::float_series())],

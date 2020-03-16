@@ -525,6 +525,7 @@ fn cmo_test() {
     let result1 = pine_ref_to_f64_series(parser.move_var(VarIndex::new(4, 0)));
     let result2 = pine_ref_to_f64_series(parser.move_var(VarIndex::new(6, 0)));
 
+    println!("result {:?} {:?}", result1, result2);
     assert_eq!(
         result1.unwrap().index_value(1).unwrap().unwrap().floor(),
         result2.unwrap().index_value(1).unwrap().unwrap().floor()

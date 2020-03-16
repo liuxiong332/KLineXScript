@@ -10,8 +10,9 @@ use crate::helper::{
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::InputSrc;
 use crate::types::{
-    downcast_pf_ref, int2float, Arithmetic, Callable, Evaluate, EvaluateVal, Float, Int, PineRef,
-    RefData, RuntimeErr, Series, SeriesCall, NA,
+    downcast_pf_ref, int2float, Arithmetic, Callable, CallableCreator, CallableFactory, Evaluate,
+    EvaluateVal, Float, Int, ParamCollectCall, PineRef, RefData, RuntimeErr, Series, SeriesCall,
+    NA,
 };
 use std::f64;
 use std::mem;
@@ -129,11 +130,36 @@ impl<'a> SeriesCall<'a> for SmaVal {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+struct SmaCreator {
+    handle: *mut (),
+}
+
+impl SmaCreator {
+    pub fn new(handle: *mut ()) -> SmaCreator {
+        SmaCreator { handle }
+    }
+}
+
+impl<'a> CallableCreator<'a> for SmaCreator {
+    fn create(&self) -> Callable<'a> {
+        Callable::new(
+            None,
+            Some(Box::new(ParamCollectCall::new_with_caller(Box::new(
+                SmaVal::new(self.handle as *mut ()),
+            )))),
+        )
+    }
+
+    fn copy(&self) -> Box<dyn CallableCreator<'a>> {
+        Box::new(self.clone())
+    }
+}
+
 pub fn declare_ma_var<'a>(name: &'static str, handle: HandleFunc) -> VarResult<'a> {
-    let value = PineRef::new(Callable::new(
-        None,
-        Some(Box::new(SmaVal::new(handle as *mut ()))),
-    ));
+    let value = PineRef::new(CallableFactory::new_with_creator(Box::new(
+        SmaCreator::new(handle as *mut ()),
+    )));
 
     let func_type = FunctionTypes(vec![FunctionType::new((
         vec![

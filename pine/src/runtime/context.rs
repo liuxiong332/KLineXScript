@@ -168,6 +168,31 @@ pub fn commit_series_for_operator<'a>(operator: &mut dyn VarOperate<'a>) {
                 (DataType::Int, SecondType::Series) => commit_series::<Int>(val),
                 (DataType::Color, SecondType::Series) => commit_series::<Color>(val),
                 (DataType::Bool, SecondType::Series) => commit_series::<Bool>(val),
+                (DataType::String, SecondType::Series) => commit_series::<String>(val),
+                _ => val,
+            };
+            operator.update_var(index, ret_val);
+        }
+    }
+}
+
+pub fn rollback_series_for_operator<'a>(operator: &mut dyn VarOperate<'a>) {
+    let len: i32 = operator.var_len();
+    // The committed set used to make sure only one instance of series commmit.
+    let mut commited: HashSet<*const (dyn PineType<'a> + 'a)> = HashSet::new();
+    for k in 0..len {
+        let index = VarIndex::new(k, 0);
+        if let Some(val) = operator.move_var(index) {
+            if commited.contains(&val.as_ptr()) {
+                continue;
+            }
+            commited.insert(val.as_ptr());
+            let ret_val = match val.get_type() {
+                (DataType::Float, SecondType::Series) => roll_back_series::<Float>(val),
+                (DataType::Int, SecondType::Series) => roll_back_series::<Int>(val),
+                (DataType::Color, SecondType::Series) => roll_back_series::<Color>(val),
+                (DataType::Bool, SecondType::Series) => roll_back_series::<Bool>(val),
+                (DataType::String, SecondType::Series) => roll_back_series::<String>(val),
                 _ => val,
             };
             operator.update_var(index, ret_val);
@@ -180,6 +205,7 @@ where
     D: Default + PartialEq + PineStaticType + PineType<'a> + PineFrom<'a, D> + Clone + Debug + 'a,
 {
     let mut series: RefData<Series<D>> = Series::implicity_from(val).unwrap();
+    println!("Now series {:?}", series);
     series.roll_back();
     series.into_pf()
 }
@@ -499,19 +525,8 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
     }
 
     pub fn roll_back(&mut self) -> Result<(), PineRuntimeError> {
-        let len = self.vars.len() as i32;
-        for k in 0..len {
-            let index = VarIndex::new(k, 0);
-            let val = self.move_var(index).unwrap();
-            let ret_val = match val.get_type() {
-                (DataType::Float, SecondType::Series) => roll_back_series::<Float>(val),
-                (DataType::Int, SecondType::Series) => roll_back_series::<Int>(val),
-                (DataType::Color, SecondType::Series) => roll_back_series::<Color>(val),
-                (DataType::Bool, SecondType::Series) => roll_back_series::<Bool>(val),
-                _ => val,
-            };
-            self.update_var(index, ret_val);
-        }
+        rollback_series_for_operator(self);
+
         let mut callables = mem::replace(&mut self.runnables, vec![]);
         for callable in callables.iter_mut() {
             if let Err(code) = callable.borrow_mut().back(self) {

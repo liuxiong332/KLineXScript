@@ -103,7 +103,9 @@ impl<'a, D: Default + PineType<'a> + Clone + Debug + 'a> Series<'a, D> {
     }
 
     pub fn roll_back(&mut self) {
-        self.history.pop().unwrap();
+        if !self.history.is_empty() {
+            self.history.pop().unwrap();
+        }
     }
 
     pub fn get_current(&self) -> D {

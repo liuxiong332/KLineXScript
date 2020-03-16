@@ -4,7 +4,9 @@ use super::{
 };
 use crate::ast::stat_expr_types::VarIndex;
 use crate::ast::syntax_type::FunctionType;
-use crate::runtime::context::{commit_series_for_operator, Ctx, VarOperate};
+use crate::runtime::context::{
+    commit_series_for_operator, rollback_series_for_operator, Ctx, VarOperate,
+};
 use crate::runtime::statement::process_assign_val;
 use std::cell::{Cell, RefCell};
 use std::fmt;
@@ -60,6 +62,7 @@ pub type RunHandleFunc<'a> = fn(
 pub struct ParamCollectCall<'a> {
     step_func: Option<StepHandleFunc<'a>>,
     run_func: Option<RunHandleFunc<'a>>,
+    caller: Option<Box<dyn SeriesCall<'a> + 'a>>,
     params: Vec<Option<PineRef<'a>>>,
     func_type: Option<FunctionType<'a>>,
 }
@@ -76,6 +79,7 @@ impl<'a> ParamCollectCall<'a> {
             params: vec![],
             step_func: None,
             run_func: Some(func),
+            caller: None,
             func_type: None,
         }
     }
@@ -88,6 +92,17 @@ impl<'a> ParamCollectCall<'a> {
             params: vec![],
             step_func,
             run_func,
+            caller: None,
+            func_type: None,
+        }
+    }
+
+    pub fn new_with_caller(caller: Box<dyn SeriesCall<'a> + 'a>) -> ParamCollectCall<'a> {
+        ParamCollectCall {
+            params: vec![],
+            step_func: None,
+            run_func: None,
+            caller: Some(caller),
             func_type: None,
         }
     }
@@ -143,6 +158,10 @@ impl<'a> SeriesCall<'a> for ParamCollectCall<'a> {
             let ret_val = step(_context, self.params.clone(), func_type);
             commit_series_for_operator(&mut self.params);
             ret_val
+        } else if let Some(caller) = &mut self.caller {
+            let ret_val = caller.step(_context, self.params.clone(), func_type);
+            commit_series_for_operator(&mut self.params);
+            ret_val
         } else {
             // Commit all of the series variables.
             commit_series_for_operator(&mut self.params);
@@ -155,6 +174,16 @@ impl<'a> SeriesCall<'a> for ParamCollectCall<'a> {
         if let Some(run_func) = self.run_func {
             let val = self.params.clone();
             run_func(_context, val, self.func_type.take().unwrap())?;
+        } else if let Some(caller) = &mut self.caller {
+            caller.run(_context)?;
+        }
+        Ok(())
+    }
+
+    fn back(&mut self, _context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
+        rollback_series_for_operator(&mut self.params);
+        if let Some(caller) = &mut self.caller {
+            caller.back(_context)?;
         }
         Ok(())
     }
@@ -174,6 +203,10 @@ impl<'a> SeriesCall<'a> for ParamCollectCall<'a> {
             step_func: self.step_func.clone(),
             run_func: self.run_func.clone(),
             func_type: self.func_type.clone(),
+            caller: match &self.caller {
+                Some(caller) => Some(caller.copy()),
+                None => None,
+            },
         })
     }
 }
@@ -318,12 +351,45 @@ impl<'a> Runnable<'a> for Callable<'a> {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+pub trait CallableCreator<'a> {
+    fn create(&self) -> Callable<'a>;
+
+    fn copy(&self) -> Box<dyn CallableCreator<'a>>;
+}
+
+impl<'a> fmt::Debug for dyn CallableCreator<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        "Callable Factory".fmt(f)
+    }
+}
+
+#[derive(Debug)]
 pub struct CallableFactory<'a> {
-    create_func: fn() -> Callable<'a>,
+    create_func: Option<fn() -> Callable<'a>>,
+    creator: Option<Box<dyn CallableCreator<'a>>>,
 }
 
 impl<'a> PineFrom<'a, CallableFactory<'a>> for CallableFactory<'a> {}
+
+impl<'a> PartialEq for CallableFactory<'a> {
+    fn eq(&self, other: &CallableFactory<'a>) -> bool {
+        true
+    }
+}
+
+impl<'a> Clone for CallableFactory<'a> {
+    fn clone(&self) -> Self {
+        let creator = match self.creator {
+            Some(ref c) => Some(c.copy()),
+            None => None,
+        };
+
+        CallableFactory {
+            create_func: self.create_func.clone(),
+            creator,
+        }
+    }
+}
 
 impl<'a> PineStaticType for CallableFactory<'a> {
     fn static_type() -> (DataType, SecondType) {
@@ -348,11 +414,27 @@ impl<'a> ComplexType for CallableFactory<'a> {}
 
 impl<'a> CallableFactory<'a> {
     pub fn new(create_func: fn() -> Callable<'a>) -> CallableFactory<'a> {
-        CallableFactory { create_func }
+        CallableFactory {
+            create_func: Some(create_func),
+            creator: None,
+        }
+    }
+
+    pub fn new_with_creator(creator: Box<dyn CallableCreator<'a>>) -> CallableFactory<'a> {
+        CallableFactory {
+            create_func: None,
+            creator: Some(creator),
+        }
     }
 
     pub fn create(&self) -> Callable<'a> {
-        (self.create_func)()
+        if let Some(func) = self.create_func {
+            func()
+        } else if let Some(creator) = &self.creator {
+            creator.create()
+        } else {
+            unreachable!()
+        }
     }
 }
 
@@ -423,8 +505,8 @@ mod tests {
         );
         let arg1_val = downcast_pf::<Series<Int>>(arg1.unwrap()).unwrap();
         let arg2_val = downcast_pf::<Series<Int>>(arg2.unwrap()).unwrap();
-        assert_eq!(arg1_val.get_history(), &vec![Some(1), Some(3)]);
-        assert_eq!(arg2_val.get_history(), &vec![Some(2), Some(4)]);
+        assert_eq!(arg1_val.get_history(), &vec![Some(1)]);
+        assert_eq!(arg2_val.get_history(), &vec![Some(2)]);
         Ok(())
     }
 

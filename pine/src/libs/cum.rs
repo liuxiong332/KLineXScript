@@ -6,10 +6,13 @@ use crate::helper::{
     move_element, pine_ref_to_bool, pine_ref_to_f64, pine_ref_to_f64_series, pine_ref_to_i64,
     require_param,
 };
+use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::types::{
-    downcast_pf_ref, int2float, Arithmetic, Callable, Evaluate, EvaluateVal, Float, Int, PineRef,
-    RefData, RuntimeErr, Series, SeriesCall, NA,
+    downcast_pf_ref, int2float, Arithmetic, Callable, CallableFactory, Evaluate, EvaluateVal,
+    Float, Int, PineRef, RefData, RuntimeErr, Series, SeriesCall, NA,
 };
+use std::mem;
+use std::rc::Rc;
 
 fn sum_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<Float, RuntimeErr> {
     let mut sum_val = Some(0f64);
@@ -20,17 +23,45 @@ fn sum_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<Float, Ru
     Ok(sum_val)
 }
 
-pub fn declare_var<'a>(name: &'static str, handle: HandleFunc) -> VarResult<'a> {
-    let value = PineRef::new(Callable::new(
-        None,
-        Some(Box::new(SmaVal::new(handle as *mut ()))),
-    ));
+#[derive(Debug, Clone, PartialEq)]
+struct CumVal {
+    prev_sum: Float,
+}
+
+impl CumVal {
+    pub fn new() -> CumVal {
+        CumVal {
+            prev_sum: Some(0f64),
+        }
+    }
+}
+
+impl<'a> SeriesCall<'a> for CumVal {
+    fn step(
+        &mut self,
+        _ctx: &mut dyn Ctx<'a>,
+        mut param: Vec<Option<PineRef<'a>>>,
+        _func_type: FunctionType<'a>,
+    ) -> Result<PineRef<'a>, RuntimeErr> {
+        let source = mem::replace(&mut param[0], None);
+
+        let source = pine_ref_to_f64(source);
+        self.prev_sum = self.prev_sum.add(source);
+        Ok(PineRef::new(Series::from(self.prev_sum)))
+    }
+
+    fn copy(&self) -> Box<dyn SeriesCall<'a> + 'a> {
+        Box::new(self.clone())
+    }
+}
+
+pub fn declare_var<'a>() -> VarResult<'a> {
+    let value = PineRef::new(CallableFactory::new(|| {
+        Callable::new(None, Some(Box::new(CumVal::new())))
+    }));
 
     let func_type = FunctionTypes(vec![FunctionType::new((
-        vec![
-            ("source", SyntaxType::float_series()),
-            ("length", SyntaxType::int()),
-        ],
+        vec![("x", SyntaxType::float_series())],
         SyntaxType::float_series(),
     ))]);
     let syntax_type = SyntaxType::Function(Rc::new(func_type));
@@ -49,12 +80,12 @@ mod tests {
     // use crate::libs::{floor, exp, };
 
     #[test]
-    fn cmo_test() {
+    fn cum_test() {
         let lib_info = LibInfo::new(
             vec![declare_var()],
             vec![("close", SyntaxType::float_series())],
         );
-        let src = "m = sum(close, 2)";
+        let src = "m = cum(close)";
         let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
 
@@ -70,7 +101,10 @@ mod tests {
 
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(2, 0)),
-            Some(PineRef::new(Series::from_vec(vec![None, Some(18f64),])))
+            Some(PineRef::new(Series::from_vec(vec![
+                Some(12f64),
+                Some(18f64),
+            ])))
         );
     }
 }

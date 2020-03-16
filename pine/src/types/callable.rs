@@ -372,7 +372,7 @@ pub struct CallableFactory<'a> {
 impl<'a> PineFrom<'a, CallableFactory<'a>> for CallableFactory<'a> {}
 
 impl<'a> PartialEq for CallableFactory<'a> {
-    fn eq(&self, other: &CallableFactory<'a>) -> bool {
+    fn eq(&self, _: &CallableFactory<'a>) -> bool {
         true
     }
 }

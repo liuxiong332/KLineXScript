@@ -12,6 +12,7 @@ pub mod change;
 pub mod cmo;
 pub mod color;
 pub mod cos;
+pub mod cum;
 pub mod ema;
 pub mod input;
 pub mod max;
@@ -133,6 +134,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         change::declare_change_var(),
         cmo::declare_var(),
         sum::declare_var(),
+        cum::declare_var(),
     ];
     debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());

@@ -502,22 +502,22 @@ m2 = f_cmo(close, 2)
 fn cmo_test() {
     use pine::ast::stat_expr_types::VarIndex;
     use pine::helper::pine_ref_to_f64_series;
-    use pine::libs::{bbw, sma};
+    use pine::libs::{change, cmo, sum};
     use pine::runtime::{NoneCallback, VarOperate};
 
     let lib_info = pine::LibInfo::new(
         vec![
-            bbw::declare_var(),
-            sma::declare_sma_var(),
-            sma::declare_stdev_var(),
+            cmo::declare_var(),
+            change::declare_change_var(),
+            sum::declare_var(),
         ],
         vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
     );
     let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
-    parser.parse_src(String::from(BBW_SCRIPT)).unwrap();
+    parser.parse_src(String::from(CMO_SCRIPT)).unwrap();
     let data = vec![(
         "close",
-        AnySeries::from_float_vec(vec![Some(200f64), Some(400f64)]),
+        AnySeries::from_float_vec(vec![Some(200f64), Some(400f64), Some(200f64)]),
     )];
 
     assert!(parser.run_with_data(data, None).is_ok());
@@ -525,6 +525,7 @@ fn cmo_test() {
     let result1 = pine_ref_to_f64_series(parser.move_var(VarIndex::new(4, 0)));
     let result2 = pine_ref_to_f64_series(parser.move_var(VarIndex::new(6, 0)));
 
+    println!("Get result {:?} {:?}", result1, result2);
     assert_eq!(
         result1.unwrap().index_value(1).unwrap().unwrap().floor(),
         result2.unwrap().index_value(1).unwrap().unwrap().floor()

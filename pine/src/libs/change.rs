@@ -17,6 +17,7 @@ fn change_func<'a>(
     let length = pine_ref_to_i64(length).unwrap_or(1i64) as usize;
 
     let val = series_index(&series, 0).minus(series_index(&series, length));
+    println!("Gen change {:?}", val);
     Ok(PineRef::new_rc(Series::from(val)))
 }
 

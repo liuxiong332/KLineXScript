@@ -13,6 +13,7 @@ use crate::types::{
 };
 
 fn sum_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<Float, RuntimeErr> {
+    println!("sum func {:?}", source);
     let mut sum_val = Some(0f64);
     for i in 0..length {
         let val = source.index_value(i as usize).unwrap();

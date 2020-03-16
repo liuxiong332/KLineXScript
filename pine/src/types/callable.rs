@@ -45,36 +45,50 @@ impl<'a> fmt::Debug for dyn SeriesCall<'a> {
     }
 }
 
+pub type StepHandleFunc<'a> = fn(
+    context: &mut dyn Ctx<'a>,
+    Vec<Option<PineRef<'a>>>,
+    FunctionType<'a>,
+) -> Result<PineRef<'a>, RuntimeErr>;
+
+pub type RunHandleFunc<'a> = fn(
+    context: &mut dyn Ctx<'a>,
+    Vec<Option<PineRef<'a>>>,
+    FunctionType<'a>,
+) -> Result<(), RuntimeErr>;
+
 pub struct ParamCollectCall<'a> {
-    func: fn(
-        context: &mut dyn Ctx<'a>,
-        Vec<Option<PineRef<'a>>>,
-        FunctionType<'a>,
-    ) -> Result<(), RuntimeErr>,
-    params: RefCell<Vec<Option<PineRef<'a>>>>,
-    func_type: Cell<Option<FunctionType<'a>>>,
+    step_func: Option<StepHandleFunc<'a>>,
+    run_func: Option<RunHandleFunc<'a>>,
+    params: Vec<Option<PineRef<'a>>>,
+    func_type: Option<FunctionType<'a>>,
 }
 
 impl<'a> fmt::Debug for ParamCollectCall<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let val = self.params.borrow();
-        let res = write!(f, "{:?}", val);
-        res
+        write!(f, "{:?}", self.params)
     }
 }
 
 impl<'a> ParamCollectCall<'a> {
-    pub fn new(
-        func: fn(
-            context: &mut dyn Ctx<'a>,
-            Vec<Option<PineRef<'a>>>,
-            FunctionType<'a>,
-        ) -> Result<(), RuntimeErr>,
+    pub fn new(func: RunHandleFunc<'a>) -> ParamCollectCall<'a> {
+        ParamCollectCall {
+            params: vec![],
+            step_func: None,
+            run_func: Some(func),
+            func_type: None,
+        }
+    }
+
+    pub fn new_with_fns(
+        step_func: Option<StepHandleFunc<'a>>,
+        run_func: Option<RunHandleFunc<'a>>,
     ) -> ParamCollectCall<'a> {
         ParamCollectCall {
-            params: RefCell::new(vec![]),
-            func,
-            func_type: Cell::new(None),
+            params: vec![],
+            step_func,
+            run_func,
+            func_type: None,
         }
     }
 }
@@ -106,7 +120,7 @@ impl<'a> SeriesCall<'a> for ParamCollectCall<'a> {
     fn init_param_len(&mut self, len: usize) {
         let mut params = Vec::with_capacity(len);
         params.resize_with(len, || None);
-        self.params.replace(params);
+        self.params = params;
     }
 
     fn step(
@@ -120,42 +134,44 @@ impl<'a> SeriesCall<'a> for ParamCollectCall<'a> {
             if let Some(v) = v {
                 let syntax_type = &func_type.signature.0[i].1;
                 // Merge all of the series variable into the exists series variable
-                process_assign_val(
-                    v,
-                    &mut *self.params.borrow_mut(),
-                    i as i32,
-                    Some(syntax_type),
-                )?;
+                process_assign_val(v, &mut self.params, i as i32, Some(syntax_type))?;
             }
         }
-        // Commit all of the series variables.
-        commit_series_for_operator(&mut *self.params.borrow_mut());
-        self.func_type.replace(Some(func_type));
-        Ok(PineRef::Box(Box::new(NA)))
+
+        // If the step function is specified, then we merge the series parameters.
+        if let Some(step) = self.step_func {
+            return step(_context, self.params.clone(), func_type);
+        } else {
+            // Commit all of the series variables.
+            commit_series_for_operator(&mut self.params);
+            self.func_type = Some(func_type);
+            Ok(PineRef::Box(Box::new(NA)))
+        }
     }
 
     fn run(&mut self, _context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
-        let val = self.params.borrow().clone();
-        (self.func)(_context, val, self.func_type.take().unwrap())?;
+        if let Some(run_func) = self.run_func {
+            let val = self.params.clone();
+            run_func(_context, val, self.func_type.take().unwrap())?;
+        }
         Ok(())
     }
 
     fn copy(&self) -> Box<dyn SeriesCall<'a> + 'a> {
-        let map = self.params.borrow();
-        let new_map: Vec<_> = map
+        let new_map: Vec<_> = self
+            .params
             .iter()
             .map(|v| match v {
                 None => None,
                 Some(v) => Some(v.copy()),
             })
             .collect();
-        // self.params.set(map);
-        let func_type = self.func_type.take();
-        self.func_type.replace(func_type.clone());
+
         Box::new(ParamCollectCall {
-            params: RefCell::new(new_map),
-            func: self.func,
-            func_type: Cell::new(func_type),
+            params: new_map,
+            step_func: self.step_func.clone(),
+            run_func: self.run_func.clone(),
+            func_type: self.func_type.clone(),
         })
     }
 }

@@ -3,7 +3,10 @@ use super::VarResult;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
 use crate::helper::{move_element, pine_ref_to_f64, pine_ref_to_f64_series, pine_ref_to_i64};
 use crate::runtime::context::{downcast_ctx, Ctx};
-use crate::types::{Arithmetic, Callable, Float, Int, PineFrom, PineRef, RuntimeErr, Series, NA};
+use crate::types::{
+    Arithmetic, Callable, CallableFactory, Float, Int, ParamCollectCall, PineFrom, PineRef,
+    RuntimeErr, Series, NA,
+};
 use std::mem;
 use std::rc::Rc;
 
@@ -17,12 +20,19 @@ fn change_func<'a>(
     let length = pine_ref_to_i64(length).unwrap_or(1i64) as usize;
 
     let val = series_index(&series, 0).minus(series_index(&series, length));
-    println!("Gen change {:?}", val);
     Ok(PineRef::new_rc(Series::from(val)))
 }
 
 fn declare_var<'a>(name: &'static str) -> VarResult<'a> {
-    let value = PineRef::new(Callable::new(Some(change_func), None));
+    let value = PineRef::new(CallableFactory::new(|| {
+        Callable::new(
+            None,
+            Some(Box::new(ParamCollectCall::new_with_fns(
+                Some(change_func),
+                None,
+            ))),
+        )
+    }));
 
     // plot(series, title, color, linewidth, style, trackprice, transp, histbase, offset, join, editable, show_last) → plot
 
@@ -54,7 +64,7 @@ mod tests {
     use crate::{LibInfo, PineParser, PineRunner};
 
     #[test]
-    fn abs_test() {
+    fn change_test() {
         let lib_info = LibInfo::new(
             vec![declare_change_var(), declare_mom_var()],
             vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],

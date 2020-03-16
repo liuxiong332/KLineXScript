@@ -140,7 +140,9 @@ impl<'a> SeriesCall<'a> for ParamCollectCall<'a> {
 
         // If the step function is specified, then we merge the series parameters.
         if let Some(step) = self.step_func {
-            return step(_context, self.params.clone(), func_type);
+            let ret_val = step(_context, self.params.clone(), func_type);
+            commit_series_for_operator(&mut self.params);
+            ret_val
         } else {
             // Commit all of the series variables.
             commit_series_for_operator(&mut self.params);

@@ -13,8 +13,6 @@ use crate::types::{
     downcast_pf_ref, int2float, Arithmetic, Callable, CallableFactory, Float, Int, PineRef,
     RefData, RuntimeErr, Series, SeriesCall,
 };
-use std::mem;
-use std::rc::Rc;
 
 pub const VAR_NAME: &'static str = "rising";
 

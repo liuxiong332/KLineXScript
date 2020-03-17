@@ -1,7 +1,8 @@
-use super::atr::series_index;
 use super::VarResult;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
-use crate::helper::{move_element, pine_ref_to_f64, pine_ref_to_f64_series, pine_ref_to_i64};
+use crate::helper::{
+    move_element, pine_ref_to_f64, pine_ref_to_f64_series, pine_ref_to_i64, series_index,
+};
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::types::{
     Arithmetic, Callable, CallableFactory, Float, Int, ParamCollectCall, PineFrom, PineRef,

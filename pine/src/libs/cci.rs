@@ -1,4 +1,3 @@
-use super::atr::series_index;
 use super::ema::rma_func;
 use super::sma::sma_func;
 use super::VarResult;
@@ -6,7 +5,7 @@ use crate::ast::stat_expr_types::VarIndex;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
 use crate::helper::{
     move_element, pine_ref_to_bool, pine_ref_to_f64, pine_ref_to_f64_series, pine_ref_to_i64,
-    require_param,
+    require_param, series_index,
 };
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::InputSrc;

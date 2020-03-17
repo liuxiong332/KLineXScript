@@ -1,4 +1,5 @@
 pub mod err_msgs;
+pub mod float_ops;
 pub mod node_finder;
 pub mod param_checker;
 pub mod pine_ref;
@@ -9,6 +10,7 @@ pub mod str_replace;
 #[macro_use]
 pub mod vec;
 
+pub use float_ops::*;
 pub use param_checker::*;
 pub use pine_ref::*;
 pub use resolution::*;

@@ -15,6 +15,7 @@ pub mod color;
 pub mod correlation;
 pub mod cos;
 pub mod cum;
+pub mod dmi;
 pub mod ema;
 pub mod input;
 pub mod max;
@@ -139,6 +140,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         cum::declare_var(),
         cog::declare_var(),
         correlation::declare_var(),
+        dmi::declare_var(),
     ];
     debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());

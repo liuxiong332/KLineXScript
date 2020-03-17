@@ -87,7 +87,7 @@ impl<'a, D: Default + PineType<'a> + Clone + Debug + 'a> Series<'a, D> {
         let val = match i {
             // m if m < 0 => Err(SeriesErr::Negative),
             0 => self.current.clone(),
-            m if m >= 1 && m <= len => self.history[(len - i) as usize].clone(),
+            m if m >= 1 && len >= 1 && m <= len => self.history[(len - i) as usize].clone(),
             _ => D::default(),
         };
         Ok(val)

@@ -17,6 +17,7 @@ pub mod cos;
 pub mod cum;
 pub mod dmi;
 pub mod ema;
+pub mod falling;
 pub mod input;
 pub mod max;
 pub mod na;
@@ -29,6 +30,7 @@ pub mod plotchar;
 pub mod plotshape;
 pub mod pow;
 pub mod print;
+pub mod rising;
 pub mod security;
 pub mod sma;
 pub mod study;
@@ -108,6 +110,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         cos::declare_asin_var(),
         cos::declare_tan_var(),
         cos::declare_atan_var(),
+        cos::declare_exp_var(),
         cos::declare_sqrt_var(),
         cos::declare_log_var(),
         cos::declare_log10_var(),
@@ -141,6 +144,8 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         cog::declare_var(),
         correlation::declare_var(),
         dmi::declare_var(),
+        falling::declare_var(),
+        rising::declare_var(),
     ];
     debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());

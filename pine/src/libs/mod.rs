@@ -20,8 +20,10 @@ pub mod ema;
 pub mod falling;
 pub mod fixnan;
 pub mod highest;
+pub mod highestbars;
 pub mod input;
 pub mod lowest;
+pub mod lowestbars;
 pub mod max;
 pub mod na;
 pub mod nz;
@@ -152,6 +154,8 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         fixnan::declare_var(),
         highest::declare_var(),
         lowest::declare_var(),
+        highestbars::declare_var(),
+        lowestbars::declare_var(),
     ];
     debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());

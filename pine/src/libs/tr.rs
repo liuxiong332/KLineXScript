@@ -9,52 +9,32 @@ use crate::helper::{
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::InputSrc;
 use crate::types::{
-    downcast_pf_ref, int2float, Arithmetic, Callable, CallableFactory, Float, Int, PineRef,
-    RefData, RuntimeErr, Series, SeriesCall,
+    downcast_pf_ref, int2float, Arithmetic, Callable, CallableEvaluate, CallableFactory,
+    EvaluateVal, Float, Int, ParamCollectCall, PineRef, RefData, RuntimeErr, Series, SeriesCall,
+    NA,
 };
 use std::mem;
 use std::rc::Rc;
 
-fn true_range(
-    close: &Option<RefData<Series<Float>>>,
-    high: &Option<RefData<Series<Float>>>,
-    low: &Option<RefData<Series<Float>>>,
-) -> Float {
-    //  max(high - low, abs(high - close[1]), abs(low - close[1]))
-    let v1 = series_index(high, 0).minus(series_index(low, 0));
-    let v2 = float_abs(series_index(high, 0).minus(series_index(close, 1)));
-    let v3 = float_abs(series_index(low, 0).minus(series_index(close, 1)));
-    float_max(v1, v2, v3)
-}
-
 #[derive(Debug, Clone, PartialEq)]
-struct AtrVal {
+struct TrVal {
     close_index: VarIndex,
     low_index: VarIndex,
     high_index: VarIndex,
-    val_history: Vec<Float>,
-    prev_val: Float,
+    prev_val: f64,
 }
 
-impl AtrVal {
-    pub fn new() -> AtrVal {
-        AtrVal {
+impl TrVal {
+    pub fn new() -> TrVal {
+        TrVal {
             close_index: VarIndex::new(0, 0),
             low_index: VarIndex::new(0, 0),
             high_index: VarIndex::new(0, 0),
-            val_history: vec![],
-            prev_val: Some(0f64),
+            prev_val: 0f64,
         }
     }
-}
 
-impl<'a> SeriesCall<'a> for AtrVal {
-    fn step(
-        &mut self,
-        ctx: &mut dyn Ctx<'a>,
-        mut param: Vec<Option<PineRef<'a>>>,
-        _func_type: FunctionType<'a>,
-    ) -> Result<PineRef<'a>, RuntimeErr> {
+    fn handle_index<'a>(&mut self, ctx: &mut dyn Ctx<'a>) {
         if !downcast_ctx(ctx).check_is_input_info_ready() {
             downcast_ctx(ctx).add_input_src(InputSrc::new(
                 None,
@@ -69,44 +49,90 @@ impl<'a> SeriesCall<'a> for AtrVal {
             self.low_index = VarIndex::new(*ctx.get_varname_index("low").unwrap(), 0);
             self.high_index = VarIndex::new(*ctx.get_varname_index("high").unwrap(), 0);
         }
-
-        let length = require_param("length", pine_ref_to_i64(mem::replace(&mut param[0], None)))?;
-
-        let close = pine_ref_to_f64_series(ctx.get_var(self.close_index).clone());
-        let low = pine_ref_to_f64_series(ctx.get_var(self.low_index).clone());
-        let high = pine_ref_to_f64_series(ctx.get_var(self.high_index).clone());
-
-        let result = rma_func(true_range(&close, &high, &low), length, self.prev_val)?;
-        self.prev_val = result;
-        self.val_history.push(result);
-        Ok(PineRef::new(Series::from(result)))
     }
 
-    fn back(&mut self, _context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
-        self.val_history.pop();
-        self.prev_val = *self.val_history.last().unwrap();
-        Ok(())
+    fn calc_tr<'a>(
+        &mut self,
+        ctx: &mut dyn Ctx<'a>,
+        handle_na: bool,
+    ) -> Result<PineRef<'a>, RuntimeErr> {
+        let high = pine_ref_to_f64(ctx.get_var(self.high_index).clone());
+        let low = pine_ref_to_f64(ctx.get_var(self.low_index).clone());
+
+        let close = pine_ref_to_f64_series(ctx.get_var(self.close_index).clone()).unwrap();
+
+        let preclose = close.index_value(1).unwrap();
+        let mut res = float_max(
+            high.minus(low),
+            float_abs(high.minus(preclose)),
+            float_abs(low.minus(preclose)),
+        );
+
+        if handle_na {
+            res = match res {
+                None => Some(self.prev_val),
+                Some(v) => {
+                    self.prev_val = v;
+                    Some(v)
+                }
+            };
+        }
+        // It is max(high - low, abs(high - close[1]), abs(low - close[1]))
+        Ok(PineRef::new_rc(Series::from(res)))
+    }
+}
+
+impl<'a> EvaluateVal<'a> for TrVal {
+    fn custom_name(&self) -> &str {
+        "tr"
+    }
+
+    fn call(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
+        self.handle_index(ctx);
+        self.calc_tr(ctx, false)
+    }
+
+    fn copy(&self) -> Box<dyn EvaluateVal<'a>> {
+        Box::new(self.clone())
+    }
+}
+
+impl<'a> SeriesCall<'a> for TrVal {
+    fn step(
+        &mut self,
+        ctx: &mut dyn Ctx<'a>,
+        mut param: Vec<Option<PineRef<'a>>>,
+        _func_type: FunctionType<'a>,
+    ) -> Result<PineRef<'a>, RuntimeErr> {
+        self.handle_index(ctx);
+        let handle_na = pine_ref_to_bool(mem::replace(&mut param[0], None));
+        self.calc_tr(ctx, handle_na.unwrap_or(false))
     }
 
     fn copy(&self) -> Box<dyn SeriesCall<'a> + 'a> {
         Box::new(self.clone())
     }
 }
-pub const VAR_NAME: &'static str = "atr";
 
 pub fn declare_var<'a>() -> VarResult<'a> {
-    let value = PineRef::new(CallableFactory::new(|| {
-        Callable::new(None, Some(Box::new(AtrVal::new())))
+    let value = PineRef::new(CallableEvaluate::new(Box::new(TrVal::new()), || {
+        Callable::new(
+            None,
+            Some(Box::new(ParamCollectCall::new_with_caller(Box::new(
+                TrVal::new(),
+            )))),
+        )
     }));
 
     // plot(series, title, color, linewidth, style, trackprice, transp, histbase, offset, join, editable, show_last) → plot
 
     let func_type = FunctionTypes(vec![FunctionType::new((
-        vec![("length", SyntaxType::int())],
+        vec![("handle_na", SyntaxType::bool())],
         SyntaxType::float_series(),
     ))]);
-    let syntax_type = SyntaxType::Function(Rc::new(func_type));
-    VarResult::new(value, syntax_type, VAR_NAME)
+    let syntax_type =
+        SyntaxType::ValFunction(Box::new(SyntaxType::float_series()), Rc::new(func_type));
+    VarResult::new(value, syntax_type, "tr")
 }
 
 #[cfg(test)]
@@ -128,7 +154,7 @@ mod tests {
                 ("low", SyntaxType::float_series()),
             ],
         );
-        let src = "m = atr(2)";
+        let src = "m = tr\nm2 = tr(true)\n";
         let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
 
@@ -152,11 +178,12 @@ mod tests {
             )
             .unwrap();
 
-        let val1 = rma_func(Some(14f64), 2, None).unwrap();
-        let val2 = rma_func(Some(20f64), 2, val1).unwrap();
         assert_eq!(
             runner.get_context().get_var(VarIndex::new(4, 0)),
-            &Some(PineRef::new(Series::from_vec(vec![val1, val2])))
+            &Some(PineRef::new(Series::from_vec(vec![
+                Some(14f64),
+                Some(20f64)
+            ])))
         );
     }
 }

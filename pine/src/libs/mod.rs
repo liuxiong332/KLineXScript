@@ -46,6 +46,7 @@ pub mod syminfo;
 pub mod time;
 pub mod timenow;
 pub mod timestamp;
+pub mod tr;
 pub mod year;
 
 use crate::ast::syntax_type::SyntaxType;
@@ -160,6 +161,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         lowestbars::declare_var(),
         hma::declare_var(),
         iff::declare_var(),
+        tr::declare_var(),
     ];
     debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());

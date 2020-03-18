@@ -33,7 +33,7 @@ pub fn sma_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<Float
     Ok(Some(sum))
 }
 
-fn wma_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<Float, RuntimeErr> {
+pub fn wma_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<Float, RuntimeErr> {
     let mut norm = 0f64;
     let mut sum = 0f64;
     for i in 0..length as usize {

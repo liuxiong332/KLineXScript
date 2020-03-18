@@ -30,6 +30,16 @@ pub fn pine_ref_to_color<'a>(val: Option<PineRef<'a>>) -> Option<String> {
     }
 }
 
+pub fn pine_ref_to_color2<'a>(val: Option<PineRef<'a>>) -> Option<Color> {
+    if val.is_none() {
+        return None;
+    }
+    match Color::implicity_from(val.unwrap()) {
+        Ok(res) => Some(res.into_inner()),
+        Err(_) => None,
+    }
+}
+
 pub fn pine_ref_to_i64<'a>(val: Option<PineRef<'a>>) -> Option<i64> {
     if val.is_none() {
         return None;

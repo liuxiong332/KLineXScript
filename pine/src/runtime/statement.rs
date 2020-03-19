@@ -247,6 +247,9 @@ impl<'a> RunnerForName<'a> for Assignment<'a> {
         // }
         // context.create_declare(name);
 
+        if _vn.value == "_" {
+            return Ok(val);
+        }
         // For variable declare with var type, it only need initialize once.
         if self.var && context.contains_var_scope(varid) {
             return Ok(context

@@ -22,6 +22,7 @@ pub enum PineErrorKind {
     NotEndOfInput,         // expect end of input, but not
     PrefixNoNamesAfterDot, // Prefix expressions don't contain names after dot
     LVTupleNoNames,        // left value tuple don't contain names
+    TupleNotMatch,         // The left tuple is not the same as right tuple.
     BlockNoStmts,          // Block don't contain statements.
     VarNotDeclare,         // The variable not declare before used
     InvalidTypeCast {

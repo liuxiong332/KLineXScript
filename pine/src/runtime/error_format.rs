@@ -30,6 +30,7 @@ static ERROR_MAP: &[(&'static str, &'static str)] = &[
     ("NotEndOfInput", "Expect end of input, but get more characters."),
     ("PrefixNoNamesAfterDot", "The property getter expression is not valid."),
     ("LVTupleNoNames", "Left tuple value cann't be empty."),
+    ("TupleNotMatch", "The tuple of the left side is not match as the right side."),
     ("BlockNoStmts", "The block without any statements is not allowed."),
     ("VarNotDeclare", "The variable isn't declared before it's used."),
     ("InvalidTypeCast", "The {} cann't cast to {}."),
@@ -106,6 +107,7 @@ impl ErrorFormater {
                 String::from(self.error_map["PrefixNoNamesAfterDot"])
             }
             PineErrorKind::LVTupleNoNames => String::from(self.error_map["LVTupleNoNames"]),
+            PineErrorKind::TupleNotMatch => String::from(self.error_map["LVTupleNoNames"]),
             PineErrorKind::BlockNoStmts => String::from(self.error_map["BlockNoStmts"]),
             PineErrorKind::VarNotDeclare => String::from(self.error_map["VarNotDeclare"]),
             PineErrorKind::InvalidTypeCast { origin, cast } => str_replace(

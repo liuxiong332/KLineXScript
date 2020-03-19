@@ -1071,10 +1071,14 @@ impl<'a> SyntaxParser<'a> {
                     range,
                 ));
             }
-            context.declare_var(name.value, result.clone());
+            if name.value != "_" {
+                context.declare_var(name.value, result.clone());
+            }
             Ok(result)
         } else {
-            context.declare_var(name.value, val.clone());
+            if name.value != "_" {
+                context.declare_var(name.value, val.clone());
+            }
             Ok(val)
         }
     }
@@ -1085,7 +1089,7 @@ impl<'a> SyntaxParser<'a> {
             if let SyntaxType::Tuple(tuple) = val_res.syntax_type {
                 if tuple.len() != assign.names.len() {
                     Err(PineInputError::new(
-                        PineErrorKind::BinaryTypeNotNum,
+                        PineErrorKind::TupleNotMatch,
                         assign.range,
                     ))
                 } else {
@@ -1103,7 +1107,9 @@ impl<'a> SyntaxParser<'a> {
                         .names
                         .iter()
                         .map(|n| {
-                            if context.contain_var_index_scope(n.value) {
+                            if n.value == "_" {
+                                -1
+                            } else if context.contain_var_index_scope(n.value) {
                                 self.catch(PineInputError::new(
                                     PineErrorKind::VarHasDeclare,
                                     n.range,
@@ -1135,7 +1141,9 @@ impl<'a> SyntaxParser<'a> {
             let context = downcast_ctx(self.context);
 
             let name = assign.names[0];
-            if context.contain_var_index_scope(name.value) {
+            if name.value == "_" {
+                assign.varids = Some(vec![-1]);
+            } else if context.contain_var_index_scope(name.value) {
                 self.catch(PineInputError::new(
                     PineErrorKind::VarHasDeclare,
                     name.range,

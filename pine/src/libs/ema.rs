@@ -16,7 +16,7 @@ use crate::types::{
 use std::mem;
 use std::rc::Rc;
 
-fn ema_func<'a>(source: Float, length: i64, prev_val: Float) -> Result<Float, RuntimeErr> {
+pub fn ema_func<'a>(source: Float, length: i64, prev_val: Float) -> Result<Float, RuntimeErr> {
     let mut sum = 0f64;
     let alpha = 2f64 / (length + 1) as f64;
     match source {

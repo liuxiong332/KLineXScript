@@ -24,6 +24,7 @@ pub mod highestbars;
 pub mod hma;
 pub mod iff;
 pub mod input;
+pub mod kc;
 pub mod lowest;
 pub mod lowestbars;
 pub mod max;
@@ -162,6 +163,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         hma::declare_var(),
         iff::declare_var(),
         tr::declare_var(),
+        kc::declare_var(),
     ];
     debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());

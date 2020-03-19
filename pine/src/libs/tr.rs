@@ -16,6 +16,14 @@ use crate::types::{
 use std::mem;
 use std::rc::Rc;
 
+pub fn tr_func(high: Float, low: Float, preclose: Float) -> Float {
+    float_max(
+        high.minus(low),
+        float_abs(high.minus(preclose)),
+        float_abs(low.minus(preclose)),
+    )
+}
+
 #[derive(Debug, Clone, PartialEq)]
 struct TrVal {
     close_index: VarIndex,
@@ -62,11 +70,7 @@ impl TrVal {
         let close = pine_ref_to_f64_series(ctx.get_var(self.close_index).clone()).unwrap();
 
         let preclose = close.index_value(1).unwrap();
-        let mut res = float_max(
-            high.minus(low),
-            float_abs(high.minus(preclose)),
-            float_abs(low.minus(preclose)),
-        );
+        let mut res = tr_func(high, low, preclose);
 
         if handle_na {
             res = match res {

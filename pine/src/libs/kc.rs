@@ -69,14 +69,12 @@ impl<'a> SeriesCall<'a> for KcVal {
 
         move_tuplet!((series, length, multi, use_true_range) = param);
 
-        println!("Get params ");
         let sval = pine_ref_to_f64(series);
         let length = require_param("length", pine_ref_to_i64(length))?;
         let multi = require_param("multi", pine_ref_to_f64(multi))?;
         let use_true_range = pine_ref_to_bool(use_true_range).unwrap_or(false);
 
         let basis = ema_func(sval, length, self.prev_basis)?;
-        println!("basis {:?}", basis);
 
         let high = pine_ref_to_f64(_ctx.get_var(self.high_index).clone());
         let low = pine_ref_to_f64(_ctx.get_var(self.low_index).clone());
@@ -88,9 +86,8 @@ impl<'a> SeriesCall<'a> for KcVal {
         } else {
             high.minus(low)
         };
-        println!("range {:?}", range);
 
-        let range_ema = ema_func(range, length, self.prev_basis)?;
+        let range_ema = ema_func(range, length, self.prev_range_ema)?;
 
         self.prev_basis = basis;
         self.prev_range_ema = range_ema;

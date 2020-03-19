@@ -28,6 +28,7 @@ pub mod kc;
 pub mod kcw;
 pub mod lowest;
 pub mod lowestbars;
+pub mod macd;
 pub mod max;
 pub mod na;
 pub mod nz;
@@ -166,6 +167,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         tr::declare_var(),
         kc::declare_var(),
         kcw::declare_var(),
+        macd::declare_var(),
     ];
     debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());

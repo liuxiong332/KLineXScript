@@ -39,7 +39,7 @@ pub fn declare_var<'a>() -> VarResult<'a> {
         vec![
             ("series", SyntaxType::float_series()),
             ("length", SyntaxType::int()),
-            ("length", SyntaxType::float()),
+            ("mult", SyntaxType::float()),
             ("useTrueRange", SyntaxType::bool()),
         ],
         SyntaxType::float_series(),

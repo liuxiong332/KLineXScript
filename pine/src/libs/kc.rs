@@ -18,25 +18,39 @@ use crate::types::{
     Tuple,
 };
 use std::f64;
+use std::mem;
 use std::rc::Rc;
 
+pub type ValGenerator<'a> = fn((Float, Float, Float)) -> PineRef<'a>;
+
+fn kc_generator<'a>(vals: (Float, Float, Float)) -> PineRef<'a> {
+    let (basis, ema1, ema2) = vals;
+    PineRef::new(Tuple(vec![
+        PineRef::new_rc(Series::from(basis)),
+        PineRef::new_rc(Series::from(ema1)),
+        PineRef::new_rc(Series::from(ema2)),
+    ]))
+}
+
 #[derive(Debug, Clone, PartialEq)]
-struct KcVal {
+pub struct KcVal {
     close_index: VarIndex,
     low_index: VarIndex,
     high_index: VarIndex,
     prev_basis: Float,
     prev_range_ema: Float,
+    val_gen: *mut (),
 }
 
 impl KcVal {
-    pub fn new() -> KcVal {
+    pub fn new(val_gen: *mut ()) -> KcVal {
         KcVal {
             close_index: VarIndex::new(0, 0),
             low_index: VarIndex::new(0, 0),
             high_index: VarIndex::new(0, 0),
             prev_basis: None,
             prev_range_ema: None,
+            val_gen: val_gen,
         }
     }
 
@@ -56,15 +70,13 @@ impl KcVal {
             self.high_index = VarIndex::new(*ctx.get_varname_index("high").unwrap(), 0);
         }
     }
-}
 
-impl<'a> SeriesCall<'a> for KcVal {
-    fn step(
+    fn process_kc<'a>(
         &mut self,
         _ctx: &mut dyn Ctx<'a>,
         mut param: Vec<Option<PineRef<'a>>>,
         _func_type: FunctionType<'a>,
-    ) -> Result<PineRef<'a>, RuntimeErr> {
+    ) -> Result<(Float, Float, Float), RuntimeErr> {
         self.handle_index(_ctx);
 
         move_tuplet!((series, length, multi, use_true_range) = param);
@@ -93,11 +105,19 @@ impl<'a> SeriesCall<'a> for KcVal {
         self.prev_range_ema = range_ema;
 
         let multi_ema = range_ema.mul(Some(multi));
-        Ok(PineRef::new(Tuple(vec![
-            PineRef::new_rc(Series::from(basis)),
-            PineRef::new_rc(Series::from(basis.add(multi_ema))),
-            PineRef::new_rc(Series::from(basis.minus(multi_ema))),
-        ])))
+        Ok((basis, basis.add(multi_ema), basis.minus(multi_ema)))
+    }
+}
+
+impl<'a> SeriesCall<'a> for KcVal {
+    fn step(
+        &mut self,
+        _ctx: &mut dyn Ctx<'a>,
+        param: Vec<Option<PineRef<'a>>>,
+        _func_type: FunctionType<'a>,
+    ) -> Result<PineRef<'a>, RuntimeErr> {
+        let func = unsafe { mem::transmute::<_, ValGenerator<'a>>(self.val_gen) };
+        Ok(func(self.process_kc(_ctx, param, _func_type)?))
     }
 
     fn copy(&self) -> Box<dyn SeriesCall<'a> + 'a> {
@@ -110,7 +130,7 @@ pub fn declare_var<'a>() -> VarResult<'a> {
         Callable::new(
             None,
             Some(Box::new(ParamCollectCall::new_with_caller(Box::new(
-                KcVal::new(),
+                KcVal::new(kc_generator as *mut ()),
             )))),
         )
     }));

@@ -593,3 +593,68 @@ fn kc_test() {
     is_equal(&mut parser, 7, 11);
     is_equal(&mut parser, 8, 12);
 }
+
+const KCW_SCRIPT: &str = "
+m1 = kcw(close, 5, 4, true)
+
+// the same on pine
+f_kcw(src, length, mult, useTrueRange) =>
+    float basis = ema(src, length)
+    float range = (useTrueRange) ? tr : (high - low)
+    float rangeEma = ema(range, length)
+    
+    ((basis + rangeEma * mult) - (basis - rangeEma * mult)) / basis
+
+m2 = f_kcw(close, 5, 4, true)
+";
+
+#[test]
+fn kcw_test() {
+    use pine::ast::stat_expr_types::VarIndex;
+    use pine::helper::pine_ref_to_f64_series;
+    use pine::libs::{ema, kcw, tr};
+    use pine::runtime::NoneCallback;
+
+    let lib_info = pine::LibInfo::new(
+        vec![
+            kcw::declare_var(),
+            ema::declare_ema_var(),
+            tr::declare_var(),
+        ],
+        vec![
+            ("close", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("high", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("low", SyntaxType::Series(SimpleSyntaxType::Float)),
+        ],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+    parser.parse_src(String::from(KCW_SCRIPT)).unwrap();
+    let data = vec![
+        (
+            "close",
+            AnySeries::from_float_vec(vec![Some(10f64), Some(20f64)]),
+        ),
+        (
+            "high",
+            AnySeries::from_float_vec(vec![Some(10f64), Some(20f64)]),
+        ),
+        (
+            "low",
+            AnySeries::from_float_vec(vec![Some(10f64), Some(20f64)]),
+        ),
+    ];
+
+    assert!(parser.run_with_data(data, None).is_ok());
+
+    let is_equal = |parser: &mut pine::PineScript, x, y| {
+        let result1 = pine_ref_to_f64_series(parser.move_var(VarIndex::new(x, 0)));
+        let result2 = pine_ref_to_f64_series(parser.move_var(VarIndex::new(y, 0)));
+        println!("result {:?} {:?}", result1, result2);
+        assert_eq!(
+            result1.unwrap().index_value(1).unwrap().unwrap().floor(),
+            result2.unwrap().index_value(1).unwrap().unwrap().floor()
+        );
+    };
+
+    is_equal(&mut parser, 6, 8);
+}

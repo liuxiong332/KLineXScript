@@ -7,8 +7,8 @@ use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, Syn
 use crate::helper::err_msgs::*;
 use crate::helper::str_replace;
 use crate::helper::{
-    move_element, pine_ref_to_bool, pine_ref_to_f64, pine_ref_to_f64_series, pine_ref_to_i64,
-    require_param,
+    ensure_srcs, move_element, pine_ref_to_bool, pine_ref_to_f64, pine_ref_to_f64_series,
+    pine_ref_to_i64, require_param,
 };
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::InputSrc;
@@ -55,20 +55,11 @@ impl KcVal {
     }
 
     fn handle_index<'a>(&mut self, ctx: &mut dyn Ctx<'a>) {
-        if !downcast_ctx(ctx).check_is_input_info_ready() {
-            downcast_ctx(ctx).add_input_src(InputSrc::new(
-                None,
-                vec![
-                    String::from("close"),
-                    String::from("low"),
-                    String::from("high"),
-                ],
-            ));
-
-            self.close_index = VarIndex::new(*ctx.get_varname_index("close").unwrap(), 0);
-            self.low_index = VarIndex::new(*ctx.get_varname_index("low").unwrap(), 0);
-            self.high_index = VarIndex::new(*ctx.get_varname_index("high").unwrap(), 0);
-        }
+        ensure_srcs(ctx, vec!["close", "low", "high"], |indexs| {
+            self.close_index = indexs[0];
+            self.low_index = indexs[1];
+            self.high_index = indexs[2];
+        });
     }
 
     fn process_kc<'a>(

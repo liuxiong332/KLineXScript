@@ -16,10 +16,6 @@ use crate::types::{
 use std::mem;
 use std::rc::Rc;
 
-fn gen_low_index<'a>(ctx: &mut dyn Ctx<'a>) -> VarIndex {
-    VarIndex::new(*ctx.get_varname_index("low").unwrap(), 0)
-}
-
 fn get_min_val<'a>(source: &Option<RefData<Series<Float>>>, length: i64) -> Float {
     let mut min_val = Some(std::f64::MAX);
     for i in 0..length as usize {
@@ -32,7 +28,7 @@ fn get_min_val<'a>(source: &Option<RefData<Series<Float>>>, length: i64) -> Floa
 }
 
 pub fn declare_var<'a>() -> VarResult<'a> {
-    declare_s_var("lowest", gen_low_index, get_min_val)
+    declare_s_var("lowest", "low", get_min_val)
 }
 
 #[cfg(test)]

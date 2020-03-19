@@ -4,8 +4,8 @@ use super::VarResult;
 use crate::ast::stat_expr_types::VarIndex;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
 use crate::helper::{
-    move_element, pine_ref_to_bool, pine_ref_to_f64, pine_ref_to_f64_series, pine_ref_to_i64,
-    require_param, series_index,
+    ensure_srcs, move_element, pine_ref_to_bool, pine_ref_to_f64, pine_ref_to_f64_series,
+    pine_ref_to_i64, require_param, series_index,
 };
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::InputSrc;
@@ -69,20 +69,10 @@ impl<'a> SeriesCall<'a> for CciVal {
         mut param: Vec<Option<PineRef<'a>>>,
         _func_type: FunctionType<'a>,
     ) -> Result<PineRef<'a>, RuntimeErr> {
-        if !downcast_ctx(ctx).check_is_input_info_ready() {
-            downcast_ctx(ctx).add_input_src(InputSrc::new(
-                None,
-                vec![
-                    // String::from("close"),
-                    String::from("low"),
-                    String::from("high"),
-                ],
-            ));
-
-            // self.close_index = VarIndex::new(*ctx.get_varname_index("close").unwrap(), 0);
-            self.low_index = VarIndex::new(*ctx.get_varname_index("low").unwrap(), 0);
-            self.high_index = VarIndex::new(*ctx.get_varname_index("high").unwrap(), 0);
-        }
+        ensure_srcs(ctx, vec!["low", "high"], |indexs| {
+            self.low_index = indexs[0];
+            self.high_index = indexs[1];
+        });
 
         let series = pine_ref_to_f64_series(mem::replace(&mut param[0], None));
 

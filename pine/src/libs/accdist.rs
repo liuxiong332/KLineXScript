@@ -1,6 +1,7 @@
 use super::VarResult;
 use crate::ast::stat_expr_types::VarIndex;
 use crate::ast::syntax_type::SyntaxType;
+use crate::helper::ensure_srcs;
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::InputSrc;
 use crate::types::{
@@ -41,28 +42,12 @@ impl<'a> EvaluateVal<'a> for AccDistVal {
     }
 
     fn call(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
-        if !downcast_ctx(ctx).check_is_input_info_ready() {
-            downcast_ctx(ctx).add_input_src(InputSrc::new(
-                None,
-                vec![
-                    String::from("close"),
-                    String::from("low"),
-                    String::from("high"),
-                    String::from("volume"),
-                ],
-            ));
-        }
-        if !self.is_init {
-            self.close_index = VarIndex::new(*ctx.get_varname_index("close").unwrap(), 0);
-            self.low_index = VarIndex::new(*ctx.get_varname_index("low").unwrap(), 0);
-            self.high_index = VarIndex::new(*ctx.get_varname_index("high").unwrap(), 0);
-            self.volume_index = VarIndex::new(*ctx.get_varname_index("volume").unwrap(), 0);
-            println!(
-                "{:?} {:?} {:?} {:?}",
-                self.close_index, self.low_index, self.high_index, self.volume_index
-            );
-            self.is_init = true;
-        }
+        ensure_srcs(ctx, vec!["close", "low", "high", "volume"], |indexs| {
+            self.close_index = indexs[0];
+            self.low_index = indexs[1];
+            self.high_index = indexs[2];
+            self.volume_index = indexs[3];
+        });
         match (
             ctx.get_var(self.close_index),
             ctx.get_var(self.low_index),

@@ -3,8 +3,8 @@ use super::VarResult;
 use crate::ast::stat_expr_types::VarIndex;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
 use crate::helper::{
-    float_abs, float_max, move_element, pine_ref_to_bool, pine_ref_to_f64, pine_ref_to_f64_series,
-    pine_ref_to_i64, require_param, series_index,
+    ensure_srcs, float_abs, float_max, move_element, pine_ref_to_bool, pine_ref_to_f64,
+    pine_ref_to_f64_series, pine_ref_to_i64, require_param, series_index,
 };
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::InputSrc;
@@ -35,15 +35,15 @@ fn get_max_val<'a>(source: &Option<RefData<Series<Float>>>, length: i64) -> Floa
 
 #[derive(Debug, Clone, PartialEq)]
 struct AtrVal {
-    genindex_func: *mut (),
+    src_name: &'static str,
     run_func: *mut (),
     dest_index: VarIndex,
 }
 
 impl AtrVal {
-    pub fn new(genindex_func: *mut (), run_func: *mut ()) -> AtrVal {
+    pub fn new(src_name: &'static str, run_func: *mut ()) -> AtrVal {
         AtrVal {
-            genindex_func,
+            src_name,
             run_func,
             dest_index: VarIndex::new(0, 0),
         }
@@ -60,14 +60,12 @@ impl<'a> SeriesCall<'a> for AtrVal {
         let source;
         let length;
 
-        let genindex = unsafe { mem::transmute::<_, GenIndexFunc>(self.genindex_func) };
         let runner = unsafe { mem::transmute::<_, GetValFunc>(self.run_func) };
 
         if _func_type.signature.0.len() == 1 {
-            if !downcast_ctx(ctx).check_is_input_info_ready() {
-                downcast_ctx(ctx).add_input_src(InputSrc::new(None, vec![String::from("high")]));
-                self.dest_index = genindex(ctx);
-            }
+            ensure_srcs(ctx, vec![self.src_name], |indexs| {
+                self.dest_index = indexs[0];
+            });
 
             source = pine_ref_to_f64_series(ctx.get_var(self.dest_index).clone());
             length = require_param("length", pine_ref_to_i64(mem::replace(&mut param[0], None)))?;
@@ -86,13 +84,13 @@ impl<'a> SeriesCall<'a> for AtrVal {
 
 #[derive(Debug, Clone, PartialEq)]
 struct SmaCreator {
-    gen_index: *mut (),
+    src_name: &'static str,
     handle: *mut (),
 }
 
 impl SmaCreator {
-    pub fn new(gen_index: *mut (), handle: *mut ()) -> SmaCreator {
-        SmaCreator { gen_index, handle }
+    pub fn new(src_name: &'static str, handle: *mut ()) -> SmaCreator {
+        SmaCreator { src_name, handle }
     }
 }
 
@@ -100,7 +98,7 @@ impl<'a> CallableCreator<'a> for SmaCreator {
     fn create(&self) -> Callable<'a> {
         Callable::new(
             None,
-            Some(Box::new(AtrVal::new(self.gen_index, self.handle))),
+            Some(Box::new(AtrVal::new(self.src_name, self.handle))),
         )
     }
 
@@ -111,11 +109,11 @@ impl<'a> CallableCreator<'a> for SmaCreator {
 
 pub fn declare_s_var<'a>(
     name: &'static str,
-    index_func: GenIndexFunc,
+    src_name: &'static str,
     run_func: GetValFunc,
 ) -> VarResult<'a> {
     let value = PineRef::new(CallableFactory::new_with_creator(Box::new(
-        SmaCreator::new(index_func as *mut (), run_func as *mut ()),
+        SmaCreator::new(src_name, run_func as *mut ()),
     )));
 
     let func_type = FunctionTypes(vec![
@@ -136,7 +134,7 @@ pub fn declare_s_var<'a>(
 }
 
 pub fn declare_var<'a>() -> VarResult<'a> {
-    declare_s_var("highest", gen_high_index, get_max_val)
+    declare_s_var("highest", "high", get_max_val)
 }
 
 #[cfg(test)]

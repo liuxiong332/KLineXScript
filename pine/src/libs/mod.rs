@@ -80,15 +80,16 @@ impl<'a> VarResult<'a> {
     }
 }
 
-fn check_names<'a>(vars: &Vec<VarResult<'a>>) -> bool {
+fn check_names<'a>(vars: &Vec<VarResult<'a>>) -> Vec<&'static str> {
     let mut set = HashSet::new();
+    let mut dup_list = vec![];
     for v in vars {
         if set.contains(v.name) {
-            return false;
+            dup_list.push(v.name);
         }
         set.insert(v.name);
     }
-    return true;
+    return dup_list;
 }
 
 pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
@@ -116,7 +117,6 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         year::declare_dayofweek_var(),
         year::declare_dayofmonth_var(),
         year::declare_hour_var(),
-        year::declare_minute_var(),
         year::declare_minute_var(),
         abs::declare_var(),
         cos::declare_cos_var(),
@@ -177,8 +177,21 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         swma::declare_var(),
         vwma::declare_var(),
     ];
-    debug_assert!(check_names(&list));
+    debug_assert!(
+        check_names(&list).len() == 0,
+        format!("Duplicate function names {:?}", check_names(&list))
+    );
     // map.insert(print::VAR_NAME, print::declare_var());
     // map.insert(plot::VAR_NAME, plot::declare_var());
     list
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn libname_test() {
+        declare_vars();
+    }
 }

@@ -41,6 +41,7 @@ pub mod plotshape;
 pub mod pow;
 pub mod print;
 pub mod rising;
+pub mod rsi;
 pub mod security;
 pub mod sma;
 pub mod study;
@@ -168,6 +169,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         kc::declare_var(),
         kcw::declare_var(),
         macd::declare_var(),
+        rsi::declare_var(),
     ];
     debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());

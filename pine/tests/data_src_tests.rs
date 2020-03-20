@@ -698,3 +698,54 @@ fn macd_example_test() {
 
     is_equal(&mut parser, 3, 5);
 }
+
+const RSI_SCRIPT: &str = "
+m1 = rsi(close, 2)
+
+// same on pine, but less efficient
+pine_rsi(x, y) => 
+    u = max(x - x[1], 0) // upward change
+    d = max(x[1] - x, 0) // downward change
+    rs = rma(u, y) / rma(d, y)
+    res = 100 - 100 / (1 + rs)
+    rs
+
+m2 = pine_rsi(close, 2)
+";
+
+#[test]
+fn rsi_test() {
+    use pine::ast::stat_expr_types::VarIndex;
+    use pine::helper::pine_ref_to_f64_series;
+    use pine::libs::{ema, max, rsi};
+    use pine::runtime::NoneCallback;
+
+    let lib_info = pine::LibInfo::new(
+        vec![
+            ema::declare_rma_var(),
+            max::declare_max_var(),
+            rsi::declare_var(),
+        ],
+        vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+    parser.parse_src(String::from(RSI_SCRIPT)).unwrap();
+    let data = vec![(
+        "close",
+        AnySeries::from_float_vec(vec![Some(20f64), Some(10f64), Some(5f64)]),
+    )];
+
+    assert!(parser.run_with_data(data, None).is_ok());
+
+    let is_equal = |parser: &mut pine::PineScript, x, y| {
+        let result1 = pine_ref_to_f64_series(parser.move_var(VarIndex::new(x, 0)));
+        let result2 = pine_ref_to_f64_series(parser.move_var(VarIndex::new(y, 0)));
+        println!("result {:?} {:?}", result1, result2);
+        assert_eq!(
+            result1.unwrap().index_value(1).unwrap().unwrap().floor(),
+            result2.unwrap().index_value(1).unwrap().unwrap().floor()
+        );
+    };
+
+    is_equal(&mut parser, 4, 6);
+}

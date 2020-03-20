@@ -21,6 +21,24 @@ use crate::types::{
 use std::mem;
 use std::rc::Rc;
 
+pub fn calc_rsi(
+    s0: Float,
+    length: i64,
+    s1: Float,
+    prev_upward: Float,
+    prev_downward: Float,
+) -> Result<(Float, Float, Float), RuntimeErr> {
+    let upward = float_max2(s0.minus(s1), Some(0f64));
+    let downward = float_max2(s1.minus(s0), Some(0f64));
+
+    let rma1 = rma_func(upward, length, prev_upward)?;
+    let rma2 = rma_func(downward, length, prev_downward)?;
+    let rs = rma1.div(rma2);
+
+    let res = Some(100f64).minus(Some(100f64).div(rs.add(Some(1f64))));
+    Ok((res, upward, downward))
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct KcVal {
     prev_upward: Float,
@@ -48,15 +66,8 @@ impl KcVal {
 
         let s0 = series.index_value(0).unwrap();
         let s1 = series.index_value(1).unwrap();
-        let upward = float_max2(s0.minus(s1), Some(0f64));
-        let downward = float_max2(s1.minus(s0), Some(0f64));
-
-        let rma1 = rma_func(upward, length, self.prev_upward)?;
-        let rma2 = rma_func(downward, length, self.prev_downward)?;
-        let rs = rma1.div(rma2);
-
-        let res = Some(100f64).minus(Some(100f64).div(rs.add(Some(1f64))));
-
+        let (res, upward, downward) =
+            calc_rsi(s0, length, s1, self.prev_upward, self.prev_downward)?;
         self.prev_downward = downward;
         self.prev_upward = upward;
         Ok(res)
@@ -85,7 +96,10 @@ pub fn declare_var<'a>() -> VarResult<'a> {
     }));
 
     let func_type = FunctionTypes(vec![FunctionType::new((
-        vec![("x", SyntaxType::float_series()), ("y", SyntaxType::int())],
+        vec![
+            ("x", SyntaxType::float_series()),
+            ("y", SyntaxType::int_series()),
+        ],
         SyntaxType::float_series(),
     ))]);
     let syntax_type = SyntaxType::Function(Rc::new(func_type));

@@ -203,6 +203,13 @@ pub fn int2float<'a>(i: Int) -> Float {
     }
 }
 
+pub fn float2int<'a>(i: Float) -> Int {
+    match i {
+        Some(i) => Some(i as i64),
+        None => None,
+    }
+}
+
 impl<'a> PineFrom<'a, Float> for Float {
     fn explicity_from(t: PineRef<'a>) -> Result<RefData<Float>, RuntimeErr> {
         Self::implicity_from(t)

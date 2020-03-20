@@ -749,3 +749,67 @@ fn rsi_test() {
 
     is_equal(&mut parser, 4, 6);
 }
+
+const MFI_SCRIPT: &str = "
+m1 = mfi(close, 2)
+
+// the same on pine
+f_mfi(src, length) =>
+    float upper = sum(volume * (change(src) <= 0.0 ? 0.0 : src), length)
+    float lower = sum(volume * (change(src) >= 0.0 ? 0.0 : src), length)
+    
+    if na(lower)
+        float res = na
+        res
+    else
+        rsi(upper, int(lower))
+
+m2 = f_mfi(close, 2)
+";
+
+#[test]
+fn mfi_test() {
+    use pine::ast::stat_expr_types::VarIndex;
+    use pine::helper::pine_ref_to_f64_series;
+    use pine::libs::{change, mfi, na, rsi, sum};
+    use pine::runtime::NoneCallback;
+
+    let lib_info = pine::LibInfo::new(
+        vec![
+            change::declare_change_var(),
+            mfi::declare_var(),
+            na::declare_var(),
+            rsi::declare_var(),
+            sum::declare_var(),
+        ],
+        vec![
+            ("close", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("volume", SyntaxType::Series(SimpleSyntaxType::Int)),
+        ],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+    parser.parse_src(String::from(MFI_SCRIPT)).unwrap();
+    let data = vec![
+        (
+            "close",
+            AnySeries::from_float_vec(vec![Some(20f64), Some(10f64), Some(5f64)]),
+        ),
+        (
+            "volume",
+            AnySeries::from_int_vec(vec![Some(1i64), Some(1i64), Some(1i64)]),
+        ),
+    ];
+
+    assert!(parser.run_with_data(data, None).is_ok());
+
+    let is_equal = |parser: &mut pine::PineScript, x, y| {
+        let result1 = pine_ref_to_f64_series(parser.move_var(VarIndex::new(x, 0)));
+        let result2 = pine_ref_to_f64_series(parser.move_var(VarIndex::new(y, 0)));
+        assert_eq!(
+            result1.unwrap().index_value(1).unwrap(),
+            result2.unwrap().index_value(1).unwrap()
+        );
+    };
+
+    is_equal(&mut parser, 7, 9);
+}

@@ -71,3 +71,15 @@ pub fn pine_ref_to_f64_series<'a>(
         Err(_) => None,
     }
 }
+
+pub fn pine_ref_to_i64_series<'a>(
+    val: Option<PineRef<'a>>,
+) -> Option<RefData<Series<Option<i64>>>> {
+    if val.is_none() {
+        return None;
+    }
+    match Series::implicity_from(val.unwrap()) {
+        Ok(res) => Some(res),
+        Err(_) => None,
+    }
+}

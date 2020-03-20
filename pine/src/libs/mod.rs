@@ -47,11 +47,13 @@ pub mod security;
 pub mod sma;
 pub mod study;
 pub mod sum;
+pub mod swma;
 pub mod syminfo;
 pub mod time;
 pub mod timenow;
 pub mod timestamp;
 pub mod tr;
+pub mod vwma;
 pub mod year;
 
 use crate::ast::syntax_type::SyntaxType;
@@ -172,6 +174,8 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         macd::declare_var(),
         rsi::declare_var(),
         mfi::declare_var(),
+        swma::declare_var(),
+        vwma::declare_var(),
     ];
     debug_assert!(check_names(&list));
     // map.insert(print::VAR_NAME, print::declare_var());

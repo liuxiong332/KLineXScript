@@ -813,3 +813,53 @@ fn mfi_test() {
 
     is_equal(&mut parser, 7, 9);
 }
+
+const SWMA_SCRIPT: &'static str = "
+m1 = vwma(close, 15)
+
+// same on pine, but less efficient
+pine_vwma(x, y) =>
+    sma(x * volume, y) / sma(volume, y)
+m2 = pine_vwma(close, 15)
+";
+
+#[test]
+fn swma_test() {
+    use pine::ast::stat_expr_types::VarIndex;
+    use pine::helper::pine_ref_to_f64_series;
+    use pine::libs::{sma, vwma};
+    use pine::runtime::NoneCallback;
+
+    let lib_info = pine::LibInfo::new(
+        vec![vwma::declare_var(), sma::declare_sma_var()],
+        vec![
+            ("close", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("volume", SyntaxType::Series(SimpleSyntaxType::Int)),
+        ],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+    parser.parse_src(String::from(SWMA_SCRIPT)).unwrap();
+    let data = vec![
+        (
+            "close",
+            AnySeries::from_float_vec(vec![Some(20f64), Some(10f64), Some(5f64), Some(10f64)]),
+        ),
+        (
+            "volume",
+            AnySeries::from_int_vec(vec![Some(1i64), Some(1i64), Some(1i64), Some(1i64)]),
+        ),
+    ];
+
+    assert!(parser.run_with_data(data, None).is_ok());
+
+    let is_equal = |parser: &mut pine::PineScript, x, y| {
+        let result1 = pine_ref_to_f64_series(parser.move_var(VarIndex::new(x, 0)));
+        let result2 = pine_ref_to_f64_series(parser.move_var(VarIndex::new(y, 0)));
+        assert_eq!(
+            result1.unwrap().index_value(1).unwrap(),
+            result2.unwrap().index_value(1).unwrap()
+        );
+    };
+
+    is_equal(&mut parser, 4, 6);
+}

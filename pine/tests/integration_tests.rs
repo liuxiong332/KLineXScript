@@ -38,17 +38,88 @@ plot(mymacd, title="MACD", color=col_macd, transp=0)
 plot(signal, title="Signal", color=col_signal, transp=0)
 "#;
 
+const AD_SCRIPTS: &'static str = r#"
+//@version=4
+study(title="Accumulation/Distribution", shorttitle="Accum/Dist", overlay=false)
+ad = cum(close==high and close==low or high==low ? 0 : ((2*close-low-high)/(high-low))*volume)
+plot(ad, title = "Accumulation/Distribution", color=color.olive)
+"#;
+
+const ADL_SCRIPTS: &'static str = r#"
+//@version=4
+study(title = "Advance Decline Line", shorttitle="ADL", precision=2)
+sym(s) => security(s, timeframe.period, close)
+difference = (sym("USI:ADVN.NY") - sym("USI:DECL.NY"))/(sym("USI:UNCH.NY") + 1)
+adline = cum(difference > 0 ? sqrt(difference) : -sqrt(-difference))
+plot(adline)
+"#;
+
+const ALMA_SCRIPTS: &'static str = r#"
+//@version=4
+study(title = "Arnaud Legoux Moving Average", shorttitle="ALMA", overlay=true)
+
+source = close
+
+windowsize = input(title="Window Size", type=input.integer, defval=9)
+offset = input(title="Offset", type=input.float, defval=0.85)
+sigma = input(title="Sigma", type=input.float, defval=6)
+
+plot(alma(source, windowsize, offset, sigma))
+"#;
+
 #[test]
 fn datasrc_test() {
     let lib_info = pine::LibInfo::new(
         declare_vars(),
-        vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+        vec![
+            ("close", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("open", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("high", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("low", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("volume", SyntaxType::Series(SimpleSyntaxType::Int)),
+            ("_time", SyntaxType::Series(SimpleSyntaxType::Int)),
+            ("bar_index", SyntaxType::Series(SimpleSyntaxType::Int)),
+        ],
     );
     let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+
+    let data = vec![
+        (
+            "close",
+            AnySeries::from_float_vec(vec![Some(1f64), Some(2f64)]),
+        ),
+        (
+            "open",
+            AnySeries::from_float_vec(vec![Some(1f64), Some(2f64)]),
+        ),
+        (
+            "high",
+            AnySeries::from_float_vec(vec![Some(1f64), Some(2f64)]),
+        ),
+        (
+            "low",
+            AnySeries::from_float_vec(vec![Some(1f64), Some(2f64)]),
+        ),
+        (
+            "volume",
+            AnySeries::from_int_vec(vec![Some(1i64), Some(2i64)]),
+        ),
+        (
+            "_time",
+            AnySeries::from_int_vec(vec![Some(100i64), Some(200i64)]),
+        ),
+    ];
+
     parser.parse_src(String::from(MACD_SCRIPT)).unwrap();
-    let data = vec![(
-        "close",
-        AnySeries::from_float_vec(vec![Some(1f64), Some(2f64)]),
-    )];
-    assert!(parser.run_with_data(data, None).is_ok());
+    assert!(parser.run_with_data(data.clone(), None).is_ok());
+
+    parser.parse_src(String::from(AD_SCRIPTS)).unwrap();
+    assert!(parser.run_with_data(data.clone(), None).is_ok());
+
+    // parser.parse_src(String::from(ADL_SCRIPTS)).unwrap();
+    // assert!(parser.run_with_data(data.clone(), None).is_ok());
+
+    parser.parse_src(String::from(ALMA_SCRIPTS)).unwrap();
+    println!("{:?}", parser.run_with_data(data.clone(), None));
+    assert!(parser.run_with_data(data.clone(), None).is_ok());
 }

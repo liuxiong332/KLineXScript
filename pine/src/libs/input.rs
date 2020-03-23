@@ -242,6 +242,9 @@ fn input_for_int<'a>(
     context: &mut dyn Ctx<'a>,
     mut param: Vec<Option<PineRef<'a>>>,
 ) -> Result<PineRef<'a>, RuntimeErr> {
+    if pine_ref_to_string(param[2].clone()) == Some(String::from("float")) {
+        return input_for_float(context, param);
+    }
     move_tuplet!((defval, title, input_type, minval, maxval, confirm, step, options) = param);
     let ctx_ins = downcast_ctx(context);
     if !ctx_ins.check_is_input_info_ready() {
@@ -391,7 +394,6 @@ fn pine_input<'a>(
     param: Vec<Option<PineRef<'a>>>,
     func_type: FunctionType<'a>,
 ) -> Result<PineRef<'a>, RuntimeErr> {
-    println!("func type {:?}", func_type);
     if func_type.arg_names().len() == 4 {
         input_for_bool(context, param)
     } else if func_type.arg_names().len() == 8 {

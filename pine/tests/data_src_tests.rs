@@ -897,3 +897,33 @@ fn myplot_test() {
 
     assert!(parser.run_with_data(data, None).is_ok());
 }
+
+const INPUT_SOURCE_SCRIPT: &'static str = "
+src = input(title='Source', type=input.source, defval=close)
+";
+
+#[test]
+fn input_source_test() {
+    use pine::libs::input;
+    use pine::runtime::output::InputVal;
+    use pine::runtime::NoneCallback;
+
+    let lib_info = pine::LibInfo::new(
+        vec![input::declare_var()],
+        vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+    parser.parse_src(String::from(INPUT_SOURCE_SCRIPT)).unwrap();
+    let data = vec![(
+        "close",
+        AnySeries::from_float_vec(vec![Some(20f64), Some(10f64), Some(5f64), Some(10f64)]),
+    )];
+
+    assert!(parser
+        .run(
+            vec![Some(InputVal::Source(String::from("close")))],
+            data,
+            None
+        )
+        .is_ok());
+}

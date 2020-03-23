@@ -197,10 +197,12 @@ fn input_for_source<'a>(
 
     let input_val = downcast_ctx(context).copy_next_input();
     match input_val {
-        Some(InputVal::String(val)) => match get_source_from_name(context, val) {
-            Some(pine_val) => Ok(pine_val),
-            None => Err(RuntimeErr::NotValidParam),
-        },
+        Some(InputVal::String(val)) | Some(InputVal::Source(val)) => {
+            match get_source_from_name(context, val) {
+                Some(pine_val) => Ok(pine_val),
+                None => Err(RuntimeErr::NotValidParam),
+            }
+        }
         _ => match move_element(&mut param, 0) {
             Some(val) => Ok(val),
             _ => Err(RuntimeErr::NotValidParam),

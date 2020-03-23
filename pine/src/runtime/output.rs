@@ -337,6 +337,7 @@ pub enum InputVal {
     Float(f64),
     Bool(bool),
     String(String),
+    Source(String),
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]

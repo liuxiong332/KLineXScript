@@ -628,10 +628,17 @@ impl<'a> SyntaxParser<'a> {
         match name_res.syntax_type {
             // If the type is simple, then we need to update the var to series.
             SyntaxType::Simple(t) => {
-                if let Some(name) = name_res.varname {
-                    let series_type = SyntaxType::Series(t);
-                    downcast_ctx(self.context).update_var(name, series_type.clone());
-                    self.parse_ref_call_arg(ref_call, series_type)
+                if t != SimpleSyntaxType::Na {
+                    if let Some(name) = name_res.varname {
+                        let series_type = SyntaxType::Series(t);
+                        downcast_ctx(self.context).update_var(name, series_type.clone());
+                        self.parse_ref_call_arg(ref_call, series_type)
+                    } else {
+                        Err(PineInputError::new(
+                            PineErrorKind::VarNotSeriesInRef,
+                            ref_call.range,
+                        ))
+                    }
                 } else {
                     Err(PineInputError::new(
                         PineErrorKind::VarNotSeriesInRef,
@@ -1837,6 +1844,13 @@ mod tests {
             context.get_var_scope("simple"),
             Some(&SyntaxType::Series(SimpleSyntaxType::Float))
         );
+
+        assert!(parser
+            .parse_exp(&mut Exp::RefCall(Box::new(RefCall::new_no_input(
+                Exp::VarName(rvarname("mm")),
+                Exp::VarName(rvarname("arg"))
+            ))))
+            .is_err());
     }
 
     #[test]

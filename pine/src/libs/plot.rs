@@ -7,30 +7,48 @@ use crate::helper::{
     pine_ref_to_string,
 };
 use crate::runtime::context::{downcast_ctx, Ctx};
-use crate::runtime::output::{OutputData, OutputInfo, PlotInfo};
+use crate::runtime::output::{OutputData, OutputInfo, PlotInfo, StrOptionsData};
 use crate::types::{
-    Bool, Callable, CallableObject, DataType, Float, Int, ParamCollectCall, PineClass, PineFrom,
-    PineRef, PineType, RefData, RuntimeErr, SecondType, Series, NA,
+    Bool, Callable, CallableObject, Color, DataType, Float, Int, ParamCollectCall, PineClass,
+    PineFrom, PineRef, PineType, RefData, RuntimeErr, SecondType, Series, NA,
 };
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-fn plot_series<'a>(
-    item_val: PineRef<'a>,
-    _context: &mut dyn Ctx<'a>,
-) -> Result<Vec<Option<f64>>, RuntimeErr> {
-    let mut items: RefData<Series<Float>> = Series::implicity_from(item_val).unwrap();
-    Ok(items.move_history())
-}
-
 fn plot_val<'a>(
     item_val: PineRef<'a>,
-    context: &mut dyn Ctx<'a>,
+    _context: &mut dyn Ctx<'a>,
 ) -> Result<Vec<Option<f64>>, RuntimeErr> {
     // let item_data: RefData<Series<Float>> = Series::implicity_from(item_val).unwrap();
     // plot_series(item_data.into_pf(), context)
     let mut items: RefData<Series<Float>> = Series::implicity_from(item_val).unwrap();
     Ok(items.move_history())
+}
+
+fn plot_color<'a>(
+    item_val: PineRef<'a>,
+    _context: &mut dyn Ctx<'a>,
+) -> Result<StrOptionsData, RuntimeErr> {
+    // let item_data: RefData<Series<Float>> = Series::implicity_from(item_val).unwrap();
+    // plot_series(item_data.into_pf(), context)
+    let mut items: RefData<Series<Color<'a>>> = Series::implicity_from(item_val).unwrap();
+    let colors: Vec<Color<'a>> = items.move_history();
+    let mut options: Vec<&'a str> = vec![];
+    let mut values: Vec<Option<i32>> = vec![];
+
+    for color in colors.iter() {
+        match options.iter().position(|&x| x == color.0) {
+            None => {
+                options.push(color.0);
+                values.push(Some((options.len() - 1) as i32));
+            }
+            Some(i) => {
+                values.push(Some(i as i32));
+            }
+        }
+    }
+    let options = options.iter().map(|&x| String::from(x)).collect();
+    Ok(StrOptionsData { options, values })
 }
 
 fn pine_plot<'a>(
@@ -47,7 +65,7 @@ fn pine_plot<'a>(
     if !downcast_ctx(context).check_is_output_info_ready() {
         let plot_info = PlotInfo {
             title: pine_ref_to_string(title),
-            color: pine_ref_to_color(color),
+            color: pine_ref_to_color(color.clone()),
             linewidth: pine_ref_to_i64(linewidth),
             style: pine_ref_to_string(style),
             transp: pine_ref_to_i64(transp),
@@ -61,13 +79,26 @@ fn pine_plot<'a>(
         };
         downcast_ctx(context).push_output_info(OutputInfo::Plot(plot_info));
     }
-    match series {
-        Some(item_val) => {
-            let data = plot_val(item_val, context)?;
-            downcast_ctx(context).push_output_data(Some(OutputData::new(vec![data])));
-            Ok(())
-        }
-        _ => Err(RuntimeErr::NotSupportOperator),
+    match _func_type.get_type(2) {
+        Some(SyntaxType::Series(_)) => match (series, color) {
+            (Some(item_val), Some(color)) => {
+                let data = plot_val(item_val, context)?;
+                let color = plot_color(color, context)?;
+                downcast_ctx(context)
+                    .push_output_data(Some(OutputData::new_with_sc(vec![data], vec![color])));
+                Ok(())
+            }
+            _ => Err(RuntimeErr::NotSupportOperator),
+        },
+        Some(SyntaxType::Simple(_)) => match series {
+            Some(item_val) => {
+                let data = plot_val(item_val, context)?;
+                downcast_ctx(context).push_output_data(Some(OutputData::new(vec![data])));
+                Ok(())
+            }
+            _ => Err(RuntimeErr::NotSupportOperator),
+        },
+        _ => unreachable!(),
     }
 }
 
@@ -110,24 +141,44 @@ pub fn declare_var<'a>() -> VarResult<'a> {
 
     // plot(series, title, color, linewidth, style, trackprice, transp, histbase, offset, join, editable, show_last) → plot
 
-    let func_type = FunctionTypes(vec![FunctionType::new((
-        vec![
-            ("series", SyntaxType::Series(SimpleSyntaxType::Float)),
-            ("title", SyntaxType::string()),
-            ("color", SyntaxType::color()),
-            ("linewidth", SyntaxType::int()),
-            ("style", SyntaxType::string()),
-            ("trackprice", SyntaxType::bool()),
-            ("transp", SyntaxType::int()),
-            ("histbase", SyntaxType::float()),
-            ("offset", SyntaxType::int()),
-            ("join", SyntaxType::bool()),
-            ("editable", SyntaxType::bool()),
-            ("show_last", SyntaxType::int()),
-            ("display", SyntaxType::int()),
-        ],
-        SyntaxType::Void,
-    ))]);
+    let func_type = FunctionTypes(vec![
+        FunctionType::new((
+            vec![
+                ("series", SyntaxType::Series(SimpleSyntaxType::Float)),
+                ("title", SyntaxType::string()),
+                ("color", SyntaxType::color()),
+                ("linewidth", SyntaxType::int()),
+                ("style", SyntaxType::string()),
+                ("trackprice", SyntaxType::bool()),
+                ("transp", SyntaxType::int()),
+                ("histbase", SyntaxType::float()),
+                ("offset", SyntaxType::int()),
+                ("join", SyntaxType::bool()),
+                ("editable", SyntaxType::bool()),
+                ("show_last", SyntaxType::int()),
+                ("display", SyntaxType::int()),
+            ],
+            SyntaxType::Void,
+        )),
+        FunctionType::new((
+            vec![
+                ("series", SyntaxType::Series(SimpleSyntaxType::Float)),
+                ("title", SyntaxType::string()),
+                ("color", SyntaxType::Series(SimpleSyntaxType::Color)),
+                ("linewidth", SyntaxType::int()),
+                ("style", SyntaxType::string()),
+                ("trackprice", SyntaxType::bool()),
+                ("transp", SyntaxType::int()),
+                ("histbase", SyntaxType::float()),
+                ("offset", SyntaxType::int()),
+                ("join", SyntaxType::bool()),
+                ("editable", SyntaxType::bool()),
+                ("show_last", SyntaxType::int()),
+                ("display", SyntaxType::int()),
+            ],
+            SyntaxType::Void,
+        )),
+    ]);
     let mut obj_type = BTreeMap::new();
     obj_type.insert("style_area", SyntaxType::string());
     obj_type.insert("style_areabr", SyntaxType::string());
@@ -286,6 +337,57 @@ mod tests {
                 display: Some(1)
             })]
         )
+    }
+
+    #[test]
+    fn plot_color_test() {
+        use crate::runtime::OutputInfo;
+
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+        );
+        let src = r"plot(close, color=close > 1 ? #00ffaa : #ff00aa)";
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        runner
+            .run(
+                &vec![(
+                    "close",
+                    AnySeries::from_float_vec(vec![Some(1f64), Some(2f64)]),
+                )],
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            runner.get_context().get_io_info().get_outputs(),
+            &vec![OutputInfo::Plot(PlotInfo {
+                title: None,
+                color: Some(String::from("")),
+                linewidth: None,
+                style: None,
+                trackprice: None,
+                transp: None,
+                histbase: None,
+                offset: None,
+                join: None,
+                editable: None,
+                show_last: None,
+                display: None,
+            })]
+        );
+
+        assert_eq!(
+            runner.get_context().move_output_data(),
+            vec![Some(OutputData::new_with_sc(
+                vec![vec![Some(1f64), Some(2f64)]],
+                vec![StrOptionsData {
+                    options: vec![String::from("#ff00aa"), String::from("#00ffaa")],
+                    values: vec![Some(0), Some(1)]
+                }]
+            )),]
+        );
     }
 
     #[test]

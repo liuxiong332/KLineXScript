@@ -267,15 +267,41 @@ impl IOInfo {
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub struct StrOptionsData {
+    pub options: Vec<String>,
+    pub values: Vec<Option<i32>>,
+}
+
+impl StrOptionsData {
+    pub fn new() -> StrOptionsData {
+        StrOptionsData {
+            options: vec![],
+            values: vec![],
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct OutputData {
     // pub from: Option<i32>,
     // pub to: Option<i32>,
     pub series: Vec<Vec<Option<f64>>>,
+    pub colors: Vec<StrOptionsData>,
 }
 
 impl OutputData {
     pub fn new(series: Vec<Vec<Option<f64>>>) -> OutputData {
-        OutputData { series }
+        OutputData {
+            series,
+            colors: vec![],
+        }
+    }
+
+    pub fn new_with_sc(series: Vec<Vec<Option<f64>>>, colors: Vec<StrOptionsData>) -> OutputData {
+        OutputData {
+            series,
+            colors: colors,
+        }
     }
 }
 

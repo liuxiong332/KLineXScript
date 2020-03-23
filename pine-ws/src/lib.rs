@@ -34,7 +34,7 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 use pine::runtime::{
     AnySeries, InputVal, NoneCallback, OutputData, OutputDataCollect, OutputInfo, PineFormatError,
-    PlotInfo,
+    PlotInfo, StrOptionsData,
 };
 use pine::PineScript;
 use std::convert::TryInto;
@@ -83,28 +83,30 @@ pub fn gen_io_info(runner: &mut ExportPineRunner) -> Result<JsValue, JsValue> {
     }
 }
 
-fn output_data_to_slice(output: OutputDataCollect) -> *mut f64 {
-    let mut res: Vec<f64> = Vec::new();
-    // push [from, to] as float64 to result array.
-    let bytes = [output.from.to_le_bytes(), output.to.to_le_bytes()].concat();
-    let dest_bytes: [u8; 8] = bytes.as_slice().try_into().unwrap();
-    res.push(f64::from_le_bytes(dest_bytes));
+#[wasm_bindgen]
+pub struct ExportOutputData {
+    output_data: *mut Option<OutputData>,
+}
 
-    for data in output.data_list {
-        match data {
-            Some(v) => {
+#[wasm_bindgen]
+pub fn output_series(output: &mut ExportOutputData) -> *mut f64 {
+    let mut res: Vec<f64> = Vec::new();
+
+    let output_d = unsafe { transmute::<_, &mut Option<OutputData>>(output.output_data) };
+    match output_d {
+        None => res.push(0f64),
+        Some(output_d) => {
+            res.push(output_d.series.len() as f64);
+            for data in output_d.series.iter() {
                 // For every output data, first push the length of data vec
-                res.push(v.series.len() as f64);
-                for ones in v.series {
-                    for element in ones {
-                        match element {
-                            Some(fv) => res.push(fv),
-                            None => res.push(f64::NAN),
-                        }
+                res.push(data.len() as f64);
+                for ones in data.iter() {
+                    match ones {
+                        Some(fv) => res.push(*fv),
+                        None => res.push(f64::NAN),
                     }
                 }
             }
-            None => res.push(f64::from_le_bytes([0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0])),
         }
     }
     res.shrink_to_fit();
@@ -114,10 +116,90 @@ fn output_data_to_slice(output: OutputDataCollect) -> *mut f64 {
 }
 
 #[wasm_bindgen]
+pub fn output_options(output: &mut ExportOutputData) -> JsValue {
+    let output_d = unsafe { transmute::<_, &mut Option<OutputData>>(output.output_data) };
+    match output_d {
+        None => {
+            let opts: Vec<String> = vec![];
+            JsValue::from_serde(&opts).unwrap()
+        }
+        Some(output_d) => {
+            let opts: Vec<_> = output_d
+                .colors
+                .iter()
+                .map(|d| d.options.join("|"))
+                .collect();
+            JsValue::from_serde(&opts).unwrap()
+        }
+    }
+}
+
+#[wasm_bindgen]
+pub fn output_colors(output: &mut ExportOutputData) -> *mut i32 {
+    let mut res: Vec<i32> = Vec::new();
+
+    let output_d = unsafe { transmute::<_, &mut Option<OutputData>>(output.output_data) };
+    match output_d {
+        None => res.push(0i32),
+        Some(output_d) => {
+            res.push(output_d.colors.len() as i32);
+            for data in output_d.colors.iter() {
+                // For every output data, first push the length of data vec
+                res.push(data.values.len() as i32);
+                for ones in data.values.iter() {
+                    match ones {
+                        Some(fv) => res.push(*fv),
+                        None => res.push(0),
+                    }
+                }
+            }
+        }
+    }
+    res.shrink_to_fit();
+    let ptr = res.as_mut_ptr();
+    mem::forget(res); // prevent deallocation in Rust
+    ptr
+}
+
+#[wasm_bindgen]
+pub struct ExportOutputArray {
+    outputs: *mut OutputDataCollect,
+}
+
+impl Drop for ExportOutputArray {
+    fn drop(&mut self) {
+        unsafe {
+            Box::from_raw(self.outputs);
+        }
+    }
+}
+
+#[wasm_bindgen]
+pub fn output_array(array: &ExportOutputArray) -> JsValue {
+    let output = unsafe { transmute::<_, &mut OutputDataCollect>(array.outputs) };
+    JsValue::from_serde(&vec![output.from, output.to, output.data_list.len() as i32]).unwrap()
+}
+
+#[wasm_bindgen]
+pub fn output_array_get(array: &ExportOutputArray, i: usize) -> ExportOutputData {
+    let output = unsafe { transmute::<_, &mut OutputDataCollect>(array.outputs) };
+
+    ExportOutputData {
+        output_data: &mut output.data_list[i],
+    }
+}
+
+fn output_data_to_slice(output: OutputDataCollect) -> ExportOutputArray {
+    ExportOutputArray {
+        outputs: Box::into_raw(Box::new(output)),
+    }
+}
+
+#[wasm_bindgen]
 pub fn run_with_input(
     runner: &mut ExportPineRunner,
     input_val: JsValue,
-) -> Result<*mut f64, JsValue> {
+) -> Result<ExportOutputArray, JsValue> {
     let runner_ins = unsafe {
         let script = transmute::<*mut (), *mut PineScript>(runner.script);
         script.as_mut().unwrap()
@@ -178,7 +260,7 @@ pub fn run_with_data(
     srcs: JsValue,
     count: usize,
     data: &[f64],
-) -> Result<*mut f64, JsValue> {
+) -> Result<ExportOutputArray, JsValue> {
     let runner_ins = unsafe {
         let script = transmute::<*mut (), *mut PineScript>(runner.script);
         script.as_mut().unwrap()
@@ -199,7 +281,7 @@ pub fn run(
     srcs: JsValue,
     count: usize,
     data: &[f64],
-) -> Result<*mut f64, JsValue> {
+) -> Result<ExportOutputArray, JsValue> {
     let runner_ins = unsafe {
         let script = transmute::<*mut (), *mut PineScript>(runner.script);
         script.as_mut().unwrap()
@@ -221,7 +303,7 @@ pub fn update(
     srcs: JsValue,
     count: usize,
     data: &[f64],
-) -> Result<*mut f64, JsValue> {
+) -> Result<ExportOutputArray, JsValue> {
     let runner_ins = unsafe {
         let script = transmute::<*mut (), *mut PineScript>(runner.script);
         script.as_mut().unwrap()
@@ -242,7 +324,7 @@ pub fn update_from(
     from: i32,
     count: usize,
     data: &[f64],
-) -> Result<*mut f64, JsValue> {
+) -> Result<ExportOutputArray, JsValue> {
     let runner_ins = unsafe {
         let script = transmute::<*mut (), *mut PineScript>(runner.script);
         script.as_mut().unwrap()

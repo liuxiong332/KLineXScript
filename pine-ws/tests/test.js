@@ -1,4 +1,8 @@
-const { init_panic_hook, new_runner, parse_src, gen_io_info, run_with_data, run_with_input, run, update, update_from } = require("../pkg");
+const {
+    init_panic_hook, new_runner, parse_src, gen_io_info,
+    run_with_data, run_with_input, run, update, update_from,
+    output_array, output_array_get, output_series
+} = require("../pkg");
 const { memory } = require("../pkg/node/pine_bg");
 
 init_panic_hook();
@@ -14,26 +18,43 @@ console.log("src result", result);
 let ioInfo = gen_io_info(runner);
 console.log("io info:", JSON.stringify(ioInfo));
 
-// Extract data from the data pointer
-function getOutputData(dataPtr) {
+function parseOutputSeries(outSeries) {
     let outputData = [];
     let byteOffset = 0;
-    // Get the length of data
-    let indexRange = new Int32Array(memory.buffer, dataPtr + byteOffset, 2);
-    byteOffset += 4 * 2;
 
-    for (let i = 0; i < ioInfo.outputs.length; i += 1) {
-        const countPtr = new Float64Array(memory.buffer, dataPtr + byteOffset, 1);
+    // The count of data list
+    const countPtr = new Float64Array(memory.buffer, outSeries, 1);
+    let listCount = Number(countPtr[0]);
+    byteOffset += 8;
+
+    for (let i = 0; i < listCount; i += 1) {
+        const countPtr = new Float64Array(memory.buffer, outSeries + byteOffset, 1);
         let count = Number(countPtr[0]);
+        console.log("count :", count);
+
         byteOffset += 8;
         if (count === 0) {
             outputData.push([]);
         } else {
-            outputData.push(new Float64Array(memory.buffer, dataPtr + byteOffset, count));
+            outputData.push(new Float64Array(memory.buffer, outSeries + byteOffset, count));
             byteOffset += 8 * count;
         }
     }
     return outputData;
+}
+
+// Extract data from the data pointer
+function getOutputData(dataPtr) {
+    let dataInfo = output_array(dataPtr);
+    let allData = [];
+    console.log("data info", dataInfo);
+
+    for (let i = 0; i < dataInfo[2]; i += 1) {
+        let oneData = output_array_get(dataPtr, i);
+        let seriesData = output_series(oneData);
+        allData.push(parseOutputSeries(seriesData));
+    }
+    return allData;
 }
 
 // Run the script with the specific data

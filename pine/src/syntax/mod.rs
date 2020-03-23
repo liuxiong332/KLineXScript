@@ -161,7 +161,9 @@ impl<'a> SyntaxCtx<'a> for SyntaxContext<'a> {
         if let Some(p) = self.parent {
             downcast_ctx(p.as_ptr()).declare_inputnames(name)
         } else {
-            self.input_varnames.push(name)
+            if !self.input_varnames.iter().all(|&x| x != name) {
+                self.input_varnames.push(name)
+            }
         }
     }
 
@@ -1749,6 +1751,12 @@ mod tests {
         downcast_ctx(parser.context).set_input_detector(&input_detector);
         // downcast_ctx(parser.context).set_input_options(vec!["close", "open", "high", "low"]);
         let mut varname = rvarname("close");
+        assert_eq!(
+            parser.parse_varname(&mut varname),
+            Ok(ParseValue::new(INT_TYPE, "close"))
+        );
+        assert_eq!(downcast_ctx(parser.context).get_inputnames(), vec!["close"]);
+
         assert_eq!(
             parser.parse_varname(&mut varname),
             Ok(ParseValue::new(INT_TYPE, "close"))

@@ -161,7 +161,7 @@ impl<'a> SyntaxCtx<'a> for SyntaxContext<'a> {
         if let Some(p) = self.parent {
             downcast_ctx(p.as_ptr()).declare_inputnames(name)
         } else {
-            if !self.input_varnames.iter().all(|&x| x != name) {
+            if self.input_varnames.iter().all(|&x| x != name) {
                 self.input_varnames.push(name)
             }
         }

@@ -927,3 +927,51 @@ fn input_source_test() {
         )
         .is_ok());
 }
+
+const SRC_SCRIPT: &'static str = "
+plot(close)
+plot(high)
+plot(high)
+plot(open)
+plot(low)
+plot(time)
+plot(volume)
+plot(bar_index)
+";
+
+#[test]
+fn inpur_srcs_test() {
+    use pine::libs::{plot, time};
+    use pine::runtime::output::InputSrc;
+    use pine::runtime::NoneCallback;
+
+    let lib_info = pine::LibInfo::new(
+        vec![plot::declare_var(), time::declare_var()],
+        vec![
+            ("close", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("high", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("low", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("open", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("volume", SyntaxType::Series(SimpleSyntaxType::Int)),
+            ("_time", SyntaxType::Series(SimpleSyntaxType::Int)),
+            ("bar_index", SyntaxType::Series(SimpleSyntaxType::Int)),
+        ],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+    parser.parse_src(String::from(SRC_SCRIPT)).unwrap();
+    let io_info = parser.gen_io_info().unwrap();
+    assert_eq!(
+        io_info.get_input_srcs(),
+        &vec![InputSrc::new(
+            None,
+            vec![
+                String::from("close"),
+                String::from("high"),
+                String::from("open"),
+                String::from("low"),
+                String::from("time"),
+                String::from("volume"),
+            ]
+        )]
+    );
+}

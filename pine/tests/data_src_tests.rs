@@ -929,6 +929,8 @@ fn input_source_test() {
 }
 
 const SRC_SCRIPT: &'static str = "
+m = input(1, 'hello', 'int')
+plot(close + m)
 plot(close)
 plot(high)
 plot(high)
@@ -941,12 +943,16 @@ plot(bar_index)
 
 #[test]
 fn inpur_srcs_test() {
-    use pine::libs::{plot, time};
+    use pine::libs::{input, plot, time};
     use pine::runtime::output::InputSrc;
     use pine::runtime::NoneCallback;
 
     let lib_info = pine::LibInfo::new(
-        vec![plot::declare_var(), time::declare_var()],
+        vec![
+            input::declare_var(),
+            plot::declare_var(),
+            time::declare_var(),
+        ],
         vec![
             ("close", SyntaxType::Series(SimpleSyntaxType::Float)),
             ("high", SyntaxType::Series(SimpleSyntaxType::Float)),

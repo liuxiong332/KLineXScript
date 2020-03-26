@@ -12,7 +12,7 @@
   "collaborators": [
     "liuxiong332 <liuxiong332@163.com>"
   ],
-  "version": "0.6.0",
+  "version": "0.7.0",
   "files": [
     "web/",
     "node/"

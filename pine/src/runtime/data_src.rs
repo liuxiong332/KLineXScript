@@ -37,7 +37,8 @@ fn get_len<'a>(
         })
         .collect();
     if lens.len() == 0 {
-        return Err(PineRuntimeError::new_no_range(RuntimeErr::NotValidParam));
+        return Ok(0);
+        // return Err(PineRuntimeError::new_no_range(RuntimeErr::NotValidParam));
     }
     for l in &lens[1..] {
         if *l != lens[0] {

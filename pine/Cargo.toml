@@ -16,3 +16,6 @@ chrono = "^0.4"
 chrono-tz = "^0.4"
 regex = "^1"
 num-traits = "^0.2"
+
+[dev-dependencies]
+comrak = "0.7"

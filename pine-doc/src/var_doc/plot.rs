@@ -1,4 +1,4 @@
-use super::{DocBase, VarType};
+use crate::{DocBase, VarType};
 
 const PINE_FN_EXAMPLE: &'static str = r#"
 ```pine

@@ -1,8 +1,9 @@
 mod doc_base;
-mod plot;
+mod var_doc;
 mod vardoc_gen;
 
 pub use doc_base::*;
+pub use vardoc_gen::*;
 
 use pine::ast::syntax_type::*;
 use pine::libs::declare_vars;
@@ -169,21 +170,37 @@ fn format_var_type<'a>(name: String, t: SyntaxType<'a>) -> Vec<NameInfo> {
 
 #[derive(Debug, PartialEq)]
 struct LibVarParser {
-    variables: BTreeMap<&'static str, DocBase>,
-    functions: BTreeMap<&'static str, DocBase>,
+    variables: BTreeMap<String, String>,
+    functions: BTreeMap<String, String>,
 }
 
 impl LibVarParser {
     fn parse_lib_vars(&mut self) {
+        let docs = var_doc::declare_vars();
         declare_vars().iter().for_each(|s| {
-            // let name_infos = format_var_type(String::from(s.name), s.syntax_type);
-            // name_infos.into_iter().for_each(|s| match s.var_type {
-            //     VarType::Variable => self.variables.insert(s.name, DocBase {
-            //         var_type: VarType::Variable,
-            //         name: ,
-            //         pub signatures: Vec<String>,
-            //     })
-            // })
+            let name_infos = format_var_type(String::from(s.name), s.syntax_type.clone());
+            name_infos.into_iter().for_each(|s| {
+                let doc = docs
+                    .iter()
+                    .find(|m| m.name == s.name && m.var_type == s.var_type);
+                match s.var_type {
+                    VarType::Variable => {
+                        self.variables.insert(
+                            s.name.clone(),
+                            gen_var_doc(s.name.clone(), doc, s.signatures),
+                        );
+                    }
+                    VarType::Function => {
+                        let doc = docs
+                            .iter()
+                            .find(|m| m.name == s.name && m.var_type == s.var_type);
+                        self.functions.insert(
+                            s.name.clone(),
+                            gen_var_doc(s.name.clone(), doc, s.signatures),
+                        );
+                    }
+                }
+            })
             // match s.syntax_type {}
         });
     }

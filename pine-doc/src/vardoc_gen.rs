@@ -83,10 +83,13 @@ mod tests {
             remarks: "",
             links: "[plotshape](#fun_plotshape)",
         };
-        gen_var_doc(
-            String::from("hello"),
-            fn_doc,
-            vec![String::from("int"), String::from("float")],
+        assert_eq!(
+            gen_var_doc(
+                String::from("hello"),
+                fn_doc,
+                vec![String::from("int"), String::from("float")],
+            ),
+            String::from("")
         );
     }
 }

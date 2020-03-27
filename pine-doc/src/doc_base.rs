@@ -1,9 +1,22 @@
+#[derive(Debug, PartialEq)]
+pub enum VarType {
+    Variable,
+    Function,
+}
+
+pub const Var: VarType = VarType::Variable;
+pub const Func: VarType = VarType::Function;
+
+#[derive(Debug, PartialEq)]
 pub struct DocBase {
+    pub var_type: VarType,
     pub name: &'static str,
+    pub signatures: Vec<String>,
     pub description: &'static str,
     pub example: &'static str,
     pub returns: &'static str,
     pub arguments: &'static str,
+    pub remarks: &'static str,
     pub links: &'static str,
 }
 
@@ -18,7 +31,8 @@ mod tests {
             hardbreaks: true,
             smart: true,
             github_pre_lang: true,
-            Some("pine".into()),
+            width: std::usize::MAX,
+            default_info_string: Some("pine".into()),
             unsafe_: true,
             ext_strikethrough: true,
             ext_tagfilter: true,

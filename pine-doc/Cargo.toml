@@ -1,5 +1,5 @@
 [package]
-name = "pine"
+name = "pine-doc"
 version = "0.1.0"
 authors = ["liuxiong <liuxiong332@163.com>"]
 edition = "2018"
@@ -7,14 +7,6 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-nom = "5"
+pine = { path = "../pine"}
+comrak = "0.7"
 lazy_static = "1.4"
-assert_matches = "1.3"
-serde = "^1.0.104"
-serde_derive = "^1.0.104"
-chrono = "^0.4"
-chrono-tz = "^0.4"
-regex = "^1"
-num-traits = "^0.2"
-
-[dev-dependencies]

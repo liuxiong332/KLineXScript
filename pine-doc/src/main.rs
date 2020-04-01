@@ -1,283 +1,57 @@
 mod doc_base;
+mod doc_parser;
 mod var_doc;
 mod vardoc_gen;
 
 pub use doc_base::*;
 pub use vardoc_gen::*;
 
-use pine::ast::syntax_type::*;
-use pine::libs::declare_vars;
-use std::collections::BTreeMap;
-use std::rc::Rc;
+use doc_parser::*;
+
+use std::error::Error;
+use std::fs::File;
+use std::io::prelude::*;
+use std::path::Path;
 
 #[macro_use]
 extern crate lazy_static;
-
-#[derive(Debug, PartialEq)]
-struct NameInfo {
-    name: String,
-    var_type: VarType,
-    signatures: Vec<String>,
+fn gen_detail_doc(doc_parser: &LibVarParser) -> String {
+    [
+        doc_parser
+            .variables
+            .iter()
+            .map(|s| s.1.clone())
+            .collect::<Vec<_>>()
+            .join("\n"),
+        doc_parser
+            .functions
+            .iter()
+            .map(|s| s.1.clone())
+            .collect::<Vec<_>>()
+            .join("\n"),
+    ]
+    .join("\n")
 }
 
-impl NameInfo {
-    pub fn new(name: String, var_type: VarType, signatures: Vec<String>) -> NameInfo {
-        NameInfo {
-            name,
-            var_type,
-            signatures,
-        }
-    }
+fn write_doc(doc_parser: &LibVarParser) {
+    let path = Path::new("pine-doc/static/output/all_doc.html");
+    let display = path.display();
 
-    pub fn simple_var(name: String, sig: &'static str) -> NameInfo {
-        NameInfo {
-            name: name,
-            var_type: VarType::Variable,
-            signatures: vec![String::from(sig)],
-        }
-    }
+    let mut file = match File::create(&path) {
+        Err(why) => panic!("couldn't create {}: {}", display, why.description()),
+        Ok(file) => file,
+    };
 
-    pub fn simple_var2(name: String, sig: String) -> NameInfo {
-        NameInfo {
-            name: name,
-            var_type: VarType::Variable,
-            signatures: vec![sig],
-        }
-    }
-
-    pub fn func_vars(name: String, sigs: Vec<String>) -> NameInfo {
-        NameInfo {
-            name: name,
-            var_type: VarType::Function,
-            signatures: sigs,
-        }
-    }
-}
-
-fn format_func_type<'a>(name: String, t: FunctionType<'a>) -> String {
-    let func_sig = t
-        .signature
-        .0
-        .iter()
-        .map(|v| {
-            format_var_type(String::from(v.0), v.1.clone())
-                .iter()
-                .map(|m| format!("{}: {}", m.name, m.signatures[0]))
-                .collect::<Vec<_>>()
-        })
-        .flatten()
-        .collect::<Vec<_>>()
-        .join(", ");
-    let ret = &format_var_type(String::from(""), t.signature.1)[0].signatures[0];
-    format!("{}({}) -> {}", name, func_sig, ret)
-}
-
-fn format_func_types<'a>(name: String, t: Rc<FunctionTypes<'a>>) -> Vec<String> {
-    t.0.iter()
-        .map(|t| format_func_type(name.clone(), t.clone()))
-        .collect()
-}
-
-fn format_obj_type<'a>(name: String, obj: Rc<BTreeMap<&'a str, SyntaxType<'a>>>) -> Vec<NameInfo> {
-    obj.iter()
-        .map(|(n, t)| format_var_type([name.clone(), String::from(*n)].join("."), t.clone()))
-        .flatten()
-        .collect()
-}
-
-fn format_func<'a>(name: String, func: Rc<FunctionTypes<'a>>) -> Vec<NameInfo> {
-    vec![NameInfo::func_vars(
-        name.clone(),
-        format_func_types(name.clone(), func),
-    )]
-}
-
-fn format_var_type<'a>(name: String, t: SyntaxType<'a>) -> Vec<NameInfo> {
-    match t {
-        SyntaxType::Void => vec![NameInfo::simple_var(name, "void")],
-
-        SyntaxType::Simple(SimpleSyntaxType::Int) => vec![NameInfo::simple_var(name, "int")],
-        SyntaxType::Simple(SimpleSyntaxType::Float) => vec![NameInfo::simple_var(name, "float")],
-        SyntaxType::Simple(SimpleSyntaxType::Bool) => vec![NameInfo::simple_var(name, "bool")],
-        SyntaxType::Simple(SimpleSyntaxType::Na) => vec![NameInfo::simple_var(name, "na")],
-        SyntaxType::Simple(SimpleSyntaxType::Color) => vec![NameInfo::simple_var(name, "color")],
-        SyntaxType::Simple(SimpleSyntaxType::String) => vec![NameInfo::simple_var(name, "string")],
-
-        SyntaxType::Series(SimpleSyntaxType::Int) => {
-            vec![NameInfo::simple_var(name, "series(int)")]
-        }
-        SyntaxType::Series(SimpleSyntaxType::Float) => {
-            vec![NameInfo::simple_var(name, "series(float)")]
-        }
-        SyntaxType::Series(SimpleSyntaxType::Bool) => {
-            vec![NameInfo::simple_var(name, "series(bool)")]
-        }
-        SyntaxType::Series(SimpleSyntaxType::Na) => vec![NameInfo::simple_var(name, "series(na)")],
-        SyntaxType::Series(SimpleSyntaxType::Color) => {
-            vec![NameInfo::simple_var(name, "series(color)")]
-        }
-        SyntaxType::Series(SimpleSyntaxType::String) => {
-            vec![NameInfo::simple_var(name, "series(string)")]
-        }
-
-        SyntaxType::List(sub_t) => vec![NameInfo::simple_var2(
-            name,
-            format!(
-                "list({})",
-                format_var_type(String::from(""), SyntaxType::Simple(sub_t))
-                    .into_iter()
-                    .map(|d| d.signatures)
-                    .flatten()
-                    .collect::<Vec<_>>()
-                    .join(",")
-            ),
-        )],
-
-        SyntaxType::Tuple(types) => {
-            let v: Vec<String> = types
-                .iter()
-                .map(|t| format_var_type(String::from(""), t.clone()))
-                .flatten()
-                .map(|d| d.signatures)
-                .flatten()
-                .collect();
-            vec![NameInfo::simple_var2(name, format!("[{}]", v.join(", ")))]
-        }
-
-        SyntaxType::Object(obj) => format_obj_type(name, obj),
-        SyntaxType::Function(func) => format_func(name, func),
-        SyntaxType::ObjectFunction(obj, func) => {
-            let v1 = format_obj_type(name.clone(), obj);
-            let v2 = format_func(name.clone(), func);
-            vec![v1, v2].into_iter().flatten().collect::<Vec<_>>()
-        }
-        SyntaxType::ValFunction(val, func) => {
-            let v1 = format_var_type(name.clone(), (*val).clone());
-            let v2 = format_func(name.clone(), func);
-            vec![v1, v2].into_iter().flatten().collect::<Vec<_>>()
-        }
-        SyntaxType::ValObjectFunction(val, obj, func) => {
-            let v1 = format_var_type(name.clone(), (*val).clone());
-            let v2 = format_obj_type(name.clone(), obj);
-            let v3 = format_func(name.clone(), func);
-            vec![v1, v2, v3].into_iter().flatten().collect::<Vec<_>>()
-        }
-        SyntaxType::UserFunction(_) => unreachable!(),
-        SyntaxType::DynamicExpr(t) => format_var_type(name, (*t).clone()),
-        SyntaxType::Any => unreachable!(),
-    }
-}
-
-#[derive(Debug, PartialEq)]
-struct LibVarParser {
-    variables: BTreeMap<String, String>,
-    functions: BTreeMap<String, String>,
-
-    brief_vars: BTreeMap<String, String>,
-    brief_funcs: BTreeMap<String, String>,
-}
-
-impl LibVarParser {
-    fn parse_lib_vars(&mut self) {
-        let docs = var_doc::declare_vars();
-        declare_vars().iter().for_each(|s| {
-            let name_infos = format_var_type(String::from(s.name), s.syntax_type.clone());
-            name_infos.into_iter().for_each(|s| {
-                let doc = docs
-                    .iter()
-                    .find(|m| m.name == s.name && m.var_type == s.var_type);
-                match s.var_type {
-                    VarType::Variable => {
-                        self.variables.insert(
-                            s.name.clone(),
-                            gen_var_doc(s.name.clone(), doc.clone(), &s.signatures),
-                        );
-                        self.brief_vars.insert(
-                            s.name.clone(),
-                            gen_brief_var_doc(s.name.clone(), doc.clone(), &s.signatures),
-                        );
-                    }
-                    VarType::Function => {
-                        self.functions.insert(
-                            s.name.clone(),
-                            gen_var_doc(s.name.clone(), doc.clone(), &s.signatures),
-                        );
-                        self.brief_funcs.insert(
-                            s.name.clone(),
-                            gen_brief_var_doc(s.name.clone(), doc.clone(), &s.signatures),
-                        );
-                    }
-                }
-            })
-            // match s.syntax_type {}
-        });
+    // println!("{:?}", self.gen_detail_doc());
+    match file.write_all(gen_detail_doc(doc_parser).as_bytes()) {
+        Err(why) => panic!("couldn't write to {}: {}", display, why.description()),
+        Ok(_) => println!("successfully wrote to {}", path.display()),
     }
 }
 
 fn main() {
     println!("Hello");
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::rc::Rc;
-    #[test]
-    fn format_type_test() {
-        assert_eq!(
-            format_var_type(String::from("hello"), SyntaxType::int()),
-            vec![NameInfo::simple_var(String::from("hello"), "int")],
-        );
-
-        assert_eq!(
-            format_var_type(String::from("hello"), SyntaxType::int_series()),
-            vec![NameInfo::simple_var(String::from("hello"), "series(int)")],
-        );
-
-        assert_eq!(
-            format_var_type(
-                String::from("hello"),
-                SyntaxType::List(SimpleSyntaxType::Int)
-            ),
-            vec![NameInfo::simple_var(String::from("hello"), "list(int)")]
-        );
-
-        assert_eq!(
-            format_var_type(
-                String::from("hello"),
-                SyntaxType::Tuple(Rc::new(vec![SyntaxType::int(), SyntaxType::float()]))
-            ),
-            vec![NameInfo::simple_var(String::from("hello"), "[int, float]")]
-        );
-
-        let mut obj = BTreeMap::new();
-        let mut obj2 = BTreeMap::new();
-        obj.insert("e1", SyntaxType::int());
-        obj2.insert("se", SyntaxType::float());
-        obj.insert("e2", SyntaxType::Object(Rc::new(obj2)));
-
-        assert_eq!(
-            format_var_type(String::from("hello"), SyntaxType::Object(Rc::new(obj))),
-            vec![
-                NameInfo::simple_var(String::from("hello.e1"), "int"),
-                NameInfo::simple_var(String::from("hello.e2.se"), "float")
-            ]
-        );
-        assert_eq!(
-            format_var_type(
-                String::from("hello"),
-                SyntaxType::Function(Rc::new(FunctionTypes(vec![
-                    FunctionType::new((vec![("e1", SyntaxType::bool())], SyntaxType::int())),
-                    FunctionType::new((vec![("e1", SyntaxType::int())], SyntaxType::int()))
-                ])))
-            ),
-            vec![NameInfo::func_vars(
-                String::from("hello"),
-                vec![
-                    String::from("hello(e1: bool) -> int"),
-                    String::from("hello(e1: int) -> int")
-                ]
-            ),]
-        );
-    }
+    let mut parser = LibVarParser::new();
+    parser.parse_lib_vars();
+    write_doc(&parser);
 }

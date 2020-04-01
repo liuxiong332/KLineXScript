@@ -22,7 +22,7 @@ lazy_static! {
     };
 }
 
-pub fn gen_var_doc(name: String, doc_base: Option<&DocBase>, sigs: Vec<String>) -> String {
+pub fn gen_var_doc(name: String, doc_base: Option<&DocBase>, sigs: &Vec<String>) -> String {
     let name = Some(format!("## {}", name));
     let desc = match doc_base {
         None => None,
@@ -85,6 +85,39 @@ pub fn gen_var_doc(name: String, doc_base: Option<&DocBase>, sigs: Vec<String>) 
     markdown_to_html(&doc_str, &MD_OPTIONS)
 }
 
+pub fn gen_brief_var_doc(name: String, doc_base: Option<&DocBase>, sigs: &Vec<String>) -> String {
+    let name = Some(format!("## {}", name));
+    let desc = match doc_base {
+        None => None,
+        Some(doc_base) => match doc_base.description {
+            "" => None,
+            _ => Some(String::from(doc_base.description)),
+        },
+    };
+
+    let sigs = Some(
+        sigs.into_iter()
+            .map(|s| format!("```pine\n{}\n```", s))
+            .collect::<Vec<_>>()
+            .join("\n"),
+    );
+    let returns = match doc_base {
+        None => None,
+        Some(doc_base) => match doc_base.returns {
+            "" => None,
+            _ => Some(format!("#### RETURNS\n{}", doc_base.returns)),
+        },
+    };
+
+    let eles = vec![name, desc, sigs, returns];
+    let doc_str = eles
+        .into_iter()
+        .filter_map(|s| s)
+        .collect::<Vec<_>>()
+        .join("\n");
+    markdown_to_html(&doc_str, &MD_OPTIONS)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -105,7 +138,7 @@ mod tests {
         gen_var_doc(
             String::from("hello"),
             Some(&fn_doc),
-            vec![String::from("int"), String::from("float")],
+            &vec![String::from("int"), String::from("float")],
         );
     }
 }

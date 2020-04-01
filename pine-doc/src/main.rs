@@ -172,6 +172,9 @@ fn format_var_type<'a>(name: String, t: SyntaxType<'a>) -> Vec<NameInfo> {
 struct LibVarParser {
     variables: BTreeMap<String, String>,
     functions: BTreeMap<String, String>,
+
+    brief_vars: BTreeMap<String, String>,
+    brief_funcs: BTreeMap<String, String>,
 }
 
 impl LibVarParser {
@@ -187,16 +190,21 @@ impl LibVarParser {
                     VarType::Variable => {
                         self.variables.insert(
                             s.name.clone(),
-                            gen_var_doc(s.name.clone(), doc, s.signatures),
+                            gen_var_doc(s.name.clone(), doc.clone(), &s.signatures),
+                        );
+                        self.brief_vars.insert(
+                            s.name.clone(),
+                            gen_brief_var_doc(s.name.clone(), doc.clone(), &s.signatures),
                         );
                     }
                     VarType::Function => {
-                        let doc = docs
-                            .iter()
-                            .find(|m| m.name == s.name && m.var_type == s.var_type);
                         self.functions.insert(
                             s.name.clone(),
-                            gen_var_doc(s.name.clone(), doc, s.signatures),
+                            gen_var_doc(s.name.clone(), doc.clone(), &s.signatures),
+                        );
+                        self.brief_funcs.insert(
+                            s.name.clone(),
+                            gen_brief_var_doc(s.name.clone(), doc.clone(), &s.signatures),
                         );
                     }
                 }

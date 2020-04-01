@@ -22,8 +22,17 @@ lazy_static! {
     };
 }
 
-pub fn gen_var_doc(name: String, doc_base: Option<&DocBase>, sigs: &Vec<String>) -> String {
-    let name = Some(format!("## {}", name));
+pub fn gen_var_doc(
+    name: String,
+    doc_base: Option<&DocBase>,
+    sigs: &Vec<String>,
+    fmt_type: String,
+) -> String {
+    let name = Some(format!(
+        "<h2 id=\"{}\">{}</h2>\n",
+        [fmt_type, name.clone()].join("-"),
+        name
+    ));
     let desc = match doc_base {
         None => None,
         Some(doc_base) => match doc_base.description {
@@ -34,7 +43,7 @@ pub fn gen_var_doc(name: String, doc_base: Option<&DocBase>, sigs: &Vec<String>)
 
     let sigs = Some(
         sigs.into_iter()
-            .map(|s| format!("```pine\n{}\n```", s))
+            .map(|s| format!("```pine-type\n{}\n```", s))
             .collect::<Vec<_>>()
             .join("\n"),
     );
@@ -83,6 +92,7 @@ pub fn gen_var_doc(name: String, doc_base: Option<&DocBase>, sigs: &Vec<String>)
         .collect::<Vec<_>>()
         .join("\n");
     markdown_to_html(&doc_str, &MD_OPTIONS)
+    // doc_str
 }
 
 pub fn gen_brief_var_doc(name: String, doc_base: Option<&DocBase>, sigs: &Vec<String>) -> String {
@@ -97,7 +107,7 @@ pub fn gen_brief_var_doc(name: String, doc_base: Option<&DocBase>, sigs: &Vec<St
 
     let sigs = Some(
         sigs.into_iter()
-            .map(|s| format!("```pine\n{}\n```", s))
+            .map(|s| format!("```pine-type\n{}\n```", s))
             .collect::<Vec<_>>()
             .join("\n"),
     );
@@ -139,6 +149,7 @@ mod tests {
             String::from("hello"),
             Some(&fn_doc),
             &vec![String::from("int"), String::from("float")],
+            String::from("fun"),
         );
     }
 }

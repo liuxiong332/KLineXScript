@@ -193,7 +193,12 @@ impl LibVarParser {
                     VarType::Variable => {
                         self.variables.insert(
                             s.name.clone(),
-                            gen_var_doc(s.name.clone(), doc.clone(), &s.signatures),
+                            gen_var_doc(
+                                s.name.clone(),
+                                doc.clone(),
+                                &s.signatures,
+                                String::from("fun"),
+                            ),
                         );
                         self.brief_vars.insert(
                             s.name.clone(),
@@ -203,7 +208,12 @@ impl LibVarParser {
                     VarType::Function => {
                         self.functions.insert(
                             s.name.clone(),
-                            gen_var_doc(s.name.clone(), doc.clone(), &s.signatures),
+                            gen_var_doc(
+                                s.name.clone(),
+                                doc.clone(),
+                                &s.signatures,
+                                String::from("var"),
+                            ),
                         );
                         self.brief_funcs.insert(
                             s.name.clone(),

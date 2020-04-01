@@ -10,3 +10,4 @@ edition = "2018"
 pine = { path = "../pine"}
 comrak = "0.7"
 lazy_static = "1.4"
+regex = "1"

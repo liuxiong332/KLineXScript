@@ -4,9 +4,6 @@ pub enum VarType {
     Function,
 }
 
-pub const Var: VarType = VarType::Variable;
-pub const Func: VarType = VarType::Function;
-
 #[derive(Debug, PartialEq)]
 pub struct DocBase {
     pub var_type: VarType,

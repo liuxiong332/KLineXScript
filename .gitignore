@@ -3,4 +3,4 @@
 Cargo.lock
 *.pyd
 .idea
-static/output/
+output/

@@ -197,7 +197,7 @@ impl LibVarParser {
                                 s.name.clone(),
                                 doc.clone(),
                                 &s.signatures,
-                                String::from("fun"),
+                                String::from("var"),
                             ),
                         );
                         self.brief_vars.insert(
@@ -212,7 +212,7 @@ impl LibVarParser {
                                 s.name.clone(),
                                 doc.clone(),
                                 &s.signatures,
-                                String::from("var"),
+                                String::from("fun"),
                             ),
                         );
                         self.brief_funcs.insert(

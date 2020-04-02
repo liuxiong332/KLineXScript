@@ -4,7 +4,7 @@ use comrak::ComrakOptions;
 
 lazy_static! {
     static ref MD_OPTIONS: ComrakOptions = ComrakOptions {
-        hardbreaks: false,
+        hardbreaks: true,
         smart: true,
         github_pre_lang: true,
         width: std::usize::MAX,
@@ -22,6 +22,10 @@ lazy_static! {
     };
 }
 
+fn process_name(name: String) -> String {
+    name.replace(".", "-")
+}
+
 pub fn gen_var_doc(
     name: String,
     doc_base: Option<&DocBase>,
@@ -30,7 +34,7 @@ pub fn gen_var_doc(
 ) -> String {
     let name = Some(format!(
         "<h2 id=\"{}\">{}</h2>\n",
-        [fmt_type, name.clone()].join("-"),
+        [fmt_type, process_name(name.clone())].join("-"),
         name
     ));
     let desc = match doc_base {

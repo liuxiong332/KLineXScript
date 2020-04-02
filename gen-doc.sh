@@ -10,3 +10,11 @@ if [ ! -f ${OUTPUT_PATH}highlight.min.js ]; then
 fi
 
 ./target/debug/pine-doc
+
+if [ ! -d ./pine-doc/node_modules]; then
+    cd pine-doc
+    npm install
+    cd ..
+fi
+
+node ./pine-doc/script/process_doc.js ${OUTPUT_PATH}all_doc.html

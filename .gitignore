@@ -4,3 +4,4 @@ Cargo.lock
 *.pyd
 .idea
 output/
+node_modules

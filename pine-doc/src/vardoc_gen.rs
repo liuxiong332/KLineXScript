@@ -1,6 +1,7 @@
 use super::DocBase;
-use super::VarType;
-use comrak::{markdown_to_html, ComrakOptions};
+use comrak::markdown_to_html;
+use comrak::ComrakOptions;
+use minidom::Element;
 
 lazy_static! {
     static ref MD_OPTIONS: ComrakOptions = ComrakOptions {
@@ -127,9 +128,9 @@ pub fn gen_brief_var_doc(name: String, doc_base: Option<&DocBase>, sigs: &Vec<St
         .join("\n");
     markdown_to_html(&doc_str, &MD_OPTIONS)
 }
-
 #[cfg(test)]
 mod tests {
+    use super::super::VarType;
     use super::*;
 
     #[test]

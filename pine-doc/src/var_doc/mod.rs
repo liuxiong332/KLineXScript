@@ -5,6 +5,7 @@ mod alma;
 mod asin;
 mod atan;
 mod atr;
+mod avg;
 mod input;
 mod plot;
 use super::DocBase;
@@ -20,6 +21,7 @@ pub fn declare_vars() -> Vec<DocBase> {
         asin::gen_doc(),
         atan::gen_doc(),
         atr::gen_doc(),
+        avg::gen_doc(),
     ]
     .into_iter()
     .flatten()

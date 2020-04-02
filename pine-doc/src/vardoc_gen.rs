@@ -96,7 +96,6 @@ pub fn gen_var_doc(
 }
 
 pub fn gen_brief_var_doc(name: String, doc_base: Option<&DocBase>, sigs: &Vec<String>) -> String {
-    let name = Some(format!("## {}", name));
     let desc = match doc_base {
         None => None,
         Some(doc_base) => match doc_base.description {
@@ -119,7 +118,7 @@ pub fn gen_brief_var_doc(name: String, doc_base: Option<&DocBase>, sigs: &Vec<St
         },
     };
 
-    let eles = vec![name, desc, sigs, returns];
+    let eles = vec![desc, sigs, returns];
     let doc_str = eles
         .into_iter()
         .filter_map(|s| s)
@@ -127,6 +126,7 @@ pub fn gen_brief_var_doc(name: String, doc_base: Option<&DocBase>, sigs: &Vec<St
         .join("\n");
     markdown_to_html(&doc_str, &MD_OPTIONS)
 }
+
 #[cfg(test)]
 mod tests {
     use super::super::VarType;

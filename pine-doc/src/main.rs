@@ -1,4 +1,5 @@
 extern crate regex;
+extern crate serde;
 
 mod doc_base;
 mod doc_parser;
@@ -17,6 +18,8 @@ use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
+
+use serde::{Deserialize, Serialize};
 
 const ALL_DOC_HTML: &'static str = r#"
 <!DOCTYPE html>
@@ -41,8 +44,9 @@ const ALL_DOC_HTML: &'static str = r#"
 
 #[macro_use]
 extern crate lazy_static;
-fn gen_detail_doc(doc_parser: &LibVarParser) -> String {
-    let doc_content = [
+
+fn gen_doc(doc_parser: &LibVarParser) -> String {
+    [
         doc_parser
             .variables
             .iter()
@@ -56,7 +60,11 @@ fn gen_detail_doc(doc_parser: &LibVarParser) -> String {
             .collect::<Vec<_>>()
             .join("\n"),
     ]
-    .join("\n");
+    .join("\n")
+}
+
+fn gen_detail_doc(doc_parser: &LibVarParser) -> String {
+    let doc_content = gen_doc(doc_parser);
     let re = Regex::new(r"\{\}").unwrap();
     String::from(re.replace(ALL_DOC_HTML, |_caps: &Captures| doc_content.clone()))
 }
@@ -75,11 +83,49 @@ fn write_doc(doc_parser: &LibVarParser) {
         Err(why) => panic!("couldn't write to {}: {}", display, why.description()),
         Ok(_) => println!("successfully wrote to {}", path.display()),
     }
+
+    let doc_path = Path::new("pine-doc/static/output/doc.html");
+    let doc_display = doc_path.display();
+
+    let mut doc_file = match File::create(&doc_path) {
+        Err(why) => panic!("couldn't create {}: {}", doc_display, why.description()),
+        Ok(file) => file,
+    };
+
+    match doc_file.write_all(gen_doc(doc_parser).as_bytes()) {
+        Err(why) => panic!("couldn't write to {}: {}", doc_display, why.description()),
+        Ok(_) => println!("successfully wrote to {}", doc_path.display()),
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct OutputRes {
+    variables: Vec<String>,
+    functions: Vec<String>,
+}
+
+fn write_vars(doc_parser: &LibVarParser) {
+    let output = OutputRes {
+        variables: doc_parser.variables.iter().map(|s| s.0).cloned().collect(),
+        functions: doc_parser.functions.iter().map(|s| s.0).cloned().collect(),
+    };
+    let path = Path::new("pine-doc/static/output/output.json");
+    let display = path.display();
+
+    let mut file = match File::create(&path) {
+        Err(why) => panic!("couldn't create file: {}", why.description()),
+        Ok(file) => file,
+    };
+
+    match file.write_all(serde_json::to_string(&output).unwrap().as_bytes()) {
+        Err(why) => panic!("couldn't write to file: {}", why.description()),
+        Ok(_) => println!("successfully wrote to {}", display),
+    }
 }
 
 fn main() {
-    println!("Hello");
     let mut parser = LibVarParser::new();
     parser.parse_lib_vars();
     write_doc(&parser);
+    write_vars(&parser);
 }

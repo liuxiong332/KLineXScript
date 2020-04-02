@@ -19,4 +19,4 @@ if [ ! -d ./pine-doc/node_modules ]; then
     cd ..
 fi
 
-node ./pine-doc/script/process_doc.js ${OUTPUT_PATH}all_doc.html
+node ./pine-doc/script/process_doc.js ${OUTPUT_PATH}all_doc.html ${OUTPUT_PATH}doc.html

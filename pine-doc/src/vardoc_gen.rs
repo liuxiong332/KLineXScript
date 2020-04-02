@@ -1,7 +1,6 @@
 use super::DocBase;
 use comrak::markdown_to_html;
 use comrak::ComrakOptions;
-use minidom::Element;
 
 lazy_static! {
     static ref MD_OPTIONS: ComrakOptions = ComrakOptions {

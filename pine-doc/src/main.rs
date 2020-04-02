@@ -32,6 +32,7 @@ const ALL_DOC_HTML: &'static str = r#"
 <body>
 {}
 <script src="highlight.min.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
 <script src="jquery-2.1.1.min.js"></script>
 <script src="perfect-scrollbar.min.js"></script>
 </body>

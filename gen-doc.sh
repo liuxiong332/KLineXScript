@@ -7,11 +7,13 @@ if [ ! -f ${OUTPUT_PATH}highlight.min.js ]; then
     cp ${OUTPUT_PATH}build/demo/perfect-scrollbar.min.css ${OUTPUT_PATH}perfect-scrollbar.min.css
     cp ${OUTPUT_PATH}build/demo/perfect-scrollbar.min.js ${OUTPUT_PATH}perfect-scrollbar.min.js
     cp ${OUTPUT_PATH}build/demo/styles/default.css ${OUTPUT_PATH}default.css
+    # cp ${OUTPUT_PATH}build/demo/styles/github-gist.css ${OUTPUT_PATH}github-gist.css
 fi
 
+cargo build
 ./target/debug/pine-doc
 
-if [ ! -d ./pine-doc/node_modules]; then
+if [ ! -d ./pine-doc/node_modules ]; then
     cd pine-doc
     npm install
     cd ..

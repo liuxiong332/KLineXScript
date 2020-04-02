@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Pine Language API</title>
+    <link rel="stylesheet" type="text/css" href="theme.css">
+    <link rel="stylesheet" href="output/perfect-scrollbar.min.css">
+    <link rel="stylesheet" href="output/default.css">
+
+</head>
+
+<body>
+    <div class="left-nav">
+        <div class="search-row">
+            <input class="search-row__input" type="text" name="q" value="" autocomplete="off" data-role="search"
+                placeholder="Search">
+            <span class="search-row__button search-row__input-reset">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 95.939 95.939" width="95.939" height="95.939">
+                    <path
+                        d="M62.82 47.97l32.53-32.534a2 2 0 0 0 0-2.828L83.332.586a2 2 0 0 0-2.827 0L47.97 33.12 15.435.587c-.75-.75-2.078-.75-2.828 0L.587 12.607a2 2 0 0 0 0 2.83L33.12 47.97.588 80.504a2 2 0 0 0 0 2.828l12.02 12.02a1.997 1.997 0 0 0 2.83 0L47.97 62.818l32.535 32.535a2 2 0 0 0 2.827 0l12.02-12.02c.78-.783.78-2.05 0-2.83L62.82 47.97z">
+                    </path>
+                </svg>
+            </span>
+            <span class="search-row__button search-row__search-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18" width="18px" height="18px">
+                    <path fill-rule="evenodd"
+                        d="M12.5 11h-.79l-.28-.27A6.47 6.47 0 0 0 13 6.5 6.5 6.5 0 1 0 6.5 13c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L17.49 16l-4.99-5zm-6 0C4.01 11 2 8.99 2 6.5S4.01 2 6.5 2 11 4.01 11 6.5 8.99 11 6.5 11z">
+                    </path>
+                </svg>
+            </span>
+        </div>
+        <div class="pine-reference">
+            <div class="accordion__section-header">Built-in variables</div>
+            <div class="accordion__section-body variables-body">
+                <a href="#fun_int" class="pine-reference-item pine-reference-selected" data-href="fun_int">int</a>
+                <a href="#fun_int" class="pine-reference-item" data-href="fun_int">int</a>
+            </div>
+            <div class="accordion__section-header">Built-in functions</div>
+            <div class="accordion__section-body functions-body">
+                <a href="#fun_int" class="pine-reference-item pine-reference-selected" data-href="fun_int">int</a>
+                <a href="#fun_int" class="pine-reference-item" data-href="fun_int">int</a>
+            </div>
+
+        </div>
+    </div>
+    <div class="right-content">
+        <pre lang="pine"><code class="pine">plot(high+low, title=&apos;Title&apos;, color=#00ffaa, linewidth=2, style=plot.style_area, transp=70, offset=15, trackprice=true)
+            p1 = plot(open)
+            p2 = plot(close)
+            fill(p1, p2, color=color.green)
+            </code></pre>
+        <h4>ARGUMENTS</h4>
+        <p><strong>series (series(float))</strong> Series of data to be plotted. Required argument.
+            <strong>title (string)</strong> Title of the plot.</p>
+        <h4>RETURNS</h4>
+        <p>A plot object, that can be used in <a href="#fun_fill">fill</a></p>
+        <h4>SEE ALSO</h4>
+        <p><a href="#fun_plotshape">plotshape</a></p>
+    </div>
+
+    <script>
+        var VARIABLES = ["var1", "var1", "var1", "var1", "var1", "var1", "var1", "var1", "var1", "var1", "var1"];
+        var FUNCTIONS = ["func1", "func1", "func1", "func1", "func1", "func1", "func1", "func1", "func1", "func1"];
+    </script>
+    <script src="output/highlight.min.js"></script>
+    <script>
+        hljs.initHighlightingOnLoad();
+    </script>
+    <script src="output/jquery-2.1.1.min.js"></script>
+    <script src="output/perfect-scrollbar.min.js"></script>
+    <script src="main.js"></script>
+</body>
+
+</html>

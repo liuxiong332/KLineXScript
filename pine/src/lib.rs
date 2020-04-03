@@ -368,16 +368,25 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
         }
     }
 
+    fn transform_data(data: &mut Vec<(&'static str, AnySeries)>) {
+        for item in data.iter_mut() {
+            if item.0 == "time" {
+                item.0 = "_time";
+            }
+        }
+    }
+
     // Run the script with new data
     pub fn run_with_data(
         &mut self,
-        data: Vec<(&'static str, AnySeries)>,
+        mut data: Vec<(&'static str, AnySeries)>,
         syminfo: Option<Rc<SymbolInfo>>,
     ) -> Result<OutputDataCollect, PineFormatError>
     where
         'li: 'ra,
         'pa: 'ra,
     {
+        PineScript::transform_data(&mut data);
         self.data = data;
         self.syminfo = syminfo.clone();
         self.get_runner();
@@ -391,13 +400,14 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
     pub fn run(
         &mut self,
         input: Vec<Option<InputVal>>,
-        data: Vec<(&'static str, AnySeries)>,
+        mut data: Vec<(&'static str, AnySeries)>,
         syminfo: Option<Rc<SymbolInfo>>,
     ) -> Result<OutputDataCollect, PineFormatError>
     where
         'li: 'ra,
         'pa: 'ra,
     {
+        PineScript::transform_data(&mut data);
         self.data = data;
         self.syminfo = syminfo.clone();
         self.get_runner().change_inputs(input);

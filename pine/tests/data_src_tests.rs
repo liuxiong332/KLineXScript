@@ -1014,3 +1014,69 @@ fn study_only_test() {
     println!("res {:?}", parser.run(vec![], vec![], None));
     assert!(parser.run(vec![], vec![], None).is_ok());
 }
+
+const RUN1_SCRIPT: &'static str = r#"
+study(title="VWAPG", shorttitle="VWAPG")
+src = (high + low + open)/3
+t = time("D")
+start = na(t[1]) or t > t[1]
+
+sumSrc = src * volume
+sumVol = volume
+sumSrc := start ? sumSrc : sumSrc + sumSrc[1]
+sumVol := start ? sumVol : sumVol + sumVol[1]
+
+// You can use built-in vwap() function instead.
+plot(sumSrc / sumVol, title="VWAPG", color=color.blue)
+"#;
+
+#[test]
+fn run1_test() {
+    use pine::libs::{color, na, plot, study, time};
+    use pine::runtime::output::{InputSrc, ScriptPurpose, StudyScript};
+    use pine::runtime::NoneCallback;
+
+    let lib_info = pine::LibInfo::new(
+        vec![
+            study::declare_var(),
+            color::declare_var(),
+            na::declare_var(),
+            plot::declare_var(),
+            time::declare_var(),
+        ],
+        vec![
+            ("high", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("low", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("open", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("volume", SyntaxType::Series(SimpleSyntaxType::Int)),
+            ("_time", SyntaxType::Series(SimpleSyntaxType::Int)),
+        ],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+    parser.parse_src(String::from(RUN1_SCRIPT)).unwrap();
+    let io_info = parser.gen_io_info().unwrap();
+    println!("io info {:?}", io_info);
+    assert_eq!(
+        io_info.get_input_srcs(),
+        &vec![InputSrc::new(
+            None,
+            vec![
+                String::from("high"),
+                String::from("low"),
+                String::from("open"),
+                String::from("time"),
+                String::from("volume")
+            ]
+        )]
+    );
+
+    let data = vec![
+        ("high", AnySeries::from_float_vec(vec![Some(20f64)])),
+        ("low", AnySeries::from_float_vec(vec![Some(20f64)])),
+        ("open", AnySeries::from_float_vec(vec![Some(20f64)])),
+        ("time", AnySeries::from_int_vec(vec![Some(20i64)])),
+        ("volume", AnySeries::from_int_vec(vec![Some(20i64)])),
+    ];
+    // println!("res {:?}", parser.run(vec![], vec![], None));
+    assert!(parser.run_with_data(data, None).is_ok());
+}

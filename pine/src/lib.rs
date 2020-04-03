@@ -499,7 +499,10 @@ pub fn parse_ast(in_str: &str) -> Result<Block, (Option<Block>, Vec<PineInputErr
             if input.len() != 0 {
                 state.catch(PineInputError::new(
                     PineErrorKind::NonRecongnizeStmt,
-                    StrRange::new(input.end, Position::max()),
+                    StrRange::new(
+                        input.start,
+                        Position::new(input.start.get_line(), std::u32::MAX),
+                    ),
                 ));
             }
             if state.is_ok() {

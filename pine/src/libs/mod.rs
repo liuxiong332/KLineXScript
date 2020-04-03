@@ -21,6 +21,8 @@ pub mod falling;
 pub mod fixnan;
 pub mod highest;
 pub mod highestbars;
+pub mod hl2;
+pub mod hlc3;
 pub mod hma;
 pub mod iff;
 pub mod input;
@@ -33,6 +35,7 @@ pub mod max;
 pub mod mfi;
 pub mod na;
 pub mod nz;
+pub mod ohlc4;
 pub mod plot;
 pub mod plotarrow;
 pub mod plotbar;
@@ -176,6 +179,9 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         mfi::declare_var(),
         swma::declare_var(),
         vwma::declare_var(),
+        hl2::declare_var(),
+        hlc3::declare_var(),
+        ohlc4::declare_var(),
     ];
     debug_assert!(
         check_names(&list).len() == 0,

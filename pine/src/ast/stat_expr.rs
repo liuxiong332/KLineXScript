@@ -1425,4 +1425,12 @@ mod tests {
         let (input, _output) = result.unwrap();
         assert_eq!(input.src, "");
     }
+
+    #[test]
+    fn exp_error_test() {
+        let test_input = Input::new_with_str("a1 = 1\na = 1;\nb = 1");
+        let result = block(test_input, &AstState::new());
+        let (input, _output) = result.unwrap();
+        assert_eq!(input.start.get_line(), 1);
+    }
 }

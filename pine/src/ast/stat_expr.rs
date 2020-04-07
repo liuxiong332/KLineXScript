@@ -442,26 +442,26 @@ pub fn function_def_with_indent<'a>(
 }
 
 #[derive(Clone, Debug, PartialEq)]
-struct DataTypeNode {
-    pub value: DataType,
+struct DataTypeNode<'a> {
+    pub value: DataType<'a>,
     pub range: StrRange,
 }
 
-impl DataTypeNode {
-    pub fn new(value: DataType, range: StrRange) -> DataTypeNode {
+impl<'a> DataTypeNode<'a> {
+    pub fn new(value: DataType<'a>, range: StrRange) -> DataTypeNode<'a> {
         DataTypeNode { value, range }
     }
 }
 
-fn datatype<'a>(input: Input<'a>, _state: &AstState) -> PineResult<'a, DataTypeNode> {
+fn datatype<'a>(input: Input<'a>, _state: &AstState) -> PineResult<'a, DataTypeNode<'a>> {
     let (input, label) = alt((
         tag("float"),
         tag("int"),
         tag("bool"),
         tag("color"),
         tag("string"),
-        // tag("line"),
-        // tag("label"),
+        tag("line"),
+        tag("label"),
     ))(input)?;
     let data_type = match label.src {
         "float" => DataType::Float,
@@ -471,6 +471,7 @@ fn datatype<'a>(input: Input<'a>, _state: &AstState) -> PineResult<'a, DataTypeN
         "string" => DataType::String,
         // "line" => DataType::Line,
         // "label" => DataType::Label,
+        other_type => DataType::Custom(other_type),
         _ => unreachable!(),
     };
     Ok((

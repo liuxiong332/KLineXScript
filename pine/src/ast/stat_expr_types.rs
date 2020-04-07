@@ -396,13 +396,13 @@ impl<'a> Exp2<'a> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeCast<'a> {
-    pub data_type: DataType,
+    pub data_type: DataType<'a>,
     pub exp: Exp<'a>,
     pub range: StrRange,
 }
 
 impl<'a> TypeCast<'a> {
-    pub fn new(data_type: DataType, exp: Exp<'a>, range: StrRange) -> TypeCast<'a> {
+    pub fn new(data_type: DataType<'a>, exp: Exp<'a>, range: StrRange) -> TypeCast<'a> {
         TypeCast {
             data_type,
             exp,
@@ -410,7 +410,7 @@ impl<'a> TypeCast<'a> {
         }
     }
 
-    pub fn new_no_input(data_type: DataType, exp: Exp<'a>) -> TypeCast<'a> {
+    pub fn new_no_input(data_type: DataType<'a>, exp: Exp<'a>) -> TypeCast<'a> {
         TypeCast {
             data_type,
             exp,
@@ -448,19 +448,20 @@ impl<'a> PrefixExp<'a> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum DataType {
+pub enum DataType<'a> {
     Float,
     Int,
     Bool,
     Color,
     String,
+    Custom(&'a str),
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Assignment<'a> {
     pub names: Vec<VarName<'a>>,
     pub val: Exp<'a>,
-    pub var_type: Option<DataType>,
+    pub var_type: Option<DataType<'a>>,
     pub var: bool,
     pub range: StrRange,
     pub varids: Option<Vec<i32>>,
@@ -471,7 +472,7 @@ impl<'a> Assignment<'a> {
         names: Vec<VarName<'a>>,
         val: Exp<'a>,
         var: bool,
-        var_type: Option<DataType>,
+        var_type: Option<DataType<'a>>,
         range: StrRange,
     ) -> Assignment<'a> {
         Assignment {
@@ -488,7 +489,7 @@ impl<'a> Assignment<'a> {
         names: Vec<VarName<'a>>,
         val: Exp<'a>,
         var: bool,
-        var_type: Option<DataType>,
+        var_type: Option<DataType<'a>>,
     ) -> Assignment<'a> {
         Assignment {
             names,
@@ -504,7 +505,7 @@ impl<'a> Assignment<'a> {
         names: Vec<VarName<'a>>,
         val: Exp<'a>,
         var: bool,
-        var_type: Option<DataType>,
+        var_type: Option<DataType<'a>>,
         varids: Vec<i32>,
     ) -> Assignment<'a> {
         Assignment {

@@ -225,6 +225,11 @@ impl IOInfo {
         self.outputs.push(output);
     }
 
+    pub fn push_output_retindex(&mut self, output: OutputInfo) -> i32 {
+        self.outputs.push(output);
+        self.outputs.len() as i32 - 1
+    }
+
     pub fn set_script_type(&mut self, script_type: ScriptPurpose) {
         self.script_type = Some(script_type);
     }

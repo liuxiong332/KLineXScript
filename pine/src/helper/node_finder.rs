@@ -84,6 +84,7 @@ impl<'a> NodeFinder<'a> for TypeCast<'a> {
             DataType::Int => "int",
             DataType::Float => "float",
             DataType::String => "string",
+            DataType::Custom(t) => t,
         };
         Some(FindVal::new_with_lib_name(type_str))
     }

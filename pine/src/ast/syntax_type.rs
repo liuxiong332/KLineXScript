@@ -46,14 +46,15 @@ pub enum SimpleSyntaxType {
     Color,
 }
 
-impl From<DataType> for SimpleSyntaxType {
-    fn from(data_type: DataType) -> Self {
+impl<'a> From<DataType<'a>> for SimpleSyntaxType {
+    fn from(data_type: DataType<'a>) -> Self {
         match data_type {
             DataType::Bool => SimpleSyntaxType::Bool,
             DataType::Int => SimpleSyntaxType::Int,
             DataType::Float => SimpleSyntaxType::Float,
             DataType::String => SimpleSyntaxType::String,
             DataType::Color => SimpleSyntaxType::Color,
+            _ => unreachable!(),
         }
     }
 }
@@ -88,6 +89,7 @@ pub enum SyntaxType<'a> {
     Series(SimpleSyntaxType),
     List(SimpleSyntaxType), // tuple list like [1, 2, 3]
     Tuple(Rc<Vec<SyntaxType<'a>>>),
+    ObjectClass(&'a str),
     Object(Rc<BTreeMap<&'a str, SyntaxType<'a>>>),
     Function(Rc<FunctionTypes<'a>>), // function
     ObjectFunction(Rc<BTreeMap<&'a str, SyntaxType<'a>>>, Rc<FunctionTypes<'a>>), // object + function

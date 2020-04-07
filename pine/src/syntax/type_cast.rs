@@ -3,7 +3,7 @@ use crate::ast::stat_expr_types::DataType;
 
 pub fn explicity_type_cast<'a>(
     cur_type: &SyntaxType<'a>,
-    dest_type: &DataType,
+    dest_type: &DataType<'a>,
 ) -> (bool, SyntaxType<'a>) {
     let cur_type = cur_type.get_v_for_vf();
     let (mut is_cast_err, mut result) = implicity_type_cast(cur_type, dest_type);
@@ -27,7 +27,7 @@ pub fn explicity_type_cast<'a>(
 
 pub fn implicity_type_cast<'a>(
     cur_type: &SyntaxType<'a>,
-    dest_type: &DataType,
+    dest_type: &DataType<'a>,
 ) -> (bool, SyntaxType<'a>) {
     let mut is_cast_err = false;
     let cur_type = cur_type.get_v_for_vf();
@@ -119,6 +119,14 @@ pub fn implicity_type_cast<'a>(
             _ => {
                 is_cast_err = true;
                 SyntaxType::Simple(SimpleSyntaxType::String)
+            }
+        },
+        DataType::Custom(t) => match cur_type {
+            SyntaxType::Series(SimpleSyntaxType::Na) => SyntaxType::ObjectClass(*t),
+            SyntaxType::ObjectClass(n) if n == t => SyntaxType::ObjectClass(n),
+            _ => {
+                is_cast_err = true;
+                SyntaxType::ObjectClass(*t)
             }
         },
     };

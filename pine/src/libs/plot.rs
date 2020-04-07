@@ -10,7 +10,7 @@ use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::output::{OutputData, OutputInfo, PlotInfo, StrOptionsData};
 use crate::types::{
     Bool, Callable, CallableObject, Color, DataType, Float, Int, ParamCollectCall, PineClass,
-    PineFrom, PineRef, PineType, RefData, RuntimeErr, SecondType, Series, NA,
+    PineFrom, PineRef, PineType, RefData, RuntimeErr, SecondType, Series, SeriesCall, NA,
 };
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -56,29 +56,7 @@ fn pine_plot<'a>(
     mut param: Vec<Option<PineRef<'a>>>,
     _func_type: FunctionType<'a>,
 ) -> Result<(), RuntimeErr> {
-    move_tuplet!(
-        (
-            series, title, color, linewidth, style, trackprice, transp, histbase, offset, join,
-            editable, show_last, display
-        ) = param
-    );
-    if !downcast_ctx(context).check_is_output_info_ready() {
-        let plot_info = PlotInfo {
-            title: pine_ref_to_string(title),
-            color: pine_ref_to_color(color.clone()),
-            linewidth: pine_ref_to_i64(linewidth),
-            style: pine_ref_to_string(style),
-            transp: pine_ref_to_i64(transp),
-            trackprice: pine_ref_to_bool(trackprice),
-            histbase: pine_ref_to_f64(histbase),
-            offset: pine_ref_to_i64(offset),
-            join: pine_ref_to_bool(join),
-            editable: pine_ref_to_bool(editable),
-            show_last: pine_ref_to_i64(show_last),
-            display: pine_ref_to_i64(display),
-        };
-        downcast_ctx(context).push_output_info(OutputInfo::Plot(plot_info));
-    }
+    move_tuplet!((series, _title, color) = param);
     match _func_type.get_type(2) {
         Some(SyntaxType::Series(_)) => match (series, color) {
             (Some(item_val), Some(color)) => {
@@ -102,11 +80,74 @@ fn pine_plot<'a>(
     }
 }
 
+#[derive(Debug, Clone)]
+struct PlotVal {
+    output_id: i32,
+}
+
+impl PlotVal {
+    fn new() -> PlotVal {
+        PlotVal { output_id: -1 }
+    }
+}
+
+impl<'a> SeriesCall<'a> for PlotVal {
+    fn step(
+        &mut self,
+        context: &mut dyn Ctx<'a>,
+        mut p: Vec<Option<PineRef<'a>>>,
+        _func_type: FunctionType<'a>,
+    ) -> Result<PineRef<'a>, RuntimeErr> {
+        if self.output_id < 0 {
+            move_tuplet!(
+                (
+                    _series, title, color, linewidth, style, trackprice, transp, histbase, offset,
+                    join, editable, show_last, display
+                ) = p
+            );
+            let plot_info = PlotInfo {
+                title: pine_ref_to_string(title),
+                color: match _func_type.get_type(2) {
+                    Some(SyntaxType::Simple(_)) => pine_ref_to_color(color),
+                    _ => Some(String::from("")),
+                },
+                linewidth: pine_ref_to_i64(linewidth),
+                style: pine_ref_to_string(style),
+                transp: pine_ref_to_i64(transp),
+                trackprice: pine_ref_to_bool(trackprice),
+                histbase: pine_ref_to_f64(histbase),
+                offset: pine_ref_to_i64(offset),
+                join: pine_ref_to_bool(join),
+                editable: pine_ref_to_bool(editable),
+                show_last: pine_ref_to_i64(show_last),
+                display: pine_ref_to_i64(display),
+            };
+            self.output_id =
+                downcast_ctx(context).push_output_info_retindex(OutputInfo::Plot(plot_info));
+        }
+
+        Ok(PineRef::Box(Box::new(Some(self.output_id as i64))))
+    }
+
+    fn run_with_cd(
+        &mut self,
+        _context: &mut dyn Ctx<'a>,
+        params: Vec<Option<PineRef<'a>>>,
+        func_type: FunctionType<'a>,
+    ) -> Result<(), RuntimeErr> {
+        pine_plot(_context, params, func_type)
+    }
+
+    fn copy(&self) -> Box<dyn SeriesCall<'a> + 'a> {
+        Box::new(self.clone())
+    }
+}
+
 struct PlotProps;
 
 impl<'a> PineClass<'a> for PlotProps {
     fn custom_type(&self) -> &str {
-        "input"
+        "plot"
     }
 
     fn get(&self, _ctx: &mut dyn Ctx<'a>, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
@@ -136,7 +177,12 @@ pub const VAR_NAME: &'static str = "plot";
 
 pub fn declare_var<'a>() -> VarResult<'a> {
     let value = PineRef::new(CallableObject::new(Box::new(PlotProps), || {
-        Callable::new(None, Some(Box::new(ParamCollectCall::new(pine_plot))))
+        Callable::new(
+            None,
+            Some(Box::new(ParamCollectCall::new_with_caller(Box::new(
+                PlotVal::new(),
+            )))),
+        )
     }));
 
     // plot(series, title, color, linewidth, style, trackprice, transp, histbase, offset, join, editable, show_last) → plot
@@ -158,7 +204,7 @@ pub fn declare_var<'a>() -> VarResult<'a> {
                 ("show_last", SyntaxType::int()),
                 ("display", SyntaxType::int()),
             ],
-            SyntaxType::Void,
+            SyntaxType::ObjectClass("plot"),
         )),
         FunctionType::new((
             vec![
@@ -176,7 +222,7 @@ pub fn declare_var<'a>() -> VarResult<'a> {
                 ("show_last", SyntaxType::int()),
                 ("display", SyntaxType::int()),
             ],
-            SyntaxType::Void,
+            SyntaxType::ObjectClass("plot"),
         )),
     ]);
     let mut obj_type = BTreeMap::new();
@@ -341,7 +387,9 @@ mod tests {
 
     #[test]
     fn plot_ret_test() {
-        use crate::runtime::OutputInfo;
+        // use crate::runtime::OutputInfo;
+        use crate::ast::stat_expr_types::VarIndex;
+        use crate::runtime::VarOperate;
 
         let lib_info = LibInfo::new(
             vec![declare_var()],
@@ -359,7 +407,11 @@ mod tests {
                 )],
                 None,
             )
-            .is_err());
+            .is_ok());
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(2, 0)).unwrap(),
+            PineRef::new(Some(0i64))
+        );
     }
 
     #[test]

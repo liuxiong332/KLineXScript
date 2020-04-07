@@ -1057,7 +1057,7 @@ impl<'a> SyntaxParser<'a> {
 
     fn parse_one_assign(
         &mut self,
-        var_type: &Option<DataType>,
+        var_type: &Option<DataType<'a>>,
         name: &VarName<'a>,
         val: SyntaxType<'a>,
         range: StrRange,

@@ -368,6 +368,14 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
         }
     }
 
+    pub fn push_output_info_retindex(&mut self, output: OutputInfo) -> i32 {
+        if let Some(p) = &mut self.parent {
+            downcast_ctx(*p).push_output_info_retindex(output)
+        } else {
+            self.io_info.push_output_retindex(output)
+        }
+    }
+
     pub fn add_input_src(&mut self, src: InputSrc) {
         if let Some(p) = &mut self.parent {
             downcast_ctx(*p).add_input_src(src)

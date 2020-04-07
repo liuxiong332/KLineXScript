@@ -28,6 +28,15 @@ pub trait SeriesCall<'a> {
         Ok(())
     }
 
+    fn run_with_cd(
+        &mut self,
+        _context: &mut dyn Ctx<'a>,
+        _params: Vec<Option<PineRef<'a>>>,
+        _func_type: FunctionType<'a>,
+    ) -> Result<(), RuntimeErr> {
+        Ok(())
+    }
+
     fn back(&mut self, _context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
         Ok(())
     }
@@ -153,6 +162,7 @@ impl<'a> SeriesCall<'a> for ParamCollectCall<'a> {
             }
         }
 
+        self.func_type = Some(func_type.clone());
         // If the step function is specified, then we merge the series parameters.
         if let Some(step) = self.step_func {
             let ret_val = step(_context, self.params.clone(), func_type);
@@ -165,7 +175,6 @@ impl<'a> SeriesCall<'a> for ParamCollectCall<'a> {
         } else {
             // Commit all of the series variables.
             commit_series_for_operator(&mut self.params);
-            self.func_type = Some(func_type);
             Ok(PineRef::Box(Box::new(NA)))
         }
     }
@@ -176,6 +185,11 @@ impl<'a> SeriesCall<'a> for ParamCollectCall<'a> {
             run_func(_context, val, self.func_type.take().unwrap())?;
         } else if let Some(caller) = &mut self.caller {
             caller.run(_context)?;
+            caller.run_with_cd(
+                _context,
+                self.params.clone(),
+                self.func_type.take().unwrap(),
+            )?;
         }
         Ok(())
     }

@@ -281,6 +281,7 @@ impl<'a> RunnerForName<'a> for Assignment<'a> {
                 SecondType::Series => Series::<String>::implicity_from(val)?.into_pf(),
                 _ => String::implicity_from(val)?.into_pf(),
             },
+            Some(DataType::Custom(_)) => val,
         };
         if let (FirstType::NA, _) = true_val.get_type() {
             return Err(RuntimeErr::InvalidNADeclarer);

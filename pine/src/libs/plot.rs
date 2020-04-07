@@ -340,6 +340,29 @@ mod tests {
     }
 
     #[test]
+    fn plot_ret_test() {
+        use crate::runtime::OutputInfo;
+
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+        );
+        let src = r"p = plot(close)";
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        assert!(runner
+            .run(
+                &vec![(
+                    "close",
+                    AnySeries::from_float_vec(vec![Some(1f64), Some(2f64)]),
+                )],
+                None,
+            )
+            .is_err());
+    }
+
+    #[test]
     fn plot_color_test() {
         use crate::runtime::OutputInfo;
 

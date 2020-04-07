@@ -67,6 +67,12 @@ sigma = input(title="Sigma", type=input.float, defval=6)
 plot(alma(source, windowsize, offset, sigma))
 "#;
 
+const VAR_SCRIPTS: &'static str = r#"
+m1 = hl2
+m2 = hlc3
+m3 = ohlc4
+"#;
+
 #[test]
 fn datasrc_test() {
     let lib_info = pine::LibInfo::new(
@@ -121,5 +127,8 @@ fn datasrc_test() {
 
     parser.parse_src(String::from(ALMA_SCRIPTS)).unwrap();
     println!("{:?}", parser.run_with_data(data.clone(), None));
+    assert!(parser.run_with_data(data.clone(), None).is_ok());
+
+    parser.parse_src(String::from(VAR_SCRIPTS)).unwrap();
     assert!(parser.run_with_data(data.clone(), None).is_ok());
 }

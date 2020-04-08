@@ -126,7 +126,7 @@ fn input_for_string<'a>(
             title: pine_ref_to_string(move_element(&mut param, 1)),
             input_type: String::from(STRING_TYPE_STR),
             confirm: pine_ref_to_bool(move_element(&mut param, 3)),
-            options: pine_ref_to_str_list(move_element(&mut param, 3)),
+            options: pine_ref_to_str_list(move_element(&mut param, 4)),
         }));
     }
 
@@ -660,7 +660,7 @@ mod tests {
             vec![declare_var()],
             vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
         );
-        let src = "m = input('defval', 'hello', 'string')";
+        let src = "m = input('defval', 'hello', 'string', options=['RMA', 'SMA', 'EMA'])";
 
         let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
@@ -674,6 +674,21 @@ mod tests {
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(2, 0)),
             Some(PineRef::new_rc(String::from("defval")))
+        );
+
+        assert_eq!(
+            runner.get_context().get_io_info().get_inputs(),
+            &vec![InputInfo::String(StringInputInfo {
+                defval: Some(String::from("defval")),
+                title: Some(String::from("hello")),
+                input_type: (String::from("string")),
+                confirm: None,
+                options: Some(vec![
+                    String::from("RMA"),
+                    String::from("SMA"),
+                    String::from("EMA")
+                ]),
+            })]
         );
     }
 

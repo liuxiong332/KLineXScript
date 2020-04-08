@@ -48,4 +48,18 @@ it("input with options test", function () {
         step: null,
         options: [1, 2, 3]
     });
-})
+});
+
+it("input with string options test", function () {
+    let runner = new Runner();
+    runner.parse('m = input(title="Smoothing", defval="RMA", options=["RMA", "SMA", "EMA", "WMA"])');
+    // console.log(runner.genIOInfo().inputs[0]);
+    assert.deepEqual(runner.genIOInfo().inputs[0], {
+        type: 'String',
+        defval: 'RMA',
+        title: 'Smoothing',
+        input_type: 'string',
+        confirm: null,
+        options: ["RMA", "SMA", "EMA", "WMA"]
+    });
+});

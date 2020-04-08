@@ -37,5 +37,15 @@ it('simple test', function () {
 it("input with options test", function () {
     let runner = new Runner();
     runner.parse("m = input(1, 'hello', 'int', options=[1, 2, 3])\n");
-    console.log(runner.genIOInfo());
+    assert.deepEqual(runner.genIOInfo().inputs[0], {
+        type: 'Int',
+        defval: 1,
+        title: 'hello',
+        input_type: 'int',
+        minval: null,
+        maxval: null,
+        confirm: null,
+        step: null,
+        options: [1, 2, 3]
+    });
 })

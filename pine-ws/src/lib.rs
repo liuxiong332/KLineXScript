@@ -218,6 +218,13 @@ fn slice_input_data(origin_data: &[f64], index: usize, count: usize) -> Vec<Opti
         .collect()
 }
 
+fn slice_input_data_i64(origin_data: &[f64], index: usize, count: usize) -> Vec<Option<i64>> {
+    origin_data[index * count..(index + 1) * count]
+        .iter()
+        .map(|s| Some(*s as i64))
+        .collect()
+}
+
 fn transfer_input_data(
     src_strs: Vec<String>,
     count: usize,
@@ -226,30 +233,32 @@ fn transfer_input_data(
     src_strs
         .into_iter()
         .enumerate()
-        .map(|(i, s)| {
-            if s == "close" {
-                (
-                    "close",
-                    AnySeries::from_float_vec(slice_input_data(data, i, count)),
-                )
-            } else if s == "open" {
-                (
-                    "open",
-                    AnySeries::from_float_vec(slice_input_data(data, i, count)),
-                )
-            } else if s == "high" {
-                (
-                    "high",
-                    AnySeries::from_float_vec(slice_input_data(data, i, count)),
-                )
-            } else if s == "low" {
-                (
-                    "low",
-                    AnySeries::from_float_vec(slice_input_data(data, i, count)),
-                )
-            } else {
-                unreachable!();
-            }
+        .map(|(i, s)| match s.as_str() {
+            "close" => (
+                "close",
+                AnySeries::from_float_vec(slice_input_data(data, i, count)),
+            ),
+            "open" => (
+                "open",
+                AnySeries::from_float_vec(slice_input_data(data, i, count)),
+            ),
+            "high" => (
+                "high",
+                AnySeries::from_float_vec(slice_input_data(data, i, count)),
+            ),
+            "low" => (
+                "low",
+                AnySeries::from_float_vec(slice_input_data(data, i, count)),
+            ),
+            "time" => (
+                "_time",
+                AnySeries::from_int_vec(slice_input_data_i64(data, i, count)),
+            ),
+            "volume" => (
+                "_time",
+                AnySeries::from_int_vec(slice_input_data_i64(data, i, count)),
+            ),
+            _ => unreachable!(),
         })
         .collect()
 }

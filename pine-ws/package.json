@@ -3,6 +3,7 @@
   "scripts": {
     "clean": "rimraf pkg",
     "test": "wasm-pack test --node",
+    "node-test": "mocha tests/*.js",
     "js-test": "node tests/test.js",
     "build-node": "wasm-pack build --target nodejs --out-dir pkg/node --out-name pine",
     "build-bundler": "wasm-pack build --target web --out-dir pkg/web --out-name pine",
@@ -12,7 +13,7 @@
   "collaborators": [
     "liuxiong332 <liuxiong332@163.com>"
   ],
-  "version": "0.9.0",
+  "version": "0.10.0",
   "files": [
     "web/",
     "node/"
@@ -23,6 +24,7 @@
   "sideEffects": false,
   "devDependencies": {
     "fs-extra": "^8.1.0",
+    "mocha": "^7.1.1",
     "rimraf": "^3.0.2"
   }
 }

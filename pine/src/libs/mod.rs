@@ -20,6 +20,7 @@ pub mod ema;
 pub mod falling;
 pub mod fill;
 pub mod fixnan;
+pub mod format;
 pub mod highest;
 pub mod highestbars;
 pub mod hl2;
@@ -184,6 +185,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         hlc3::declare_var(),
         ohlc4::declare_var(),
         fill::declare_var(),
+        format::declare_var(),
     ];
     debug_assert!(
         check_names(&list).len() == 0,

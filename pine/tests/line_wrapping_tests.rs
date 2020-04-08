@@ -130,7 +130,8 @@ fn func_def_test() {
                     VarName::new_with_start("updown", Position::new(1, 0)),
                     vec![VarName::new_with_start("s", Position::new(1, 7))],
                     Block::new(
-                        vec![Statement::Assignment(Box::new(Assignment::new(
+                        vec![],
+                        Some(Exp::Assignment(Box::new(Assignment::new(
                             vec![VarName::new_with_start("isEqual", Position::new(2, 4))],
                             Exp::BinaryExp(Box::new(BinaryExp::new(
                                 BinaryOp::Eq,
@@ -151,8 +152,7 @@ fn func_def_test() {
                             false,
                             None,
                             StrRange::new(Position::new(2, 4), Position::new(2, 23))
-                        )))],
-                        None,
+                        )))),
                         StrRange::new(Position::new(2, 4), Position::new(2, 23))
                     ),
                     StrRange::new(Position::new(1, 0), Position::new(2, 23))
@@ -284,87 +284,71 @@ fn cond_expr_test() {
                             ),
                             StrRange::from_start("isGrowing = s > s[1]", Position::new(2, 4))
                         ),
-                        gen_assign(
-                            VarName::new_with_start("ud", Position::new(3, 4)),
-                            gen_condition(
-                                gen_name(VarName::new_with_start("isEqual", Position::new(3, 9))),
-                                gen_int(0, StrRange::from_start("0", Position::new(4, 11))),
-                                gen_condition(
-                                    gen_name(VarName::new_with_start(
-                                        "isGrowing",
-                                        Position::new(5, 11)
-                                    )),
-                                    gen_condition(
-                                        gen_binop(
-                                            BinaryOp::Leq,
-                                            gen_nz_call(Position::new(6, 16)),
-                                            gen_int(
-                                                0,
-                                                StrRange::from_start("0", Position::new(6, 29))
-                                            ),
-                                            StrRange::from_start(
-                                                "nz(ud[1]) <= 0",
-                                                Position::new(6, 16)
-                                            )
-                                        ),
-                                        gen_int(1, StrRange::from_start("1", Position::new(7, 21))),
-                                        gen_binop(
-                                            BinaryOp::Plus,
-                                            gen_nz_call(Position::new(8, 19)),
-                                            gen_int(
-                                                1,
-                                                StrRange::from_start("1", Position::new(8, 29))
-                                            ),
-                                            StrRange::from_start(
-                                                "nz(ud[1])+1",
-                                                Position::new(8, 19)
-                                            )
-                                        ),
-                                        StrRange::new(Position::new(6, 16), Position::new(8, 30))
-                                    ),
-                                    gen_condition(
-                                        gen_binop(
-                                            BinaryOp::Geq,
-                                            gen_nz_call(Position::new(9, 16)),
-                                            gen_int(
-                                                0,
-                                                StrRange::from_start("0", Position::new(9, 29))
-                                            ),
-                                            StrRange::from_start(
-                                                "nz(ud[1]) >= 0",
-                                                Position::new(9, 16)
-                                            )
-                                        ),
-                                        gen_unop(
-                                            UnaryOp::Minus,
-                                            gen_int(
-                                                1,
-                                                StrRange::from_start("1", Position::new(10, 20))
-                                            ),
-                                            StrRange::from_start("-1", Position::new(10, 19))
-                                        ),
-                                        gen_binop(
-                                            BinaryOp::Minus,
-                                            gen_nz_call(Position::new(11, 19)),
-                                            gen_int(
-                                                1,
-                                                StrRange::from_start("1", Position::new(11, 29))
-                                            ),
-                                            StrRange::from_start(
-                                                "nz(ud[1])-1",
-                                                Position::new(11, 19)
-                                            )
-                                        ),
-                                        StrRange::new(Position::new(9, 16), Position::new(11, 30))
-                                    ),
-                                    StrRange::new(Position::new(5, 11), Position::new(11, 30))
-                                ),
-                                StrRange::new(Position::new(3, 9), Position::new(11, 30))
-                            ),
-                            StrRange::new(Position::new(3, 4), Position::new(11, 30))
-                        ),
                     ],
-                    None,
+                    Some(gen_assign_exp(
+                        VarName::new_with_start("ud", Position::new(3, 4)),
+                        gen_condition(
+                            gen_name(VarName::new_with_start("isEqual", Position::new(3, 9))),
+                            gen_int(0, StrRange::from_start("0", Position::new(4, 11))),
+                            gen_condition(
+                                gen_name(VarName::new_with_start(
+                                    "isGrowing",
+                                    Position::new(5, 11)
+                                )),
+                                gen_condition(
+                                    gen_binop(
+                                        BinaryOp::Leq,
+                                        gen_nz_call(Position::new(6, 16)),
+                                        gen_int(0, StrRange::from_start("0", Position::new(6, 29))),
+                                        StrRange::from_start(
+                                            "nz(ud[1]) <= 0",
+                                            Position::new(6, 16)
+                                        )
+                                    ),
+                                    gen_int(1, StrRange::from_start("1", Position::new(7, 21))),
+                                    gen_binop(
+                                        BinaryOp::Plus,
+                                        gen_nz_call(Position::new(8, 19)),
+                                        gen_int(1, StrRange::from_start("1", Position::new(8, 29))),
+                                        StrRange::from_start("nz(ud[1])+1", Position::new(8, 19))
+                                    ),
+                                    StrRange::new(Position::new(6, 16), Position::new(8, 30))
+                                ),
+                                gen_condition(
+                                    gen_binop(
+                                        BinaryOp::Geq,
+                                        gen_nz_call(Position::new(9, 16)),
+                                        gen_int(0, StrRange::from_start("0", Position::new(9, 29))),
+                                        StrRange::from_start(
+                                            "nz(ud[1]) >= 0",
+                                            Position::new(9, 16)
+                                        )
+                                    ),
+                                    gen_unop(
+                                        UnaryOp::Minus,
+                                        gen_int(
+                                            1,
+                                            StrRange::from_start("1", Position::new(10, 20))
+                                        ),
+                                        StrRange::from_start("-1", Position::new(10, 19))
+                                    ),
+                                    gen_binop(
+                                        BinaryOp::Minus,
+                                        gen_nz_call(Position::new(11, 19)),
+                                        gen_int(
+                                            1,
+                                            StrRange::from_start("1", Position::new(11, 29))
+                                        ),
+                                        StrRange::from_start("nz(ud[1])-1", Position::new(11, 19))
+                                    ),
+                                    StrRange::new(Position::new(9, 16), Position::new(11, 30))
+                                ),
+                                StrRange::new(Position::new(5, 11), Position::new(11, 30))
+                            ),
+                            StrRange::new(Position::new(3, 9), Position::new(11, 30))
+                        ),
+                        StrRange::new(Position::new(3, 4), Position::new(11, 30))
+                    )),
                     StrRange::new(Position::new(1, 4), Position::new(11, 30))
                 ),
                 StrRange::new(Position::new(0, 0), Position::new(11, 30))

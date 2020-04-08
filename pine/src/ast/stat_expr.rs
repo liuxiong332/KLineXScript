@@ -654,23 +654,31 @@ fn transfer_block_ret<'a>(mut blk: Block<'a>) -> Block<'a> {
         return blk;
     }
     match blk.stmts.last() {
-        Some(&Statement::Ite(_)) | Some(&Statement::ForRange(_)) | Some(&Statement::Exp(_)) => {
-            match blk.stmts.pop().unwrap() {
-                Statement::Ite(mut s) => {
-                    s.then_blk = transfer_block_ret(s.then_blk);
-                    if let Some(else_blk) = s.else_blk {
-                        s.else_blk = Some(transfer_block_ret(else_blk));
-                    }
-                    Block::new(blk.stmts, Some(Exp::Ite(s)), blk.range)
+        Some(&Statement::Ite(_))
+        | Some(&Statement::ForRange(_))
+        | Some(&Statement::Assignment(_))
+        | Some(&Statement::VarAssignment(_))
+        | Some(&Statement::Exp(_)) => match blk.stmts.pop().unwrap() {
+            Statement::Ite(mut s) => {
+                s.then_blk = transfer_block_ret(s.then_blk);
+                if let Some(else_blk) = s.else_blk {
+                    s.else_blk = Some(transfer_block_ret(else_blk));
                 }
-                Statement::ForRange(mut s) => {
-                    s.do_blk = transfer_block_ret(s.do_blk);
-                    Block::new(blk.stmts, Some(Exp::ForRange(s)), blk.range)
-                }
-                Statement::Exp(s) => Block::new(blk.stmts, Some(s), blk.range),
-                _ => unreachable!(),
+                Block::new(blk.stmts, Some(Exp::Ite(s)), blk.range)
             }
-        }
+            Statement::ForRange(mut s) => {
+                s.do_blk = transfer_block_ret(s.do_blk);
+                Block::new(blk.stmts, Some(Exp::ForRange(s)), blk.range)
+            }
+            Statement::Assignment(assign) => {
+                Block::new(blk.stmts, Some(Exp::Assignment(assign)), blk.range)
+            }
+            Statement::VarAssignment(assign) => {
+                Block::new(blk.stmts, Some(Exp::VarAssignment(assign)), blk.range)
+            }
+            Statement::Exp(s) => Block::new(blk.stmts, Some(s), blk.range),
+            _ => unreachable!(),
+        },
         _ => blk,
     }
 }

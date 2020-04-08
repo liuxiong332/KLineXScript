@@ -68,6 +68,16 @@ pub fn gen_assign<'a>(name: VarName<'a>, val: Exp<'a>, range: StrRange) -> State
     )))
 }
 
+pub fn gen_assign_exp<'a>(name: VarName<'a>, val: Exp<'a>, range: StrRange) -> Exp<'a> {
+    Exp::Assignment(Box::new(Assignment::new(
+        vec![name],
+        val,
+        false,
+        None,
+        range,
+    )))
+}
+
 pub fn gen_func_def<'a>(
     name: VarName<'a>,
     params: Vec<VarName<'a>>,

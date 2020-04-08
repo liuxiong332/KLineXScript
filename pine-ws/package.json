@@ -8,7 +8,7 @@
     "build-node": "wasm-pack build --target nodejs --out-dir pkg/node --out-name pine",
     "build-bundler": "wasm-pack build --target web --out-dir pkg/web --out-name pine",
     "cp": "node scripts/change",
-    "build": "npm run clean && npm run test && npm run build-node && npm run build-bundler && npm run cp"
+    "build": "npm run clean && npm run test && npm run build-node && npm run build-bundler && npm run cp && npm run node-test"
   },
   "collaborators": [
     "liuxiong332 <liuxiong332@163.com>"

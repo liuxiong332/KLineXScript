@@ -33,3 +33,9 @@ it('simple test', function () {
     );
     assert.deepEqual(output[0].series, [new Float64Array([210.0])]);
 });
+
+it("input with options test", function () {
+    let runner = new Runner();
+    runner.parse("m = input(1, 'hello', 'int', options=[1, 2, 3])\n");
+    console.log(runner.genIOInfo());
+})

@@ -25,7 +25,7 @@ fn plot_val<'a>(
     Ok(items.move_history())
 }
 
-fn plot_color<'a>(
+pub fn plot_color<'a>(
     item_val: PineRef<'a>,
     _context: &mut dyn Ctx<'a>,
 ) -> Result<StrOptionsData, RuntimeErr> {

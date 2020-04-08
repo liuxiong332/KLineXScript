@@ -1,3 +1,4 @@
+pub mod atom;
 pub mod color;
 pub mod comment;
 pub mod error;

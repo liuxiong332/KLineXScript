@@ -64,7 +64,7 @@ fn reserved(input: Input) -> PineResult {
     ))(input)
 }
 
-fn alpha_or_underscore(input: Input) -> PineResult {
+pub fn alpha_or_underscore(input: Input) -> PineResult {
     match input.src.chars().next().map(|t: char| {
         let b = t.is_alphabetic() || t == '_';
         (t, b)
@@ -78,7 +78,7 @@ fn alpha_or_underscore(input: Input) -> PineResult {
     // alt((alpha0, tag("_")))(input)
 }
 
-fn is_alphanum_or_underscore(input: char) -> bool {
+pub fn is_alphanum_or_underscore(input: char) -> bool {
     input.is_alphanumeric() || input == '_'
 }
 

@@ -73,6 +73,31 @@ m2 = hlc3
 m3 = ohlc4
 "#;
 
+const ADI_SCRIPTS: &'static str = r#"
+//@version=4
+study("Average Directional Index", shorttitle="ADX", format=format.price, precision=2)
+adxlen = input(14, title="ADX Smoothing")
+dilen = input(14, title="DI Length")
+dirmov(len) =>
+    up = change(high)
+    down = -change(low)
+    plusDM = na(up) ? na : (up > down and up > 0 ? up : 0)
+    minusDM = na(down) ? na : (down > up and down > 0 ? down : 0)
+    truerange = rma(tr, len)
+    plus = 100 * rma(plusDM, len) / truerange
+    minus = fixnan(100 * rma(minusDM, len) / truerange)
+    [plus, minus]
+
+adx(dilen, adxlen) =>
+    [plus, minus] = dirmov(dilen)
+    sum = plus + minus
+    adx = 100 * rma(abs(plus - minus) / (sum == 0 ? 1 : sum), adxlen)
+
+sig = adx(dilen, adxlen)
+
+plot(sig, color=color.red, title="ADX")
+"#;
+
 #[test]
 fn datasrc_test() {
     let lib_info = pine::LibInfo::new(
@@ -130,5 +155,8 @@ fn datasrc_test() {
     assert!(parser.run_with_data(data.clone(), None).is_ok());
 
     parser.parse_src(String::from(VAR_SCRIPTS)).unwrap();
+    assert!(parser.run_with_data(data.clone(), None).is_ok());
+
+    parser.parse_src(String::from(ADI_SCRIPTS)).unwrap();
     assert!(parser.run_with_data(data.clone(), None).is_ok());
 }

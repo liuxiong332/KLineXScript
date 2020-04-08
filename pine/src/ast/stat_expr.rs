@@ -1,3 +1,4 @@
+use super::atom::atom_lit;
 use super::color::color_lit;
 use super::error::{PineError, PineErrorKind, PineResult};
 use super::func_call::{func_call, func_call_args, func_call_ws};
@@ -19,15 +20,23 @@ use nom::{
     Err,
 };
 
+pub fn bool_exp<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, BoolNode> {
+    let (next_in, out) = atom_lit(input, state)?;
+    let range = StrRange::new(out.start, out.end);
+    match out.src {
+        "true" => Ok((next_in, BoolNode::new(true, range))),
+        "false" => Ok((next_in, BoolNode::new(false, range))),
+        _ => Err(Err::Error(PineError::from_pine_kind(
+            next_in,
+            PineErrorKind::Context("Not match bool"),
+        ))),
+    }
+}
+
 // exp2 contain the expressions that can apply the binary operators(+,-,*,/) and unary operators(+,-)
 pub fn exp2<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Exp2<'a>> {
     alt((
-        map(eat_sep(tag("true")), |s| {
-            Exp2::Bool(BoolNode::new(true, StrRange::from_input(&s)))
-        }),
-        map(eat_sep(tag("false")), |s| {
-            Exp2::Bool(BoolNode::new(false, StrRange::from_input(&s)))
-        }),
+        map(eat_sep(|s| bool_exp(s, state)), |s| Exp2::Bool(s)),
         map(num_lit_ws, Exp2::Num),
         map(string_lit_ws, Exp2::Str),
         map(|s| color_lit(s, state), Exp2::Color),

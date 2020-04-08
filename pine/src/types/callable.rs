@@ -182,13 +182,13 @@ impl<'a> SeriesCall<'a> for ParamCollectCall<'a> {
     fn run(&mut self, _context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
         if let Some(run_func) = self.run_func {
             let val = self.params.clone();
-            run_func(_context, val, self.func_type.take().unwrap())?;
+            run_func(_context, val, self.func_type.clone().unwrap())?;
         } else if let Some(caller) = &mut self.caller {
             caller.run(_context)?;
             caller.run_with_cd(
                 _context,
                 self.params.clone(),
-                self.func_type.take().unwrap(),
+                self.func_type.clone().unwrap(),
             )?;
         }
         Ok(())

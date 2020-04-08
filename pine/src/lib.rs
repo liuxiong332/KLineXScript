@@ -345,7 +345,7 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
         }
     }
 
-    fn move_output_data(&mut self) -> OutputDataCollect {
+    pub fn move_output_data(&mut self) -> OutputDataCollect {
         let context = self.get_runner().get_context();
         let (start, end) = context.get_data_range();
         OutputDataCollect::new(start.unwrap(), end.unwrap(), context.move_output_data())

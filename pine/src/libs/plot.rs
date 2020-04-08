@@ -21,6 +21,7 @@ fn plot_val<'a>(
 ) -> Result<Vec<Option<f64>>, RuntimeErr> {
     // let item_data: RefData<Series<Float>> = Series::implicity_from(item_val).unwrap();
     // plot_series(item_data.into_pf(), context)
+    println!("item_val {:?}", item_val);
     let mut items: RefData<Series<Float>> = Series::implicity_from(item_val).unwrap();
     Ok(items.move_history())
 }
@@ -135,6 +136,7 @@ impl<'a> SeriesCall<'a> for PlotVal {
         params: Vec<Option<PineRef<'a>>>,
         func_type: FunctionType<'a>,
     ) -> Result<(), RuntimeErr> {
+        println!("run with cd");
         pine_plot(_context, params, func_type)
     }
 

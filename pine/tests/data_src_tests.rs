@@ -1015,6 +1015,36 @@ fn study_only_test() {
     assert!(parser.run(vec![], vec![], None).is_ok());
 }
 
+const VOLUME_SCRIPT: &'static str = r#"
+plot(volume)
+"#;
+
+#[test]
+fn volume_test() {
+    use pine::libs::plot;
+    use pine::runtime::output::{OutputData, ScriptPurpose, StudyScript};
+    use pine::runtime::NoneCallback;
+
+    let lib_info = pine::LibInfo::new(
+        vec![plot::declare_var()],
+        vec![("volume", SyntaxType::Series(SimpleSyntaxType::Int))],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+    parser.parse_src(String::from(VOLUME_SCRIPT)).unwrap();
+    assert!(parser.gen_io_info().is_ok());
+    // let data = vec![("close", AnySeries::from_float_vec(vec![Some(20f64)]))];
+    println!("res {:?}", parser.run(vec![], vec![], None));
+    let result = parser.run_with_data(
+        vec![("volume", AnySeries::from_int_vec(vec![Some(20i64)]))],
+        None,
+    );
+    assert!(result.is_ok());
+    assert_eq!(
+        result.unwrap().data_list,
+        vec![Some(OutputData::new(vec![vec![Some(20.0f64)]]))]
+    );
+}
+
 const RUN1_SCRIPT: &'static str = r#"
 study(title="VWAPG", shorttitle="VWAPG")
 src = (high + low + open)/3

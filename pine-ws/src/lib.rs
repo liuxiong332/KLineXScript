@@ -9,6 +9,15 @@ use wasm_bindgen::prelude::*;
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
+// If want to print the message to console, use log!
+extern crate web_sys;
+
+macro_rules! log {
+    ( $( $t:tt )* ) => {
+        web_sys::console::log_1(&format!( $( $t )* ).into());
+    }
+}
+
 // #[wasm_bindgen]
 // extern {
 //     fn alert(s: &str);
@@ -255,7 +264,7 @@ fn transfer_input_data(
                 AnySeries::from_int_vec(slice_input_data_i64(data, i, count)),
             ),
             "volume" => (
-                "_time",
+                "volume",
                 AnySeries::from_int_vec(slice_input_data_i64(data, i, count)),
             ),
             _ => unreachable!(),
@@ -277,6 +286,7 @@ pub fn run_with_data(
     let src_strs: Vec<String> = srcs.into_serde().unwrap();
     debug_assert_eq!(data.len(), src_strs.len() * count);
     let input_data = transfer_input_data(src_strs, count, data);
+
     match runner_ins.run_with_data(input_data, None) {
         Ok(output) => Ok(output_data_to_slice(output)),
         Err(err) => Err(JsValue::from_serde(&err).unwrap()),

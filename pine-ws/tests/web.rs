@@ -72,3 +72,26 @@ fn runner_simple_test() {
     assert_eq!(parse_src(&mut runner, String::from("plot(close)")), Ok(()));
     assert!(gen_io_info(&mut runner).is_ok());
 }
+
+#[wasm_bindgen_test]
+fn volume_test() {
+    init_panic_hook();
+    // assert_eq!(1 + 1, 2);
+    let mut runner = new_runner();
+    assert_eq!(parse_src(&mut runner, String::from("plot(volume)")), Ok(()));
+    assert!(gen_io_info(&mut runner).is_ok());
+    let input_data: Vec<f64> = vec![10f64];
+
+    let result = run_with_data(
+        &mut runner,
+        JsValue::from_serde(&vec!["volume"]).unwrap(),
+        1,
+        input_data.into_boxed_slice().as_mut(),
+    );
+    assert!(result.is_ok());
+    if let Ok(output) = result {
+        let mut out_data = output_array_get(&output, 0);
+        let vec = unsafe { Vec::from_raw_parts(output_series(&mut out_data), 3, 3) };
+        assert_eq!(vec, vec![1f64, 1f64, 10f64]);
+    }
+}

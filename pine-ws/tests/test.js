@@ -63,3 +63,15 @@ it("input with string options test", function () {
         options: ["RMA", "SMA", "EMA", "WMA"]
     });
 });
+
+it("volume should plot", function () {
+    let runner = new Runner();
+    runner.parse('plot(volume)');
+    // console.log(runner.genIOInfo().inputs[0]);
+    console.log(runner.genIOInfo().input_srcs);
+    assert.deepEqual(runner.genIOInfo().input_srcs, [{ ticker: null, srcs: ['volume'] }]);
+    let result = runner.runWithData(["volume"], 1, new Float64Array([10]));
+    console.log(result);
+    assert.deepEqual(result[0].series, [new Float64Array([10.0])]);
+
+});

@@ -190,6 +190,21 @@ pub fn process_assign_val<'a>(
                 context.create_var(varid, val.clone());
                 Ok(val)
             }
+
+            ((_, SecondType::Simple), _) | (_, (_, SecondType::Simple)) => {
+                // If the syntax type is specified, then we convert the val to this type
+                if let Some(syntax_type) = syntax_type {
+                    let true_val = true_val.copy_inner();
+                    let res_val = convert_val_for_type(true_val, syntax_type)?;
+                    context.create_var(varid, res_val.clone());
+                    Ok(res_val)
+                } else {
+                    // When assignment, must copy new variable.
+                    let true_val = true_val.copy_inner();
+                    context.create_var(varid, true_val.clone());
+                    Ok(true_val)
+                }
+            }
             _ => {
                 // return Err(RuntimeErr::TypeMismatch(format!(
                 //     "Variable type can only be Int, Float, Bool, Color, String, but get {:?}",

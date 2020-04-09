@@ -166,6 +166,16 @@ pub struct FillInfo {
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub struct HLineInfo {
+    pub price: Option<f64>,
+    pub title: Option<String>,
+    pub color: Option<String>,
+    pub linestyle: Option<String>,
+    pub linewidth: Option<i64>,
+    pub editable: Option<bool>,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum OutputInfo {
     Plot(PlotInfo),
@@ -175,6 +185,7 @@ pub enum OutputInfo {
     PlotChar(PlotCharInfo),
     PlotShape(PlotShapeInfo),
     Fill(FillInfo),
+    HLine(HLineInfo),
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]

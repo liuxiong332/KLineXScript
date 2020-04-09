@@ -62,10 +62,15 @@ impl<'a> SeriesCall<'a> for PlotVal {
     ) -> Result<PineRef<'a>, RuntimeErr> {
         if self.output_id < 0 {
             move_tuplet!((plot1, plot2, color, transp, title, editable, show_last) = p);
+            let names = match _func_type.get_type(0) {
+                Some(&SyntaxType::ObjectClass("plot")) => ("plot", "plot1", "plot2"),
+                Some(&SyntaxType::ObjectClass("hline")) => ("hline", "hline1", "hline2"),
+                _ => unreachable!(),
+            };
             let plot_info = FillInfo {
-                fill_type: String::from("plot"),
-                start: require_param("plot1", pine_ref_to_i64(plot1))?,
-                end: require_param("plot2", pine_ref_to_i64(plot2))?,
+                fill_type: String::from(names.0),
+                start: require_param(names.1, pine_ref_to_i64(plot1))?,
+                end: require_param(names.2, pine_ref_to_i64(plot2))?,
                 title: pine_ref_to_string(title),
                 color: pine_ref_to_color(color),
                 transp: pine_ref_to_i64(transp),
@@ -118,7 +123,7 @@ pub fn declare_var<'a>() -> VarResult<'a> {
                 ("editable", SyntaxType::bool()),
                 ("show_last", SyntaxType::int()),
             ],
-            SyntaxType::ObjectClass("plot"),
+            SyntaxType::Void,
         )),
         FunctionType::new((
             vec![
@@ -130,7 +135,31 @@ pub fn declare_var<'a>() -> VarResult<'a> {
                 ("editable", SyntaxType::bool()),
                 ("show_last", SyntaxType::int()),
             ],
-            SyntaxType::ObjectClass("plot"),
+            SyntaxType::Void,
+        )),
+        FunctionType::new((
+            vec![
+                ("hline1", SyntaxType::ObjectClass("hline")),
+                ("hline2", SyntaxType::ObjectClass("hline")),
+                ("color", SyntaxType::Simple(SimpleSyntaxType::Color)),
+                ("transp", SyntaxType::int()),
+                ("title", SyntaxType::string()),
+                ("editable", SyntaxType::bool()),
+                ("show_last", SyntaxType::int()),
+            ],
+            SyntaxType::Void,
+        )),
+        FunctionType::new((
+            vec![
+                ("hline1", SyntaxType::ObjectClass("hline")),
+                ("hline2", SyntaxType::ObjectClass("hline")),
+                ("color", SyntaxType::Series(SimpleSyntaxType::Color)),
+                ("transp", SyntaxType::int()),
+                ("title", SyntaxType::string()),
+                ("editable", SyntaxType::bool()),
+                ("show_last", SyntaxType::int()),
+            ],
+            SyntaxType::Void,
         )),
     ]);
     let syntax_type = SyntaxType::Function(Rc::new(func_type));
@@ -181,7 +210,7 @@ mod tests {
             })
         );
 
-        let mut output_data = runner.get_context().move_output_data();
+        let output_data = runner.get_context().move_output_data();
         assert_eq!(output_data[3], None);
         assert_eq!(
             output_data[4],
@@ -192,6 +221,44 @@ mod tests {
                     values: vec![Some(0), Some(0)]
                 }]
             ))
+        );
+    }
+
+    #[test]
+    fn fill_hline_test() {
+        use super::super::hline;
+        use crate::runtime::OutputInfo;
+
+        let lib_info = LibInfo::new(
+            vec![declare_var(), hline::declare_var()],
+            vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+        );
+        let src = "p1 = hline(1.0)\np2 = hline(2.0)\n
+        fill(p1, p2, #111111, 1, 'fill', true, 1)";
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        runner
+            .run(
+                &vec![(
+                    "close",
+                    AnySeries::from_float_vec(vec![Some(1f64), Some(2f64)]),
+                )],
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            &runner.get_context().get_io_info().get_outputs()[2],
+            &OutputInfo::Fill(FillInfo {
+                fill_type: String::from("hline"),
+                start: 0i64,
+                end: 1i64,
+                title: Some(String::from("fill")),
+                color: Some(String::from("#111111")),
+                transp: Some(1i64),
+                editable: Some(true),
+                show_last: Some(1i64),
+            })
         );
     }
 }

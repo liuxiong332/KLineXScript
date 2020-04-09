@@ -25,6 +25,7 @@ pub mod highest;
 pub mod highestbars;
 pub mod hl2;
 pub mod hlc3;
+pub mod hline;
 pub mod hma;
 pub mod iff;
 pub mod input;
@@ -186,6 +187,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         ohlc4::declare_var(),
         fill::declare_var(),
         format::declare_var(),
+        hline::declare_var(),
     ];
     debug_assert!(
         check_names(&list).len() == 0,

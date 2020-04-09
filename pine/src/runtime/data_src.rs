@@ -89,6 +89,11 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
         }
     }
 
+    pub fn reset_vars(&mut self) {
+        self.context
+            .reset(self.input_index + self.input_names.len() as i32);
+    }
+
     pub fn change_inputs(&mut self, inputs: Vec<Option<InputVal>>) {
         self.context.change_inputs(inputs);
     }
@@ -170,6 +175,7 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
         if let Some(syminfo) = syminfo {
             self.context.set_syminfo(syminfo);
         }
+        self.reset_vars();
         self.run_data(data, 0, len)
     }
 

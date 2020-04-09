@@ -293,6 +293,22 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
         self.init_fun_instances(funs);
     }
 
+    pub fn reset(&mut self, var_keep: i32) {
+        let var_count = self.vars.len();
+        self.vars.resize(var_keep as usize, None);
+        self.vars.resize(var_count, None);
+
+        let ctx_count = self.sub_contexts.len();
+        self.sub_contexts.clear();
+        self.sub_contexts.resize_with(ctx_count, || None);
+
+        // function instance need not reset
+
+        // let fun_count = self.fun_instances.len();
+        // self.fun_instances.clear();
+        // self.fun_instances.resize_with(fun_count, || None);
+    }
+
     pub fn change_inputs(&mut self, inputs: Vec<Option<InputVal>>) {
         if let Some(p) = &mut self.parent {
             downcast_ctx(*p).change_inputs(inputs)

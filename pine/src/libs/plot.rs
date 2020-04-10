@@ -98,7 +98,7 @@ impl<'a> SeriesCall<'a> for PlotVal {
         mut p: Vec<Option<PineRef<'a>>>,
         _func_type: FunctionType<'a>,
     ) -> Result<PineRef<'a>, RuntimeErr> {
-        if self.output_id < 0 {
+        if self.output_id < 0 && !downcast_ctx(context).check_is_output_info_ready() {
             move_tuplet!(
                 (
                     _series, title, color, linewidth, style, trackprice, transp, histbase, offset,
@@ -265,7 +265,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            runner.get_context().move_output_data(),
+            runner.move_output_data(),
             vec![Some(OutputData::new(vec![vec![
                 Some(1000f64),
                 Some(1000f64)
@@ -294,13 +294,13 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            runner.get_context().move_output_data(),
+            runner.move_output_data(),
             vec![
                 Some(OutputData::new(vec![vec![Some(1f64), Some(2f64)]])),
                 Some(OutputData::new(vec![vec![Some(2f64), Some(3f64)]]))
             ]
         );
-        assert_eq!(runner.get_context().get_io_info().get_outputs().len(), 2);
+        assert_eq!(runner.get_io_info().get_outputs().len(), 2);
 
         runner
             .update(&vec![(
@@ -309,13 +309,13 @@ mod tests {
             )])
             .unwrap();
         assert_eq!(
-            runner.get_context().move_output_data(),
+            runner.move_output_data(),
             vec![
                 Some(OutputData::new(vec![vec![Some(10f64), Some(11f64)]])),
                 Some(OutputData::new(vec![vec![Some(11f64), Some(12f64)]])),
             ]
         );
-        assert_eq!(runner.get_context().get_io_info().get_outputs().len(), 2);
+        assert_eq!(runner.get_io_info().get_outputs().len(), 2);
 
         runner
             .update_from(
@@ -327,7 +327,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            runner.get_context().move_output_data(),
+            runner.move_output_data(),
             vec![
                 Some(OutputData::new(vec![vec![
                     Some(100f64),
@@ -367,7 +367,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            runner.get_context().get_io_info().get_outputs(),
+            runner.get_io_info().get_outputs(),
             &vec![OutputInfo::Plot(PlotInfo {
                 title: Some(String::from("Title")),
                 color: Some(String::from("#00ffaa")),
@@ -436,7 +436,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            runner.get_context().get_io_info().get_outputs(),
+            runner.get_io_info().get_outputs(),
             &vec![OutputInfo::Plot(PlotInfo {
                 title: None,
                 color: Some(String::from("")),
@@ -454,7 +454,7 @@ mod tests {
         );
 
         assert_eq!(
-            runner.get_context().move_output_data(),
+            runner.move_output_data(),
             vec![Some(OutputData::new_with_sc(
                 vec![vec![Some(1f64), Some(2f64)]],
                 vec![StrOptionsData {

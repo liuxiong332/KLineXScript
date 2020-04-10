@@ -83,7 +83,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            runner.get_context().get_io_info().get_script_type(),
+            runner.get_io_info().get_script_type(),
             &Some(ScriptPurpose::Study(StudyScript {
                 title: String::from("hello"),
                 shorttitle: Some(String::from("dd")),

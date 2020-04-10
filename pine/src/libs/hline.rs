@@ -33,7 +33,11 @@ impl<'a> SeriesCall<'a> for PlotVal {
         mut p: Vec<Option<PineRef<'a>>>,
         _func_type: FunctionType<'a>,
     ) -> Result<PineRef<'a>, RuntimeErr> {
-        if self.output_id < 0 {
+        println!(
+            "is ready {:?}",
+            downcast_ctx(context).check_is_output_info_ready(),
+        );
+        if self.output_id < 0 && !downcast_ctx(context).check_is_output_info_ready() {
             move_tuplet!((price, title, color, linestyle, linewidth, editable) = p);
             let plot_info = HLineInfo {
                 price: pine_ref_to_f64(price),
@@ -47,6 +51,7 @@ impl<'a> SeriesCall<'a> for PlotVal {
                 downcast_ctx(context).push_output_info_retindex(OutputInfo::HLine(plot_info));
         }
 
+        println!("get id {:?}", self.output_id);
         Ok(PineRef::Box(Box::new(Some(self.output_id as i64))))
     }
 
@@ -141,7 +146,7 @@ mod tests {
                 None,
             )
             .is_ok());
-        assert_eq!(runner.get_context().move_output_data(), vec![None]);
+        assert_eq!(runner.move_output_data(), vec![None]);
 
         assert!(runner
             .run(
@@ -153,7 +158,7 @@ mod tests {
             )
             .is_ok());
         assert_eq!(
-            runner.get_context().get_io_info().get_outputs(),
+            runner.get_io_info().get_outputs(),
             &vec![OutputInfo::HLine(HLineInfo {
                 price: Some(1f64),
                 title: Some(String::from("h1")),

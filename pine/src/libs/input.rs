@@ -550,7 +550,7 @@ mod tests {
             Some(PineRef::new_box(false))
         );
         assert_eq!(
-            runner.get_context().get_io_info().get_inputs(),
+            runner.get_io_info().get_inputs(),
             &vec![InputInfo::Bool(BoolInputInfo {
                 defval: Some(true),
                 title: Some(String::from("title")),
@@ -594,7 +594,7 @@ mod tests {
             Some(PineRef::new_box(Some(4)))
         );
         assert_eq!(
-            runner.get_context().get_io_info().get_inputs(),
+            runner.get_io_info().get_inputs(),
             &vec![InputInfo::Int(IntInputInfo {
                 defval: Some(1),
                 title: Some(String::from("hello")),
@@ -677,7 +677,7 @@ mod tests {
         );
 
         assert_eq!(
-            runner.get_context().get_io_info().get_inputs(),
+            runner.get_io_info().get_inputs(),
             &vec![InputInfo::String(StringInputInfo {
                 defval: Some(String::from("defval")),
                 title: Some(String::from("hello")),

@@ -157,7 +157,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            runner.get_context().move_output_data(),
+            runner.move_output_data(),
             vec![Some(OutputData::new(vec![
                 vec![Some(0f64), Some(10f64)],
                 vec![Some(1f64), Some(12f64)],
@@ -166,7 +166,7 @@ mod tests {
             ])),]
         );
         assert_eq!(
-            runner.get_context().get_io_info().get_outputs(),
+            runner.get_io_info().get_outputs(),
             &vec![OutputInfo::PlotCandle(PlotCandleInfo {
                 title: Some(String::from("Title")),
                 color: Some(String::from("#ff0000")),

@@ -116,7 +116,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            runner.get_context().get_io_info().get_outputs(),
+            runner.get_io_info().get_outputs(),
             &vec![OutputInfo::PlotShape(PlotShapeInfo {
                 title: Some(String::from("Title")),
                 style: Some(String::from("h")),

@@ -111,11 +111,11 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            runner.get_context().move_output_data(),
+            runner.move_output_data(),
             vec![Some(OutputData::new(vec![vec![Some(1f64), Some(2f64)]])),]
         );
         assert_eq!(
-            runner.get_context().get_io_info().get_outputs(),
+            runner.get_io_info().get_outputs(),
             &vec![OutputInfo::PlotArrow(PlotArrowInfo {
                 title: Some(String::from("Title")),
                 colorup: Some(String::from("#00ffaa")),

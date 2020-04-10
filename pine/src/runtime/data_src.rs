@@ -1,4 +1,6 @@
-use super::context::{Context, Ctx, PineRuntimeError, Runner, VarOperate};
+use super::context::{
+    downcast_ctx, Context, ContextType, Ctx, PineRuntimeError, Runner, VarOperate,
+};
 // use super::ctxid_parser::CtxIdParser;
 use super::output::{InputSrc, InputVal, SymbolInfo};
 use super::{AnySeries, AnySeriesType};
@@ -6,6 +8,7 @@ use crate::ast::stat_expr_types::{Block, VarIndex};
 use crate::types::{
     DataType, Float, Int, PineFrom, PineRef, PineType, RefData, RuntimeErr, Series,
 };
+use std::mem;
 use std::rc::Rc;
 
 pub trait Callback {
@@ -17,12 +20,15 @@ pub trait Callback {
 pub struct NoneCallback();
 impl Callback for NoneCallback {}
 
-pub struct DataSrc<'a, 'b, 'c> {
-    context: Context<'a, 'b, 'c>,
+pub struct DataSrc<'a> {
+    lib_context: Box<dyn Ctx<'a> + 'a>,
+    context: Box<dyn Ctx<'a> + 'a>,
     blk: &'a Block<'a>,
     input_index: i32,
     input_names: Vec<(&'a str, AnySeriesType)>,
     pub callback: &'a dyn Callback,
+    inputs: Vec<Option<InputVal>>,
+    input_srcs: Option<InputSrc>,
 }
 
 fn get_len<'a>(
@@ -48,17 +54,18 @@ fn get_len<'a>(
     Ok(lens[0])
 }
 
-impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
+impl<'a> DataSrc<'a> {
     pub fn new(
         blk: &'a Block<'a>,
         lib_vars: Vec<(&'a str, PineRef<'a>)>,
         input_names: Vec<(&'a str, AnySeriesType)>,
         callback: &'a dyn Callback,
-    ) -> DataSrc<'a, 'b, 'c> {
-        let mut context = Context::new_with_callback(callback);
-        context.init(blk.var_count, blk.subctx_count, blk.libfun_count);
-
+    ) -> DataSrc<'a> {
         let input_index = lib_vars.len() as i32;
+
+        let mut context = Box::new(Context::new(None, ContextType::Library));
+        let libvar_count = input_index + input_names.len() as i32;
+        context.init(libvar_count, 1, 0);
 
         for (i, (_k, v)) in lib_vars.into_iter().enumerate() {
             context.create_var(i as i32, v);
@@ -80,26 +87,50 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
                 }
             }
         }
+
+        let libctx_ptr = Box::into_raw(context);
+        let mut main_ctx = Box::new(Context::new(
+            Some(unsafe { libctx_ptr.as_mut().unwrap() }),
+            ContextType::Main,
+        ));
+        main_ctx.init(
+            blk.var_count - libvar_count,
+            blk.subctx_count,
+            blk.libfun_count,
+        );
+
         DataSrc {
             blk,
-            context,
+            context: main_ctx,
+            lib_context: unsafe { Box::from_raw(libctx_ptr) },
             input_names,
             input_index,
             callback,
+            inputs: vec![],
+            input_srcs: None,
         }
     }
 
     pub fn reset_vars(&mut self) {
-        self.context
-            .reset(self.input_index + self.input_names.len() as i32);
+        let parent = unsafe { mem::transmute::<_, &mut (dyn Ctx<'a>)>(self.lib_context.as_mut()) };
+        let mut main_ctx = Context::new(Some(parent), ContextType::Main);
+        // Set the inputs and input sources.
+        main_ctx.change_inputs(self.inputs.clone());
+        if let Some(input_src) = self.input_srcs.as_ref() {
+            main_ctx.add_input_src(input_src.clone());
+        }
+        self.context = Box::new(main_ctx);
     }
 
     pub fn change_inputs(&mut self, inputs: Vec<Option<InputVal>>) {
-        self.context.change_inputs(inputs);
+        self.inputs = inputs;
+        downcast_ctx(self.context.as_mut()).change_inputs(self.inputs.clone());
     }
 
     pub fn set_input_srcs(&mut self, srcs: Vec<String>) {
-        self.context.add_input_src(InputSrc::new(None, srcs));
+        self.input_srcs = Some(InputSrc::new(None, srcs));
+        downcast_ctx(self.context.as_mut())
+            .add_input_src(self.input_srcs.as_ref().unwrap().clone());
     }
 
     fn run_data(
@@ -118,47 +149,50 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
             for (index, (_k, v)) in data.iter().enumerate() {
                 if let Some(name_index) = name_indexs[index] {
                     let var_index = VarIndex::new(self.input_index + name_index as i32, 0);
-                    let series = self.context.move_var(var_index).unwrap();
+                    let series = self.lib_context.move_var(var_index).unwrap();
                     match series.get_type().0 {
                         DataType::Float => {
                             let mut float_s: RefData<Series<Float>> =
                                 Series::implicity_from(series).unwrap();
                             float_s.update(v.index(i as isize));
-                            self.context.update_var(var_index, float_s.into_pf());
+                            self.lib_context.update_var(var_index, float_s.into_pf());
                         }
                         DataType::Int => {
                             let mut int_s: RefData<Series<Int>> =
                                 Series::implicity_from(series).unwrap();
                             int_s.update(v.index(i as isize));
-                            self.context.update_var(var_index, int_s.into_pf());
+                            self.lib_context.update_var(var_index, int_s.into_pf());
                         }
                         _ => unreachable!(),
                     }
                 } else {
                     // TODO: Remove this data copy.
-                    self.context.insert_input_data(String::from(*_k), v.clone());
+                    downcast_ctx(self.lib_context.as_mut())
+                        .insert_input_data(String::from(*_k), v.clone());
                 }
             }
 
             if let Some(bar_index) = bar_index {
                 let var_index = VarIndex::new(self.input_index + bar_index as i32, 0);
-                let series = self.context.move_var(var_index).unwrap();
+                let series = self.lib_context.move_var(var_index).unwrap();
                 let mut index_s: RefData<Series<Int>> = Series::implicity_from(series).unwrap();
                 index_s.update(Some(start + i as i64));
-                self.context.update_var(var_index, index_s.into_pf());
+                self.lib_context.update_var(var_index, index_s.into_pf());
             }
 
-            self.blk.run(&mut self.context)?;
-            self.context.commit();
+            self.blk.run(self.context.as_mut())?;
+            let main_ctx = downcast_ctx(self.context.as_mut());
+            main_ctx.commit();
             // self.context.clear_declare();
-            self.context.clear_is_run();
-            self.context.reset_input_index();
-            self.context.let_input_info_ready();
+            main_ctx.clear_is_run();
+            main_ctx.reset_input_index();
+            main_ctx.let_input_info_ready();
         }
-        match self.context.run_callbacks() {
+        let main_ctx = downcast_ctx(self.context.as_mut());
+        match downcast_ctx(main_ctx).run_callbacks() {
             Err(err) => Err(PineRuntimeError::new_no_range(err)),
             _ => {
-                self.context.let_output_info_ready();
+                main_ctx.let_output_info_ready();
                 Ok(())
             }
         }
@@ -171,9 +205,10 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
     ) -> Result<(), PineRuntimeError> {
         let len = get_len(data, &self.input_names)?;
         // Update the range of data.
-        self.context.update_data_range((Some(0), Some(len as i32)));
+        let main_ctx = downcast_ctx(self.context.as_mut());
+        main_ctx.update_data_range((Some(0), Some(len as i32)));
         if let Some(syminfo) = syminfo {
-            self.context.set_syminfo(syminfo);
+            main_ctx.set_syminfo(syminfo);
         }
         self.reset_vars();
         self.run_data(data, 0, len)
@@ -185,13 +220,14 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
     ) -> Result<(), PineRuntimeError> {
         let len = get_len(data, &self.input_names)?;
 
+        let main_ctx = downcast_ctx(self.context.as_mut());
+
         // Get the range of exist running data.
-        let range = self.context.get_data_range();
+        let range = main_ctx.get_data_range();
         // The new data's start index.
         let start = range.1.unwrap() - 1;
-        self.context
-            .update_data_range((Some(start), Some(start + len as i32)));
-        self.context.roll_back()?;
+        main_ctx.update_data_range((Some(start), Some(start + len as i32)));
+        main_ctx.roll_back()?;
         self.run_data(data, start as i64, len)
     }
 
@@ -202,20 +238,21 @@ impl<'a, 'b, 'c> DataSrc<'a, 'b, 'c> {
     ) -> Result<(), PineRuntimeError> {
         let len = get_len(data, &self.input_names)?;
 
-        let range = self.context.get_data_range();
+        let main_ctx = downcast_ctx(self.context.as_mut());
+
+        let range = main_ctx.get_data_range();
         // Calculate the count of roll_back invocation
         let roll_count = range.1.unwrap() - from;
-        self.context
-            .update_data_range((Some(from), Some(from + len as i32)));
+        main_ctx.update_data_range((Some(from), Some(from + len as i32)));
 
         for _ in 0..roll_count {
-            self.context.roll_back()?;
+            main_ctx.roll_back()?;
         }
         self.run_data(data, from as i64, len)
     }
 
-    pub fn get_context(&mut self) -> &mut Context<'a, 'b, 'c> {
-        &mut self.context
+    pub fn get_context(&mut self) -> &mut Ctx<'a> {
+        unsafe { mem::transmute::<_, &mut Ctx<'a>>((self.context.as_mut())) }
     }
 }
 
@@ -266,7 +303,7 @@ mod tests {
         )];
 
         assert_eq!(datasrc.run(&data, None), Ok(()));
-        datasrc.context.map_var(VarIndex::new(1, 0), |hv| match hv {
+        downcast_ctx(datasrc.context.as_mut()).map_var(VarIndex::new(1, 0), |hv| match hv {
             None => None,
             Some(v) => {
                 let ser: RefData<Series<Float>> = Series::implicity_from(v).unwrap();

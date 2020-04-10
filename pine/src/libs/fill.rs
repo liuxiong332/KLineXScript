@@ -60,7 +60,7 @@ impl<'a> SeriesCall<'a> for PlotVal {
         mut p: Vec<Option<PineRef<'a>>>,
         _func_type: FunctionType<'a>,
     ) -> Result<PineRef<'a>, RuntimeErr> {
-        if self.output_id < 0 {
+        if self.output_id < 0 && !downcast_ctx(context).check_is_output_info_ready() {
             move_tuplet!((plot1, plot2, color, transp, title, editable, show_last) = p);
             let names = match _func_type.get_type(0) {
                 Some(&SyntaxType::ObjectClass("plot")) => ("plot", "plot1", "plot2"),
@@ -197,7 +197,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            &runner.get_context().get_io_info().get_outputs()[3],
+            &runner.get_io_info().get_outputs()[3],
             &OutputInfo::Fill(FillInfo {
                 fill_type: String::from("plot"),
                 start: 0i64,
@@ -210,7 +210,7 @@ mod tests {
             })
         );
 
-        let output_data = runner.get_context().move_output_data();
+        let output_data = runner.move_output_data();
         assert_eq!(output_data[3], None);
         assert_eq!(
             output_data[4],
@@ -248,7 +248,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            &runner.get_context().get_io_info().get_outputs()[2],
+            &runner.get_io_info().get_outputs()[2],
             &OutputInfo::Fill(FillInfo {
                 fill_type: String::from("hline"),
                 start: 0i64,

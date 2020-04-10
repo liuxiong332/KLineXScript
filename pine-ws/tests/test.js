@@ -75,3 +75,26 @@ it("volume should plot", function () {
     assert.deepEqual(result[0].series, [new Float64Array([10.0])]);
 
 });
+
+const Script = `
+//@version=4
+study(title="TRIX", shorttitle="TRIX", format=format.price, precision=2)
+length = input(2, minval=1)
+out = ema(log(close), 2) 
+plot(out, color=color.maroon, title="TRIX")
+`;
+
+it("mytest", function () {
+    let runner = new Runner();
+    runner.parse(Script);
+    // console.log(runner.genIOInfo().inputs[0]);
+    console.log(runner.genIOInfo().input_srcs);
+    assert.deepEqual(runner.genIOInfo().input_srcs, [{ ticker: null, srcs: ['close'] }]);
+    let farray = new Float64Array(100);
+    for (let i = 0; i < 3; i += 1) {
+        farray[i] = i + 100.0;
+    }
+    let result = runner.runWithData(["close"], 3, farray);
+    console.log(result[0].series[0]);
+    // assert.deepEqual(result[0].series, [new Float64Array([10.0])]);
+});

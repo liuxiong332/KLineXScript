@@ -57,11 +57,15 @@ pub trait Ctx<'a>: VarOperate<'a> {
 
     // fn any_declare(&self) -> bool;
 
+    fn get_context_type(&self) -> ContextType;
+
     fn has_parent(&self) -> bool;
+
+    fn get_main_ctx(&mut self) -> &mut dyn Ctx<'a>;
 
     fn get_top_ctx(&mut self) -> &mut dyn Ctx<'a>;
 
-    fn get_rel_top_ctx(&mut self) -> (i32, &mut dyn Ctx<'a>);
+    fn get_rel_main_ctx(&mut self) -> (i32, &mut dyn Ctx<'a>);
 
     fn set_is_run(&mut self, is_run: bool);
 
@@ -76,6 +80,8 @@ pub trait Ctx<'a>: VarOperate<'a> {
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum ContextType {
+    Library,
+    Main,
     Normal,
     IfElseBlock,
     ForRangeBlock,
@@ -292,196 +298,215 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
         self.init_fun_instances(funs);
     }
 
-    pub fn reset(&mut self, var_keep: i32) {
-        let var_count = self.vars.len();
-        self.vars.resize(var_keep as usize, None);
-        self.vars.resize(var_count, None);
-
-        let ctx_count = self.sub_contexts.len();
-        self.sub_contexts.clear();
-        self.sub_contexts.resize_with(ctx_count, || None);
-
-        // function instance need not reset
-
-        // let fun_count = self.fun_instances.len();
-        // self.fun_instances.clear();
-        // self.fun_instances.resize_with(fun_count, || None);
-    }
-
     pub fn change_inputs(&mut self, inputs: Vec<Option<InputVal>>) {
-        if let Some(p) = &mut self.parent {
-            downcast_ctx(*p).change_inputs(inputs)
-        } else {
+        if self.context_type == ContextType::Main {
             debug_assert!(
                 self.io_info.get_inputs().is_empty()
                     || inputs.len() == self.io_info.get_inputs().len()
             );
             self.inputs = inputs;
+        } else if let Some(p) = &mut self.parent {
+            downcast_ctx(*p).change_inputs(inputs)
+        } else {
+            unreachable!()
         }
     }
 
     pub fn get_inputs(&self) -> &Vec<Option<InputVal>> {
-        if let Some(p) = &self.parent {
+        if self.context_type == ContextType::Main {
+            &self.inputs
+        } else if let Some(p) = &self.parent {
             downcast_ctx_const(*p).get_inputs()
         } else {
-            &self.inputs
+            unreachable!()
         }
     }
 
     pub fn copy_next_input(&mut self) -> Option<InputVal> {
-        if let Some(p) = &mut self.parent {
-            downcast_ctx(*p).copy_next_input()
-        } else {
+        if self.context_type == ContextType::Main {
             self.input_index += 1;
             if self.input_index as usize >= self.inputs.len() {
                 None
             } else {
                 self.inputs[self.input_index as usize].clone()
             }
+        } else if let Some(p) = &mut self.parent {
+            downcast_ctx(*p).copy_next_input()
+        } else {
+            unreachable!()
         }
     }
 
     pub fn get_next_input_index(&mut self) -> i32 {
-        if let Some(p) = &mut self.parent {
-            downcast_ctx(*p).get_next_input_index()
-        } else {
+        if self.context_type == ContextType::Main {
             self.input_index += 1;
             self.input_index
+        } else if let Some(p) = &mut self.parent {
+            downcast_ctx(*p).get_next_input_index()
+        } else {
+            unreachable!()
         }
     }
 
     pub fn reset_input_index(&mut self) {
-        if let Some(p) = &mut self.parent {
+        if self.context_type == ContextType::Main {
+            self.input_index = -1;
+        } else if let Some(p) = &mut self.parent {
             downcast_ctx(*p).reset_input_index()
         } else {
-            self.input_index = -1;
+            unreachable!()
         }
     }
 
     // io_info related methods
     pub fn set_script_type(&mut self, script_type: ScriptPurpose) {
-        if let Some(p) = &mut self.parent {
+        if self.context_type == ContextType::Main {
+            self.io_info.set_script_type(script_type);
+        } else if let Some(p) = &mut self.parent {
             downcast_ctx(*p).set_script_type(script_type)
         } else {
-            self.io_info.set_script_type(script_type);
+            unreachable!()
         }
     }
 
     pub fn push_input_info(&mut self, input: InputInfo) {
-        if let Some(p) = &mut self.parent {
+        if self.context_type == ContextType::Main {
+            self.io_info.push_input(input);
+        } else if let Some(p) = &mut self.parent {
             downcast_ctx(*p).push_input_info(input)
         } else {
-            self.io_info.push_input(input);
+            unreachable!()
         }
     }
 
     pub fn push_output_info(&mut self, output: OutputInfo) {
-        if let Some(p) = &mut self.parent {
+        if self.context_type == ContextType::Main {
+            self.io_info.push_output(output);
+        } else if let Some(p) = &mut self.parent {
             downcast_ctx(*p).push_output_info(output)
         } else {
-            self.io_info.push_output(output);
+            unreachable!()
         }
     }
 
     pub fn push_output_info_retindex(&mut self, output: OutputInfo) -> i32 {
-        if let Some(p) = &mut self.parent {
+        if self.context_type == ContextType::Main {
+            self.io_info.push_output_retindex(output)
+        } else if let Some(p) = &mut self.parent {
             downcast_ctx(*p).push_output_info_retindex(output)
         } else {
-            self.io_info.push_output_retindex(output)
+            unreachable!()
         }
     }
 
     pub fn add_input_src(&mut self, src: InputSrc) {
-        if let Some(p) = &mut self.parent {
+        if self.context_type == ContextType::Main {
+            self.io_info.add_input_src(src);
+        } else if let Some(p) = &mut self.parent {
             downcast_ctx(*p).add_input_src(src)
         } else {
-            self.io_info.add_input_src(src);
+            unreachable!()
         }
     }
 
     pub fn get_io_info(&self) -> &IOInfo {
-        if let Some(p) = &self.parent {
+        if self.context_type == ContextType::Main {
+            &self.io_info
+        } else if let Some(p) = &self.parent {
             downcast_ctx_const(*p).get_io_info()
         } else {
-            &self.io_info
+            unreachable!()
         }
     }
 
     pub fn check_is_input_info_ready(&self) -> bool {
-        if let Some(p) = &self.parent {
+        if self.context_type == ContextType::Main {
+            self.is_input_info_ready
+        } else if let Some(p) = &self.parent {
             downcast_ctx_const(*p).check_is_input_info_ready()
         } else {
-            self.is_input_info_ready
+            unreachable!()
         }
     }
 
     pub fn let_input_info_ready(&mut self) {
-        debug_assert!(!self.has_parent());
+        debug_assert!(!self.is_main());
         self.is_input_info_ready = true;
     }
 
     pub fn check_is_output_info_ready(&self) -> bool {
-        if let Some(p) = &self.parent {
+        if self.context_type == ContextType::Main {
+            self.is_output_info_ready
+        } else if let Some(p) = &self.parent {
             downcast_ctx_const(*p).check_is_output_info_ready()
         } else {
-            self.is_output_info_ready
+            unreachable!()
         }
     }
 
     pub fn let_output_info_ready(&mut self) {
-        debug_assert!(!self.has_parent());
+        debug_assert!(!self.is_main());
         self.is_output_info_ready = true;
     }
 
     pub fn insert_input_data(&mut self, name: String, data: AnySeries) {
-        if let Some(p) = &mut self.parent {
+        if self.context_type == ContextType::Main {
+            self.input_data.insert(name, data);
+        } else if let Some(p) = &mut self.parent {
             downcast_ctx(*p).insert_input_data(name, data)
         } else {
-            self.input_data.insert(name, data);
+            unreachable!()
         }
     }
 
     pub fn get_input_data(&self, name: &str) -> Option<&AnySeries> {
-        if let Some(p) = &self.parent {
+        if self.context_type == ContextType::Main {
+            self.input_data.get(name)
+        } else if let Some(p) = &self.parent {
             downcast_ctx_const(*p).get_input_data(name)
         } else {
-            self.input_data.get(name)
+            unreachable!()
         }
     }
 
     pub fn push_output_data(&mut self, data: Option<OutputData>) {
-        if let Some(p) = &mut self.parent {
+        if self.context_type == ContextType::Main {
+            self.output_data.push(data);
+        } else if let Some(p) = &mut self.parent {
             downcast_ctx(*p).push_output_data(data)
         } else {
-            self.output_data.push(data);
+            unreachable!()
         }
     }
 
     pub fn move_output_data(&mut self) -> Vec<Option<OutputData>> {
+        debug_assert!(self.is_main());
         debug_assert_eq!(self.output_data.len(), self.io_info.get_outputs().len());
         mem::replace(&mut self.output_data, vec![])
     }
 
     pub fn set_syminfo(&mut self, syminfo: Rc<SymbolInfo>) {
-        if let Some(p) = &mut self.parent {
+        if self.context_type == ContextType::Main {
+            self.syminfo = Some(syminfo);
+        } else if let Some(p) = &mut self.parent {
             downcast_ctx(*p).set_syminfo(syminfo)
         } else {
-            self.syminfo = Some(syminfo);
+            unreachable!()
         }
     }
 
     pub fn get_syminfo(&self) -> &Option<Rc<SymbolInfo>> {
-        debug_assert!(!self.has_parent());
+        debug_assert!(!self.is_main());
         &self.syminfo
     }
 
     pub fn get_data_range(&self) -> (Option<i32>, Option<i32>) {
-        debug_assert!(!self.has_parent());
+        debug_assert!(!self.is_main());
         self.data_range.clone()
     }
 
     pub fn update_data_range(&mut self, range: (Option<i32>, Option<i32>)) {
-        debug_assert!(!self.has_parent());
+        debug_assert!(!self.is_main());
         self.data_range = range;
     }
 
@@ -613,6 +638,10 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
         }
         dest_ctx
     }
+
+    fn is_main(&self) -> bool {
+        self.context_type == ContextType::Main
+    }
 }
 
 impl<'a, 'b, 'c> VarOperate<'a> for Context<'a, 'b, 'c> {
@@ -674,10 +703,10 @@ impl<'a, 'b, 'c> Ctx<'a> for Context<'a, 'b, 'c> {
     }
 
     fn create_runnable(&mut self, call: Rc<RefCell<dyn Runnable<'a> + 'a>>) {
-        if let Some(ref mut v) = self.parent {
-            v.create_runnable(call);
-        } else if !self.first_commit {
+        if self.context_type == ContextType::Main && !self.first_commit {
             self.runnables.push(call);
+        } else if let Some(ref mut v) = self.parent {
+            v.create_runnable(call);
         }
     }
 
@@ -697,14 +726,28 @@ impl<'a, 'b, 'c> Ctx<'a> for Context<'a, 'b, 'c> {
         dest_ctx
     }
 
-    fn get_rel_top_ctx(&mut self) -> (i32, &mut dyn Ctx<'a>) {
+    fn get_main_ctx(&mut self) -> &mut dyn Ctx<'a> {
+        let mut dest_ctx: &mut dyn Ctx<'a> = self;
+        while dest_ctx.get_context_type() != ContextType::Main && dest_ctx.has_parent() {
+            dest_ctx = *downcast_ctx(dest_ctx).parent.as_mut().unwrap();
+        }
+        debug_assert!(dest_ctx.get_context_type() == ContextType::Main);
+        dest_ctx
+    }
+
+    fn get_rel_main_ctx(&mut self) -> (i32, &mut dyn Ctx<'a>) {
         let mut dest_ctx: &mut dyn Ctx<'a> = self;
         let mut rel_count = 0;
-        while dest_ctx.has_parent() {
+        while dest_ctx.get_context_type() != ContextType::Main && dest_ctx.has_parent() {
             rel_count += 1;
             dest_ctx = *downcast_ctx(dest_ctx).parent.as_mut().unwrap();
         }
+        debug_assert!(dest_ctx.get_context_type() == ContextType::Main);
         (rel_count, dest_ctx)
+    }
+
+    fn get_context_type(&self) -> ContextType {
+        self.context_type
     }
 
     fn has_parent(&self) -> bool {

@@ -77,10 +77,10 @@ impl<'a> SecurityInfo<'a> {
     ) -> Result<(), RuntimeErr> {
         self.ticker = Some(gen_ticker(symbol, resolution)?);
         let func_ins = get_func(expression)?;
-        let var_i = *downcast_ctx(_context.get_top_ctx())
-            .get_varname_index("_time")
+        let var_i = downcast_ctx(_context)
+            .get_top_varname_index("_time")
             .unwrap();
-        self.time_index = Some(VarIndex::new(var_i, 0));
+        self.time_index = Some(var_i);
 
         self.fun_def = Some(func_ins);
         let params = &self.fun_def.as_ref().unwrap().get_def().params;
@@ -230,7 +230,7 @@ impl<'a> SeriesCall<'a> for SecurityInfo<'a> {
         // let func_ins = self.fun_def.as_ref().unwrap();
 
         let time_index = self.time_index.clone().unwrap();
-        let time = pine_ref_to_i64(self.get_subctx().get_top_ctx().get_var(time_index).clone());
+        let time = pine_ref_to_i64(self.get_subctx().get_var(time_index).clone());
 
         match time {
             None => Ok(PineRef::new_box(NA)),
@@ -483,7 +483,7 @@ mod tests {
             Some(PineRef::new_rc(Series::from_vec(vec![None, Some(42f64)])))
         );
         assert_eq!(
-            runner.get_context().get_io_info().get_input_srcs(),
+            runner.get_io_info().get_input_srcs(),
             &vec![
                 InputSrc::new(None, vec![String::from("close"), String::from("time")]),
                 InputSrc::new(

@@ -33,10 +33,10 @@ use ast::syntax_type::{SimpleSyntaxType, SyntaxType};
 use syntax::SyntaxParser;
 
 use libs::{declare_vars, VarResult};
-use runtime::context::{Context, PineRuntimeError, VarOperate};
+use runtime::context::{downcast_ctx, Ctx, PineRuntimeError, VarOperate};
 use runtime::data_src::{Callback, DataSrc};
 use runtime::error_format::{ErrorFormater, PineFormatError};
-use runtime::output::{IOInfo, InputVal, OutputDataCollect, SymbolInfo};
+use runtime::output::{IOInfo, InputVal, OutputData, OutputDataCollect, SymbolInfo};
 use runtime::{AnySeries, AnySeriesType};
 use std::mem;
 use std::rc::Rc;
@@ -159,16 +159,16 @@ impl<'a, 'b> PineParser<'a, 'b> {
     }
 }
 
-pub struct PineRunner<'a, 'b, 'c> {
-    datasrc: DataSrc<'a, 'b, 'c>,
+pub struct PineRunner<'a> {
+    datasrc: DataSrc<'a>,
 }
 
-impl<'a, 'b, 'c> PineRunner<'a, 'b, 'c> {
+impl<'a> PineRunner<'a> {
     pub fn new(
         lib_info: &LibInfo<'a>,
         blk: &Block<'a>,
         callback: &'a dyn Callback,
-    ) -> PineRunner<'a, 'b, 'c> {
+    ) -> PineRunner<'a> {
         let var_values = lib_info.var_values.clone();
         let input_names = lib_info.input_names.clone();
 
@@ -208,18 +208,26 @@ impl<'a, 'b, 'c> PineRunner<'a, 'b, 'c> {
         self.datasrc.change_inputs(inputs);
     }
 
-    pub fn get_context(&mut self) -> &mut Context<'a, 'b, 'c> {
+    pub fn get_context(&mut self) -> &mut dyn Ctx<'a> {
         self.datasrc.get_context()
+    }
+
+    pub fn get_io_info(&mut self) -> &IOInfo {
+        downcast_ctx(self.get_context()).get_io_info()
+    }
+
+    pub fn move_output_data(&mut self) -> Vec<Option<OutputData>> {
+        downcast_ctx(self.get_context()).move_output_data()
     }
 }
 
-pub struct PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
+pub struct PineScript<'pa, 'li, 'ra> {
     source: String,
     lib_info: LibInfo<'li>,
     blk: Block<'pa>,
     syntax_parser: Option<SyntaxParser<'pa>>,
     callback: Option<&'ra dyn Callback>,
-    runner: Option<PineRunner<'ra, 'rb, 'rc>>,
+    runner: Option<PineRunner<'ra>>,
     data: Vec<(&'static str, AnySeries)>,
     syminfo: Option<Rc<SymbolInfo>>,
     error_format: ErrorFormater,
@@ -228,8 +236,8 @@ pub struct PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
 const SERIES_FLOAT: SyntaxType = SyntaxType::Series(SimpleSyntaxType::Float);
 const SERIES_INT: SyntaxType = SyntaxType::Series(SimpleSyntaxType::Int);
 
-impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
-    pub fn new(callback: Option<&'ra dyn Callback>) -> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
+impl<'pa, 'li, 'ra> PineScript<'pa, 'li, 'ra> {
+    pub fn new(callback: Option<&'ra dyn Callback>) -> PineScript<'pa, 'li, 'ra> {
         let lib_info = LibInfo::new(
             declare_vars(),
             vec![
@@ -258,7 +266,7 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
     pub fn new_with_libinfo(
         lib_info: LibInfo<'li>,
         callback: Option<&'ra dyn Callback>,
-    ) -> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
+    ) -> PineScript<'pa, 'li, 'ra> {
         PineScript {
             source: String::from(""),
             lib_info,
@@ -308,9 +316,9 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
         }
     }
 
-    pub fn get_runner(&mut self) -> &mut PineRunner<'ra, 'rb, 'rc> {
+    pub fn get_runner(&mut self) -> &mut PineRunner<'ra> {
         if self.runner.is_none() {
-            let mut runner: PineRunner<'ra, 'rb, 'rc>;
+            let mut runner: PineRunner<'ra>;
             unsafe {
                 let blk_ref: &'ra Block<'ra> =
                     mem::transmute::<&Block<'pa>, &'ra Block<'ra>>(&self.blk);
@@ -340,13 +348,15 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
             Err(err) => Err(PineFormatError::from_runtime_error(&self.error_format, err)),
             Ok(_) => {
                 self.move_output_data();
-                Ok(self.get_runner().get_context().get_io_info().clone())
+                Ok(downcast_ctx(self.get_runner().get_context())
+                    .get_io_info()
+                    .clone())
             }
         }
     }
 
     pub fn move_output_data(&mut self) -> OutputDataCollect {
-        let context = self.get_runner().get_context();
+        let context = downcast_ctx(self.get_runner().get_context());
         let (start, end) = context.get_data_range();
         OutputDataCollect::new(start.unwrap(), end.unwrap(), context.move_output_data())
     }
@@ -484,7 +494,7 @@ impl<'pa, 'li, 'ra, 'rb, 'rc> PineScript<'pa, 'li, 'ra, 'rb, 'rc> {
     }
 
     pub fn move_var(&mut self, var_index: VarIndex) -> Option<PineRef<'pa>> {
-        let runner: &mut PineRunner<'ra, 'rb, 'rc> = self.get_runner();
+        let runner: &mut PineRunner<'ra> = self.get_runner();
 
         let context = runner.get_context();
         unsafe { mem::transmute::<_, Option<PineRef<'pa>>>(context.move_var(var_index)) }

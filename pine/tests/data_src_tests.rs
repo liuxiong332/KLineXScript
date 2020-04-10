@@ -1282,3 +1282,40 @@ fn run1_test() {
     // println!("res {:?}", parser.run(vec![], vec![], None));
     assert!(parser.run_with_data(data, None).is_ok());
 }
+
+const EMA2_SCRIPT: &str = r#"
+out = ema(log(close), 2) 
+plot(out, color=color.maroon, title="TRIX")
+"#;
+
+#[test]
+fn ema2_test() {
+    use pine::libs::{color, cos, ema};
+    use pine::runtime::NoneCallback;
+
+    let lib_info = pine::LibInfo::new(
+        vec![
+            cos::declare_log_var(),
+            color::declare_var(),
+            ema::declare_ema_var(),
+            plot::declare_var(),
+        ],
+        vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+    parser.parse_src(String::from(EMA2_SCRIPT)).unwrap();
+    let data = vec![(
+        "close",
+        AnySeries::from_float_vec(vec![Some(100f64), Some(101f64), Some(102f64)]),
+    )];
+
+    let out_data = parser.run_with_data(
+        vec![("close", AnySeries::from_float_vec(vec![Some(0f64)]))],
+        None,
+    );
+    assert!(out_data.is_ok());
+
+    let out_data = parser.run_with_data(data, None);
+    println!("Now data {:?}", out_data);
+    assert!(out_data.is_err());
+}

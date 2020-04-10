@@ -51,6 +51,7 @@ pub mod rising;
 pub mod rsi;
 pub mod security;
 pub mod sma;
+pub mod stoch;
 pub mod study;
 pub mod sum;
 pub mod swma;
@@ -190,6 +191,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         format::declare_var(),
         hline::declare_var(),
         tsi::declare_var(),
+        stoch::declare_var(),
     ];
     debug_assert!(
         check_names(&list).len() == 0,

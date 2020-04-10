@@ -16,7 +16,7 @@ use crate::types::{
 use std::mem;
 use std::rc::Rc;
 
-fn get_min_val<'a>(source: &Option<RefData<Series<Float>>>, length: i64) -> Float {
+pub fn get_min_val<'a>(source: &Option<RefData<Series<Float>>>, length: i64) -> Float {
     let mut min_val = Some(std::f64::MAX);
     for i in 0..length as usize {
         let cur_val = series_index(source, i);

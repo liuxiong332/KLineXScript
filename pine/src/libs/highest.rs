@@ -22,7 +22,7 @@ fn gen_high_index<'a>(ctx: &mut dyn Ctx<'a>) -> VarIndex {
     VarIndex::new(*ctx.get_varname_index("high").unwrap(), 0)
 }
 
-fn get_max_val<'a>(source: &Option<RefData<Series<Float>>>, length: i64) -> Float {
+pub fn get_max_val<'a>(source: &Option<RefData<Series<Float>>>, length: i64) -> Float {
     let mut max_val = Some(0f64);
     for i in 0..length as usize {
         let cur_val = series_index(source, i);

@@ -933,6 +933,59 @@ fn tsi_test() {
     );
 }
 
+const STOCH_SCRIPT: &str = r#"
+pine_stoch(close, high, low, length) => 
+    100 * (close - lowest(low, length)) / (highest(high, length) - lowest(low, length))
+
+plot(stoch(close, high, low, 2))
+plot(pine_stoch(close, high, low, 2))
+"#;
+
+#[test]
+fn stoch_test() {
+    use pine::libs::{highest, lowest, plot, stoch};
+    use pine::runtime::NoneCallback;
+
+    let lib_info = pine::LibInfo::new(
+        vec![
+            stoch::declare_var(),
+            lowest::declare_var(),
+            highest::declare_var(),
+            plot::declare_var(),
+        ],
+        vec![
+            ("close", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("high", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("low", SyntaxType::Series(SimpleSyntaxType::Float)),
+        ],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+    parser.parse_src(String::from(STOCH_SCRIPT)).unwrap();
+    let data = vec![
+        (
+            "close",
+            AnySeries::from_float_vec(vec![Some(20f64), Some(10f64), Some(5f64)]),
+        ),
+        (
+            "high",
+            AnySeries::from_float_vec(vec![Some(30f64), Some(10f64), Some(10f64)]),
+        ),
+        (
+            "low",
+            AnySeries::from_float_vec(vec![Some(10f64), Some(5f64), Some(5f64)]),
+        ),
+    ];
+
+    let out_data = parser.run_with_data(data, None);
+    assert!(out_data.is_ok());
+
+    let data_list = out_data.unwrap().data_list;
+    assert_eq!(
+        data_list[0].as_ref().unwrap().series[0],
+        data_list[1].as_ref().unwrap().series[0]
+    );
+}
+
 const SWMA_SCRIPT: &'static str = "
 m1 = vwma(close, 15)
 

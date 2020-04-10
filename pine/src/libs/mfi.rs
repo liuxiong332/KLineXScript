@@ -1,6 +1,6 @@
 use super::ema::ema_func;
 use super::ema::rma_func;
-use super::rsi::calc_rsi;
+use super::rsi::calc_rsi_series;
 use super::sma::{declare_ma_var, wma_func};
 use super::tr::tr_func;
 use super::VarResult;
@@ -34,9 +34,6 @@ fn sum_vec<'a>(source: &Vec<Float>, length: i64) -> Float {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct KcVal {
-    prev_upward: Float,
-    prev_downward: Float,
-    prev_upper: Float,
     volume_index: VarIndex,
     upper_history: Vec<Float>,
     lower_history: Vec<Float>,
@@ -45,9 +42,6 @@ pub struct KcVal {
 impl KcVal {
     pub fn new() -> KcVal {
         KcVal {
-            prev_upward: None,
-            prev_downward: None,
-            prev_upper: None,
             volume_index: VarIndex::new(0, 0),
             upper_history: vec![],
             lower_history: vec![],
@@ -97,16 +91,7 @@ impl KcVal {
         let res = if lower_sum.is_none() {
             None
         } else {
-            let (res, upward, downward) = calc_rsi(
-                upper_sum,
-                float2int(lower_sum).unwrap(),
-                self.prev_upper,
-                self.prev_upward,
-                self.prev_downward,
-            )?;
-            self.prev_upward = upward;
-            self.prev_downward = downward;
-            self.prev_upper = upper_sum;
+            let res = calc_rsi_series(upper_sum, lower_sum)?;
             res
         };
         Ok(res)
@@ -156,7 +141,7 @@ mod tests {
     // use crate::libs::{floor, exp, };
 
     #[test]
-    fn alma_test() {
+    fn mfi_test() {
         let lib_info = LibInfo::new(
             vec![declare_var()],
             vec![
@@ -173,11 +158,11 @@ mod tests {
                 &vec![
                     (
                         "close",
-                        AnySeries::from_float_vec(vec![Some(20f64), Some(10f64)]),
+                        AnySeries::from_float_vec(vec![Some(20f64), Some(10f64), Some(20f64)]),
                     ),
                     (
                         "volume",
-                        AnySeries::from_int_vec(vec![Some(1i64), Some(1i64)]),
+                        AnySeries::from_int_vec(vec![Some(1i64), Some(1i64), Some(1i64)]),
                     ),
                 ],
                 None,
@@ -187,8 +172,9 @@ mod tests {
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(3, 0)),
             Some(PineRef::new(Series::from_vec(vec![
-                None,
-                Float::from(None)
+                Some(0f64),
+                Some(0f64),
+                Some(0f64),
             ])))
         );
     }

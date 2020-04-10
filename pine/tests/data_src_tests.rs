@@ -762,7 +762,7 @@ f_mfi(src, length) =>
         float res = na
         res
     else
-        rsi(upper, int(lower))
+        rsi(upper, lower)
 
 m2 = f_mfi(close, 2)
 ";

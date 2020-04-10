@@ -98,6 +98,21 @@ sig = adx(dilen, adxlen)
 plot(sig, color=color.red, title="ADX")
 "#;
 
+const VI_SCRIPTS: &'static str = r#"
+//@version=4
+study(title = "Vortex Indicator", shorttitle="VI", format=format.price, precision=4)
+period_ = input(14, title="Period", minval=2)
+
+VMP = sum( abs( high - low[1]), period_ )
+VMM = sum( abs( low - high[1]), period_ )
+STR = sum( atr(1), period_ )
+VIP = VMP / STR
+VIM = VMM / STR
+
+plot(VIP, title="VI +", color=#3BB3E4)
+plot(VIM, title="VI -", color=#FF006E)
+"#;
+
 #[test]
 fn datasrc_test() {
     let lib_info = pine::LibInfo::new(
@@ -158,5 +173,8 @@ fn datasrc_test() {
     assert!(parser.run_with_data(data.clone(), None).is_ok());
 
     parser.parse_src(String::from(ADI_SCRIPTS)).unwrap();
+    assert!(parser.run_with_data(data.clone(), None).is_ok());
+
+    parser.parse_src(String::from(VI_SCRIPTS)).unwrap();
     assert!(parser.run_with_data(data.clone(), None).is_ok());
 }

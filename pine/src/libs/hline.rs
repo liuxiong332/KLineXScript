@@ -22,7 +22,6 @@ struct PlotVal {
 
 impl PlotVal {
     fn new() -> PlotVal {
-        println!("New plot");
         PlotVal { output_id: -1 }
     }
 }
@@ -35,7 +34,6 @@ impl<'a> SeriesCall<'a> for PlotVal {
         _func_type: FunctionType<'a>,
     ) -> Result<PineRef<'a>, RuntimeErr> {
         if self.output_id < 0 {
-            println!("Run output");
             move_tuplet!((price, title, color, linestyle, linewidth, editable) = p);
             let plot_info = HLineInfo {
                 price: pine_ref_to_f64(price),
@@ -143,6 +141,7 @@ mod tests {
                 None,
             )
             .is_ok());
+        assert_eq!(runner.get_context().move_output_data(), vec![None]);
 
         assert!(runner
             .run(

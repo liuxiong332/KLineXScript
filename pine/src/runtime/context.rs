@@ -209,7 +209,6 @@ where
     D: Default + PartialEq + PineStaticType + PineType<'a> + PineFrom<'a, D> + Clone + Debug + 'a,
 {
     let mut series: RefData<Series<D>> = Series::implicity_from(val).unwrap();
-    println!("Now series {:?}", series);
     series.roll_back();
     series.into_pf()
 }

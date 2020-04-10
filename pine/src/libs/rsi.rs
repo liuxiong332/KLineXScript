@@ -39,6 +39,13 @@ pub fn calc_rsi(
     Ok((res, upward, downward))
 }
 
+pub fn calc_rsi_series(s0: Float, s1: Float) -> Result<Float, RuntimeErr> {
+    // rs = x / y
+    // res = 100 - 100 / (1 + rs)
+    let rs = s0.div(s1);
+    Ok(Some(100f64).minus(Some(100f64).div(Some(1f64).add(rs))))
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct KcVal {
     prev_upward: Float,
@@ -61,16 +68,27 @@ impl KcVal {
     ) -> Result<Float, RuntimeErr> {
         move_tuplet!((x, y) = param);
 
-        let series = require_param("x", pine_ref_to_f64_series(x))?;
-        let length = require_param("y", pine_ref_to_i64(y))?;
-
-        let s0 = series.index_value(0).unwrap();
-        let s1 = series.index_value(1).unwrap();
-        let (res, upward, downward) =
-            calc_rsi(s0, length, s1, self.prev_upward, self.prev_downward)?;
-        self.prev_downward = downward;
-        self.prev_upward = upward;
-        Ok(res)
+        match _func_type.get_type(1) {
+            Some(&SyntaxType::Simple(SimpleSyntaxType::Int)) => {
+                let series = require_param("x", pine_ref_to_f64_series(x))?;
+                let length = require_param("y", pine_ref_to_i64(y))?;
+                let s0 = series.index_value(0).unwrap();
+                let s1 = series.index_value(1).unwrap();
+                let (res, upward, downward) =
+                    calc_rsi(s0, length, s1, self.prev_upward, self.prev_downward)?;
+                self.prev_downward = downward;
+                self.prev_upward = upward;
+                Ok(res)
+            }
+            _ => {
+                let s1 = pine_ref_to_f64(x);
+                let s2 = pine_ref_to_f64(y);
+                // rs = x / y
+                // res = 100 - 100 / (1 + rs)
+                let rs = s1.div(s2);
+                Ok(Some(100f64).minus(Some(100f64).div(Some(1f64).add(rs))))
+            }
+        }
     }
 }
 
@@ -95,13 +113,19 @@ pub fn declare_var<'a>() -> VarResult<'a> {
         Callable::new(None, Some(Box::new(KcVal::new())))
     }));
 
-    let func_type = FunctionTypes(vec![FunctionType::new((
-        vec![
-            ("x", SyntaxType::float_series()),
-            ("y", SyntaxType::int_series()),
-        ],
-        SyntaxType::float_series(),
-    ))]);
+    let func_type = FunctionTypes(vec![
+        FunctionType::new((
+            vec![("x", SyntaxType::float_series()), ("y", SyntaxType::int())],
+            SyntaxType::float_series(),
+        )),
+        FunctionType::new((
+            vec![
+                ("x", SyntaxType::float_series()),
+                ("y", SyntaxType::float_series()),
+            ],
+            SyntaxType::float_series(),
+        )),
+    ]);
     let syntax_type = SyntaxType::Function(Rc::new(func_type));
     VarResult::new(value, syntax_type, "rsi")
 }
@@ -117,7 +141,7 @@ mod tests {
     // use crate::libs::{floor, exp, };
 
     #[test]
-    fn alma_test() {
+    fn rsi_int_test() {
         let lib_info = LibInfo::new(
             vec![declare_var()],
             vec![("close", SyntaxType::float_series())],
@@ -139,6 +163,35 @@ mod tests {
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(2, 0)),
             Some(PineRef::new(Series::from_vec(vec![None, Some(0.0)])))
+        );
+    }
+
+    #[test]
+    fn rsi_series_test() {
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![("close", SyntaxType::float_series())],
+        );
+        let src = "m = rsi(close, close)\n";
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        runner
+            .run(
+                &vec![(
+                    "close",
+                    AnySeries::from_float_vec(vec![Some(20f64), Some(10f64)]),
+                )],
+                None,
+            )
+            .unwrap();
+
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(2, 0)),
+            Some(PineRef::new(Series::from_vec(vec![
+                Some(50f64),
+                Some(50f64)
+            ])))
         );
     }
 }

@@ -18,3 +18,8 @@ regex = "^1"
 num-traits = "^0.2"
 
 [dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "my_benchmark"
+harness = false

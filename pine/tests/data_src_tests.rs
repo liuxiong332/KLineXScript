@@ -892,6 +892,47 @@ fn mfi2_test() {
     );
 }
 
+const TSI_SCRIPT: &str = r#"
+pine_tsi(x, s, l) => 
+    v1 = ema(ema(x - x[1], l), s) 
+    v2 = ema(ema(abs(x - x[1]), l), s) 
+    v1 / v2 * 100
+
+plot(tsi(close, 2, 2))
+plot(pine_tsi(close, 2, 2))
+"#;
+
+#[test]
+fn tsi_test() {
+    use pine::libs::{abs, ema, plot, tsi};
+    use pine::runtime::NoneCallback;
+
+    let lib_info = pine::LibInfo::new(
+        vec![
+            tsi::declare_var(),
+            ema::declare_ema_var(),
+            abs::declare_var(),
+            plot::declare_var(),
+        ],
+        vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+    parser.parse_src(String::from(TSI_SCRIPT)).unwrap();
+    let data = vec![(
+        "close",
+        AnySeries::from_float_vec(vec![Some(20f64), Some(10f64), Some(5f64)]),
+    )];
+
+    let out_data = parser.run_with_data(data, None);
+    assert!(out_data.is_ok());
+
+    let data_list = out_data.unwrap().data_list;
+    assert_eq!(
+        data_list[0].as_ref().unwrap().series[0],
+        data_list[1].as_ref().unwrap().series[0]
+    );
+}
+
 const SWMA_SCRIPT: &'static str = "
 m1 = vwma(close, 15)
 

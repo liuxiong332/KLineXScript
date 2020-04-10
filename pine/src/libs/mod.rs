@@ -59,6 +59,7 @@ pub mod time;
 pub mod timenow;
 pub mod timestamp;
 pub mod tr;
+pub mod tsi;
 pub mod vwma;
 pub mod year;
 
@@ -188,6 +189,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         fill::declare_var(),
         format::declare_var(),
         hline::declare_var(),
+        tsi::declare_var(),
     ];
     debug_assert!(
         check_names(&list).len() == 0,

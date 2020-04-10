@@ -102,6 +102,11 @@ impl<'a, D: Default + PineType<'a> + Clone + Debug + 'a> Series<'a, D> {
             .push(mem::replace(&mut self.current, D::default()));
     }
 
+    pub fn update_commit(&mut self, current: D) {
+        self.update(current);
+        self.commit();
+    }
+
     pub fn roll_back(&mut self) {
         if !self.history.is_empty() {
             self.history.pop().unwrap();

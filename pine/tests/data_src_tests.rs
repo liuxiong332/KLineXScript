@@ -814,6 +814,84 @@ fn mfi_test() {
     is_equal(&mut parser, 7, 9);
 }
 
+const MFI2_SCRIPT: &str = r#"
+study(title="Money Flow", shorttitle="MFI", format=format.price, precision=2)
+length = input(title="Length", type=input.integer, defval=14, minval=1, maxval=2000)
+src = hlc3
+upper = sum(volume * (change(src) <= 0 ? 0 : src), length)
+lower = sum(volume * (change(src) >= 0 ? 0 : src), length)
+
+pine_rsi(x, y) => 
+    // u = max(x - x[1],   0) // upward change
+    // d = max( y[1] - y, 0) // downward change
+    rs = x / y // rma(u, 2) / rma(d, 2)
+    res = 100 - 100 / (1 + rs)
+    res
+
+mf = rsi(upper, lower)
+mf2 = pine_rsi(upper, lower)
+plot(mf)
+plot(mf2)
+"#;
+
+#[test]
+fn mfi2_test() {
+    use pine::ast::stat_expr_types::VarIndex;
+    use pine::helper::pine_ref_to_f64_series;
+    use pine::libs::{change, format, hlc3, input, mfi, na, plot, rsi, study, sum};
+    use pine::runtime::NoneCallback;
+
+    let lib_info = pine::LibInfo::new(
+        vec![
+            study::declare_var(),
+            format::declare_var(),
+            input::declare_var(),
+            hlc3::declare_var(),
+            change::declare_change_var(),
+            mfi::declare_var(),
+            na::declare_var(),
+            rsi::declare_var(),
+            sum::declare_var(),
+            plot::declare_var(),
+        ],
+        vec![
+            ("high", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("low", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("close", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("volume", SyntaxType::Series(SimpleSyntaxType::Int)),
+        ],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+    parser.parse_src(String::from(MFI2_SCRIPT)).unwrap();
+    let data = vec![
+        (
+            "high",
+            AnySeries::from_float_vec(vec![Some(30f64), Some(20f64), Some(1f64)]),
+        ),
+        (
+            "low",
+            AnySeries::from_float_vec(vec![Some(10f64), Some(10f64), Some(5f64)]),
+        ),
+        (
+            "close",
+            AnySeries::from_float_vec(vec![Some(20f64), Some(10f64), Some(5f64)]),
+        ),
+        (
+            "volume",
+            AnySeries::from_int_vec(vec![Some(1i64), Some(1i64), Some(1i64)]),
+        ),
+    ];
+
+    let out_data = parser.run_with_data(data, None);
+    assert!(out_data.is_ok());
+
+    let data_list = out_data.unwrap().data_list;
+    assert_eq!(
+        data_list[0].as_ref().unwrap().series[0],
+        data_list[1].as_ref().unwrap().series[0]
+    );
+}
+
 const SWMA_SCRIPT: &'static str = "
 m1 = vwma(close, 15)
 

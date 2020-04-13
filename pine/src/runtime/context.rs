@@ -325,6 +325,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
     pub fn copy_next_input(&mut self) -> Option<InputVal> {
         if self.context_type == ContextType::Main {
             self.input_index += 1;
+
             if self.input_index as usize >= self.inputs.len() {
                 None
             } else {
@@ -509,7 +510,6 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
     pub fn update_data_range(&mut self, range: (Option<i32>, Option<i32>)) {
         debug_assert!(self.is_main());
         self.data_range = range;
-        println!("set data range {:?}", self.data_range);
     }
 
     pub fn create_sub_context(

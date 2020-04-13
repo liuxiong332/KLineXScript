@@ -191,10 +191,14 @@ impl<'a> DataSrc<'a> {
 
             self.blk.run(self.context.as_mut())?;
 
+            let lib_ctx = downcast_ctx(self.lib_context.as_mut());
+            // main context is not children of Library context, so commit it alone.
+            lib_ctx.commit();
+
             let main_ctx = downcast_ctx(self.context.as_mut());
             main_ctx.commit();
-            // self.context.clear_declare();
             main_ctx.clear_is_run();
+            // self.context.clear_declare();
             main_ctx.reset_input_index();
             main_ctx.let_input_info_ready();
         }

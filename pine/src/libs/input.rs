@@ -161,8 +161,8 @@ fn get_name_from_source<'a>(
 }
 
 fn get_source_from_name<'a>(context: &mut dyn Ctx<'a>, name: String) -> Option<PineRef<'a>> {
-    match context.get_varname_index(&name) {
-        Some(&index) => match context.get_var(VarIndex::new(index, 0)) {
+    match context.get_top_varname_index(&name) {
+        Some(index) => match context.get_var(index) {
             Some(val) => Some(PineRef::clone(val)),
             _ => None,
         },
@@ -196,6 +196,8 @@ fn input_for_source<'a>(
     }
 
     let input_val = downcast_ctx(context).copy_next_input();
+    println!("Get input val {:?}", input_val);
+
     match input_val {
         Some(InputVal::String(val)) | Some(InputVal::Source(val)) => {
             match get_source_from_name(context, val) {

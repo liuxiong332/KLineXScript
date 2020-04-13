@@ -18,8 +18,7 @@ use std::mem::transmute;
 use std::rc::Rc;
 
 pub fn parse_time_from_ctx<'a>(ctx: &mut dyn Ctx<'a>) -> (VarIndex, Tz) {
-    let i = downcast_ctx(ctx).get_varname_index("_time").unwrap();
-    let time_index = VarIndex::new(*i, 0);
+    let time_index = downcast_ctx(ctx).get_top_varname_index("_time").unwrap();
     (time_index, parse_tz_from_ctx(ctx))
 }
 

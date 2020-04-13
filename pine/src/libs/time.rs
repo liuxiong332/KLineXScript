@@ -28,8 +28,7 @@ impl<'a> EvaluateVal<'a> for TimeVal {
 
     fn call(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
         if self.time_index.is_none() {
-            let i = downcast_ctx(ctx).get_varname_index("_time").unwrap();
-            self.time_index = Some(VarIndex::new(*i, 0));
+            self.time_index = downcast_ctx(ctx).get_rel_varname_index("_time");
         }
         match ctx.get_var(self.time_index.unwrap()) {
             Some(val) => Ok(val.clone()),
@@ -65,8 +64,8 @@ impl<'a> SeriesCall<'a> for TimeCallVal {
         _func_type: FunctionType<'a>,
     ) -> Result<PineRef<'a>, RuntimeErr> {
         if self.time_index.borrow().is_none() {
-            let i = downcast_ctx(ctx).get_varname_index("_time").unwrap();
-            self.time_index.replace(Some(VarIndex::new(*i, 0)));
+            let i = downcast_ctx(ctx).get_rel_varname_index("_time").unwrap();
+            self.time_index.replace(Some(i));
             match downcast_ctx(ctx).get_syminfo() {
                 Some(syminfo) => {
                     self.tz.replace(Some(syminfo.timezone.parse().unwrap()));
@@ -172,7 +171,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(3, 0)),
+            runner.get_context().move_var(VarIndex::new(0, 0)),
             Some(PineRef::new_rc(Series::from_vec(vec![Some(5i64)])))
         );
     }

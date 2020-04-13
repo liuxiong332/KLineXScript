@@ -60,7 +60,7 @@ where
         .map(|v| Format::fmt(v))
         .collect::<Vec<String>>()
         .join(",");
-    context.get_callback().unwrap().print(s);
+    // context.get_callback().unwrap().print(s);
     Ok(())
 }
 

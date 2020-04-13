@@ -269,7 +269,7 @@ mod tests {
                 )
                 .unwrap();
             assert_eq!(
-                runner.get_context().move_var(VarIndex::new(0, 0)),
+                runner.get_context().move_var(VarIndex::new(1, 0)),
                 Some(res)
             );
         }

@@ -94,7 +94,6 @@ impl<'a> DataSrc<'a> {
             Some(unsafe { libctx_ptr.as_mut().unwrap() }),
             ContextType::Main,
         ));
-
         main_ctx.init(blk.var_count, blk.subctx_count, blk.libfun_count);
 
         DataSrc {
@@ -219,12 +218,12 @@ impl<'a> DataSrc<'a> {
     ) -> Result<(), PineRuntimeError> {
         let len = get_len(data, &self.input_names)?;
         // Update the range of data.
+        self.reset_vars();
         let main_ctx = downcast_ctx(self.context.as_mut());
         main_ctx.update_data_range((Some(0), Some(len as i32)));
         if let Some(syminfo) = syminfo {
             main_ctx.set_syminfo(syminfo);
         }
-        self.reset_vars();
         self.has_run = true;
         self.run_data(data, 0, len)
     }

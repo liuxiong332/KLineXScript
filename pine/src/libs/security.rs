@@ -123,7 +123,6 @@ impl<'a> SecurityInfo<'a> {
                 name => format!("{}-{}", ticker, name),
             })
             .collect();
-
         for (i, name) in names.iter().enumerate() {
             subctx.set_varname_index(name, i as i32);
         }

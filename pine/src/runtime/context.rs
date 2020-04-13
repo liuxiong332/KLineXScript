@@ -39,6 +39,8 @@ pub trait Ctx<'a>: VarOperate<'a> {
 
     fn get_varname_index(&self, name: &str) -> Option<&i32>;
 
+    fn get_rel_varname_index(&self, name: &str) -> Option<VarIndex>;
+
     fn get_top_varname_index(&self, name: &str) -> Option<VarIndex>;
 
     fn create_runnable(&mut self, call: Rc<RefCell<dyn Runnable<'a> + 'a>>);
@@ -694,6 +696,31 @@ impl<'a, 'b, 'c> Ctx<'a> for Context<'a, 'b, 'c> {
 
     fn get_varname_index(&self, name: &str) -> Option<&i32> {
         self.varname_indexs.get(name)
+    }
+
+    fn get_rel_varname_index(&self, name: &str) -> Option<VarIndex> {
+        // let mut dest_ctx: &dyn Ctx<'a> = self;
+        // let mut rel_count = 0;
+        // while dest_ctx.has_parent() {
+        //     rel_count += 1;
+        //     dest_ctx = *downcast_ctx_const(dest_ctx).parent.as_ref().unwrap();
+        // }
+        match self.get_varname_index(name) {
+            None => {
+                if self.has_parent() {
+                    let parent = self.parent.as_ref().unwrap();
+                    match parent.get_rel_varname_index(name) {
+                        None => None,
+                        Some(var_index) => {
+                            Some(VarIndex::new(var_index.varid, var_index.rel_ctx + 1))
+                        }
+                    }
+                } else {
+                    None
+                }
+            }
+            Some(v) => Some(VarIndex::new(*v, 0)),
+        }
     }
 
     fn get_top_varname_index(&self, name: &str) -> Option<VarIndex> {

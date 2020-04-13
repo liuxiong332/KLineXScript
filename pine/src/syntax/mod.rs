@@ -32,6 +32,8 @@ use types_id_gen::TypesIdGen;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum ContextType {
+    Library,
+    Main,
     Normal,
     IfElseBlock,
     ForRangeBlock,
@@ -158,12 +160,14 @@ impl<'a> SyntaxCtx<'a> for SyntaxContext<'a> {
     }
 
     fn declare_inputnames(&mut self, name: &'a str) {
-        if let Some(p) = self.parent {
-            downcast_ctx(p.as_ptr()).declare_inputnames(name)
-        } else {
+        if self.context_type == ContextType::Main {
             if self.input_varnames.iter().all(|&x| x != name) {
                 self.input_varnames.push(name)
             }
+        } else if let Some(p) = self.parent {
+            downcast_ctx(p.as_ptr()).declare_inputnames(name)
+        } else {
+            unreachable!();
         }
     }
 
@@ -242,30 +246,39 @@ impl<'a> SyntaxContext<'a> {
     }
 
     pub fn set_input_detector(&mut self, detector: *const dyn InputSrcDetector<'a>) {
+        debug_assert_eq!(self.context_type, ContextType::Main);
         self.input_detector = Some(detector);
     }
 
     pub fn is_client_input(&self, name: &'a str) -> bool {
-        if let Some(p) = self.parent {
+        if self.context_type == ContextType::Main {
+            if let Some(input_detector) = self.input_detector {
+                // options.iter().position(|&x| x == name).is_some()
+                let detector = unsafe { input_detector.as_ref().unwrap() };
+                detector.map_client_src(name).is_some()
+            } else {
+                false
+            }
+        } else if let Some(p) = self.parent {
             downcast_ctx(p.as_ptr()).is_client_input(name)
-        } else if let Some(input_detector) = self.input_detector {
-            // options.iter().position(|&x| x == name).is_some()
-            let detector = unsafe { input_detector.as_ref().unwrap() };
-            detector.map_client_src(name).is_some()
         } else {
-            false
+            unreachable!();
         }
     }
 
     pub fn map_input_src(&self, name: &'a str) -> Option<&'a str> {
-        if let Some(p) = self.parent {
+        if self.context_type == ContextType::Main {
+            if let Some(input_detector) = self.input_detector {
+                // options.iter().position(|&x| x == name).is_some()
+                let detector = unsafe { input_detector.as_ref().unwrap() };
+                detector.map_input_src(name)
+            } else {
+                None
+            }
+        } else if let Some(p) = self.parent {
             downcast_ctx(p.as_ptr()).map_input_src(name)
-        } else if let Some(input_detector) = self.input_detector {
-            // options.iter().position(|&x| x == name).is_some()
-            let detector = unsafe { input_detector.as_ref().unwrap() };
-            detector.map_input_src(name)
         } else {
-            None
+            unreachable!()
         }
     }
 
@@ -321,10 +334,10 @@ type ParseResult<'a> = Result<ParseValue<'a>, PineInputError>;
 
 impl<'a> SyntaxParser<'a> {
     pub fn new() -> SyntaxParser<'a> {
-        let mut _lib_ctx = Box::new(SyntaxContext::new(None, ContextType::Normal));
+        let mut _lib_ctx = Box::new(SyntaxContext::new(None, ContextType::Library));
         let mut _root_ctx = Box::new(SyntaxContext::new(
             unsafe { Some(NonNull::new_unchecked(&mut *_lib_ctx)) },
-            ContextType::Normal,
+            ContextType::Main,
         ));
         let mut name_rel_parser = ExpNameRelParser::new();
         name_rel_parser.enter_ctx(&mut *_root_ctx, 0);
@@ -341,7 +354,7 @@ impl<'a> SyntaxParser<'a> {
     }
 
     pub fn new_with_vars(vars: &Vec<(&'a str, SyntaxType<'a>)>) -> SyntaxParser<'a> {
-        let mut _lib_ctx = Box::new(SyntaxContext::new(None, ContextType::Normal));
+        let mut _lib_ctx = Box::new(SyntaxContext::new(None, ContextType::Library));
         for (k, _v) in vars.iter() {
             _lib_ctx.gen_var_index(k);
         }
@@ -349,7 +362,7 @@ impl<'a> SyntaxParser<'a> {
 
         let mut _root_ctx = Box::new(SyntaxContext::new(
             unsafe { Some(NonNull::new_unchecked(&mut *_lib_ctx)) },
-            ContextType::Normal,
+            ContextType::Main,
         ));
         let mut name_rel_parser = ExpNameRelParser::new();
         name_rel_parser.enter_ctx(&mut *_root_ctx, 0);
@@ -1532,7 +1545,7 @@ mod tests {
             parser.parse_func_call(&mut func_call),
             Ok(ParseValue::new_with_type(FLOAT_TYPE))
         );
-        assert_eq!(downcast_ctx(parser.context).parent, None);
+        assert_eq!(downcast_ctx(parser.context).context_type, ContextType::Main);
         assert_eq!(func_call.ctxid, 0);
 
         let mut parser = SyntaxParser::new();

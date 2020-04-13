@@ -871,7 +871,7 @@ mod tests {
     #[test]
     fn callable_context_test() {
         // Parent context create callable
-        let mut context1 = Context::new(None, ContextType::Normal);
+        let mut context1 = Context::new(None, ContextType::Main);
         context1.create_runnable(RefData::new_rc(Callable::new(None, None)).into_rc());
         assert_eq!(context1.runnables.len(), 1);
 

@@ -540,7 +540,7 @@ pub fn parse_syntax<'a>(
     vars: &Vec<(&'a str, SyntaxType<'a>)>,
     lib_info: *const dyn InputSrcDetector<'a>,
 ) -> Result<SyntaxParser<'a>, (Option<SyntaxParser<'a>>, Vec<PineInputError>)> {
-    let mut syntax_parser = SyntaxParser::new_with_vars(vars);
+    let mut syntax_parser = SyntaxParser::new_with_libvars(vars);
     // syntax_parser.init_input_options(input_names.clone());
     // syntax_parser.set_input_name_mapper(map_input_name);
     syntax_parser.init_input_detector(lib_info);

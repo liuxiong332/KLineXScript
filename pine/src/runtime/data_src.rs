@@ -94,11 +94,7 @@ impl<'a> DataSrc<'a> {
             ContextType::Main,
         ));
 
-        main_ctx.init(
-            blk.var_count - libvar_count,
-            blk.subctx_count,
-            blk.libfun_count,
-        );
+        main_ctx.init(blk.var_count, blk.subctx_count, blk.libfun_count);
 
         DataSrc {
             blk,
@@ -121,9 +117,9 @@ impl<'a> DataSrc<'a> {
             main_ctx.add_input_src(input_src.clone());
         }
 
-        let libvar_count = self.input_index + self.input_names.len() as i32;
+        // let libvar_count = self.input_index + self.input_names.len() as i32;
         main_ctx.init(
-            self.blk.var_count - libvar_count,
+            self.blk.var_count,
             self.blk.subctx_count,
             self.blk.libfun_count,
         );
@@ -292,10 +288,10 @@ mod tests {
         );
         let typemap = vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))];
         assert_eq!(
-            SyntaxParser::new_with_vars(&typemap).parse_blk(&mut blk),
+            SyntaxParser::new_with_libvars(&typemap).parse_blk(&mut blk),
             Ok(ParseValue::new_with_type(SyntaxType::Void))
         );
-        assert_eq!(blk.var_count, 2);
+        assert_eq!(blk.var_count, 1);
         assert_eq!(blk.subctx_count, 0);
 
         let mut datasrc = DataSrc::new(
@@ -304,7 +300,7 @@ mod tests {
             vec![("close", AnySeriesType::Float)],
             &MyCallback,
         );
-        assert_eq!(datasrc.context.var_len(), 2);
+        assert_eq!(datasrc.context.var_len(), 1);
 
         let data = vec![(
             "close",
@@ -312,7 +308,7 @@ mod tests {
         )];
 
         assert_eq!(datasrc.run(&data, None), Ok(()));
-        downcast_ctx(datasrc.context.as_mut()).map_var(VarIndex::new(1, 0), |hv| match hv {
+        downcast_ctx(datasrc.context.as_mut()).map_var(VarIndex::new(0, 0), |hv| match hv {
             None => None,
             Some(v) => {
                 let ser: RefData<Series<Float>> = Series::implicity_from(v).unwrap();

@@ -502,12 +502,14 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
 
     pub fn get_data_range(&self) -> (Option<i32>, Option<i32>) {
         debug_assert!(self.is_main());
+        println!("Get data range {:?}", self.data_range);
         self.data_range.clone()
     }
 
     pub fn update_data_range(&mut self, range: (Option<i32>, Option<i32>)) {
         debug_assert!(self.is_main());
         self.data_range = range;
+        println!("set data range {:?}", self.data_range);
     }
 
     pub fn create_sub_context(
@@ -661,14 +663,7 @@ impl<'a, 'b, 'c> VarOperate<'a> for Context<'a, 'b, 'c> {
     // Move the value for the specific name from this context or the parent context.
     fn move_var(&mut self, index: VarIndex) -> Option<PineRef<'a>> {
         // Insert the temporary NA into the name and move the original value out.
-        println!(
-            "var index {:?} {:?} {:?}",
-            index,
-            self.is_main(),
-            self.vars.len()
-        );
         let dest_ctx = downcast_ctx(self.get_subctx_mut(index));
-        println!("vars {:?}", dest_ctx.vars.len());
         mem::replace(&mut dest_ctx.vars[index.varid as usize], None)
     }
 

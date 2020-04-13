@@ -416,7 +416,7 @@ mod tests {
             )
             .unwrap();
 
-        let stari = 9;
+        let stari = 0;
 
         // year
         assert_eq!(
@@ -521,7 +521,7 @@ mod tests {
             )
             .unwrap();
         let tuple_res =
-            downcast_pf::<Tuple>(runner.get_context().move_var(VarIndex::new(2, 0)).unwrap());
+            downcast_pf::<Tuple>(runner.get_context().move_var(VarIndex::new(0, 0)).unwrap());
         let tuple_vec = tuple_res.unwrap().into_inner().0;
 
         assert_eq!(

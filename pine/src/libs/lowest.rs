@@ -69,7 +69,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            runner.get_context().get_var(VarIndex::new(3, 0)),
+            runner.get_context().get_var(VarIndex::new(0, 0)),
             &Some(PineRef::new(Series::from_vec(vec![
                 None,
                 Some(19f64),

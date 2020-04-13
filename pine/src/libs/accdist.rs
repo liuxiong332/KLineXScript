@@ -154,7 +154,7 @@ mod tests {
         let val1 = ((10f64 - 1f64) - (15f64 - 10f64)) / (15f64 - 1f64) * 100f64;
         let val2 = ((20f64 - 2f64) - (22f64 - 20f64)) / (22f64 - 2f64) * 200f64 + val1;
         assert_eq!(
-            runner.get_context().get_var(VarIndex::new(5, 0)),
+            runner.get_context().get_var(VarIndex::new(0, 0)),
             &Some(PineRef::new(Series::from_vec(vec![Some(val1), Some(val2)])))
         );
 
@@ -167,7 +167,7 @@ mod tests {
             ])
             .unwrap();
         assert_eq!(
-            runner.get_context().get_var(VarIndex::new(5, 0)),
+            runner.get_context().get_var(VarIndex::new(0, 0)),
             &Some(PineRef::new(Series::from_vec(vec![Some(val1), Some(val2)])))
         );
     }

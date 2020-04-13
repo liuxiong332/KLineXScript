@@ -9,8 +9,8 @@ use crate::helper::{
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::InputSrc;
 use crate::types::{
-    downcast_pf_ref, int2float, Arithmetic, Callable, Evaluate, EvaluateVal, Float, Int, PineRef,
-    RefData, RuntimeErr, Series, SeriesCall, Tuple, NA,
+    downcast_pf_ref, int2float, Arithmetic, Callable, CallableFactory, Evaluate, EvaluateVal,
+    Float, Int, ParamCollectCall, PineRef, RefData, RuntimeErr, Series, SeriesCall, Tuple, NA,
 };
 use std::rc::Rc;
 
@@ -46,7 +46,12 @@ impl<'a> SeriesCall<'a> for BbVal {
 }
 
 pub fn declare_var<'a>() -> VarResult<'a> {
-    let value = PineRef::new(Callable::new(None, Some(Box::new(BbVal))));
+    let value = PineRef::new(CallableFactory::new(|| {
+        Callable::new(
+            None,
+            Some(Box::new(ParamCollectCall::new_with_caller(Box::new(BbVal)))),
+        )
+    }));
 
     let func_type = FunctionTypes(vec![FunctionType::new((
         vec![
@@ -75,7 +80,7 @@ mod tests {
     // use crate::libs::{floor, exp, };
 
     #[test]
-    fn alma_test() {
+    fn bb_test() {
         let lib_info = LibInfo::new(
             vec![declare_var()],
             vec![("close", SyntaxType::float_series())],
@@ -95,7 +100,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(2, 0)),
+            runner.get_context().move_var(VarIndex::new(0, 0)),
             Some(PineRef::new(Series::from_vec(vec![None, Some(9f64)])))
         );
     }

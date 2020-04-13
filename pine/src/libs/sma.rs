@@ -229,25 +229,25 @@ mod tests {
                 None,
             )
             .unwrap();
-
+        let starti = 0;
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(6, 0)),
+            runner.get_context().move_var(VarIndex::new(starti, 0)),
             Some(PineRef::new(Series::from_vec(vec![None, Some(9f64)])))
         );
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(7, 0)),
+            runner.get_context().move_var(VarIndex::new(starti + 1, 0)),
             Some(PineRef::new(Series::from_vec(vec![None, Some(10f64)])))
         );
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(8, 0)),
+            runner.get_context().move_var(VarIndex::new(starti + 2, 0)),
             Some(PineRef::new(Series::from_vec(vec![Some(0f64), Some(6f64)])))
         );
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(9, 0)),
+            runner.get_context().move_var(VarIndex::new(starti + 3, 0)),
             Some(PineRef::new(Series::from_vec(vec![Some(0f64), Some(3f64)])))
         );
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(10, 0)),
+            runner.get_context().move_var(VarIndex::new(starti + 4, 0)),
             Some(PineRef::new(Series::from_vec(vec![
                 None,
                 Some(18f64.sqrt())

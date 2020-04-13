@@ -9,8 +9,8 @@ use crate::helper::{
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::InputSrc;
 use crate::types::{
-    downcast_pf_ref, int2float, Arithmetic, Callable, Evaluate, EvaluateVal, Float, Int, PineRef,
-    RefData, RuntimeErr, Series, SeriesCall, Tuple, NA,
+    downcast_pf_ref, int2float, Arithmetic, Callable, CallableFactory, Evaluate, EvaluateVal,
+    Float, Int, ParamCollectCall, PineRef, RefData, RuntimeErr, Series, SeriesCall, Tuple, NA,
 };
 use std::rc::Rc;
 
@@ -43,7 +43,12 @@ impl<'a> SeriesCall<'a> for BbVal {
 }
 
 pub fn declare_var<'a>() -> VarResult<'a> {
-    let value = PineRef::new(Callable::new(None, Some(Box::new(BbVal))));
+    let value = PineRef::new(CallableFactory::new(|| {
+        Callable::new(
+            None,
+            Some(Box::new(ParamCollectCall::new_with_caller(Box::new(BbVal)))),
+        )
+    }));
 
     let func_type = FunctionTypes(vec![FunctionType::new((
         vec![
@@ -89,7 +94,7 @@ mod tests {
             .unwrap();
         // 9 +   None, 3 * sqrt(2) * 1.2 * 2 / 9
         let res = 18f64.sqrt() * 1.2f64 * 2f64 / 9f64;
-        let series = pine_ref_to_f64_series(runner.get_context().move_var(VarIndex::new(2, 0)));
+        let series = pine_ref_to_f64_series(runner.get_context().move_var(VarIndex::new(0, 0)));
         let res_val = series.unwrap().index_value(1).unwrap().unwrap();
         assert!((res_val - res).abs() < 0.1f64);
         // assert_eq!(

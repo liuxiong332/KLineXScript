@@ -21,39 +21,37 @@ use std::rc::Rc;
 
 #[derive(Debug, PartialEq, Clone)]
 struct BarStateProps {
-    barindex_index: Cell<i32>,
-    time_index: Cell<i32>,
+    barindex_index: Cell<VarIndex>,
+    time_index: Cell<VarIndex>,
     data_ranges: RefCell<Vec<(i32, i32)>>,
 }
 
 impl BarStateProps {
     pub fn new() -> BarStateProps {
         BarStateProps {
-            barindex_index: Cell::new(0),
-            time_index: Cell::new(0),
+            barindex_index: Cell::new(VarIndex::new(0, 0)),
+            time_index: Cell::new(VarIndex::new(0, 0)),
             data_ranges: RefCell::new(vec![(0, 0)]),
         }
     }
 
     fn get_varindex<'a>(&self, ctx: &mut dyn Ctx<'a>) -> i64 {
-        let barindex = ctx
-            .get_var(VarIndex::new(self.barindex_index.get(), 0))
-            .clone();
+        let barindex = ctx.get_var(self.barindex_index.get()).clone();
         pine_ref_to_i64(barindex).unwrap()
     }
 
     fn is_last<'a>(&self, ctx: &mut dyn Ctx<'a>) -> bool {
         let index = self.get_varindex(ctx);
-        let (_, end) = downcast_ctx(ctx).get_data_range();
+        let (_, end) = downcast_ctx(ctx.get_main_ctx()).get_data_range();
         index == (end.unwrap() - 1) as i64
     }
 
     fn is_in_trade<'a>(&self, ctx: &mut dyn Ctx<'a>) -> bool {
-        match downcast_ctx(ctx).get_syminfo() {
+        match downcast_ctx(ctx.get_main_ctx()).get_syminfo() {
             Some(syminfo) => {
                 let tz = syminfo.timezone.parse().unwrap();
                 let timespan = TradeTimeSpan::parse_str(&syminfo.trade_start, &syminfo.trade_end);
-                let time_index = VarIndex::new(self.time_index.get(), 0);
+                let time_index = self.time_index.get();
                 let cur_time = pine_ref_to_i64(ctx.get_var(time_index).clone()).unwrap();
                 if timespan.is_in(cur_time, &tz) {
                     true
@@ -72,18 +70,13 @@ impl<'a> PineClass<'a> for BarStateProps {
     }
 
     fn get(&self, _ctx: &mut dyn Ctx<'a>, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
-        if self.barindex_index.get() == 0 {
-            let index = _ctx.get_varname_index("bar_index").unwrap().clone();
+        if self.barindex_index.get() == VarIndex::new(0, 0) {
+            let index = _ctx.get_top_varname_index("bar_index").unwrap();
             self.barindex_index.set(index);
-            let index = _ctx.get_varname_index("_time").unwrap().clone();
+            let index = _ctx.get_top_varname_index("_time").unwrap();
             self.time_index.set(index);
-            println!(
-                "Now index {:?} {:?}",
-                self.barindex_index.get(),
-                self.time_index.get()
-            );
         }
-        let (start, end) = downcast_ctx(_ctx).get_data_range();
+        let (start, end) = downcast_ctx(_ctx.get_main_ctx()).get_data_range();
         if self.data_ranges.borrow().last() != Some(&(start.unwrap(), end.unwrap())) {
             self.data_ranges
                 .borrow_mut()
@@ -92,7 +85,6 @@ impl<'a> PineClass<'a> for BarStateProps {
         match name {
             "isfirst" => {
                 let index = self.get_varindex(_ctx);
-                println!("get barindex {}", index);
                 if index == 0 {
                     Ok(PineRef::new_rc(Series::from(true)))
                 } else {
@@ -144,7 +136,6 @@ impl<'a> PineClass<'a> for BarStateProps {
                     .iter()
                     .filter(|range| index >= range.0 && index < range.1)
                     .count();
-                println!("appear count {:?}", appear_count);
                 if appear_count > 1 {
                     let end_index = self.data_ranges.borrow().last().unwrap().1;
                     // appearing not only once but not the last on is considered as onfirmed.
@@ -188,6 +179,7 @@ mod tests {
     use crate::runtime::{AnySeries, NoneCallback, SymbolInfo};
     use crate::{LibInfo, PineParser, PineRunner};
     use chrono::offset::TimeZone;
+    use std::mem;
 
     fn gen_ts(h: u32, m: u32) -> i64 {
         Tz::Asia__Shanghai
@@ -249,27 +241,27 @@ mod tests {
             .unwrap();
 
         assert_eq!(
+            runner.get_context().get_var(VarIndex::new(0, 0)),
+            &Some(PineRef::new(Series::from_vec(vec![true, false])))
+        );
+        assert_eq!(
+            runner.get_context().get_var(VarIndex::new(1, 0)),
+            &Some(PineRef::new(Series::from_vec(vec![false, true])))
+        );
+        assert_eq!(
+            runner.get_context().get_var(VarIndex::new(2, 0)),
+            &Some(PineRef::new(Series::from_vec(vec![true, false])))
+        );
+        assert_eq!(
+            runner.get_context().get_var(VarIndex::new(3, 0)),
+            &Some(PineRef::new(Series::from_vec(vec![false, true])))
+        );
+        assert_eq!(
             runner.get_context().get_var(VarIndex::new(4, 0)),
-            &Some(PineRef::new(Series::from_vec(vec![true, false])))
-        );
-        assert_eq!(
-            runner.get_context().get_var(VarIndex::new(5, 0)),
-            &Some(PineRef::new(Series::from_vec(vec![false, true])))
-        );
-        assert_eq!(
-            runner.get_context().get_var(VarIndex::new(6, 0)),
-            &Some(PineRef::new(Series::from_vec(vec![true, false])))
-        );
-        assert_eq!(
-            runner.get_context().get_var(VarIndex::new(7, 0)),
-            &Some(PineRef::new(Series::from_vec(vec![false, true])))
-        );
-        assert_eq!(
-            runner.get_context().get_var(VarIndex::new(8, 0)),
             &Some(PineRef::new(Series::from_vec(vec![true, true])))
         );
         assert_eq!(
-            runner.get_context().get_var(VarIndex::new(9, 0)),
+            runner.get_context().get_var(VarIndex::new(5, 0)),
             &Some(PineRef::new(Series::from_vec(vec![false, false])))
         );
 
@@ -287,11 +279,11 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            runner.get_context().get_var(VarIndex::new(8, 0)),
+            runner.get_context().get_var(VarIndex::new(4, 0)),
             &Some(PineRef::new(Series::from_vec(vec![true, false, true])))
         );
         assert_eq!(
-            runner.get_context().get_var(VarIndex::new(9, 0)),
+            runner.get_context().get_var(VarIndex::new(5, 0)),
             &Some(PineRef::new(Series::from_vec(vec![false, true, false])))
         );
     }

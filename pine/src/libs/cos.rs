@@ -237,7 +237,7 @@ mod tests {
             )
             .unwrap();
 
-        let starti = 12;
+        let starti = 0;
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(starti, 0)),
             Some(PineRef::new(Some(1f64)))

@@ -55,7 +55,7 @@ mod tests {
             )
             .unwrap();
 
-        let val = Int::implicity_from(runner.get_context().move_var(VarIndex::new(2, 0)).unwrap())
+        let val = Int::implicity_from(runner.get_context().move_var(VarIndex::new(0, 0)).unwrap())
             .unwrap()
             .into_inner();
         assert!(val.unwrap() > 0);

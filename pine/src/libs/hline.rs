@@ -169,11 +169,11 @@ mod tests {
             })]
         );
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(2, 0)),
+            runner.get_context().move_var(VarIndex::new(0, 0)),
             Some(PineRef::new(Some(0i64)))
         );
         let tuple_res =
-            downcast_pf::<Tuple>(runner.get_context().move_var(VarIndex::new(3, 0)).unwrap());
+            downcast_pf::<Tuple>(runner.get_context().move_var(VarIndex::new(1, 0)).unwrap());
         let tuple_vec = tuple_res.unwrap().into_inner().0;
 
         assert_eq!(

@@ -170,7 +170,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(3, 0)),
+            runner.get_context().move_var(VarIndex::new(0, 0)),
             Some(PineRef::new(Series::from_vec(vec![
                 Some(0f64),
                 Some(0f64),

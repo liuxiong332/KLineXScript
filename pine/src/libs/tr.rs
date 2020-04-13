@@ -174,7 +174,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            runner.get_context().get_var(VarIndex::new(4, 0)),
+            runner.get_context().get_var(VarIndex::new(0, 0)),
             &Some(PineRef::new(Series::from_vec(vec![
                 Some(14f64),
                 Some(20f64)

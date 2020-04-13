@@ -29,6 +29,7 @@ pub struct DataSrc<'a> {
     pub callback: &'a dyn Callback,
     inputs: Vec<Option<InputVal>>,
     input_srcs: Option<InputSrc>,
+    has_run: bool,
 }
 
 fn get_len<'a>(
@@ -105,10 +106,14 @@ impl<'a> DataSrc<'a> {
             callback,
             inputs: vec![],
             input_srcs: None,
+            has_run: false,
         }
     }
 
     pub fn reset_vars(&mut self) {
+        if !self.has_run {
+            return;
+        }
         let parent = unsafe { mem::transmute::<_, &mut (dyn Ctx<'a>)>(self.lib_context.as_mut()) };
         let mut main_ctx = Context::new(Some(parent), ContextType::Main);
         // Set the inputs and input sources.
@@ -216,6 +221,7 @@ impl<'a> DataSrc<'a> {
             main_ctx.set_syminfo(syminfo);
         }
         self.reset_vars();
+        self.has_run = true;
         self.run_data(data, 0, len)
     }
 
@@ -256,8 +262,8 @@ impl<'a> DataSrc<'a> {
         self.run_data(data, from as i64, len)
     }
 
-    pub fn get_context(&mut self) -> &mut Ctx<'a> {
-        unsafe { mem::transmute::<_, &mut Ctx<'a>>((self.context.as_mut())) }
+    pub fn get_context(&mut self) -> &mut dyn Ctx<'a> {
+        unsafe { mem::transmute::<_, &mut dyn Ctx<'a>>(self.context.as_mut()) }
     }
 }
 

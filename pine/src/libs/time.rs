@@ -221,7 +221,7 @@ mod tests {
             .timestamp()
             * 1000;
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(3, 0)),
+            runner.get_context().move_var(VarIndex::new(0, 0)),
             Some(PineRef::new_rc(Series::from_vec(vec![Some(res_ts)])))
         );
     }

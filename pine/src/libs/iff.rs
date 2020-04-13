@@ -180,48 +180,49 @@ mod tests {
             )
             .unwrap();
 
+        let mut starti = 0;
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(2, 0)),
+            runner.get_context().move_var(VarIndex::new(starti, 0)),
             Some(PineRef::new(Some(1i64)))
         );
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(3, 0)),
+            runner.get_context().move_var(VarIndex::new(starti + 1, 0)),
             Some(PineRef::new(Some(1f64)))
         );
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(4, 0)),
+            runner.get_context().move_var(VarIndex::new(starti + 2, 0)),
             Some(PineRef::new(true))
         );
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(5, 0)),
+            runner.get_context().move_var(VarIndex::new(starti + 3, 0)),
             Some(PineRef::new(String::from("hello")))
         );
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(6, 0)),
+            runner.get_context().move_var(VarIndex::new(starti + 4, 0)),
             Some(PineRef::new(Color("#123456")))
         );
 
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(7, 0)),
+            runner.get_context().move_var(VarIndex::new(starti + 5, 0)),
             Some(PineRef::new(Series::from_vec(vec![Some(1i64), Some(2i64)])))
         );
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(8, 0)),
+            runner.get_context().move_var(VarIndex::new(starti + 6, 0)),
             Some(PineRef::new(Series::from_vec(vec![Some(1f64), Some(2f64)])))
         );
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(9, 0)),
+            runner.get_context().move_var(VarIndex::new(starti + 7, 0)),
             Some(PineRef::new(Series::from_vec(vec![true, false])))
         );
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(10, 0)),
+            runner.get_context().move_var(VarIndex::new(starti + 8, 0)),
             Some(PineRef::new(Series::from_vec(vec![
                 String::from("hello"),
                 String::from("world")
             ])))
         );
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(11, 0)),
+            runner.get_context().move_var(VarIndex::new(starti + 9, 0)),
             Some(PineRef::new(Series::from_vec(vec![
                 Color("#123456"),
                 Color("#654321")

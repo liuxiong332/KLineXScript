@@ -146,7 +146,7 @@ mod tests {
         let val1 = rma_func(Some(14f64), 2, None).unwrap();
         let val2 = rma_func(Some(20f64), 2, val1).unwrap();
         assert_eq!(
-            runner.get_context().get_var(VarIndex::new(4, 0)),
+            runner.get_context().get_var(VarIndex::new(0, 0)),
             &Some(PineRef::new(Series::from_vec(vec![val1, val2])))
         );
     }

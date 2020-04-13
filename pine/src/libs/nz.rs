@@ -124,15 +124,15 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(2, 0)),
+            runner.get_context().move_var(VarIndex::new(0, 0)),
             Some(PineRef::new_rc(Series::from_vec(vec![Some(0i64)])))
         );
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(3, 0)),
+            runner.get_context().move_var(VarIndex::new(1, 0)),
             Some(PineRef::new_rc(Series::from_vec(vec![Some(1i64)])))
         );
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(4, 0)),
+            runner.get_context().move_var(VarIndex::new(2, 0)),
             Some(PineRef::new_rc(Series::from_vec(vec![Some(0f64)])))
         );
     }

@@ -191,7 +191,7 @@ mod tests {
             .unwrap();
         // tp 9  ma 4.5 md 2.25  14 11.5  3.5
         assert_eq!(
-            runner.get_context().get_var(VarIndex::new(4, 0)),
+            runner.get_context().get_var(VarIndex::new(0, 0)),
             &Some(PineRef::new(Series::from_vec(vec![
                 Some(4.5f64 / (2.25f64 * 0.015f64)),
                 Some(2.5f64 / (3.5f64 * 0.015f64))

@@ -2,7 +2,7 @@ use super::{
     Category, ComplexType, DataType, PineClass, PineFrom, PineRef, PineStaticType, PineType,
     RuntimeErr, SecondType,
 };
-use crate::runtime::Ctx;
+use crate::runtime::{downcast_ctx, Ctx};
 
 #[derive(Debug)]
 pub struct Object<'a> {

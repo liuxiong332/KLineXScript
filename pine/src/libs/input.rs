@@ -534,7 +534,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(2, 0)),
+            runner.get_context().move_var(VarIndex::new(0, 0)),
             Some(PineRef::new_box(true))
         );
 
@@ -546,7 +546,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(2, 0)),
+            runner.get_context().move_var(VarIndex::new(0, 0)),
             Some(PineRef::new_box(false))
         );
         assert_eq!(
@@ -578,7 +578,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(2, 0)),
+            runner.get_context().move_var(VarIndex::new(0, 0)),
             Some(PineRef::new_box(Some(1)))
         );
 
@@ -590,7 +590,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(2, 0)),
+            runner.get_context().move_var(VarIndex::new(0, 0)),
             Some(PineRef::new_box(Some(4)))
         );
         assert_eq!(
@@ -626,7 +626,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(2, 0)),
+            runner.get_context().move_var(VarIndex::new(0, 0)),
             Some(PineRef::new_box(Some(4)))
         );
     }
@@ -649,7 +649,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(2, 0)),
+            runner.get_context().move_var(VarIndex::new(0, 0)),
             Some(PineRef::new_box(Some(1.5f64)))
         );
     }
@@ -672,7 +672,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(2, 0)),
+            runner.get_context().move_var(VarIndex::new(0, 0)),
             Some(PineRef::new_rc(String::from("defval")))
         );
 
@@ -716,7 +716,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(3, 0)),
+            runner.get_context().move_var(VarIndex::new(0, 0)),
             Some(PineRef::new_rc(Series::from_vec(vec![Some(1f64)])))
         );
 
@@ -728,7 +728,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(3, 0)),
+            runner.get_context().move_var(VarIndex::new(0, 0)),
             Some(PineRef::new_rc(Series::from_vec(vec![Some(10f64)])))
         );
     }
@@ -756,7 +756,7 @@ mod tests {
             )
             .unwrap();
         let tuple_res =
-            downcast_pf::<Tuple>(runner.get_context().move_var(VarIndex::new(2, 0)).unwrap());
+            downcast_pf::<Tuple>(runner.get_context().move_var(VarIndex::new(0, 0)).unwrap());
         assert_eq!(
             tuple_res.unwrap().into_inner(),
             Tuple(vec![

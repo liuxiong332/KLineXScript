@@ -116,24 +116,25 @@ mod tests {
                 None,
             )
             .unwrap();
+        let starti = 0;
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(2, 0)),
+            runner.get_context().move_var(VarIndex::new(starti, 0)),
             Some(PineRef::new(false))
         );
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(3, 0)),
+            runner.get_context().move_var(VarIndex::new(starti + 1, 0)),
             Some(PineRef::new_rc(Series::from_vec(vec![false])))
         );
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(4, 0)),
+            runner.get_context().move_var(VarIndex::new(starti + 2, 0)),
             Some(PineRef::new(false))
         );
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(5, 0)),
+            runner.get_context().move_var(VarIndex::new(starti + 3, 0)),
             Some(PineRef::new_rc(Series::from_vec(vec![false])))
         );
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(6, 0)),
+            runner.get_context().move_var(VarIndex::new(starti + 4, 0)),
             Some(PineRef::new_box(true))
         );
     }
@@ -161,21 +162,21 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(2, 0)),
+            runner.get_context().move_var(VarIndex::new(0, 0)),
             Some(PineRef::new(Series::from_vec(vec![
                 Float::from(None),
                 Float::from(None)
             ])))
         );
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(3, 0)),
+            runner.get_context().move_var(VarIndex::new(1, 0)),
             Some(PineRef::new_rc(Series::from_vec(vec![
                 Some(2f64),
                 Some(1f64),
             ])))
         );
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(4, 0)),
+            runner.get_context().move_var(VarIndex::new(2, 0)),
             Some(PineRef::new_rc(Series::from_vec(vec![
                 Some(2f64),
                 Some(1f64)

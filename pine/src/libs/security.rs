@@ -230,8 +230,7 @@ impl<'a> SeriesCall<'a> for SecurityInfo<'a> {
         // let func_ins = self.fun_def.as_ref().unwrap();
 
         let time_index = self.time_index.clone().unwrap();
-        let time = pine_ref_to_i64(self.get_subctx().get_var(time_index).clone());
-
+        let time = pine_ref_to_i64(_context.get_var(time_index).clone());
         match time {
             None => Ok(PineRef::new_box(NA)),
             Some(cur_time) => {
@@ -358,7 +357,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(5, 0)),
+            runner.get_context().move_var(VarIndex::new(2, 0)),
             Some(PineRef::new_rc(Series::from_vec(vec![None, Some(31f64)])))
         );
 
@@ -387,7 +386,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(5, 0)),
+            runner.get_context().move_var(VarIndex::new(2, 0)),
             Some(PineRef::new_rc(Series::from_vec(vec![
                 None,
                 Some(31f64),
@@ -432,7 +431,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(5, 0)),
+            runner.get_context().move_var(VarIndex::new(2, 0)),
             Some(PineRef::new_rc(Series::from_vec(vec![
                 Some(3f64),
                 Some(7f64),
@@ -479,7 +478,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(7, 0)),
+            runner.get_context().move_var(VarIndex::new(2, 0)),
             Some(PineRef::new_rc(Series::from_vec(vec![None, Some(42f64)])))
         );
         assert_eq!(
@@ -532,7 +531,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(5, 0)),
+            runner.get_context().move_var(VarIndex::new(2, 0)),
             Some(PineRef::new_rc(Series::from_vec(vec![
                 Some(31f64),
                 Some(41f64),
@@ -577,7 +576,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            runner.get_context().move_var(VarIndex::new(0, 0)),
+            runner.get_context().move_var(VarIndex::new(2, 0)),
             Some(PineRef::new_rc(Series::from_vec(vec![
                 Some(5f64),
                 Some(9f64),

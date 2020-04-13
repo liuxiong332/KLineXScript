@@ -451,7 +451,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
     }
 
     pub fn insert_input_data(&mut self, name: String, data: AnySeries) {
-        if self.context_type == ContextType::Main {
+        if self.context_type == ContextType::Library {
             self.input_data.insert(name, data);
         } else if let Some(p) = &mut self.parent {
             downcast_ctx(*p).insert_input_data(name, data)
@@ -461,7 +461,8 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
     }
 
     pub fn get_input_data(&self, name: &str) -> Option<&AnySeries> {
-        if self.context_type == ContextType::Main {
+        if self.context_type == ContextType::Library {
+            println!("Get input {:?} {:?}", name, self.input_data.get(name));
             self.input_data.get(name)
         } else if let Some(p) = &self.parent {
             downcast_ctx_const(*p).get_input_data(name)

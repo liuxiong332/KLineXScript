@@ -299,6 +299,7 @@ impl<'a> RunnerForName<'a> for Assignment<'a> {
             Some(DataType::Custom(_)) => val,
         };
         if let (FirstType::NA, _) = true_val.get_type() {
+            println!("assignment for {} can not be NA", _vn.value);
             return Err(RuntimeErr::InvalidNADeclarer);
         }
 

@@ -430,7 +430,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
     }
 
     pub fn let_input_info_ready(&mut self) {
-        debug_assert!(!self.is_main());
+        debug_assert!(self.is_main());
         self.is_input_info_ready = true;
     }
 
@@ -445,7 +445,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
     }
 
     pub fn let_output_info_ready(&mut self) {
-        debug_assert!(!self.is_main());
+        debug_assert!(self.is_main());
         self.is_output_info_ready = true;
     }
 
@@ -496,17 +496,17 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
     }
 
     pub fn get_syminfo(&self) -> &Option<Rc<SymbolInfo>> {
-        debug_assert!(!self.is_main());
+        debug_assert!(self.is_main());
         &self.syminfo
     }
 
     pub fn get_data_range(&self) -> (Option<i32>, Option<i32>) {
-        debug_assert!(!self.is_main());
+        debug_assert!(self.is_main());
         self.data_range.clone()
     }
 
     pub fn update_data_range(&mut self, range: (Option<i32>, Option<i32>)) {
-        debug_assert!(!self.is_main());
+        debug_assert!(self.is_main());
         self.data_range = range;
     }
 
@@ -639,8 +639,12 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
         dest_ctx
     }
 
-    fn is_main(&self) -> bool {
+    pub fn is_main(&self) -> bool {
         self.context_type == ContextType::Main
+    }
+
+    pub fn get_varcount(&self) -> usize {
+        self.vars.len()
     }
 }
 
@@ -657,7 +661,14 @@ impl<'a, 'b, 'c> VarOperate<'a> for Context<'a, 'b, 'c> {
     // Move the value for the specific name from this context or the parent context.
     fn move_var(&mut self, index: VarIndex) -> Option<PineRef<'a>> {
         // Insert the temporary NA into the name and move the original value out.
+        println!(
+            "var index {:?} {:?} {:?}",
+            index,
+            self.is_main(),
+            self.vars.len()
+        );
         let dest_ctx = downcast_ctx(self.get_subctx_mut(index));
+        println!("vars {:?}", dest_ctx.vars.len());
         mem::replace(&mut dest_ctx.vars[index.varid as usize], None)
     }
 

@@ -93,6 +93,7 @@ impl<'a> DataSrc<'a> {
             Some(unsafe { libctx_ptr.as_mut().unwrap() }),
             ContextType::Main,
         ));
+
         main_ctx.init(
             blk.var_count - libvar_count,
             blk.subctx_count,
@@ -119,6 +120,13 @@ impl<'a> DataSrc<'a> {
         if let Some(input_src) = self.input_srcs.as_ref() {
             main_ctx.add_input_src(input_src.clone());
         }
+
+        let libvar_count = self.input_index + self.input_names.len() as i32;
+        main_ctx.init(
+            self.blk.var_count - libvar_count,
+            self.blk.subctx_count,
+            self.blk.libfun_count,
+        );
         self.context = Box::new(main_ctx);
     }
 
@@ -181,6 +189,7 @@ impl<'a> DataSrc<'a> {
             }
 
             self.blk.run(self.context.as_mut())?;
+
             let main_ctx = downcast_ctx(self.context.as_mut());
             main_ctx.commit();
             // self.context.clear_declare();

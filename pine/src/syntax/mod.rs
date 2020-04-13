@@ -282,6 +282,7 @@ impl<'a> SyntaxContext<'a> {
 }
 
 pub struct SyntaxParser<'a> {
+    _lib_ctx: Box<SyntaxContext<'a>>,
     _root_ctx: Box<SyntaxContext<'a>>,
     context: *mut (dyn SyntaxCtx<'a> + 'a),
 
@@ -320,11 +321,16 @@ type ParseResult<'a> = Result<ParseValue<'a>, PineInputError>;
 
 impl<'a> SyntaxParser<'a> {
     pub fn new() -> SyntaxParser<'a> {
-        let mut _root_ctx = Box::new(SyntaxContext::new(None, ContextType::Normal));
+        let mut _lib_ctx = Box::new(SyntaxContext::new(None, ContextType::Normal));
+        let mut _root_ctx = Box::new(SyntaxContext::new(
+            unsafe { Some(NonNull::new_unchecked(&mut *_lib_ctx)) },
+            ContextType::Normal,
+        ));
         let mut name_rel_parser = ExpNameRelParser::new();
         name_rel_parser.enter_ctx(&mut *_root_ctx, 0);
         SyntaxParser {
             context: &mut *_root_ctx,
+            _lib_ctx,
             _root_ctx,
             name_rel_parser,
             func_defs: vec![],
@@ -335,16 +341,22 @@ impl<'a> SyntaxParser<'a> {
     }
 
     pub fn new_with_vars(vars: &Vec<(&'a str, SyntaxType<'a>)>) -> SyntaxParser<'a> {
-        let mut _root_ctx = Box::new(SyntaxContext::new(None, ContextType::Normal));
+        let mut _lib_ctx = Box::new(SyntaxContext::new(None, ContextType::Normal));
         for (k, _v) in vars.iter() {
-            _root_ctx.gen_var_index(k);
+            _lib_ctx.gen_var_index(k);
         }
-        _root_ctx.vars = vars.iter().cloned().collect();
+        _lib_ctx.vars = vars.iter().cloned().collect();
+
+        let mut _root_ctx = Box::new(SyntaxContext::new(
+            unsafe { Some(NonNull::new_unchecked(&mut *_lib_ctx)) },
+            ContextType::Normal,
+        ));
         let mut name_rel_parser = ExpNameRelParser::new();
         name_rel_parser.enter_ctx(&mut *_root_ctx, 0);
 
         SyntaxParser {
             context: &mut *_root_ctx,
+            _lib_ctx,
             _root_ctx,
             name_rel_parser,
             func_defs: vec![],
@@ -1394,13 +1406,22 @@ mod tests {
                 Rc::new((vec!["hello", "hello2"], SyntaxType::Any))
             )))
         );
+        // The variable can override the library variable
+        assert_eq!(parser2.errors, vec![]);
+
+        assert_eq!(
+            parser2.parse_func_def(&mut func_def),
+            Ok(ParseValue::new_with_type(SyntaxType::UserFunction(
+                Rc::new((vec!["hello", "hello2"], SyntaxType::Any))
+            )))
+        );
         assert_eq!(
             parser2.errors,
             vec![PineInputError::new(
                 PineErrorKind::VarHasDeclare,
                 StrRange::new_empty()
             )]
-        )
+        );
     }
 
     #[test]

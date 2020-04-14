@@ -84,7 +84,7 @@ out = ema(log(close), 2)
 plot(out, color=color.maroon, title="TRIX")
 `;
 
-it("mytest", function () {
+it("log test", function () {
     let runner = new Runner();
     runner.parse(Script);
     // console.log(runner.genIOInfo().inputs[0]);
@@ -95,6 +95,7 @@ it("mytest", function () {
         farray[i] = i + 100.0;
     }
     let result = runner.runWithData(["close"], 3, farray);
-    console.log(result[0].series[0]);
+    // console.log(result[0].series[0]);
+    assert(!isNaN(result[0].series[0][0]));
     // assert.deepEqual(result[0].series, [new Float64Array([10.0])]);
 });

@@ -1,3 +1,4 @@
+use super::atom::atom_val;
 use super::error::PineResult;
 use super::input::{Input, StrRange};
 use super::utils::skip_ws;
@@ -60,7 +61,7 @@ pub fn unary_op(input: Input) -> PineResult<UnaryOpNode> {
         map(tag("-"), |s| {
             UnaryOpNode::new(UnaryOp::Minus, StrRange::from_input(&s))
         }),
-        map(tag("not"), |s| {
+        map(atom_val("not"), |s| {
             UnaryOpNode::new(UnaryOp::BoolNot, StrRange::from_input(&s))
         }),
     ))(input)
@@ -102,10 +103,10 @@ pub fn binary_op(input: Input) -> PineResult<BinaryOpNode> {
         map(tag("!="), |s| {
             BinaryOpNode::new(BinaryOp::Neq, StrRange::from_input(&s))
         }),
-        map(tag("and"), |s| {
+        map(atom_val("and"), |s| {
             BinaryOpNode::new(BinaryOp::BoolAnd, StrRange::from_input(&s))
         }),
-        map(tag("or"), |s| {
+        map(atom_val("or"), |s| {
             BinaryOpNode::new(BinaryOp::BoolOr, StrRange::from_input(&s))
         }),
     ))(input)

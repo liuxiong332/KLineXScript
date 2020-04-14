@@ -48,13 +48,14 @@ pub enum SimpleSyntaxType {
 
 impl<'a> From<DataType<'a>> for SimpleSyntaxType {
     fn from(data_type: DataType<'a>) -> Self {
+        println!("now data type {:?}", data_type);
         match data_type {
             DataType::Bool => SimpleSyntaxType::Bool,
             DataType::Int => SimpleSyntaxType::Int,
             DataType::Float => SimpleSyntaxType::Float,
             DataType::String => SimpleSyntaxType::String,
             DataType::Color => SimpleSyntaxType::Color,
-            _ => unreachable!(),
+            _ => SimpleSyntaxType::Na,
         }
     }
 }

@@ -113,6 +113,38 @@ plot(VIP, title="VI +", color=#3BB3E4)
 plot(VIM, title="VI -", color=#FF006E)
 "#;
 
+const SUPER_TREND_SCRIPTS: &'static str = r#"
+study("Supertrend V1.0 - Buy or Sell Signal", overlay = true)
+
+Factor = input(3, minval=1, maxval = 100)
+Pd = input(7, minval=1, maxval = 100)
+
+
+Up = hl2 - (Factor * atr(Pd))
+Dn = hl2 + (Factor * atr(Pd))
+
+TrendUp = 0.0
+TrendDown = 0.0
+
+TrendUp := close[1] > TrendUp[1]? max(Up, TrendUp[1]) : Up
+TrendDown := close[1] < TrendDown[1]? min(Dn, TrendDown[1]) : Dn
+
+Trend = 0
+Trend := close > TrendDown[1] ? 1: close< TrendUp[1]? -1: nz(Trend[1],1)
+Tsl = Trend == 1? TrendUp: TrendDown
+
+linecolor = close == 1 ? color.green : color.red
+
+plot(Tsl, color = linecolor , style = plot.style_line , linewidth = 2,title = "SuperTrend")
+
+// plotshape(cross(close,Tsl) and close>Tsl , "Up Arrow", "triangleup", "belowbar", color.green,0,0)
+// plotshape(cross(Tsl,close) and close<Tsl , "Down Arrow", "triangledown", "abovebar", color.red,0,0)
+// //plot(Trend==1 and Trend[1]==-1,color = linecolor, style = circles, linewidth = 3,title="Trend")
+
+// plotarrow(Trend == 1 and Trend[1] == -1 ? Trend : na, title="Up Entry Arrow", colorup=color.lime, maxheight=60, minheight=50, transp=0)
+// plotarrow(Trend == -1 and Trend[1] == 1 ? Trend : na, title="Down Entry Arrow", colordown=color.red, maxheight=60, minheight=50, transp=0)
+"#;
+
 #[test]
 fn datasrc_test() {
     let lib_info = pine::LibInfo::new(
@@ -176,5 +208,8 @@ fn datasrc_test() {
     assert!(parser.run_with_data(data.clone(), None).is_ok());
 
     parser.parse_src(String::from(VI_SCRIPTS)).unwrap();
+    assert!(parser.run_with_data(data.clone(), None).is_ok());
+
+    parser.parse_src(String::from(SUPER_TREND_SCRIPTS)).unwrap();
     assert!(parser.run_with_data(data.clone(), None).is_ok());
 }

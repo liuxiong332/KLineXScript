@@ -1,4 +1,4 @@
-use super::atom::atom_lit;
+use super::atom::{atom_lit, atom_val, atom_vals};
 use super::color::color_lit;
 use super::error::{PineError, PineErrorKind, PineResult};
 use super::func_call::{func_call, func_call_args, func_call_ws};
@@ -341,11 +341,11 @@ where
 {
     move |input: Input<'a>, state: &AstState| {
         let (input, (if_tag, cond, then_block, else_block)) = tuple((
-            tag("if"),
+            atom_val("if"),
             |s| exp_with_stmt_end(s, state),
             |s| block_parser(s, state),
             opt(tuple((
-                preceded(statement_indent(state.get_indent()), tag("else")),
+                preceded(statement_indent(state.get_indent()), atom_val("else")),
                 statement_end,
                 |s| block_parser(s, state),
             ))),
@@ -387,13 +387,13 @@ where
 {
     move |input: Input<'a>, state| {
         let (input, (for_tag, var, _, start, _, end, by, _, do_blk)) = tuple((
-            tag("for"),
+            atom_val("for"),
             |s| varname_ws(s, state),
             eat_sep(tag("=")),
             |s| all_exp(s, state), // int_lit_ws,
-            eat_sep(tag("to")),
+            eat_sep(atom_val("to")),
             |s| all_exp(s, state), // int_lit_ws,
-            opt(tuple((eat_sep(tag("by")), |s| all_exp(s, state)))),
+            opt(tuple((eat_sep(atom_val("by")), |s| all_exp(s, state)))),
             statement_end,
             |s| block_parser(s, state),
         ))(input)?;
@@ -463,15 +463,8 @@ impl<'a> DataTypeNode<'a> {
 }
 
 fn datatype<'a>(input: Input<'a>, _state: &AstState) -> PineResult<'a, DataTypeNode<'a>> {
-    let (input, label) = alt((
-        tag("float"),
-        tag("int"),
-        tag("bool"),
-        tag("color"),
-        tag("string"),
-        tag("line"),
-        tag("label"),
-    ))(input)?;
+    let (input, label) =
+        atom_vals(&["float", "int", "bool", "color", "string", "line", "label"])(input)?;
     let data_type = match label.src {
         "float" => DataType::Float,
         "int" => DataType::Int,
@@ -481,7 +474,6 @@ fn datatype<'a>(input: Input<'a>, _state: &AstState) -> PineResult<'a, DataTypeN
         // "line" => DataType::Line,
         // "label" => DataType::Label,
         other_type => DataType::Custom(other_type),
-        _ => unreachable!(),
     };
     Ok((
         input,
@@ -510,7 +502,7 @@ where
     alt((
         map(
             tuple((
-                tag("var"),
+                atom_val("var"),
                 eat_sep(|s| datatype(s, state)),
                 |s| assign_lv_names(s, state),
                 eat_sep(tag("=")),
@@ -523,7 +515,7 @@ where
         ),
         map(
             tuple((
-                tag("var"),
+                atom_val("var"),
                 |s| assign_lv_names(s, state),
                 eat_sep(tag("=")),
                 |s| assign_fn(s, state),
@@ -702,10 +694,10 @@ fn inner_block_for_stmt<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a
 fn statement_with_indent<'a>(input: Input<'a>, state: &AstState) -> PineResult<'a, Statement<'a>> {
     let gen_indent = || statement_indent(state.get_indent());
     alt((
-        map(eat_statement(gen_indent(), tag("break")), |s| {
+        map(eat_statement(gen_indent(), atom_val("break")), |s| {
             Statement::Break(StrRange::from_input(&s))
         }),
-        map(eat_statement(gen_indent(), tag("continue")), |s| {
+        map(eat_statement(gen_indent(), atom_val("continue")), |s| {
             Statement::Continue(StrRange::from_input(&s))
         }),
         map(

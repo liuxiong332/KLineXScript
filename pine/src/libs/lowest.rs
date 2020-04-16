@@ -20,7 +20,7 @@ pub fn get_min_val<'a>(source: &Option<RefData<Series<Float>>>, length: i64) -> 
     let mut min_val = Some(std::f64::MAX);
     for i in 0..length as usize {
         let cur_val = series_index(source, i);
-        if cur_val < min_val {
+        if cur_val.is_some() && cur_val < min_val {
             min_val = cur_val;
         }
     }
@@ -71,7 +71,7 @@ mod tests {
         assert_eq!(
             runner.get_context().get_var(VarIndex::new(0, 0)),
             &Some(PineRef::new(Series::from_vec(vec![
-                None,
+                Some(19f64),
                 Some(19f64),
                 Some(10f64)
             ])))

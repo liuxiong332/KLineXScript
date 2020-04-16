@@ -602,36 +602,36 @@ impl<'a> Runner<'a> for FunctionCall<'a> {
                         FirstType::CallableFactory => {
                             let factory = downcast_pf::<CallableFactory>(result).unwrap();
                             context
-                                .create_fun_instance(self.ctxid, RefData::new_rc(factory.create()));
+                                .create_fun_instance(self.ctxid, PineRef::new_rc(factory.create()));
                             opt_instance = context.move_fun_instance(self.ctxid);
                         }
                         FirstType::CallableObject => {
                             let factory = downcast_pf::<CallableObject>(result).unwrap();
                             context
-                                .create_fun_instance(self.ctxid, RefData::new_rc(factory.create()));
+                                .create_fun_instance(self.ctxid, PineRef::new_rc(factory.create()));
                             opt_instance = context.move_fun_instance(self.ctxid);
                         }
                         FirstType::CallableEvaluate => {
                             let factory = downcast_pf::<CallableEvaluate>(result).unwrap();
                             context
-                                .create_fun_instance(self.ctxid, RefData::new_rc(factory.create()));
+                                .create_fun_instance(self.ctxid, PineRef::new_rc(factory.create()));
                             opt_instance = context.move_fun_instance(self.ctxid);
                         }
                         FirstType::CallableObjectEvaluate => {
                             let factory = downcast_pf::<CallObjEval>(result).unwrap();
                             context
-                                .create_fun_instance(self.ctxid, RefData::new_rc(factory.create()));
+                                .create_fun_instance(self.ctxid, PineRef::new_rc(factory.create()));
                             opt_instance = context.move_fun_instance(self.ctxid);
                         }
                         _ => unreachable!(),
                     }
                 }
-                let mut callable = opt_instance.unwrap();
+                let mut callable = downcast_pf::<Callable>(opt_instance.unwrap()).unwrap();
 
                 let func_type = self.func_type.as_ref().unwrap().clone();
                 let result = callable.call(context, pos_args, dict_args, func_type);
 
-                context.create_fun_instance(self.ctxid, RefData::clone(&callable));
+                context.create_fun_instance(self.ctxid, RefData::clone(&callable).into_pf());
                 context.create_runnable(callable.into_rc());
                 result
             }

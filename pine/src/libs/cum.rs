@@ -13,15 +13,6 @@ use crate::types::{
 use std::mem;
 use std::rc::Rc;
 
-fn sum_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<Float, RuntimeErr> {
-    let mut sum_val = Some(0f64);
-    for i in 0..length {
-        let val = source.index_value(i as usize).unwrap();
-        sum_val = sum_val.add(val);
-    }
-    Ok(sum_val)
-}
-
 #[derive(Debug, Clone, PartialEq)]
 struct CumVal {
     prev_sum: Float,
@@ -45,7 +36,9 @@ impl<'a> SeriesCall<'a> for CumVal {
         let source = mem::replace(&mut param[0], None);
 
         let source = pine_ref_to_f64(source);
-        self.prev_sum = self.prev_sum.add(source);
+        if source.is_some() {
+            self.prev_sum = self.prev_sum.add(source);
+        }
         Ok(PineRef::new(Series::from(self.prev_sum)))
     }
 

@@ -661,9 +661,11 @@ impl<'a> SyntaxParser<'a> {
         name_type: SyntaxType<'a>,
     ) -> ParseResult<'a> {
         let arg_res = self.parse_exp(&mut ref_call.arg)?;
-        match arg_res.syntax_type {
-            SyntaxType::Simple(SimpleSyntaxType::Int)
-            | SyntaxType::Series(SimpleSyntaxType::Int) => Ok(ParseValue::new_with_type(name_type)),
+        match arg_res.syntax_type.get_v_for_vf() {
+            &SyntaxType::Simple(SimpleSyntaxType::Int)
+            | &SyntaxType::Series(SimpleSyntaxType::Int) => {
+                Ok(ParseValue::new_with_type(name_type))
+            }
             _ => {
                 self.catch(PineInputError::new(
                     PineErrorKind::RefIndexNotInt,
@@ -677,7 +679,7 @@ impl<'a> SyntaxParser<'a> {
     fn parse_ref_call(&mut self, ref_call: &mut RefCall<'a>) -> ParseResult<'a> {
         let name_res = self.parse_exp(&mut ref_call.name)?;
 
-        match name_res.syntax_type {
+        match name_res.syntax_type.clone().into_v_for_vf() {
             // If the type is simple, then we need to update the var to series.
             SyntaxType::Simple(t) => {
                 if t != SimpleSyntaxType::Na {
@@ -972,6 +974,15 @@ impl<'a> SyntaxParser<'a> {
             }
             Some(val) => {
                 varname.var_index = downcast_ctx(self.context).get_var_index(name);
+                match val {
+                    &SyntaxType::Val(_)
+                    | &SyntaxType::ValFunction(_, _)
+                    | &SyntaxType::ValObjectFunction(_, _, _) => {
+                        // If the var is evaluate var, we need generate one index to cache.
+                        varname.eval_id = downcast_ctx(self.context).gen_lib_func_index();
+                    }
+                    _ => {}
+                }
                 Ok(ParseValue::new(val.clone(), name))
             }
         }
@@ -1007,7 +1018,7 @@ impl<'a> SyntaxParser<'a> {
             }
             UnaryOp::BoolNot => {
                 if implicity_convert(&exp_type, &SyntaxType::Series(SimpleSyntaxType::Bool)) {
-                    match exp_type {
+                    match exp_type.into_v_for_vf() {
                         SyntaxType::Simple(_) => Ok(ParseValue::new_with_type(SyntaxType::Simple(
                             SimpleSyntaxType::Bool,
                         ))),
@@ -1029,21 +1040,22 @@ impl<'a> SyntaxParser<'a> {
     pub fn parse_binary(&mut self, binary: &mut BinaryExp<'a>) -> ParseResult<'a> {
         let exp1_type = self.parse_exp(&mut binary.exp1)?.syntax_type;
         let exp2_type = self.parse_exp(&mut binary.exp2)?.syntax_type;
-        let gen_bool = |binary: &mut BinaryExp<'a>, exp1_type, exp2_type| {
-            let result = match (exp1_type, exp2_type) {
-                (SyntaxType::Series(_), _) | (_, SyntaxType::Series(_)) => {
-                    SyntaxType::Series(SimpleSyntaxType::Bool)
-                }
-                _ => SyntaxType::Simple(SimpleSyntaxType::Bool),
+        let gen_bool =
+            |binary: &mut BinaryExp<'a>, exp1_type: SyntaxType<'a>, exp2_type: SyntaxType<'a>| {
+                let result = match (exp1_type.into_v_for_vf(), exp2_type.into_v_for_vf()) {
+                    (SyntaxType::Series(_), _) | (_, SyntaxType::Series(_)) => {
+                        SyntaxType::Series(SimpleSyntaxType::Bool)
+                    }
+                    _ => SyntaxType::Simple(SimpleSyntaxType::Bool),
+                };
+                binary.result_type = result.clone();
+                Ok(ParseValue::new_with_type(result))
             };
-            binary.result_type = result.clone();
-            Ok(ParseValue::new_with_type(result))
-        };
         match binary.op {
             BinaryOp::Plus | BinaryOp::Minus | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => {
                 // plus for string concatenate
                 if binary.op == BinaryOp::Plus && exp1_type.is_string() && exp2_type.is_string() {
-                    let result_type = match (exp1_type, exp2_type) {
+                    let result_type = match (exp1_type.into_v_for_vf(), exp2_type.into_v_for_vf()) {
                         (SyntaxType::Series(_), _) | (_, SyntaxType::Series(_)) => {
                             SyntaxType::Series(SimpleSyntaxType::String)
                         }

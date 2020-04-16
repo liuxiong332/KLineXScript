@@ -113,6 +113,7 @@ impl<'a> DataSrc<'a> {
         if !self.has_run {
             return;
         }
+        println!("Will reset vars");
         let parent = unsafe { mem::transmute::<_, &mut (dyn Ctx<'a>)>(self.lib_context.as_mut()) };
         let mut main_ctx = Context::new(Some(parent), ContextType::Main);
         // Set the inputs and input sources.

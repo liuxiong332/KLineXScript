@@ -26,7 +26,7 @@ pub fn get_max_val<'a>(source: &Option<RefData<Series<Float>>>, length: i64) -> 
     let mut max_val = Some(0f64);
     for i in 0..length as usize {
         let cur_val = series_index(source, i);
-        if cur_val > max_val {
+        if cur_val.is_some() && cur_val > max_val {
             max_val = cur_val;
         }
     }

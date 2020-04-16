@@ -7,8 +7,8 @@ pub use crate::ast::stat_expr_types::{
 };
 use crate::types::{
     downcast_pf, downcast_pf_mut, Bool, CallObjEval, CallableEvaluate, CallableObject, Color,
-    DataType as FirstType, Evaluate, Float, Int, Object, PineFrom, PineRef, PineStaticType,
-    PineType, PineVar, RefData, RuntimeErr, SecondType, Series, Tuple, NA,
+    DataType as FirstType, Evaluate, EvaluateFactory, Float, Int, Object, PineFrom, PineRef,
+    PineStaticType, PineType, PineVar, RefData, RuntimeErr, SecondType, Series, Tuple, NA,
 };
 use std::fmt::Debug;
 
@@ -70,6 +70,28 @@ impl<'a> RVRunner<'a> for Exp<'a> {
                             context.create_runnable(RefData::clone(&eval_val).into_rc());
                             // downcast_pf_mut::<CallableEvaluate>(&mut s).unwrap()
                             eval_val.call(context)
+                        }
+                        (FirstType::EvaluateFactory, SecondType::Simple) => {
+                            // Get evaluate instance from context
+                            let mut eval_instance = context.move_fun_instance(name.eval_id);
+                            if eval_instance.is_none() {
+                                let factory = downcast_pf::<EvaluateFactory>(s.clone()).unwrap();
+                                context.create_fun_instance(
+                                    name.eval_id,
+                                    PineRef::new_rc(factory.create()),
+                                );
+                                eval_instance = context.move_fun_instance(name.eval_id);
+                            }
+                            let mut eval_val =
+                                downcast_pf::<Evaluate>(eval_instance.unwrap()).unwrap();
+                            let result = eval_val.call(context);
+
+                            context.create_fun_instance(
+                                name.eval_id,
+                                RefData::clone(&eval_val).into_pf(),
+                            );
+                            context.create_runnable(RefData::clone(&eval_val).into_rc());
+                            result
                         }
                         _ => Ok(s.copy()),
                     };

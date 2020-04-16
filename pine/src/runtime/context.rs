@@ -45,9 +45,9 @@ pub trait Ctx<'a>: VarOperate<'a> {
 
     fn create_runnable(&mut self, call: Rc<RefCell<dyn Runnable<'a> + 'a>>);
 
-    fn move_fun_instance(&mut self, index: i32) -> Option<RefData<Callable<'a>>>;
+    fn move_fun_instance(&mut self, index: i32) -> Option<PineRef<'a>>;
 
-    fn create_fun_instance(&mut self, index: i32, val: RefData<Callable<'a>>);
+    fn create_fun_instance(&mut self, index: i32, val: PineRef<'a>);
 
     // fn create_declare(&mut self, name: &'a str);
 
@@ -104,9 +104,10 @@ pub struct Context<'a, 'b, 'c> {
 
     varname_indexs: HashMap<&'a str, i32>,
 
-    // function instances
-    fun_instances: Vec<Option<RefData<Callable<'a>>>>,
+    // function and evaluate instances
+    fun_instances: Vec<Option<PineRef<'a>>>,
 
+    // runnables contains all the callable instance that need commit or rollback
     runnables: Vec<Rc<RefCell<dyn Runnable<'a> + 'a>>>,
     // declare_vars: HashSet<&'a str>,
 
@@ -280,7 +281,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
         self.sub_contexts = sub_contexts;
     }
 
-    pub fn init_fun_instances(&mut self, fun_instances: Vec<Option<RefData<Callable<'a>>>>) {
+    pub fn init_fun_instances(&mut self, fun_instances: Vec<Option<PineRef<'a>>>) {
         self.fun_instances = fun_instances;
     }
 
@@ -295,7 +296,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
         self.init_sub_contexts(ctxs);
 
         let fun_count = libfun_count as usize;
-        let mut funs: Vec<Option<RefData<Callable<'a>>>> = Vec::with_capacity(fun_count);
+        let mut funs: Vec<Option<PineRef<'a>>> = Vec::with_capacity(fun_count);
         funs.resize_with(fun_count, || None);
         self.init_fun_instances(funs);
     }
@@ -744,11 +745,11 @@ impl<'a, 'b, 'c> Ctx<'a> for Context<'a, 'b, 'c> {
         }
     }
 
-    fn move_fun_instance(&mut self, index: i32) -> Option<RefData<Callable<'a>>> {
+    fn move_fun_instance(&mut self, index: i32) -> Option<PineRef<'a>> {
         mem::replace(&mut self.fun_instances[index as usize], None)
     }
 
-    fn create_fun_instance(&mut self, index: i32, val: RefData<Callable<'a>>) {
+    fn create_fun_instance(&mut self, index: i32, val: PineRef<'a>) {
         self.fun_instances[index as usize] = Some(val);
     }
 

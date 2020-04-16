@@ -139,6 +139,7 @@ fn format_var_type<'a>(name: String, t: SyntaxType<'a>) -> Vec<NameInfo> {
         }
 
         SyntaxType::ObjectClass(t) => vec![NameInfo::simple_var2(name, String::from(t))],
+        SyntaxType::Val(t) => format_var_type(name, *t),
         SyntaxType::Object(obj) => format_obj_type(name, obj),
         SyntaxType::Function(func) => format_func(name, func),
         SyntaxType::ObjectFunction(obj, func) => {

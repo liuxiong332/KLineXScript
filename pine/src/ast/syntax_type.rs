@@ -48,7 +48,6 @@ pub enum SimpleSyntaxType {
 
 impl<'a> From<DataType<'a>> for SimpleSyntaxType {
     fn from(data_type: DataType<'a>) -> Self {
-        println!("now data type {:?}", data_type);
         match data_type {
             DataType::Bool => SimpleSyntaxType::Bool,
             DataType::Int => SimpleSyntaxType::Int,
@@ -91,6 +90,7 @@ pub enum SyntaxType<'a> {
     List(SimpleSyntaxType), // tuple list like [1, 2, 3]
     Tuple(Rc<Vec<SyntaxType<'a>>>),
     ObjectClass(&'a str),
+    Val(Box<SyntaxType<'a>>), // evaluate value
     Object(Rc<BTreeMap<&'a str, SyntaxType<'a>>>),
     Function(Rc<FunctionTypes<'a>>), // function
     ObjectFunction(Rc<BTreeMap<&'a str, SyntaxType<'a>>>, Rc<FunctionTypes<'a>>), // object + function
@@ -109,6 +109,7 @@ impl<'a> SyntaxType<'a> {
     // Get the value type from ValFunction type.
     pub fn get_v_for_vf(&self) -> &Self {
         match self {
+            SyntaxType::Val(t) => &*t,
             SyntaxType::ValFunction(t, _) => &*t,
             SyntaxType::ValObjectFunction(t, _, _) => &*t,
             t => t,
@@ -117,6 +118,7 @@ impl<'a> SyntaxType<'a> {
 
     pub fn into_v_for_vf(self) -> Self {
         match self {
+            SyntaxType::Val(t) => *t,
             SyntaxType::ValFunction(t, _) => *t,
             SyntaxType::ValObjectFunction(t, _, _) => *t,
             t => t,

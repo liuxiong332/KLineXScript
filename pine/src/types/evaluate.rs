@@ -1,9 +1,12 @@
 use super::Runnable;
 use crate::runtime::context::Ctx;
-use crate::types::traits::{Category, ComplexType, DataType, PineStaticType, PineType, SecondType};
+use crate::types::traits::{
+    Category, ComplexType, DataType, PineFrom, PineStaticType, PineType, SecondType,
+};
 use crate::types::{PineRef, RuntimeErr};
 use std::fmt;
 
+// EvaluateVal
 pub trait EvaluateVal<'a> {
     fn custom_name(&self) -> &str;
 
@@ -46,6 +49,7 @@ pub fn downcast_evaluate_val_ref<'a, 'b, T: EvaluateVal<'a>>(
     }
 }
 
+// Evaluate
 pub struct Evaluate<'a> {
     val: Box<dyn EvaluateVal<'a>>,
 }
@@ -110,6 +114,65 @@ impl<'a> Clone for Evaluate<'a> {
     fn clone(&self) -> Evaluate<'a> {
         Evaluate {
             val: self.val.copy(),
+        }
+    }
+}
+
+// EvaluateFactory
+#[derive(Debug)]
+pub struct EvaluateFactory<'a> {
+    create_func: Option<fn() -> Evaluate<'a>>,
+}
+
+impl<'a> PineFrom<'a, EvaluateFactory<'a>> for EvaluateFactory<'a> {}
+
+impl<'a> PartialEq for EvaluateFactory<'a> {
+    fn eq(&self, _: &EvaluateFactory<'a>) -> bool {
+        true
+    }
+}
+
+impl<'a> Clone for EvaluateFactory<'a> {
+    fn clone(&self) -> Self {
+        EvaluateFactory {
+            create_func: self.create_func.clone(),
+        }
+    }
+}
+
+impl<'a> PineStaticType for EvaluateFactory<'a> {
+    fn static_type() -> (DataType, SecondType) {
+        (DataType::EvaluateFactory, SecondType::Simple)
+    }
+}
+impl<'a> PineType<'a> for EvaluateFactory<'a> {
+    fn get_type(&self) -> (DataType, SecondType) {
+        <Self as PineStaticType>::static_type()
+    }
+
+    fn category(&self) -> Category {
+        Category::Complex
+    }
+
+    fn copy(&self) -> PineRef<'a> {
+        PineRef::new_rc(self.clone())
+    }
+}
+
+impl<'a> ComplexType for EvaluateFactory<'a> {}
+
+impl<'a> EvaluateFactory<'a> {
+    pub fn new(create_func: fn() -> Evaluate<'a>) -> EvaluateFactory<'a> {
+        EvaluateFactory {
+            create_func: Some(create_func),
+        }
+    }
+
+    pub fn create(&self) -> Evaluate<'a> {
+        if let Some(func) = self.create_func {
+            func()
+        } else {
+            unreachable!()
         }
     }
 }

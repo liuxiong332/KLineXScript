@@ -1,12 +1,12 @@
 use super::VarResult;
 use crate::ast::stat_expr_types::VarIndex;
 use crate::ast::syntax_type::SyntaxType;
-use crate::helper::ensure_srcs;
+use crate::helper::{ensure_srcs, float_add};
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::InputSrc;
 use crate::types::{
-    downcast_pf_ref, int2float, Arithmetic, Evaluate, EvaluateVal, Float, Int, PineRef, RuntimeErr,
-    Series,
+    downcast_pf_ref, int2float, Arithmetic, Evaluate, EvaluateFactory, EvaluateVal, Float, Int,
+    PineRef, RuntimeErr, Series,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -22,6 +22,7 @@ struct AccDistVal {
 
 impl AccDistVal {
     pub fn new() -> AccDistVal {
+        println!("init accdist");
         AccDistVal {
             close_index: VarIndex::new(0, 0),
             low_index: VarIndex::new(0, 0),
@@ -69,7 +70,7 @@ impl<'a> EvaluateVal<'a> for AccDistVal {
                     .get_current();
 
                 let val1 = (close.minus(low).minus(high.minus(close))).div(high.minus(low));
-                let cmfv = val1.mul(int2float(volume)).add(self.prev_cmfv);
+                let cmfv = float_add(val1.mul(int2float(volume)), self.prev_cmfv);
                 self.ad_history.push(cmfv);
                 self.prev_cmfv = cmfv;
                 Ok(PineRef::new_rc(Series::from(cmfv)))
@@ -95,11 +96,11 @@ impl<'a> EvaluateVal<'a> for AccDistVal {
 pub const VAR_NAME: &'static str = "accdist";
 
 pub fn declare_var<'a>() -> VarResult<'a> {
-    let value = PineRef::new(Evaluate::new(Box::new(AccDistVal::new())));
+    let value = PineRef::new(EvaluateFactory::new(|| {
+        Evaluate::new(Box::new(AccDistVal::new()))
+    }));
 
-    // plot(series, title, color, linewidth, style, trackprice, transp, histbase, offset, join, editable, show_last) → plot
-
-    let syntax_type = SyntaxType::float_series();
+    let syntax_type = SyntaxType::Val(Box::new(SyntaxType::float_series()));
     VarResult::new(value, syntax_type, VAR_NAME)
 }
 

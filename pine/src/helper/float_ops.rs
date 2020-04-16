@@ -25,3 +25,12 @@ pub fn float_abs(val: Float) -> Float {
         None => None,
     }
 }
+
+pub fn float_add(val1: Float, val2: Float) -> Float {
+    match (val1, val2) {
+        (Some(v1), Some(v2)) => Some(v1 + v2),
+        (None, Some(v2)) => Some(v2),
+        (Some(v1), None) => Some(v1),
+        _ => None,
+    }
+}

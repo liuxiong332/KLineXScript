@@ -1324,3 +1324,165 @@ fn ema2_test() {
     println!("Now data {:?}", out_data);
     // assert!(out_data.is_err());
 }
+
+const OBV_SCRIPT: &'static str = r#"
+src = close
+obv = cum(sign(change(src)) * volume)
+plot(obv, color=color.blue, title="OBV")
+"#;
+
+#[test]
+fn obv_test() {
+    use pine::libs::{change, color, cos, cum};
+    use pine::runtime::NoneCallback;
+
+    let lib_info = pine::LibInfo::new(
+        vec![
+            cos::declare_sign_var(),
+            color::declare_var(),
+            change::declare_change_var(),
+            cum::declare_var(),
+            plot::declare_var(),
+        ],
+        vec![
+            ("close", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("volume", SyntaxType::Series(SimpleSyntaxType::Int)),
+        ],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+    parser.parse_src(String::from(OBV_SCRIPT)).unwrap();
+    let data = vec![
+        (
+            "close",
+            AnySeries::from_float_vec(vec![Some(100f64), Some(101f64), Some(100f64)]),
+        ),
+        (
+            "volume",
+            AnySeries::from_int_vec(vec![Some(1i64), Some(2i64), Some(3i64)]),
+        ),
+    ];
+    // na 1 -1 -> na 1 -1 -> na 2 -3 -> na 2 -1
+
+    let out_data = parser.run_with_data(data, None);
+    assert!(out_data.is_ok());
+    assert_eq!(
+        out_data.unwrap().data_list,
+        vec![Some(OutputData::new(vec![vec![
+            Some(0f64),
+            Some(2f64),
+            Some(-1f64)
+        ]]))]
+    );
+}
+
+const WR_SCRIPT: &'static str = r#"
+_pr(length) =>
+    max = highest(length)
+    min = lowest(length)
+    100 * (close - max) / (max - min)
+percentR = _pr(2)
+plot(percentR, title="%R", color=#ff6d00, transp=0)
+"#;
+
+#[test]
+fn wr_test() {
+    use pine::libs::{highest, lowest};
+    use pine::runtime::NoneCallback;
+
+    let lib_info = pine::LibInfo::new(
+        vec![
+            highest::declare_var(),
+            lowest::declare_var(),
+            plot::declare_var(),
+        ],
+        vec![
+            ("close", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("high", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("low", SyntaxType::Series(SimpleSyntaxType::Float)),
+        ],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+    parser.parse_src(String::from(WR_SCRIPT)).unwrap();
+    let data = vec![
+        (
+            "close",
+            AnySeries::from_float_vec(vec![Some(2f64), Some(4f64), Some(4f64)]),
+        ),
+        (
+            "high",
+            AnySeries::from_float_vec(vec![Some(4f64), Some(6f64), Some(8f64)]),
+        ),
+        (
+            "low",
+            AnySeries::from_float_vec(vec![Some(2f64), Some(4f64), Some(2f64)]),
+        ),
+    ];
+    // 4 6 8, 2 2 2, -2 -2 -4, 2 4 6
+    let out_data = parser.run_with_data(data, None);
+    assert!(out_data.is_ok());
+    assert_eq!(
+        out_data.unwrap().data_list,
+        vec![Some(OutputData::new(vec![vec![
+            Some(-100f64),
+            Some(-50f64),
+            Some(-200f64 / 3f64)
+        ]]))]
+    );
+}
+
+const Chaikin_SCRIPT: &'static str = r#"
+short = 2
+long = 2
+osc = ema(accdist, short) - ema(accdist, long)
+plot(osc)
+"#;
+
+#[test]
+fn chaikin_test() {
+    use pine::libs::{accdist, ema};
+    use pine::runtime::NoneCallback;
+
+    let lib_info = pine::LibInfo::new(
+        vec![
+            ema::declare_ema_var(),
+            accdist::declare_var(),
+            plot::declare_var(),
+        ],
+        vec![
+            ("close", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("high", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("low", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("volume", SyntaxType::Series(SimpleSyntaxType::Int)),
+        ],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+    parser.parse_src(String::from(Chaikin_SCRIPT)).unwrap();
+    let data = vec![
+        (
+            "close",
+            AnySeries::from_float_vec(vec![Some(2f64), Some(4f64), Some(4f64)]),
+        ),
+        (
+            "high",
+            AnySeries::from_float_vec(vec![Some(4f64), Some(6f64), Some(8f64)]),
+        ),
+        (
+            "low",
+            AnySeries::from_float_vec(vec![Some(2f64), Some(4f64), Some(2f64)]),
+        ),
+        (
+            "volume",
+            AnySeries::from_int_vec(vec![Some(2i64), Some(4i64), Some(2i64)]),
+        ),
+    ];
+    // 4 6 8, 2 2 2, -2 -2 -4, 2 4 6
+    assert!(parser.gen_io_info().is_ok());
+    let out_data = parser.run_with_data(data, None);
+    assert!(out_data.is_ok());
+    println!("Out data {:?}", out_data.as_ref().unwrap().data_list);
+    assert!(out_data.as_ref().unwrap().data_list[0]
+        .as_ref()
+        .unwrap()
+        .series[0][0]
+        .is_some());
+}

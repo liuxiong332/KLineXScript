@@ -217,6 +217,8 @@ impl<'a> LVTupleNode<'a> {
 pub struct RVVarName<'a> {
     pub name: VarName<'a>,
     pub var_index: VarIndex,
+    // If the var is evaluate var, then the eval_id save the eval index
+    pub eval_id: i32,
 }
 
 impl<'a> RVVarName<'a> {
@@ -224,6 +226,7 @@ impl<'a> RVVarName<'a> {
         RVVarName {
             name,
             var_index: VarIndex::new(0, 0),
+            eval_id: 0,
         }
     }
 
@@ -231,6 +234,7 @@ impl<'a> RVVarName<'a> {
         RVVarName {
             name: VarName::new(n, range),
             var_index: VarIndex::new(0, 0),
+            eval_id: 0,
         }
     }
 
@@ -238,6 +242,7 @@ impl<'a> RVVarName<'a> {
         RVVarName {
             name: VarName::new_with_start(value, start),
             var_index: VarIndex::new(0, 0),
+            eval_id: 0,
         }
     }
 
@@ -245,6 +250,7 @@ impl<'a> RVVarName<'a> {
         RVVarName {
             name: VarName::new_no_input(n),
             var_index: VarIndex::new(0, 0),
+            eval_id: 0,
         }
     }
 
@@ -252,6 +258,7 @@ impl<'a> RVVarName<'a> {
         RVVarName {
             name: VarName::new_no_input(n),
             var_index: index,
+            eval_id: 0,
         }
     }
 }

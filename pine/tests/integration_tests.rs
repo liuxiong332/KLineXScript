@@ -145,6 +145,24 @@ plot(Tsl, color = linecolor , style = plot.style_line , linewidth = 2,title = "S
 // plotarrow(Trend == -1 and Trend[1] == 1 ? Trend : na, title="Down Entry Arrow", colordown=color.red, maxheight=60, minheight=50, transp=0)
 "#;
 
+const VWAP_SCRIPTS: &'static str = r#"
+//@version=4
+study(title="VWAP", shorttitle="VWAP", overlay=true)
+
+src = input(hlc3)
+t = time
+start = na(t[1]) or t > t[1]
+
+sumSrc = src * volume
+sumVol = volume
+sumSrc := start ? sumSrc : sumSrc + sumSrc[1]
+sumVol := start ? sumVol : sumVol + sumVol[1]
+
+// You can use built-in vwap() function instead.
+
+plot(sumSrc / sumVol, title="VWAP", color=color.blue)
+"#;
+
 #[test]
 fn datasrc_test() {
     let lib_info = pine::LibInfo::new(
@@ -211,5 +229,8 @@ fn datasrc_test() {
     assert!(parser.run_with_data(data.clone(), None).is_ok());
 
     parser.parse_src(String::from(SUPER_TREND_SCRIPTS)).unwrap();
+    assert!(parser.run_with_data(data.clone(), None).is_ok());
+
+    parser.parse_src(String::from(VWAP_SCRIPTS)).unwrap();
     assert!(parser.run_with_data(data.clone(), None).is_ok());
 }

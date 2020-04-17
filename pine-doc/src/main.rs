@@ -14,6 +14,7 @@ use doc_parser::*;
 use regex::Captures;
 use regex::Regex;
 
+use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
@@ -45,6 +46,10 @@ const ALL_DOC_HTML: &'static str = r#"
 #[macro_use]
 extern crate lazy_static;
 
+fn process_name(name: String) -> String {
+    name.replace(".", "-")
+}
+
 fn gen_doc(doc_parser: &LibVarParser) -> String {
     [
         doc_parser
@@ -67,6 +72,22 @@ fn gen_detail_doc(doc_parser: &LibVarParser) -> String {
     let doc_content = gen_doc(doc_parser);
     let re = Regex::new(r"\{\}").unwrap();
     String::from(re.replace(ALL_DOC_HTML, |_caps: &Captures| doc_content.clone()))
+}
+
+fn gen_json_doc(doc_parser: &LibVarParser) -> String {
+    let mut vars: HashMap<_, _> = doc_parser
+        .variables
+        .iter()
+        .map(|s| (process_name(format!("{}-{}", "var", s.0)), s.1))
+        .collect::<HashMap<_, _>>();
+
+    let funs: HashMap<_, _> = doc_parser
+        .functions
+        .iter()
+        .map(|s| (process_name(format!("{}-{}", "fun", s.0)), s.1))
+        .collect::<HashMap<_, _>>();
+    vars.extend(funs.into_iter());
+    serde_json::to_string(&vars).unwrap()
 }
 
 fn write_doc(doc_parser: &LibVarParser) {
@@ -93,6 +114,19 @@ fn write_doc(doc_parser: &LibVarParser) {
     };
 
     match doc_file.write_all(gen_doc(doc_parser).as_bytes()) {
+        Err(why) => panic!("couldn't write to {}: {}", doc_display, why.description()),
+        Ok(_) => println!("successfully wrote to {}", doc_path.display()),
+    }
+
+    let doc_path = Path::new("pine-doc/static/output/doc.json");
+    let doc_display = doc_path.display();
+
+    let mut doc_file = match File::create(&doc_path) {
+        Err(why) => panic!("couldn't create {}: {}", doc_display, why.description()),
+        Ok(file) => file,
+    };
+
+    match doc_file.write_all(gen_json_doc(doc_parser).as_bytes()) {
         Err(why) => panic!("couldn't write to {}: {}", doc_display, why.description()),
         Ok(_) => println!("successfully wrote to {}", doc_path.display()),
     }

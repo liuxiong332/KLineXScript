@@ -1,24 +1,20 @@
 use crate::{DocBase, VarType};
 
 const DESCRIPTION: &'static str = r#"
-Calculates average of all given series (elementwise).
+The ceil function returns the smallest (closest to negative infinity) integer that is greater than or equal to the argument.
 "#;
-
-const PINE_FN_ARGUMENTS: &'static str = "
-**length (int)** Length (number of bars back).
-";
 
 pub fn gen_doc() -> Vec<DocBase> {
     let fn_doc = DocBase {
         var_type: VarType::Function,
-        name: "avg",
+        name: "ceil",
         signatures: vec![],
         description: DESCRIPTION,
         example: "",
-        returns: "Average.",
-        arguments: PINE_FN_ARGUMENTS,
+        returns: "The smallest integer greater than or equal to the given number.",
+        arguments: "",
         remarks: "",
-        links: "[sum](#fun-sum) [cum](#fun-cum) [sma](#fun-sma)",
+        links: "",
     };
     vec![fn_doc]
 }

@@ -5,7 +5,7 @@ Function atr (average true range) returns the RMA of true range. True range is m
 "#;
 
 const PINE_FN_ARGUMENTS: &'static str = "
-**length (integer)** Length (number of bars back).
+**length (int)** Length (number of bars back).
 ";
 
 pub fn gen_doc() -> Vec<DocBase> {

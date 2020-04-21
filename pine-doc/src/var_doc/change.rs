@@ -1,24 +1,25 @@
 use crate::{DocBase, VarType};
 
 const DESCRIPTION: &'static str = r#"
-Calculates average of all given series (elementwise).
+Difference between current value and previous, `x - x[y]`.
 "#;
 
 const PINE_FN_ARGUMENTS: &'static str = "
-**length (int)** Length (number of bars back).
+**source (series(float))**
+**length (int)** Offset from the current bar to the previous bar. Optional, if not given, length = 1 is used.
 ";
 
 pub fn gen_doc() -> Vec<DocBase> {
     let fn_doc = DocBase {
         var_type: VarType::Function,
-        name: "avg",
+        name: "change",
         signatures: vec![],
         description: DESCRIPTION,
         example: "",
-        returns: "Average.",
+        returns: "Differences series.",
         arguments: PINE_FN_ARGUMENTS,
         remarks: "",
-        links: "[sum](#fun-sum) [cum](#fun-cum) [sma](#fun-sma)",
+        links: "",
     };
     vec![fn_doc]
 }

@@ -1,24 +1,20 @@
 use crate::{DocBase, VarType};
 
 const DESCRIPTION: &'static str = r#"
-Calculates average of all given series (elementwise).
+Cumulative (total) sum of x. In other words it's a sum of all elements of x.
 "#;
-
-const PINE_FN_ARGUMENTS: &'static str = "
-**length (int)** Length (number of bars back).
-";
 
 pub fn gen_doc() -> Vec<DocBase> {
     let fn_doc = DocBase {
         var_type: VarType::Function,
-        name: "avg",
+        name: "cum",
         signatures: vec![],
         description: DESCRIPTION,
         example: "",
-        returns: "Average.",
-        arguments: PINE_FN_ARGUMENTS,
+        returns: "Total sum series.",
+        arguments: "",
         remarks: "",
-        links: "[sum](#fun-sum) [cum](#fun-cum) [sma](#fun-sma)",
+        links: "[sum](#fun-sum)",
     };
     vec![fn_doc]
 }

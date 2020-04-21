@@ -1,24 +1,24 @@
 use crate::{DocBase, VarType};
 
 const DESCRIPTION: &'static str = r#"
-Calculates average of all given series (elementwise).
+The cos function returns the trigonometric cosine of an angle.
 "#;
 
 const PINE_FN_ARGUMENTS: &'static str = "
-**length (int)** Length (number of bars back).
+**x** Angle, in radians.
 ";
 
 pub fn gen_doc() -> Vec<DocBase> {
     let fn_doc = DocBase {
         var_type: VarType::Function,
-        name: "avg",
+        name: "cos",
         signatures: vec![],
         description: DESCRIPTION,
         example: "",
-        returns: "Average.",
+        returns: "The trigonometric cosine of an angle.",
         arguments: PINE_FN_ARGUMENTS,
         remarks: "",
-        links: "[sum](#fun-sum) [cum](#fun-cum) [sma](#fun-sma)",
+        links: "",
     };
     vec![fn_doc]
 }

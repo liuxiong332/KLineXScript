@@ -21,7 +21,7 @@ plot(pine_alma(close, 9, 0.85, 6))
 
 const ARGUMENTS: &'static str = r#"
 **series (series)** Series of values to process.
-**length (integer)** Number of bars (length).
+**length (int)** Number of bars (length).
 **offset (float)** Controls tradeoff between smoothness (closer to 1) and responsiveness (closer to 0).
 **sigma (float)** Changes the smoothness of ALMA. The larger sigma the smoother ALMA.
 "#;

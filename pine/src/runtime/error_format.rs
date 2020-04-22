@@ -11,7 +11,7 @@ static ERROR_MAP: &[(&'static str, &'static str)] = &[
     ("UnknownErr", "Unknown syntax error."),
     (
         "ReservedVarName",
-        "You cann't use reserved name for identifier.",
+        "You can't use reserved name for identifier.",
     ),
     (
         "InvalidIdentifier",
@@ -29,19 +29,19 @@ static ERROR_MAP: &[(&'static str, &'static str)] = &[
     ("CannotInferType", "Can inter the variable type from the context."),
     ("NotEndOfInput", "Expect end of input, but get more characters."),
     ("PrefixNoNamesAfterDot", "The property getter expression is not valid."),
-    ("LVTupleNoNames", "Left tuple value cann't be empty."),
+    ("LVTupleNoNames", "Left tuple value can't be empty."),
     ("TupleNotMatch", "The tuple of the left side is not match as the right side."),
     ("BlockNoStmts", "The block without any statements is not allowed."),
     ("VarNotDeclare", "The variable isn't declared before it's used."),
-    ("InvalidTypeCast", "The {} cann't cast to {}."),
+    ("InvalidTypeCast", "The {} can't cast to {}."),
     ("VarNotCallable", "The variable is not callable."),
     ("FuncCallSignatureNotMatch", "The function call arguments aren't match the function signature."),
-    ("ForbiddenDictArgsForUserFunc", "The dictionary arguments cann't be used in user funciton."),
+    ("ForbiddenDictArgsForUserFunc", "The dictionary arguments can't be used in user funciton."),
     ("VarNotSeriesInRef", "The data type in reference expression is not series."),
     ("RefIndexNotInt", "The index of reference expression is not integer"),
     ("RefObjTypeNotObj", "The destination type in object property getter expression is not object"),
     ("RefKeyNotExist", "The key in object property getter don't exist in the object"),
-    ("CondNotBool", "The condition expression cann't be converted to bool value."),
+    ("CondNotBool", "The condition expression can't be converted to bool value."),
     ("CondExpTypesNotSame", "The return types from different branches are not compatible."),
     ("ExpNoReturn", "The block in expression that return nothing is not allowed."),
     ("ExpReturnNa", "The block in expression that return NA is not allowed."),
@@ -49,8 +49,8 @@ static ERROR_MAP: &[(&'static str, &'static str)] = &[
     ("ForRangeIndexNotInt", "The index in for-range expression isn't integer."),
     ("UnaryTypeNotNum", "The destination type for unary expression isn't numeric."),
     ("BinaryTypeNotNum", "The destination types for binary expression must be numeric or string."),
-    ("BoolExpTypeNotBool", "The destination types for bool expression cann't be converted to bool."),
-    ("VarHasDeclare", "The variable cann't be declared twice."),
+    ("BoolExpTypeNotBool", "The destination types for bool expression can't be converted to bool."),
+    ("VarHasDeclare", "The variable can't be declared twice."),
     ("BreakNotInForStmt", "The break statement can only appear in for range statement."),
     ("ContinueNotInForStmt", "The continue statement can only appear in for range statement."),
     ("NonRecongnizeStmt", "This statement isn't valid pine statements."),
@@ -59,7 +59,7 @@ static ERROR_MAP: &[(&'static str, &'static str)] = &[
     ("NotSupportOperator", "The operation is not supported now."),
     ("NotImplement", "The operation has not implemented now."),
     // ("InvalidTypeCast", "The type cast is not valid."),
-    ("InvalidNADeclarer", "The variable cann't be declared with na."),
+    ("InvalidNADeclarer", "The variable can't be declared with na."),
     ("UnrecongnizedSession", "Unrecognized session string."),
     ("InvalidParameters", "The parameters are not valid."),
     ("MissingParameters", "Missing parameters. {}"),
@@ -68,7 +68,7 @@ static ERROR_MAP: &[(&'static str, &'static str)] = &[
     ("UnknownRuntimeErr", "Unknown runtime error."),
     ("Continue", "Continue statement."),
     ("Break", "Break statement."),
-    ("ForRangeIndexIsNA", "The index for for range statement cann't be na")
+    ("ForRangeIndexIsNA", "The index for for range statement can't be na")
 ];
 
 pub struct ErrorFormater {

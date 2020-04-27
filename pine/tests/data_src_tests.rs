@@ -1222,6 +1222,55 @@ fn volume_test() {
     );
 }
 
+const TIME_SCRIPT: &'static str = r#"
+int a1 = dayofmonth
+int a2 = dayofweek
+float a3 = dayofweek==dayofweek.monday ? 1.0 :2.0
+float a4 = dayofweek==dayofweek.tuesday ? 1.0 :2.0
+plot(a1)
+plot(a2)
+plot(a3)
+plot(a4)
+"#;
+
+#[test]
+fn dayofweek_test() {
+    use pine::libs::{plot, year};
+    use pine::runtime::output::{OutputData, ScriptPurpose, StudyScript};
+    use pine::runtime::NoneCallback;
+
+    let lib_info = pine::LibInfo::new(
+        vec![
+            plot::declare_var(),
+            year::declare_dayofmonth_var(),
+            year::declare_dayofweek_var(),
+        ],
+        vec![("_time", SyntaxType::Series(SimpleSyntaxType::Int))],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+    parser.parse_src(String::from(TIME_SCRIPT)).unwrap();
+    assert!(parser.gen_io_info().is_ok());
+    // let data = vec![("close", AnySeries::from_float_vec(vec![Some(20f64)]))];
+    println!("res {:?}", parser.run(vec![], vec![], None));
+    let result = parser.run_with_data(
+        vec![(
+            "_time",
+            AnySeries::from_int_vec(vec![Some(1587978379382i64), Some(1588089600000)]),
+        )],
+        None,
+    );
+    assert!(result.is_ok());
+    assert_eq!(
+        result.unwrap().data_list,
+        vec![
+            Some(OutputData::new(vec![vec![Some(27f64), Some(28f64)]])),
+            Some(OutputData::new(vec![vec![Some(2f64), Some(3f64)]])),
+            Some(OutputData::new(vec![vec![Some(1f64), Some(2f64)]])),
+            Some(OutputData::new(vec![vec![Some(2f64), Some(1f64)]]))
+        ]
+    );
+}
+
 const RUN1_SCRIPT: &'static str = r#"
 study(title="VWAPG", shorttitle="VWAPG")
 src = (high + low + open)/3

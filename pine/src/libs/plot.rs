@@ -135,6 +135,7 @@ impl<'a> SeriesCall<'a> for PlotVal {
         params: Vec<Option<PineRef<'a>>>,
         func_type: FunctionType<'a>,
     ) -> Result<(), RuntimeErr> {
+        println!("Get params {:?}", params);
         pine_plot(_context, params, func_type)
     }
 

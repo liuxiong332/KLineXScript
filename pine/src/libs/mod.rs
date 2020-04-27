@@ -31,6 +31,7 @@ pub mod iff;
 pub mod input;
 pub mod kc;
 pub mod kcw;
+pub mod line;
 pub mod lowest;
 pub mod lowestbars;
 pub mod macd;
@@ -192,6 +193,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         hline::declare_var(),
         tsi::declare_var(),
         stoch::declare_var(),
+        // line::declare_var(),
     ];
     debug_assert!(
         check_names(&list).len() == 0,

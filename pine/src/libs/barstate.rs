@@ -162,12 +162,12 @@ pub fn declare_var<'a>() -> VarResult<'a> {
     let value = PineRef::new(Object::new(Box::new(BarStateProps::new())));
 
     let mut obj_type = BTreeMap::new();
-    obj_type.insert("isfirst", SyntaxType::string());
-    obj_type.insert("islast", SyntaxType::string());
-    obj_type.insert("ishistory", SyntaxType::string());
-    obj_type.insert("isrealtime", SyntaxType::string());
-    obj_type.insert("isnew", SyntaxType::string());
-    obj_type.insert("isconfirmed", SyntaxType::string());
+    obj_type.insert("isfirst", SyntaxType::bool());
+    obj_type.insert("islast", SyntaxType::bool());
+    obj_type.insert("ishistory", SyntaxType::bool());
+    obj_type.insert("isrealtime", SyntaxType::bool());
+    obj_type.insert("isnew", SyntaxType::bool());
+    obj_type.insert("isconfirmed", SyntaxType::bool());
     let syntax_type = SyntaxType::Object(Rc::new(obj_type));
     VarResult::new(value, syntax_type, VAR_NAME)
 }
@@ -286,5 +286,55 @@ mod tests {
             runner.get_context().get_var(VarIndex::new(5, 0)),
             &Some(PineRef::new(Series::from_vec(vec![false, true, false])))
         );
+    }
+
+    #[test]
+    fn barstate_test() {
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![
+                ("close", SyntaxType::Series(SimpleSyntaxType::Float)),
+                ("_time", SyntaxType::Series(SimpleSyntaxType::Int)),
+                ("bar_index", SyntaxType::Series(SimpleSyntaxType::Int)),
+            ],
+        );
+
+        let src = r#"
+            float a1 = barstate.isconfirmed ? close :na
+            float a2 = barstate.isfirst ? close :na
+            float a3 = barstate.ishistory? close :na
+            float a4 = barstate.islast ? close :na
+            float a5 = barstate.isnew ? close :na
+            float a6 = barstate.isrealtime ? close :na
+        "#;
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+        downcast_ctx(runner.get_context()).update_data_range((Some(0), Some(2)));
+        runner
+            .run(
+                &vec![
+                    (
+                        "close",
+                        AnySeries::from_float_vec(vec![Some(1f64), Some(2f64)]),
+                    ),
+                    (
+                        "_time",
+                        AnySeries::from_int_vec(vec![Some(gen_ts(10, 0)), Some(gen_ts(14, 0))]),
+                    ),
+                ],
+                Some(Rc::new(SymbolInfo {
+                    symbol_type: String::from(""),
+                    timezone: String::from("Asia/Shanghai"),
+                    ticker: String::from(""),
+                    session: String::from(""),
+                    trade_start: String::from("9:30"),
+                    trade_end: String::from("15:00"),
+                    root: None,
+                    currency: String::from(""),
+                    description: String::from(""),
+                    mintick: 1f64,
+                })),
+            )
+            .unwrap();
     }
 }

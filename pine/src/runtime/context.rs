@@ -78,6 +78,10 @@ pub trait Ctx<'a>: VarOperate<'a> {
     fn get_type(&self) -> ContextType;
 
     fn get_callback(&self) -> Option<&'a dyn Callback>;
+
+    fn set_iterindex(&mut self, index: i32);
+
+    fn get_iterindex(&self) -> i32;
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -110,6 +114,9 @@ pub struct Context<'a, 'b, 'c> {
     // runnables contains all the callable instance that need commit or rollback
     runnables: Vec<Rc<RefCell<dyn Runnable<'a> + 'a>>>,
     // declare_vars: HashSet<&'a str>,
+
+    // The iterator index, start from 0
+    iterindex: i32,
 
     // The input value from user
     inputs: Vec<Option<InputVal>>,
@@ -232,6 +239,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             varname_indexs: HashMap::new(),
             fun_instances: Vec::new(),
             runnables: vec![],
+            iterindex: 0,
             // declare_vars: HashSet::new(),
             callback: None,
             inputs: vec![],
@@ -257,6 +265,7 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             varname_indexs: HashMap::new(),
             fun_instances: Vec::new(),
             runnables: vec![],
+            iterindex: 0,
             // declare_vars: HashSet::new(),
             callback: Some(callback),
             inputs: vec![],
@@ -812,6 +821,21 @@ impl<'a, 'b, 'c> Ctx<'a> for Context<'a, 'b, 'c> {
 
     fn get_callback(&self) -> Option<&'a dyn Callback> {
         self.callback
+    }
+
+    fn set_iterindex(&mut self, index: i32) {
+        debug_assert!(self.context_type == ContextType::Main);
+        self.iterindex = index;
+    }
+
+    fn get_iterindex(&self) -> i32 {
+        if self.context_type == ContextType::Main {
+            self.iterindex
+        } else if let Some(ref v) = self.parent {
+            v.get_iterindex()
+        } else {
+            unreachable!()
+        }
     }
 }
 

@@ -153,7 +153,7 @@ impl<'a> DataSrc<'a> {
             .iter()
             .map(|(k, _)| self.input_names.iter().position(|(s, _)| *s == *k))
             .collect();
-        for i in 0..len {
+        for iter_i in start..(start + len as i64) {
             // Extract data into context
             for (index, (_k, v)) in data.iter().enumerate() {
                 if let Some(name_index) = name_indexs[index] {
@@ -163,13 +163,13 @@ impl<'a> DataSrc<'a> {
                         DataType::Float => {
                             let mut float_s: RefData<Series<Float>> =
                                 Series::implicity_from(series).unwrap();
-                            float_s.update(v.index(i as isize));
+                            float_s.update(v.index((iter_i - start) as isize));
                             self.lib_context.update_var(var_index, float_s.into_pf());
                         }
                         DataType::Int => {
                             let mut int_s: RefData<Series<Int>> =
                                 Series::implicity_from(series).unwrap();
-                            int_s.update(v.index(i as isize));
+                            int_s.update(v.index((iter_i - start) as isize));
                             self.lib_context.update_var(var_index, int_s.into_pf());
                         }
                         _ => unreachable!(),
@@ -185,10 +185,11 @@ impl<'a> DataSrc<'a> {
                 let var_index = VarIndex::new(self.input_index + bar_index as i32, 0);
                 let series = self.lib_context.move_var(var_index).unwrap();
                 let mut index_s: RefData<Series<Int>> = Series::implicity_from(series).unwrap();
-                index_s.update(Some(start + i as i64));
+                index_s.update(Some(iter_i as i64));
                 self.lib_context.update_var(var_index, index_s.into_pf());
             }
 
+            self.context.set_iterindex(iter_i as i32);
             self.blk.run(self.context.as_mut())?;
 
             let lib_ctx = downcast_ctx(self.lib_context.as_mut());

@@ -70,7 +70,10 @@ impl<'a> EvaluateVal<'a> for AccDistVal {
                     .get_current();
 
                 let val1 = (close.minus(low).minus(high.minus(close))).div(high.minus(low));
-                let cmfv = float_add(val1.mul(int2float(volume)), self.prev_cmfv);
+                let cmfv = float_add(
+                    val1.mul(int2float(volume)),
+                    Some(self.prev_cmfv.unwrap_or(0f64)),
+                );
                 self.ad_history.push(cmfv);
                 self.prev_cmfv = cmfv;
                 Ok(PineRef::new_rc(Series::from(cmfv)))

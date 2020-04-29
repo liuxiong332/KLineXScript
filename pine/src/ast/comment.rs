@@ -1,12 +1,19 @@
 use super::error::PineResult;
 use super::input::Input;
-use nom::bytes::complete::{tag, take_until};
+use super::utils::input_end;
+use nom::branch::alt;
+use nom::bytes::complete::{is_not, tag, take_while};
+use nom::combinator::{not, recognize};
+use nom::sequence::tuple;
 
 // The comment is like this //... until the end of this line.
 pub fn comment(input: Input) -> PineResult {
-    let (_, _) = tag("//")(input)?;
-    let (input, out) = take_until("\n")(input)?;
-    Ok((input.forward(1), out))
+    let (input, out) = recognize(tuple((
+        tag("//"),
+        is_not("\n"),
+        alt((tag("\n"), input_end)),
+    )))(input)?;
+    Ok((input, out))
 }
 
 #[cfg(test)]
@@ -23,12 +30,11 @@ mod tests {
     #[test]
     fn comment_test() {
         let s = Input::new_with_str("//hello world\nwode");
-        let content_len: u32 = "//hello world\n".len().try_into().unwrap();
         assert_eq!(
             comment(s),
             Ok((
                 Input::new("wode", Position::new(1, 0), Position::max()),
-                Input::new_u32("//hello world", 0, 0, 0, content_len - 1)
+                Input::new_u32("//hello world\n", 0, 0, 1, 0)
             ))
         );
         assert_eq!(
@@ -40,10 +46,10 @@ mod tests {
         );
         assert_eq!(
             comment(Input::new_with_str("//hello world")),
-            Err(Err::Error(PineError::from_error_kind(
-                Input::new_with_str("//hello world"),
-                ErrorKind::TakeUntil
-            )))
+            Ok((
+                Input::new("", Position::new(0, 13), Position::max()),
+                Input::new_u32("//hello world", 0, 0, 0, 13)
+            ))
         );
     }
 }

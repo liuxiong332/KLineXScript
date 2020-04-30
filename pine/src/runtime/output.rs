@@ -258,7 +258,16 @@ impl IOInfo {
         self.script_type = Some(script_type);
     }
 
-    pub fn add_input_src(&mut self, input_src: InputSrc) {
+    pub fn add_input_src(&mut self, mut input_src: InputSrc) {
+        // If the input source contain `_time`, we should transfer to `time`
+        let pos = input_src.srcs.iter().position(|s| s.as_str() == "_time");
+        if pos.is_some() {
+            input_src.srcs.remove(pos.unwrap());
+            if !input_src.srcs.contains(&String::from("time")) {
+                input_src.srcs.push(String::from("time"));
+            }
+        }
+
         let exist_input = self
             .input_srcs
             .iter_mut()
@@ -408,6 +417,11 @@ mod tests {
             vec![String::from("close"), String::from("high")],
         ));
 
+        io_info.add_input_src(InputSrc::new(
+            Some(String::from("AAPL")),
+            vec![String::from("_time"), String::from("time")],
+        ));
+
         assert_eq!(
             io_info.get_input_srcs(),
             &vec![
@@ -422,7 +436,11 @@ mod tests {
                 ),
                 InputSrc::new(
                     Some(String::from("AAPL")),
-                    vec![String::from("close"), String::from("high")]
+                    vec![
+                        String::from("close"),
+                        String::from("high"),
+                        String::from("time")
+                    ]
                 )
             ]
         );

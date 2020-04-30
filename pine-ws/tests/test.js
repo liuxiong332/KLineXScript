@@ -133,3 +133,41 @@ it("fl script test", function () {
         });
     }
 });
+
+it("abs test", function () {
+    let runner = new Runner();
+
+    runner.parse("plot(abs(-5))");
+    runner.genIOInfo();
+
+    // console.log(result[0].series[0]);
+    let result = runner.runWithData([], 3, new Float64Array(0));
+    // console.log(result[0].series[0]);
+    assert.deepEqual(result[0].series, [new Float64Array([5.0, 5.0, 5.0])]);
+
+    result = runner.run([], [], 2, new Float64Array(0));
+    assert.deepEqual(result[0].series, [new Float64Array([5.0, 5.0])]);
+
+});
+
+it("dayofweek test", function () {
+    let runner = new Runner();
+    runner.parse("plot(dayofweek)");
+    console.log(runner.genIOInfo().input_srcs);
+    // assert.deepEqual(runner.genIOInfo().input_srcs, [{ ticker: null, srcs: ['time'] }]);
+});
+
+it("alma test", function () {
+    let runner = new Runner();
+    runner.parse("plot(alma(dayofweek, 4, 0.85, 2.0))");
+    console.log(runner.genIOInfo().input_srcs);
+    // assert.deepEqual(runner.genIOInfo().input_srcs, [{ ticker: null, srcs: ['time'] }]);
+
+    let farray = new Float64Array(100);
+    for (let i = 0; i < 8; i += 1) {
+        farray[i] = i + 100.0;
+    }
+    let result = runner.runWithData(["time"], 8, farray);
+    // console.log(result[0].series);
+    assert.deepEqual(result[0].series[0].slice(3, 8), new Float64Array([4, 4, 4, 4, 4]));
+});

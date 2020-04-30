@@ -10,8 +10,8 @@ use crate::helper::{
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::InputSrc;
 use crate::types::{
-    downcast_pf_ref, int2float, Arithmetic, Callable, Evaluate, EvaluateVal, Float, Int, PineRef,
-    RuntimeErr, Series, SeriesCall, NA,
+    downcast_pf_ref, int2float, Arithmetic, Callable, CallableFactory, Evaluate, EvaluateVal,
+    Float, Int, ParamCollectCall, PineRef, RuntimeErr, Series, SeriesCall, NA,
 };
 use std::rc::Rc;
 
@@ -69,7 +69,14 @@ impl<'a> SeriesCall<'a> for AlmaVal {
 pub const VAR_NAME: &'static str = "alma";
 
 pub fn declare_var<'a>() -> VarResult<'a> {
-    let value = PineRef::new(Callable::new(None, Some(Box::new(AlmaVal))));
+    let value = PineRef::new(CallableFactory::new(|| {
+        Callable::new(
+            None,
+            Some(Box::new(ParamCollectCall::new_with_caller(Box::new(
+                AlmaVal,
+            )))),
+        )
+    }));
 
     let func_type = FunctionTypes(vec![FunctionType::new((
         vec![

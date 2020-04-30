@@ -516,7 +516,6 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
 
     pub fn get_data_range(&self) -> (Option<i32>, Option<i32>) {
         debug_assert!(self.is_main());
-        println!("Get data range {:?}", self.data_range);
         self.data_range.clone()
     }
 

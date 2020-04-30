@@ -116,7 +116,12 @@ impl<'a> SeriesCall<'a> for KcVal {
 
 pub fn declare_var<'a>() -> VarResult<'a> {
     let value = PineRef::new(CallableFactory::new(|| {
-        Callable::new(None, Some(Box::new(KcVal::new())))
+        Callable::new(
+            None,
+            Some(Box::new(ParamCollectCall::new_with_caller(Box::new(
+                KcVal::new(),
+            )))),
+        )
     }));
 
     let func_type = FunctionTypes(vec![FunctionType::new((

@@ -5,8 +5,8 @@ use crate::helper::err_msgs::*;
 use crate::helper::session::TradeTimeSpan;
 use crate::helper::str_replace;
 use crate::helper::{
-    move_element, pine_ref_to_bool, pine_ref_to_color, pine_ref_to_f64, pine_ref_to_i64,
-    pine_ref_to_string,
+    ensure_srcs, move_element, pine_ref_to_bool, pine_ref_to_color, pine_ref_to_f64,
+    pine_ref_to_i64, pine_ref_to_string,
 };
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::output::{OutputData, OutputInfo, PlotInfo};
@@ -73,8 +73,9 @@ impl<'a> PineClass<'a> for BarStateProps {
         if self.barindex_index.get() == VarIndex::new(0, 0) {
             let index = _ctx.get_top_varname_index("bar_index").unwrap();
             self.barindex_index.set(index);
-            let index = _ctx.get_top_varname_index("_time").unwrap();
-            self.time_index.set(index);
+            ensure_srcs(_ctx, vec!["_time"], |indexs| {
+                self.time_index.set(indexs[0]);
+            });
         }
         let (start, end) = downcast_ctx(_ctx.get_main_ctx()).get_data_range();
         if self.data_ranges.borrow().last() != Some(&(start.unwrap(), end.unwrap())) {

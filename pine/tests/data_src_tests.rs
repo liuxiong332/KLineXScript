@@ -1594,3 +1594,44 @@ fn myplot2_test() {
         }
     }
 }
+
+const ALMA_TIME_SCRIPT: &'static str = r#"
+plot(alma(dayofweek, 4, 0.85, 2.0))
+plot(highest(dayofweek, 2))
+"#;
+
+#[test]
+fn alma_time_test() {
+    use pine::libs::{alma, highest, year};
+    use pine::runtime::NoneCallback;
+
+    let lib_info = pine::LibInfo::new(
+        vec![
+            plot::declare_var(),
+            alma::declare_var(),
+            year::declare_dayofweek_var(),
+            highest::declare_var(),
+        ],
+        vec![("_time", SyntaxType::Series(SimpleSyntaxType::Int))],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+    parser.parse_src(String::from(ALMA_TIME_SCRIPT)).unwrap();
+
+    let mut times: Vec<Option<i64>> = vec![];
+    for m in 0..16 {
+        times.push(Some(100i64 + m * 1000 * 3600 * 24 as i64));
+    }
+    let data = vec![("_time", AnySeries::from_int_vec(times))];
+    assert!(parser.gen_io_info().is_ok());
+
+    let out_data = parser.run_with_data(data.clone(), None);
+    assert!(out_data.is_ok());
+    println!("Out data {:?}", out_data.as_ref().unwrap().data_list);
+    for i in 0..2 {
+        assert!(out_data.as_ref().unwrap().data_list[i]
+            .as_ref()
+            .unwrap()
+            .series[0][15]
+            .is_some());
+    }
+}

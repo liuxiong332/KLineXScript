@@ -10,7 +10,7 @@ use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::InputSrc;
 use crate::types::{
     downcast_pf_ref, int2float, Arithmetic, Callable, CallableCreator, CallableFactory, Float, Int,
-    PineRef, RefData, RuntimeErr, Series, SeriesCall,
+    ParamCollectCall, PineRef, RefData, RuntimeErr, Series, SeriesCall,
 };
 use std::mem;
 use std::rc::Rc;
@@ -98,7 +98,9 @@ impl<'a> CallableCreator<'a> for SmaCreator {
     fn create(&self) -> Callable<'a> {
         Callable::new(
             None,
-            Some(Box::new(AtrVal::new(self.src_name, self.handle))),
+            Some(Box::new(ParamCollectCall::new_with_caller(Box::new(
+                AtrVal::new(self.src_name, self.handle),
+            )))),
         )
     }
 
@@ -180,6 +182,14 @@ mod tests {
                 Some(19f64),
                 Some(25f64),
                 Some(25f64)
+            ])))
+        );
+        assert_eq!(
+            runner.get_context().get_var(VarIndex::new(1, 0)),
+            &Some(PineRef::new(Series::from_vec(vec![
+                Some(10f64),
+                Some(20f64),
+                Some(20f64)
             ])))
         );
     }

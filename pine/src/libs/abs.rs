@@ -112,4 +112,20 @@ mod tests {
             Some(PineRef::new_rc(Series::from_vec(vec![Some(2f64)])))
         );
     }
+
+    #[test]
+    fn abs_const_test() {
+        use crate::libs::plot;
+        use crate::runtime::{downcast_ctx, OutputData};
+
+        let lib_info = LibInfo::new(vec![declare_var(), plot::declare_var()], vec![]);
+        let src = "plot(abs(-1))";
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+        runner.runl(&vec![], 2, None).unwrap();
+        assert_eq!(
+            downcast_ctx(runner.get_context()).move_output_data(),
+            vec![Some(OutputData::new(vec![vec![Some(1f64), Some(1f64)]]))]
+        );
+    }
 }

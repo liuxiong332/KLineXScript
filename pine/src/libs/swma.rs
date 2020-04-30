@@ -11,7 +11,7 @@ use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::InputSrc;
 use crate::types::{
     downcast_pf_ref, int2float, Arithmetic, Callable, CallableFactory, Evaluate, EvaluateVal,
-    Float, Int, PineRef, RefData, RuntimeErr, Series, SeriesCall, NA,
+    Float, Int, ParamCollectCall, PineRef, RefData, RuntimeErr, Series, SeriesCall, NA,
 };
 use std::mem;
 use std::rc::Rc;
@@ -52,7 +52,12 @@ impl<'a> SeriesCall<'a> for EmaVal {
 
 pub fn declare_var<'a>() -> VarResult<'a> {
     let value = PineRef::new(CallableFactory::new(|| {
-        Callable::new(None, Some(Box::new(EmaVal)))
+        Callable::new(
+            None,
+            Some(Box::new(ParamCollectCall::new_with_caller(Box::new(
+                EmaVal,
+            )))),
+        )
     }));
 
     let func_type = FunctionTypes(vec![FunctionType::new((

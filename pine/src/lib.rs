@@ -79,7 +79,12 @@ impl<'a> InputSrcDetector<'a> for LibInfo<'a> {
     }
 
     // Check if the src is input source for client.
+    // Get all the input names such as high, low, open, close, time, volume
+    // The client must provide these sources.
     fn map_client_src<'b>(&self, src: &'b str) -> Option<&'b str> {
+        // if src == "time" {
+        //     return Some("_time");
+        // }
         if self.client_input_names.contains(&src) {
             Some(src)
         } else {
@@ -88,6 +93,7 @@ impl<'a> InputSrcDetector<'a> for LibInfo<'a> {
     }
 
     // Check if the src is input source and map to another source name.
+    // For security to filter the input names include bar_index
     fn map_input_src<'b>(&self, src: &'b str) -> Option<&'b str> {
         if src == "time" {
             return Some("_time");

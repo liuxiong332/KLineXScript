@@ -3,7 +3,9 @@ use crate::ast::stat_expr_types::VarIndex;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SyntaxType};
 use crate::helper::err_msgs::*;
 use crate::helper::str_replace;
-use crate::helper::{move_element, pine_ref_to_i64, pine_ref_to_string, Resolution, Session};
+use crate::helper::{
+    ensure_srcs, move_element, pine_ref_to_i64, pine_ref_to_string, Resolution, Session,
+};
 use crate::runtime::{downcast_ctx, Ctx};
 use crate::types::{
     CallObjEval, Callable, CallableEvaluate, EvaluateVal, Float, Int, PineClass, PineFrom, PineRef,
@@ -17,10 +19,13 @@ use std::collections::BTreeMap;
 use std::mem::transmute;
 use std::rc::Rc;
 
-pub fn parse_time_from_ctx<'a>(ctx: &mut dyn Ctx<'a>) -> (VarIndex, Tz) {
-    let time_index = downcast_ctx(ctx).get_top_varname_index("_time").unwrap();
-    (time_index, parse_tz_from_ctx(ctx))
-}
+// pub fn parse_time_from_ctx<'a>(ctx: &mut dyn Ctx<'a>) -> (VarIndex, Tz) {
+//     let time_index;
+//     ensure_srcs(ctx, vec!["_time"], |indexs| {
+//         time_index = indexs[0];
+//     });
+//     (time_index, parse_tz_from_ctx(ctx))
+// }
 
 pub fn parse_tz_from_ctx<'a>(ctx: &mut dyn Ctx<'a>) -> Tz {
     let tz: Tz = match downcast_ctx(ctx).get_syminfo() {
@@ -59,9 +64,10 @@ impl<'a> EvaluateVal<'a> for TimeVal {
 
     fn call(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
         if self.time_index.is_none() {
-            let (time_index, tz) = parse_time_from_ctx(ctx);
-            self.time_index = Some(time_index);
-            self.tz = Some(tz);
+            ensure_srcs(ctx, vec!["_time"], |indexs| {
+                self.time_index = Some(indexs[0]);
+            });
+            self.tz = Some(parse_tz_from_ctx(ctx));
         }
         let processor =
             unsafe { transmute::<_, fn(Option<PineRef<'a>>, &Tz) -> PineRef<'a>>(self.processor) };
@@ -344,6 +350,7 @@ mod tests {
     use super::*;
     use crate::ast::stat_expr_types::VarIndex;
     use crate::ast::syntax_type::SimpleSyntaxType;
+    use crate::runtime::output::InputSrc;
     use crate::runtime::{AnySeries, NoneCallback, SymbolInfo, VarOperate};
     use crate::{LibInfo, PineParser, PineRunner};
     use chrono::TimeZone;
@@ -422,6 +429,11 @@ mod tests {
             runner.get_context().move_var(VarIndex::new(stari, 0)),
             Some(PineRef::new_rc(Series::from_vec(vec![Some(2020)])))
         );
+        assert_eq!(
+            runner.get_io_info().get_input_srcs(),
+            &vec![InputSrc::new(None, vec![String::from("time")])]
+        );
+
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(stari + 1, 0)),
             Some(PineRef::new_rc(Series::from_vec(vec![Some(2021)])))

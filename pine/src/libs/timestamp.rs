@@ -171,7 +171,7 @@ fn gen_sig1_type<'a>() -> FunctionType<'a> {
             ("minute", SyntaxType::int()),
             ("second", SyntaxType::int()),
         ],
-        SyntaxType::Void,
+        SyntaxType::int(),
     ))
 }
 
@@ -185,7 +185,7 @@ fn gen_sig2_type<'a>() -> FunctionType<'a> {
             ("minute", SyntaxType::int_series()),
             ("second", SyntaxType::int_series()),
         ],
-        SyntaxType::Void,
+        SyntaxType::int(),
     ))
 }
 
@@ -286,5 +286,19 @@ mod tests {
             PineRef::new_rc(Series::from_vec(vec![Some(1581436800000)])),
         );
         run_src(src5, &lib_info, PineRef::new_box(Some(1581436800000)));
+    }
+
+    #[test]
+    fn plot_ts_test() {
+        use crate::libs::{color, plot};
+
+        let lib_info = LibInfo::new(
+            vec![declare_var(), plot::declare_var(), color::declare_var()],
+            vec![],
+        );
+        let src = "plot(timestamp(2016, 01, 19, 09, 30), linewidth=3, color=color.green)";
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+        runner.runl(&vec![], 2, None).unwrap();
     }
 }

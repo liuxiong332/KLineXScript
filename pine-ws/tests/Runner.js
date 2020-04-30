@@ -46,7 +46,7 @@ function parseOutputSeries(outSeries, dataType) {
         if (count === 0) {
             outputData.push(new ArrayType([]));
         } else {
-            outputData.push(new ArrayType(memory.buffer, outSeries + byteOffset, count));
+            outputData.push(new ArrayType(memory.buffer, outSeries + byteOffset, count).slice());
             byteOffset += unitBytes * count;
         }
     }

@@ -1535,3 +1535,62 @@ fn chaikin_test() {
         .series[0][0]
         .is_some());
 }
+
+const MYPLOT2_SCRIPT: &'static str = r#"
+plot(open)
+plot(close)
+plot(close)
+plot(close)
+plot(close)
+plot(close)
+plot(close)
+plot(close)
+plot(close)
+plot(close)
+"#;
+
+#[test]
+fn myplot2_test() {
+    use pine::runtime::NoneCallback;
+
+    let lib_info = pine::LibInfo::new(
+        vec![plot::declare_var()],
+        vec![
+            ("close", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("open", SyntaxType::Series(SimpleSyntaxType::Float)),
+        ],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+    parser.parse_src(String::from(MYPLOT2_SCRIPT)).unwrap();
+
+    let mut closes: Vec<Option<f64>> = vec![];
+    let mut openes: Vec<Option<f64>> = vec![];
+    for m in 0..400 {
+        closes.push(Some(100f64 + m as f64));
+    }
+    for m in 0..400 {
+        openes.push(Some(100f64 + m as f64));
+    }
+    let data = vec![
+        ("close", AnySeries::from_float_vec(closes)),
+        ("open", AnySeries::from_float_vec(openes)),
+    ];
+    // 4 6 8, 2 2 2, -2 -2 -4, 2 4 6
+    assert!(parser.gen_io_info().is_ok());
+
+    for _ in 0..3 {
+        let out_data = parser.run_with_data(data.clone(), None);
+        assert!(out_data.is_ok());
+        println!("Out data {:?}", out_data.as_ref().unwrap().data_list);
+        for i in 0..10 {
+            assert_eq!(
+                out_data.as_ref().unwrap().data_list[i]
+                    .as_ref()
+                    .unwrap()
+                    .series[0]
+                    .len(),
+                400
+            );
+        }
+    }
+}

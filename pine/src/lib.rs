@@ -34,7 +34,7 @@ use syntax::SyntaxParser;
 
 use libs::{declare_vars, VarResult};
 use runtime::context::{downcast_ctx, Ctx, PineRuntimeError, VarOperate};
-use runtime::data_src::{Callback, DataSrc};
+use runtime::data_src::{parse_datalen, Callback, DataSrc};
 use runtime::error_format::{ErrorFormater, PineFormatError};
 use runtime::output::{IOInfo, InputVal, OutputData, OutputDataCollect, SymbolInfo};
 use runtime::{AnySeries, AnySeriesType};
@@ -185,11 +185,28 @@ impl<'a> PineRunner<'a> {
         self.datasrc.run(data, syminfo)
     }
 
+    pub fn runl(
+        &mut self,
+        data: &Vec<(&'static str, AnySeries)>,
+        len: usize,
+        syminfo: Option<Rc<SymbolInfo>>,
+    ) -> Result<(), PineRuntimeError> {
+        self.datasrc.runl(data, len, syminfo)
+    }
+
     pub fn update(
         &mut self,
         data: &Vec<(&'static str, AnySeries)>,
     ) -> Result<(), PineRuntimeError> {
         self.datasrc.update(data)
+    }
+
+    pub fn updatel(
+        &mut self,
+        data: &Vec<(&'static str, AnySeries)>,
+        len: usize,
+    ) -> Result<(), PineRuntimeError> {
+        self.datasrc.updatel(data, len)
     }
 
     pub fn update_from(
@@ -198,6 +215,15 @@ impl<'a> PineRunner<'a> {
         from: i32,
     ) -> Result<(), PineRuntimeError> {
         self.datasrc.update_from(data, from)
+    }
+
+    pub fn update_froml(
+        &mut self,
+        data: &Vec<(&'static str, AnySeries)>,
+        from: i32,
+        len: usize,
+    ) -> Result<(), PineRuntimeError> {
+        self.datasrc.update_froml(data, from, len)
     }
 
     pub fn set_input_srcs(&mut self, srcs: Vec<String>) {
@@ -229,6 +255,7 @@ pub struct PineScript<'pa, 'li, 'ra> {
     callback: Option<&'ra dyn Callback>,
     runner: Option<PineRunner<'ra>>,
     data: Vec<(&'static str, AnySeries)>,
+    datalen: usize,
     syminfo: Option<Rc<SymbolInfo>>,
     error_format: ErrorFormater,
 }
@@ -258,6 +285,7 @@ impl<'pa, 'li, 'ra> PineScript<'pa, 'li, 'ra> {
             callback,
             runner: None,
             data: vec![],
+            datalen: 0,
             syminfo: None,
             error_format: ErrorFormater::new(),
         }
@@ -275,6 +303,7 @@ impl<'pa, 'li, 'ra> PineScript<'pa, 'li, 'ra> {
             callback,
             runner: None,
             data: vec![],
+            datalen: 0,
             syminfo: None,
             error_format: ErrorFormater::new(),
         }
@@ -372,7 +401,12 @@ impl<'pa, 'li, 'ra> PineScript<'pa, 'li, 'ra> {
     ) -> Result<OutputDataCollect, PineFormatError> {
         let runner = self.get_runner();
         runner.change_inputs(input);
-        match self.runner.as_mut().unwrap().run(&self.data, None) {
+        match self
+            .runner
+            .as_mut()
+            .unwrap()
+            .runl(&self.data, self.datalen, None)
+        {
             Ok(_) => Ok(self.move_output_data()),
             Err(err) => Err(PineFormatError::from_runtime_error(&self.error_format, err)),
         }
@@ -389,7 +423,21 @@ impl<'pa, 'li, 'ra> PineScript<'pa, 'li, 'ra> {
     // Run the script with new data
     pub fn run_with_data(
         &mut self,
+        data: Vec<(&'static str, AnySeries)>,
+        syminfo: Option<Rc<SymbolInfo>>,
+    ) -> Result<OutputDataCollect, PineFormatError>
+    where
+        'li: 'ra,
+        'pa: 'ra,
+    {
+        let len = parse_datalen(&data, &self.lib_info.input_names).unwrap();
+        self.run_with_datal(data, len, syminfo)
+    }
+
+    pub fn run_with_datal(
+        &mut self,
         mut data: Vec<(&'static str, AnySeries)>,
+        datalen: usize,
         syminfo: Option<Rc<SymbolInfo>>,
     ) -> Result<OutputDataCollect, PineFormatError>
     where
@@ -397,20 +445,27 @@ impl<'pa, 'li, 'ra> PineScript<'pa, 'li, 'ra> {
         'pa: 'ra,
     {
         PineScript::transform_data(&mut data);
+        self.datalen = datalen;
         self.data = data;
         self.syminfo = syminfo.clone();
         self.get_runner();
-        match self.runner.as_mut().unwrap().run(&self.data, syminfo) {
+        match self
+            .runner
+            .as_mut()
+            .unwrap()
+            .runl(&self.data, self.datalen, syminfo)
+        {
             Ok(_) => Ok(self.move_output_data()),
             Err(err) => Err(PineFormatError::from_runtime_error(&self.error_format, err)),
         }
     }
 
     // Run the script with new data
-    pub fn run(
+    pub fn runl(
         &mut self,
         input: Vec<Option<InputVal>>,
         mut data: Vec<(&'static str, AnySeries)>,
+        datalen: usize,
         syminfo: Option<Rc<SymbolInfo>>,
     ) -> Result<OutputDataCollect, PineFormatError>
     where
@@ -418,13 +473,33 @@ impl<'pa, 'li, 'ra> PineScript<'pa, 'li, 'ra> {
         'pa: 'ra,
     {
         PineScript::transform_data(&mut data);
+        self.datalen = datalen;
         self.data = data;
         self.syminfo = syminfo.clone();
         self.get_runner().change_inputs(input);
-        match self.runner.as_mut().unwrap().run(&self.data, syminfo) {
+        match self
+            .runner
+            .as_mut()
+            .unwrap()
+            .runl(&self.data, self.datalen, syminfo)
+        {
             Ok(_) => Ok(self.move_output_data()),
             Err(err) => Err(PineFormatError::from_runtime_error(&self.error_format, err)),
         }
+    }
+
+    pub fn run(
+        &mut self,
+        input: Vec<Option<InputVal>>,
+        data: Vec<(&'static str, AnySeries)>,
+        syminfo: Option<Rc<SymbolInfo>>,
+    ) -> Result<OutputDataCollect, PineFormatError>
+    where
+        'li: 'ra,
+        'pa: 'ra,
+    {
+        let len = parse_datalen(&data, &self.lib_info.input_names).unwrap();
+        self.runl(input, data, len, syminfo)
     }
 
     // Run the script with old data and input
@@ -434,7 +509,12 @@ impl<'pa, 'li, 'ra> PineScript<'pa, 'li, 'ra> {
         'pa: 'ra,
     {
         let syminfo = self.syminfo.clone();
-        match self.runner.as_mut().unwrap().run(&self.data, syminfo) {
+        match self
+            .runner
+            .as_mut()
+            .unwrap()
+            .runl(&self.data, self.datalen, syminfo)
+        {
             Ok(_) => Ok(self.move_output_data()),
             Err(err) => Err(PineFormatError::from_runtime_error(&self.error_format, err)),
         }
@@ -470,8 +550,18 @@ impl<'pa, 'li, 'ra> PineScript<'pa, 'li, 'ra> {
         &mut self,
         data: Vec<(&'static str, AnySeries)>,
     ) -> Result<OutputDataCollect, PineFormatError> {
-        self.merge_data(&data, self.data[0].1.len() - 1);
-        match self.runner.as_mut().unwrap().update(&data) {
+        let len = parse_datalen(&data, &self.lib_info.input_names).unwrap();
+        self.updatel(data, len)
+    }
+
+    pub fn updatel(
+        &mut self,
+        data: Vec<(&'static str, AnySeries)>,
+        dlen: usize,
+    ) -> Result<OutputDataCollect, PineFormatError> {
+        self.merge_data(&data, self.datalen - 1);
+        self.datalen += dlen - 1;
+        match self.runner.as_mut().unwrap().updatel(&data, dlen) {
             Ok(_) => Ok(self.move_output_data()),
             Err(err) => Err(PineFormatError::from_runtime_error(&self.error_format, err)),
         }
@@ -482,8 +572,24 @@ impl<'pa, 'li, 'ra> PineScript<'pa, 'li, 'ra> {
         data: Vec<(&'static str, AnySeries)>,
         from: i32,
     ) -> Result<OutputDataCollect, PineFormatError> {
+        let len = parse_datalen(&data, &self.lib_info.input_names).unwrap();
+        self.update_froml(data, from, len)
+    }
+
+    pub fn update_froml(
+        &mut self,
+        data: Vec<(&'static str, AnySeries)>,
+        from: i32,
+        dlen: usize,
+    ) -> Result<OutputDataCollect, PineFormatError> {
         self.merge_data(&data, from as usize);
-        match self.runner.as_mut().unwrap().update_from(&data, from) {
+        self.datalen = from as usize + dlen;
+        match self
+            .runner
+            .as_mut()
+            .unwrap()
+            .update_froml(&data, from, dlen)
+        {
             Ok(_) => Ok(self.move_output_data()),
             Err(err) => Err(PineFormatError::from_runtime_error(&self.error_format, err)),
         }
@@ -761,5 +867,46 @@ mod tests {
                 vec![Some(101f64), Some(110f64), Some(110f64), Some(111f64)]
             ))
         );
+    }
+
+    #[test]
+    fn datalen_test() {
+        let lib_info = LibInfo::new(vec![input::declare_var(), plot::declare_var()], vec![]);
+        let mut parser = PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+        parser.parse_src(String::from("plot(10)")).unwrap();
+        assert_eq!(
+            parser.run_with_datal(vec![], 2, None),
+            Ok(OutputDataCollect::new_with_one(
+                0,
+                2,
+                vec![Some(10f64), Some(10f64)]
+            ))
+        );
+        assert_eq!(
+            parser.runl(vec![], vec![], 1, None),
+            Ok(OutputDataCollect::new_with_one(0, 1, vec![Some(10f64),]))
+        );
+        assert_eq!(
+            parser.run_with_input(vec![]),
+            Ok(OutputDataCollect::new_with_one(0, 1, vec![Some(10f64),]))
+        );
+        assert_eq!(
+            parser.updatel(vec![], 2),
+            Ok(OutputDataCollect::new_with_one(
+                0,
+                2,
+                vec![Some(10f64), Some(10f64)]
+            ))
+        );
+
+        assert_eq!(
+            parser.update_froml(vec![], 1, 2),
+            Ok(OutputDataCollect::new_with_one(
+                1,
+                3,
+                vec![Some(10f64), Some(10f64)]
+            ))
+        );
+        assert_eq!(parser.datalen, 3);
     }
 }

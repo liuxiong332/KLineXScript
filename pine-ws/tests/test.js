@@ -99,3 +99,37 @@ it("log test", function () {
     assert(!isNaN(result[0].series[0][0]));
     // assert.deepEqual(result[0].series, [new Float64Array([10.0])]);
 });
+
+const FLScript = `
+plot(open)
+plot(close)
+plot(close)
+plot(close)
+plot(close)
+plot(close)
+plot(close)
+plot(close)
+plot(close)
+plot(close)
+`;
+
+it("fl script test", function () {
+    let runner = new Runner();
+
+    runner.parse(FLScript);
+    // console.log(runner.genIOInfo().inputs[0]);
+    assert.deepEqual(runner.genIOInfo().input_srcs, [{ ticker: null, srcs: ['open', 'close'] }]);
+
+    for (let m = 0; m < 3; m += 1) {
+        let farray = new Float64Array(800);
+        for (let i = 0; i < 400 * 2; i += 1) {
+            farray[i] = i + 100.0;
+        }
+
+        let result = runner.runWithData(["close", "open"], 400, farray);
+        // console.log(result[0].series[0]);
+        result.map(d => {
+            assert.equal(d.series[0].length, 400);
+        });
+    }
+});

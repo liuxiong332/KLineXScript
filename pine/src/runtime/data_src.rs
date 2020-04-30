@@ -32,7 +32,7 @@ pub struct DataSrc<'a> {
     has_run: bool,
 }
 
-fn get_len<'a>(
+pub fn parse_datalen<'a>(
     data: &Vec<(&'static str, AnySeries)>,
     names: &Vec<(&'a str, AnySeriesType)>,
 ) -> Result<usize, PineRuntimeError> {
@@ -218,7 +218,16 @@ impl<'a> DataSrc<'a> {
         data: &Vec<(&'static str, AnySeries)>,
         syminfo: Option<Rc<SymbolInfo>>,
     ) -> Result<(), PineRuntimeError> {
-        let len = get_len(data, &self.input_names)?;
+        let len = parse_datalen(data, &self.input_names)?;
+        self.runl(data, len, syminfo)
+    }
+
+    pub fn runl(
+        &mut self,
+        data: &Vec<(&'static str, AnySeries)>,
+        len: usize,
+        syminfo: Option<Rc<SymbolInfo>>,
+    ) -> Result<(), PineRuntimeError> {
         // Update the range of data.
         self.reset_vars();
         let main_ctx = downcast_ctx(self.context.as_mut());
@@ -234,8 +243,16 @@ impl<'a> DataSrc<'a> {
         &mut self,
         data: &Vec<(&'static str, AnySeries)>,
     ) -> Result<(), PineRuntimeError> {
-        let len = get_len(data, &self.input_names)?;
+        let len = parse_datalen(data, &self.input_names)?;
 
+        self.updatel(data, len)
+    }
+
+    pub fn updatel(
+        &mut self,
+        data: &Vec<(&'static str, AnySeries)>,
+        len: usize,
+    ) -> Result<(), PineRuntimeError> {
         let main_ctx = downcast_ctx(self.context.as_mut());
 
         // Get the range of exist running data.
@@ -252,8 +269,17 @@ impl<'a> DataSrc<'a> {
         data: &Vec<(&'static str, AnySeries)>,
         from: i32,
     ) -> Result<(), PineRuntimeError> {
-        let len = get_len(data, &self.input_names)?;
+        let len = parse_datalen(data, &self.input_names)?;
 
+        self.update_froml(data, from, len)
+    }
+
+    pub fn update_froml(
+        &mut self,
+        data: &Vec<(&'static str, AnySeries)>,
+        from: i32,
+        len: usize,
+    ) -> Result<(), PineRuntimeError> {
         let main_ctx = downcast_ctx(self.context.as_mut());
 
         let range = main_ctx.get_data_range();

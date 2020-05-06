@@ -1041,6 +1041,85 @@ fn swma_test() {
     is_equal(&mut parser, 0, 2);
 }
 
+const DMI_SCRIPT: &'static str = r#"
+adxlen = 2
+dilen = 2
+
+dirmov(len) =>
+	up = change(high)
+	down = -change(low)
+	truerange = rma(tr, len)
+	plus = fixnan(100 * rma(up > down and up > 0 ? up : 0, len) / truerange)
+	minus = fixnan(100 * rma(down > up and down > 0 ? down : 0, len) / truerange)
+    [plus, minus]
+
+myadx(dilen, adxlen) => 
+	[plus, minus] = dirmov(dilen)
+	sum = plus + minus
+	adx = 100 * rma(abs(plus - minus) / (sum == 0 ? 1 : sum), adxlen)
+	[plus, minus, adx]
+
+[sig, up, down] = myadx(dilen, adxlen)
+ 
+[diplus, diminus, adx] = dmi(dilen, adxlen)
+"#;
+
+#[test]
+fn dmi_test() {
+    use pine::ast::stat_expr_types::VarIndex;
+    use pine::helper::pine_ref_to_f64_series;
+    use pine::libs::{abs, change, dmi, ema, fixnan, plot, tr};
+    use pine::runtime::NoneCallback;
+
+    let lib_info = pine::LibInfo::new(
+        vec![
+            change::declare_change_var(),
+            ema::declare_rma_var(),
+            tr::declare_var(),
+            fixnan::declare_var(),
+            abs::declare_var(),
+            dmi::declare_var(),
+            plot::declare_var(),
+        ],
+        vec![
+            ("close", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("high", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("low", SyntaxType::Series(SimpleSyntaxType::Float)),
+        ],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+    parser.parse_src(String::from(DMI_SCRIPT)).unwrap();
+    let data = vec![
+        (
+            "close",
+            AnySeries::from_float_vec(vec![Some(20f64), Some(10f64), Some(5f64), Some(10f64)]),
+        ),
+        (
+            "high",
+            AnySeries::from_float_vec(vec![Some(30f64), Some(10f64), Some(10f64), Some(20f64)]),
+        ),
+        (
+            "low",
+            AnySeries::from_float_vec(vec![Some(10f64), Some(10f64), Some(5f64), Some(8f64)]),
+        ),
+    ];
+
+    assert!(parser.run_with_data(data, None).is_ok());
+
+    let is_equal = |parser: &mut pine::PineScript, x, y| {
+        let result1 = pine_ref_to_f64_series(parser.move_var(VarIndex::new(x, 0)));
+        let result2 = pine_ref_to_f64_series(parser.move_var(VarIndex::new(y, 0)));
+        assert_eq!(
+            result1.unwrap().index_value(1).unwrap(),
+            result2.unwrap().index_value(1).unwrap()
+        );
+    };
+
+    is_equal(&mut parser, 4, 7);
+    is_equal(&mut parser, 5, 8);
+    is_equal(&mut parser, 6, 9);
+}
+
 const MYPLOT_SCRIPT: &'static str = "
 // Plot colors
 col_grow_above = #26A69A

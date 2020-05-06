@@ -93,6 +93,16 @@ impl<'a, D: Default + PineType<'a> + Clone + Debug + 'a> Series<'a, D> {
         Ok(val)
     }
 
+    pub fn at(&self, i: usize) -> D {
+        let len = self.history.len();
+        match i {
+            // m if m < 0 => Err(SeriesErr::Negative),
+            0 => self.current.clone(),
+            m if m >= 1 && len >= 1 && m <= len => self.history[(len - i) as usize].clone(),
+            _ => D::default(),
+        }
+    }
+
     pub fn update(&mut self, current: D) {
         self.current = current;
     }

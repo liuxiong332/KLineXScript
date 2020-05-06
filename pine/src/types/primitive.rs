@@ -4,8 +4,8 @@ use super::pine_ref::PineRef;
 use super::ref_data::RefData;
 use super::series::Series;
 use super::traits::{
-    Arithmetic, Category, ComplexType, DataType, Negative, PineClass, PineFrom, PineStaticType,
-    PineType, SecondType, SimpleType,
+    Arithmetic, Category, Comparator, ComplexType, DataType, Negative, PineClass, PineFrom,
+    PineStaticType, PineType, SecondType, SimpleType,
 };
 
 // pine int type
@@ -176,6 +176,36 @@ impl Arithmetic for Float {
         match (self, other) {
             (Some(i1), Some(i2)) => Some(i1 % i2),
             _ => None,
+        }
+    }
+}
+
+impl Comparator for Float {
+    fn gt(self, other: Self) -> bool {
+        match (self, other) {
+            (Some(v1), Some(v2)) => v1 > v2,
+            _ => false,
+        }
+    }
+
+    fn ge(self, other: Self) -> bool {
+        match (self, other) {
+            (Some(v1), Some(v2)) => v1 >= v2,
+            _ => false,
+        }
+    }
+
+    fn lt(self, other: Self) -> bool {
+        match (self, other) {
+            (Some(v1), Some(v2)) => v1 < v2,
+            _ => false,
+        }
+    }
+
+    fn le(self, other: Self) -> bool {
+        match (self, other) {
+            (Some(v1), Some(v2)) => v1 <= v2,
+            _ => false,
         }
     }
 }

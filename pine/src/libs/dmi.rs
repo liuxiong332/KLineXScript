@@ -4,39 +4,107 @@ use crate::ast::stat_expr_types::VarIndex;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
 use crate::helper::{
     ensure_srcs, float_abs, float_max, move_element, pine_ref_to_bool, pine_ref_to_f64,
-    pine_ref_to_f64_series, pine_ref_to_i64, require_param, series_index,
+    pine_ref_to_f64_series, pine_ref_to_i64, require_param, series_index, series_index2,
 };
+use crate::libs::change::series_change;
+use crate::libs::ema::series_rma;
+use crate::libs::tr::series_tr;
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::InputSrc;
 use crate::types::{
-    downcast_pf_ref, int2float, Arithmetic, Callable, CallableFactory, Float, Int, PineRef,
-    RefData, RuntimeErr, Series, SeriesCall, Tuple,
+    downcast_pf_ref, int2float, Arithmetic, Callable, CallableFactory, Comparator, Float, Int,
+    Negative, PineRef, RefData, RuntimeErr, Series, SeriesCall, Tuple,
 };
 use std::mem;
 use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
-struct DmiVal {
+struct DirmovProps<'a> {
+    trs: Series<'a, Float>,
+    dm1s: Series<'a, Float>,
+    dm2s: Series<'a, Float>,
+}
+
+impl<'a> DirmovProps<'a> {
+    fn new() -> DirmovProps<'a> {
+        DirmovProps {
+            trs: Series::new(),
+            dm1s: Series::new(),
+            dm2s: Series::new(),
+        }
+    }
+
+    fn commit(&mut self) {
+        self.trs.commit();
+        self.dm1s.commit();
+        self.dm2s.commit();
+    }
+}
+
+// dirmov(len) =>
+// 	up = change(high)
+// 	down = -change(low)
+// 	truerange = rma(tr, len)
+// 	plus = fixnan(100 * rma(up > down and up > 0 ? up : 0, len) / truerange)
+// 	minus = fixnan(100 * rma(down > up and down > 0 ? down : 0, len) / truerange)
+//     [plus, minus]
+fn dirmov(
+    high: &Series<Float>,
+    low: &Series<Float>,
+    close: &Series<Float>,
+    props: &mut DirmovProps,
+    len: i64,
+) -> Result<(Float, Float), RuntimeErr> {
+    let up = series_change(high, 1);
+    let down = series_change(low, 1).negative();
+
+    let trv = series_tr(high.at(0), low.at(0), close);
+    let truerange = series_rma(trv, len, &mut props.trs)?;
+
+    let dm_plus = if up.gt(down) && up.gt(Some(0f64)) {
+        up
+    } else {
+        Some(0f64)
+    };
+    let plus = Some(100f64)
+        .mul(series_rma(dm_plus, len, &mut props.dm1s)?)
+        .div(truerange);
+
+    let dm_minus = if down.gt(up) && down.gt(Some(0f64)) {
+        down
+    } else {
+        Some(0f64)
+    };
+    let minus = Some(100f64)
+        .mul(series_rma(dm_minus, len, &mut props.dm2s)?)
+        .div(truerange);
+
+    return Ok((plus, minus));
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct DmiVal<'a> {
     close_index: VarIndex,
     low_index: VarIndex,
     high_index: VarIndex,
-    val_history: Vec<Float>,
-    prev_val: Float,
+
+    dirmov_props: DirmovProps<'a>,
+    adxs: Series<'a, Float>,
 }
 
-impl DmiVal {
-    pub fn new() -> DmiVal {
+impl<'a> DmiVal<'a> {
+    pub fn new() -> DmiVal<'a> {
         DmiVal {
             close_index: VarIndex::new(0, 0),
             low_index: VarIndex::new(0, 0),
             high_index: VarIndex::new(0, 0),
-            val_history: vec![],
-            prev_val: Some(0f64),
+            dirmov_props: DirmovProps::new(),
+            adxs: Series::new(),
         }
     }
 }
 
-impl<'a> SeriesCall<'a> for DmiVal {
+impl<'a> SeriesCall<'a> for DmiVal<'a> {
     fn step(
         &mut self,
         ctx: &mut dyn Ctx<'a>,
@@ -58,63 +126,42 @@ impl<'a> SeriesCall<'a> for DmiVal {
             pine_ref_to_i64(mem::replace(&mut param[1], None)),
         )?;
 
-        let close = pine_ref_to_f64_series(ctx.get_var(self.close_index).clone());
-        let low = pine_ref_to_f64_series(ctx.get_var(self.low_index).clone());
-        let high = pine_ref_to_f64_series(ctx.get_var(self.high_index).clone());
+        let close = require_param(
+            "close",
+            pine_ref_to_f64_series(ctx.get_var(self.close_index).clone()),
+        )?;
+        let low = require_param(
+            "low",
+            pine_ref_to_f64_series(ctx.get_var(self.low_index).clone()),
+        )?;
+        let high = require_param(
+            "high",
+            pine_ref_to_f64_series(ctx.get_var(self.high_index).clone()),
+        )?;
 
-        let mut tr = Some(0f64);
-        let mut dm_ps = Some(0f64);
-        let mut dm_ms = Some(0f64);
-        for i in 0..di_len as usize {
-            let tr_val = float_max(
-                float_abs(series_index(&high, i).minus(series_index(&low, i))),
-                float_abs(series_index(&high, i).minus(series_index(&close, i + 1))),
-                float_abs(series_index(&low, i).minus(series_index(&close, i + 1))),
-            );
+        // myadx(dilen, adxlen) =>
+        // [plus, minus] = dirmov(dilen)
+        // sum = plus + minus
+        // adx = 100 * rma(abs(plus - minus) / (sum == 0 ? 1 : sum), adxlen)
+        // [adx, plus, minus]
 
-            let dm_plus1 = series_index(&high, i).minus(series_index(&high, i + 1));
-            let dm_minus1 = series_index(&low, i).minus(series_index(&low, i + 1));
-            let dm_plus = if dm_plus1 < dm_minus1 {
-                Some(0f64)
-            } else {
-                dm_plus1
-            };
-            let dm_minus = if dm_minus1 < dm_plus1 {
-                Some(0f64)
-            } else {
-                dm_minus1
-            };
-            tr = tr.add(tr_val);
-            dm_ps = dm_ps.add(dm_plus);
-            dm_ms = dm_ms.add(dm_minus);
-        }
+        let (plus, minus) = dirmov(&*high, &*low, &*close, &mut self.dirmov_props, di_len)?;
+        let sum = plus.add(minus);
+        let aval =
+            float_abs(plus.minus(minus)).div(if sum == Some(0f64) { Some(1f64) } else { sum });
+        let adx = series_rma(aval, adx_len, &mut self.adxs)?.mul(Some(100f64));
 
-        println!("tr val {:?} {:?} {:?}", tr, dm_ps, dm_ms);
+        self.dirmov_props.commit();
+        self.adxs.commit();
 
-        let di_plus = dm_ps.div(tr).mul(Some(100f64));
-        let di_minus = dm_ms.div(tr).mul(Some(100f64));
-
-        let dx = (di_plus.minus(di_minus))
-            .div(di_plus.add(di_minus))
-            .mul(Some(100f64));
-        self.val_history.push(dx);
-
-        let mut adx = Some(0f64);
-        for i in 0..adx_len as usize {
-            if i < self.val_history.len() {
-                adx = adx.add(self.val_history[i]);
-            }
-        }
-        adx = adx.div(Some(adx_len as f64));
         Ok(PineRef::new(Tuple(vec![
-            PineRef::new_rc(Series::from(di_plus)),
-            PineRef::new_rc(Series::from(di_minus)),
+            PineRef::new_rc(Series::from(plus)),
+            PineRef::new_rc(Series::from(minus)),
             PineRef::new_rc(Series::from(adx)),
         ])))
     }
 
     fn back(&mut self, _context: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
-        self.val_history.pop();
         Ok(())
     }
 

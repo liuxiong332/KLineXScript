@@ -16,6 +16,16 @@ use crate::types::{
 use std::mem;
 use std::rc::Rc;
 
+pub fn series_rma<'a>(
+    src: Float,
+    length: i64,
+    rma: &mut Series<Float>,
+) -> Result<Float, RuntimeErr> {
+    let val = rma_func(src, length, rma.at(1))?;
+    rma.update(val);
+    Ok(val)
+}
+
 pub fn ema_func<'a>(source: Float, length: i64, prev_val: Float) -> Result<Float, RuntimeErr> {
     let mut sum = 0f64;
     let alpha = 2f64 / (length + 1) as f64;
@@ -33,6 +43,7 @@ pub fn ema_func<'a>(source: Float, length: i64, prev_val: Float) -> Result<Float
 pub fn rma_func<'a>(source: Float, length: i64, prev_val: Float) -> Result<Float, RuntimeErr> {
     let mut sum = 0f64;
     let alpha = length as f64;
+    println!("with rma {:?} {:?} {:?}", source, prev_val, length);
     match source {
         Some(val) => {
             sum = val + (alpha - 1f64) * prev_val.unwrap_or(0f64);

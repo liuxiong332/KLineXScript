@@ -199,6 +199,16 @@ pub trait Arithmetic {
     fn rem(self, other: Self) -> Self;
 }
 
+pub trait Comparator {
+    fn gt(self, other: Self) -> bool;
+
+    fn ge(self, other: Self) -> bool;
+
+    fn lt(self, other: Self) -> bool;
+
+    fn le(self, other: Self) -> bool;
+}
+
 pub trait SimpleType {}
 
 pub trait ComplexType {}

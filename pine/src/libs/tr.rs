@@ -4,7 +4,7 @@ use crate::ast::stat_expr_types::VarIndex;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
 use crate::helper::{
     ensure_srcs, float_abs, float_max, move_element, pine_ref_to_bool, pine_ref_to_f64,
-    pine_ref_to_f64_series, pine_ref_to_i64, require_param, series_index,
+    pine_ref_to_f64_series, pine_ref_to_i64, require_param, series_index, series_index2,
 };
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::InputSrc;
@@ -15,6 +15,10 @@ use crate::types::{
 };
 use std::mem;
 use std::rc::Rc;
+
+pub fn series_tr(high: Float, low: Float, close: &Series<Float>) -> Float {
+    tr_func(high, low, series_index2(close, 1))
+}
 
 pub fn tr_func(high: Float, low: Float, preclose: Float) -> Float {
     float_max(

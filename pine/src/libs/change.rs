@@ -4,7 +4,7 @@ use crate::helper::err_msgs::*;
 use crate::helper::str_replace;
 use crate::helper::{
     check_ge1_i64, move_element, pine_ref_to_f64, pine_ref_to_f64_series, pine_ref_to_i64,
-    series_index,
+    require_param, series_index, series_index2,
 };
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::types::{
@@ -14,16 +14,20 @@ use crate::types::{
 use std::mem;
 use std::rc::Rc;
 
+pub fn series_change(series: &Series<Option<f64>>, length: usize) -> Float {
+    series_index2(series, 0).minus(series_index2(series, length))
+}
+
 fn change_func<'a>(
     _context: &mut dyn Ctx<'a>,
     mut param: Vec<Option<PineRef<'a>>>,
     _func_type: FunctionType<'a>,
 ) -> Result<PineRef<'a>, RuntimeErr> {
     move_tuplet!((source, length) = param);
-    let series = pine_ref_to_f64_series(source);
+    let series = require_param("series", pine_ref_to_f64_series(source))?;
     let length = check_ge1_i64("length", pine_ref_to_i64(length).unwrap_or(1i64))? as usize;
 
-    let val = series_index(&series, 0).minus(series_index(&series, length));
+    let val = series_change(&*series, length);
     Ok(PineRef::new_rc(Series::from(val)))
 }
 

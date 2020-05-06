@@ -105,6 +105,7 @@ impl<'a> SeriesCall<'a> for DmiVal {
                 adx = adx.add(self.val_history[i]);
             }
         }
+        adx = adx.div(Some(adx_len as f64));
         Ok(PineRef::new(Tuple(vec![
             PineRef::new_rc(Series::from(di_plus)),
             PineRef::new_rc(Series::from(di_minus)),

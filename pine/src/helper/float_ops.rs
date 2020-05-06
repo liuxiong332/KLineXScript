@@ -1,10 +1,16 @@
 use crate::types::{Float, RefData, Series};
 
+#[inline]
 pub fn series_index(series: &Option<RefData<Series<Float>>>, index: usize) -> Float {
     match series {
         None => None,
         Some(s) => s.index_value(index).unwrap(),
     }
+}
+
+#[inline]
+pub fn series_index2(series: &Series<Float>, index: usize) -> Float {
+    series.index_value(index).unwrap()
 }
 
 pub fn float_max2(f1: Float, f2: Float) -> Float {

@@ -1,4 +1,3 @@
-use super::ema::ema_func;
 use super::kc::KcVal;
 use super::sma::{declare_ma_var, wma_func};
 use super::tr::tr_func;

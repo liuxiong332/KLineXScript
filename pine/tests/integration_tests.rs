@@ -163,6 +163,12 @@ sumVol := start ? sumVol : sumVol + sumVol[1]
 plot(sumSrc / sumVol, title="VWAP", color=color.blue)
 "#;
 
+const ALMA_ERR_SCRIPTS: &'static str = r#"
+study("alma test ") 
+plot(alma(close, -9, 0.85, 6))
+plot(close,color = color.red)
+"#;
+
 #[test]
 fn datasrc_test() {
     let lib_info = pine::LibInfo::new(
@@ -233,4 +239,7 @@ fn datasrc_test() {
 
     parser.parse_src(String::from(VWAP_SCRIPTS)).unwrap();
     assert!(parser.run_with_data(data.clone(), None).is_ok());
+
+    parser.parse_src(String::from(ALMA_ERR_SCRIPTS)).unwrap();
+    assert!(parser.run_with_data(data.clone(), None).is_err());
 }

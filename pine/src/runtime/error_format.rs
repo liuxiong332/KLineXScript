@@ -61,7 +61,7 @@ static ERROR_MAP: &[(&'static str, &'static str)] = &[
     // ("InvalidTypeCast", "The type cast is not valid."),
     ("InvalidNADeclarer", "The variable can't be declared with na."),
     ("UnrecongnizedSession", "Unrecognized session string."),
-    ("InvalidParameters", "The parameters are not valid."),
+    ("InvalidParameters", "The parameters are not valid. {}"),
     ("MissingParameters", "Missing parameters. {}"),
     ("FuncCallParamNotValid", "The function call's parameters is not valid, {}."),
     ("VarNotFound", "The variable doesn't exist in this cotnext."),

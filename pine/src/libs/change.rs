@@ -99,4 +99,53 @@ mod tests {
             Some(PineRef::new(Series::from_vec(vec![None, Some(10f64)])))
         );
     }
+
+    #[test]
+    fn change_color_test() {
+        use crate::libs::color;
+        use crate::libs::plot;
+        use crate::runtime::output::{OutputData, StrOptionsData};
+
+        let lib_info = LibInfo::new(
+            vec![
+                declare_change_var(),
+                plot::declare_var(),
+                color::declare_var(),
+            ],
+            vec![
+                ("high", SyntaxType::Series(SimpleSyntaxType::Float)),
+                ("low", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ],
+        );
+        // 5 10 -10
+        let src = "ao = high - low\nplot(ao, color = change(ao) <= 0 ? color.red : color.green, style=plot.style_histogram)";
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        runner
+            .run(
+                &vec![
+                    (
+                        "high",
+                        AnySeries::from_float_vec(vec![Some(10f64), Some(20f64), Some(10f64)]),
+                    ),
+                    (
+                        "low",
+                        AnySeries::from_float_vec(vec![Some(5f64), Some(10f64), Some(20f64)]),
+                    ),
+                ],
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            runner.move_output_data(),
+            vec![Some(OutputData::new_with_sc(
+                vec![vec![Some(5f64), Some(10f64), Some(-10f64)]],
+                vec![StrOptionsData {
+                    options: vec![String::from("#FF5252"), String::from("#4CAF50")],
+                    values: vec![Some(0), Some(1), Some(0)]
+                }]
+            )),]
+        );
+    }
 }

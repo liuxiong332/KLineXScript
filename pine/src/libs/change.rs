@@ -1,7 +1,10 @@
 use super::VarResult;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
+use crate::helper::err_msgs::*;
+use crate::helper::str_replace;
 use crate::helper::{
-    move_element, pine_ref_to_f64, pine_ref_to_f64_series, pine_ref_to_i64, series_index,
+    check_ge1_i64, move_element, pine_ref_to_f64, pine_ref_to_f64_series, pine_ref_to_i64,
+    series_index,
 };
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::types::{
@@ -18,7 +21,7 @@ fn change_func<'a>(
 ) -> Result<PineRef<'a>, RuntimeErr> {
     move_tuplet!((source, length) = param);
     let series = pine_ref_to_f64_series(source);
-    let length = pine_ref_to_i64(length).unwrap_or(1i64) as usize;
+    let length = check_ge1_i64("length", pine_ref_to_i64(length).unwrap_or(1i64))? as usize;
 
     let val = series_index(&series, 0).minus(series_index(&series, length));
     Ok(PineRef::new_rc(Series::from(val)))

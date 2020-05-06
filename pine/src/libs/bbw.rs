@@ -2,6 +2,8 @@ use super::sma::{sma_func, stdev_func};
 use super::VarResult;
 use crate::ast::stat_expr_types::VarIndex;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
+use crate::helper::err_msgs::*;
+use crate::helper::str_replace;
 use crate::helper::{
     move_element, pine_ref_to_bool, pine_ref_to_f64, pine_ref_to_f64_series, pine_ref_to_i64,
     require_param,
@@ -29,6 +31,14 @@ impl<'a> SeriesCall<'a> for BbVal {
         let series = require_param("series", pine_ref_to_f64_series(series))?;
         let length = require_param("length", pine_ref_to_i64(length))?;
         let mult = require_param("mult", pine_ref_to_f64(mult))?;
+
+        if length < 1i64 {
+            return Err(RuntimeErr::InvalidParameters(str_replace(
+                GE_1,
+                vec![String::from("length")],
+            )));
+        }
+
         let basis = sma_func(RefData::clone(&series), length)?;
         let dev = Some(mult).mul(stdev_func(series, length)?);
 

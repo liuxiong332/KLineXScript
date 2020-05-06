@@ -2,6 +2,8 @@ use super::ema::rma_func;
 use super::VarResult;
 use crate::ast::stat_expr_types::VarIndex;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
+use crate::helper::err_msgs::*;
+use crate::helper::str_replace;
 use crate::helper::{
     ensure_srcs, float_abs, float_max, move_element, pine_ref_to_bool, pine_ref_to_f64,
     pine_ref_to_f64_series, pine_ref_to_i64, require_param, series_index,
@@ -63,6 +65,13 @@ impl<'a> SeriesCall<'a> for AtrVal {
 
         let length = require_param("length", pine_ref_to_i64(mem::replace(&mut param[0], None)))?;
 
+        if length < 1i64 {
+            return Err(RuntimeErr::InvalidParameters(str_replace(
+                GE_1,
+                vec![String::from("length")],
+            )));
+        }
+
         let close = pine_ref_to_f64_series(ctx.get_var(self.close_index).clone());
         let low = pine_ref_to_f64_series(ctx.get_var(self.low_index).clone());
         let high = pine_ref_to_f64_series(ctx.get_var(self.high_index).clone());
@@ -110,7 +119,7 @@ mod tests {
     use crate::{LibInfo, PineParser, PineRunner};
 
     #[test]
-    fn accdist_test() {
+    fn atr_test() {
         let lib_info = LibInfo::new(
             vec![declare_var()],
             vec![
@@ -149,5 +158,30 @@ mod tests {
             runner.get_context().get_var(VarIndex::new(0, 0)),
             &Some(PineRef::new(Series::from_vec(vec![val1, val2])))
         );
+    }
+
+    #[test]
+    fn atr_len_err_test() {
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![
+                ("close", SyntaxType::float_series()),
+                ("high", SyntaxType::float_series()),
+                ("low", SyntaxType::float_series()),
+            ],
+        );
+        let src = "m = atr(-2)";
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        assert!(runner
+            .run(
+                &vec![(
+                    "close",
+                    AnySeries::from_float_vec(vec![Some(10f64), Some(20f64)]),
+                ),],
+                None,
+            )
+            .is_err());
     }
 }

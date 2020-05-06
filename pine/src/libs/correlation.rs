@@ -4,8 +4,8 @@ use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, Syn
 use crate::helper::err_msgs::*;
 use crate::helper::str_replace;
 use crate::helper::{
-    move_element, pine_ref_to_bool, pine_ref_to_f64, pine_ref_to_f64_series, pine_ref_to_i64,
-    require_param,
+    ge1_param_i64, move_element, pine_ref_to_bool, pine_ref_to_f64, pine_ref_to_f64_series,
+    pine_ref_to_i64, require_param,
 };
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::InputSrc;
@@ -66,7 +66,7 @@ impl<'a> SeriesCall<'a> for CorrelationVal {
 
         let source_a = require_param("source_a", pine_ref_to_f64_series(source_a))?;
         let source_b = require_param("source_b", pine_ref_to_f64_series(source_b))?;
-        let length = require_param("length", pine_ref_to_i64(length))?;
+        let length = ge1_param_i64("length", pine_ref_to_i64(length))?;
         Ok(PineRef::new(Series::from(cor_func(
             source_a, source_b, length,
         )?)))
@@ -110,7 +110,7 @@ mod tests {
     // use crate::libs::{floor, exp, };
 
     #[test]
-    fn alma_test() {
+    fn correlation_test() {
         let lib_info = LibInfo::new(
             vec![declare_var()],
             vec![
@@ -142,5 +142,35 @@ mod tests {
         //     runner.get_context().move_var(VarIndex::new(3, 0)),
         //     Some(PineRef::new(Series::from_vec(vec![Some(0f64), Some(9f64)])))
         // );
+    }
+
+    #[test]
+    fn correlation_len_err_test() {
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![
+                ("close", SyntaxType::float_series()),
+                ("open", SyntaxType::float_series()),
+            ],
+        );
+        let src = "m = correlation(close, open, -2)";
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        assert!(runner
+            .run(
+                &vec![
+                    (
+                        "close",
+                        AnySeries::from_float_vec(vec![Some(1f64), Some(2f64)]),
+                    ),
+                    (
+                        "open",
+                        AnySeries::from_float_vec(vec![Some(2f64), Some(4f64)]),
+                    ),
+                ],
+                None,
+            )
+            .is_err());
     }
 }

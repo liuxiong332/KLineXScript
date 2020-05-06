@@ -31,6 +31,13 @@ impl<'a> SeriesCall<'a> for AlmaVal {
         let length = require_param("length", pine_ref_to_f64(length))?;
         let offset = require_param("offset", pine_ref_to_f64(offset))?;
         let sigma = require_param("sigma", pine_ref_to_f64(sigma))?;
+
+        if length < 1f64 {
+            return Err(RuntimeErr::InvalidParameters(str_replace(
+                GE_1,
+                vec![String::from("length")],
+            )));
+        }
         // m = floor(offset * (windowsize - 1))
         let m = (offset * (length - 1f64)).floor();
 
@@ -120,5 +127,26 @@ mod tests {
                 None,
             )
             .unwrap();
+    }
+
+    #[test]
+    fn alma_len_err_test() {
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![("close", SyntaxType::float_series())],
+        );
+        let src = "alma(close, -9, 0.85, 6)";
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        assert!(runner
+            .run(
+                &vec![(
+                    "close",
+                    AnySeries::from_float_vec(vec![Some(10f64), Some(20f64)]),
+                )],
+                None,
+            )
+            .is_err());
     }
 }

@@ -3,3 +3,4 @@ pub const NO_FIELD_IN_OBJECT: &'static str = "No field named {} found for {}.";
 pub const REQUIRED_PARAMETERS: &'static str = "Required parameters {}.";
 pub const UNRECONGNIZED_TZ: &'static str = "Unrecognized timezone {}.";
 pub const UNRECONGNIZED_RES: &'static str = "Unrecognized resolution {}.";
+pub const GE_1: &'static str = "The value of {} should be greater than or equal to 1.";

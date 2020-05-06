@@ -3,6 +3,8 @@ use super::sma::sma_func;
 use super::VarResult;
 use crate::ast::stat_expr_types::VarIndex;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
+use crate::helper::err_msgs::*;
+use crate::helper::str_replace;
 use crate::helper::{
     ensure_srcs, move_element, pine_ref_to_bool, pine_ref_to_f64, pine_ref_to_f64_series,
     pine_ref_to_i64, require_param, series_index,
@@ -77,6 +79,12 @@ impl<'a> SeriesCall<'a> for CciVal {
         let series = pine_ref_to_f64_series(mem::replace(&mut param[0], None));
 
         let length = require_param("length", pine_ref_to_i64(mem::replace(&mut param[1], None)))?;
+        if length < 1i64 {
+            return Err(RuntimeErr::InvalidParameters(str_replace(
+                GE_1,
+                vec![String::from("length")],
+            )));
+        }
 
         let low = pine_ref_to_f64(ctx.get_var(self.low_index).clone());
         let high = pine_ref_to_f64(ctx.get_var(self.high_index).clone());

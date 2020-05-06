@@ -4,8 +4,8 @@ use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, Syn
 use crate::helper::err_msgs::*;
 use crate::helper::str_replace;
 use crate::helper::{
-    move_element, pine_ref_to_bool, pine_ref_to_f64, pine_ref_to_f64_series, pine_ref_to_i64,
-    require_param,
+    ge1_param_i64, move_element, pine_ref_to_bool, pine_ref_to_f64, pine_ref_to_f64_series,
+    pine_ref_to_i64,
 };
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::InputSrc;
@@ -81,7 +81,7 @@ impl<'a> SeriesCall<'a> for EmaVal {
         move_tuplet!((source, length) = param);
 
         let source = pine_ref_to_f64(source);
-        let length = require_param("length", pine_ref_to_i64(length))?;
+        let length = ge1_param_i64("length", pine_ref_to_i64(length))?;
 
         let func = unsafe {
             mem::transmute::<_, fn(Float, i64, Float) -> Result<Float, RuntimeErr>>(self.ma_func)

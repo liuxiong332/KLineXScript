@@ -1179,6 +1179,50 @@ fn hma_test() {
     is_equal(&mut parser, 2, 4);
 }
 
+const STDEV_SCRIPT: &str = "
+plot(stdev(close, 2)) 
+pstdev(Series, Period) =>
+    mean = sum(Series, Period) / Period
+    summation = 0.0
+    for i=0 to Period-1
+        sampleMinusMean = nz(Series[i]) - mean
+        summation := summation + sampleMinusMean * sampleMinusMean
+    sqrt(summation / Period)
+plot(pstdev(close, 2)) 
+";
+
+#[test]
+fn stdev_test() {
+    use pine::libs::{abs, cos, ema, nz, plot, sma, sum};
+    use pine::runtime::NoneCallback;
+
+    let lib_info = pine::LibInfo::new(
+        vec![
+            sma::declare_stdev_var(),
+            sum::declare_var(),
+            nz::declare_var(),
+            cos::declare_sqrt_var(),
+            plot::declare_var(),
+        ],
+        vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+    parser.parse_src(String::from(STDEV_SCRIPT)).unwrap();
+    let data = vec![(
+        "close",
+        AnySeries::from_float_vec(vec![Some(20f64), Some(10f64), Some(5f64)]),
+    )];
+
+    let out_data = parser.run_with_data(data, None);
+    assert!(out_data.is_ok());
+
+    let data_list = out_data.unwrap().data_list;
+    assert_eq!(
+        data_list[0].as_ref().unwrap().series[0].last(),
+        data_list[1].as_ref().unwrap().series[0].last()
+    );
+}
+
 const MYPLOT_SCRIPT: &'static str = "
 // Plot colors
 col_grow_above = #26A69A

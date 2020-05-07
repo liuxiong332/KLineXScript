@@ -103,9 +103,10 @@ mod tests {
             )
             .unwrap();
         // 9 +   None, 3 * sqrt(2) * 1.2 * 2 / 9
-        let res = 18f64.sqrt() * 1.2f64 * 2f64 / 9f64;
+        let res = 3f64 * 1.2f64 * 2f64 / 9f64;
         let series = pine_ref_to_f64_series(runner.get_context().move_var(VarIndex::new(0, 0)));
         let res_val = series.unwrap().index_value(1).unwrap().unwrap();
+        println!("get res {:?} {:?}", res_val, res);
         assert!((res_val - res).abs() < 0.1f64);
         // assert_eq!(
         //     ,

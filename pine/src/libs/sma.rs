@@ -60,13 +60,11 @@ fn deviation(values: Vec<f64>, avg: f64) -> f64 {
 }
 
 fn variance(values: Vec<f64>, avg: f64) -> f64 {
-    let v = values.iter().fold(0f64, |mul, x| mul + (x - avg).powi(2)) / values.len() as f64;
-    v.sqrt()
+    values.iter().fold(0f64, |mul, x| mul + (x - avg).powi(2)) / values.len() as f64
 }
 
 fn stdev(values: Vec<f64>, avg: f64) -> f64 {
-    let v = values.iter().fold(0f64, |mul, x| mul + (x - avg).powi(2)) / (values.len() - 1) as f64;
-    v.sqrt()
+    variance(values, avg).sqrt()
 }
 
 pub fn generic_dev_func<'a>(
@@ -207,7 +205,7 @@ mod tests {
     // use crate::libs::{floor, exp, };
 
     #[test]
-    fn alma_test() {
+    fn sma_test() {
         let lib_info = LibInfo::new(
             vec![
                 declare_sma_var(),
@@ -248,14 +246,11 @@ mod tests {
         );
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(starti + 3, 0)),
-            Some(PineRef::new(Series::from_vec(vec![Some(0f64), Some(3f64)])))
+            Some(PineRef::new(Series::from_vec(vec![Some(0f64), Some(9f64)])))
         );
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(starti + 4, 0)),
-            Some(PineRef::new(Series::from_vec(vec![
-                None,
-                Some(18f64.sqrt())
-            ])))
+            Some(PineRef::new(Series::from_vec(vec![Some(0f64), Some(3f64)])))
         );
     }
 }

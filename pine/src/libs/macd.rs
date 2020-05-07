@@ -1,4 +1,4 @@
-use super::ema::ema_func;
+use super::ema::series_ema;
 use super::sma::{declare_ma_var, wma_func};
 use super::tr::tr_func;
 use super::VarResult;
@@ -32,20 +32,22 @@ fn val_generator<'a>(vals: (Float, Float, Float)) -> PineRef<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct KcVal {
-    prev_close: Float,
-    prev_dif: Float,
+pub struct KcVal<'a> {
+    ema1s: Series<'a, Float>,
+    ema2s: Series<'a, Float>,
+    dems: Series<'a, Float>,
 }
 
-impl KcVal {
-    pub fn new() -> KcVal {
+impl<'a> KcVal<'a> {
+    pub fn new() -> KcVal<'a> {
         KcVal {
-            prev_close: None,
-            prev_dif: None,
+            ema1s: Series::new(),
+            ema2s: Series::new(),
+            dems: Series::new(),
         }
     }
 
-    fn process_macd<'a>(
+    fn process_macd(
         &mut self,
         _ctx: &mut dyn Ctx<'a>,
         mut param: Vec<Option<PineRef<'a>>>,
@@ -58,21 +60,22 @@ impl KcVal {
         let slowlen = require_param("slowlen", pine_ref_to_i64(slowlen))?;
         let siglen = require_param("siglen", pine_ref_to_i64(siglen))?;
 
-        let ema1 = ema_func(close, fastlen, self.prev_close)?;
-        let ema2 = ema_func(close, slowlen, self.prev_close)?;
+        let ema1 = series_ema(close, fastlen, &mut self.ema1s)?;
+        let ema2 = series_ema(close, slowlen, &mut self.ema2s)?;
         let dif = ema1.minus(ema2);
 
-        let dem = ema_func(dif, siglen, self.prev_dif)?;
+        let dem = series_ema(dif, siglen, &mut self.dems)?;
         let osc = dif.minus(dem);
 
-        self.prev_close = close;
-        self.prev_dif = dif;
+        self.ema2s.commit();
+        self.ema2s.commit();
+        self.dems.commit();
 
         Ok((dif, dem, osc))
     }
 }
 
-impl<'a> SeriesCall<'a> for KcVal {
+impl<'a> SeriesCall<'a> for KcVal<'a> {
     fn step(
         &mut self,
         _ctx: &mut dyn Ctx<'a>,

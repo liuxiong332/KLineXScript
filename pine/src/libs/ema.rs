@@ -26,6 +26,16 @@ pub fn series_rma<'a>(
     Ok(val)
 }
 
+pub fn series_ema<'a>(
+    src: Float,
+    length: i64,
+    ema: &mut Series<Float>,
+) -> Result<Float, RuntimeErr> {
+    let val = ema_func(src, length, ema.at(1))?;
+    ema.update(val);
+    Ok(val)
+}
+
 pub fn ema_func<'a>(source: Float, length: i64, prev_val: Float) -> Result<Float, RuntimeErr> {
     let mut sum = 0f64;
     let alpha = 2f64 / (length + 1) as f64;

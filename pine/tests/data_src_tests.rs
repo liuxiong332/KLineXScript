@@ -206,39 +206,51 @@ pine_ema(x, y) =>
     sum := alpha * x + (1 - alpha) * (sum[1] ? sum[1] : 0)
     sum
 
-pine_macd() =>
+pine_macd(fastlen, slowlen, siglen) =>
     // DIF=EMA_{{(close,12)}}-EMA_{{(close,26)}}
-    dif = pine_ema(close, 12.0) - pine_ema(close, 26.0)
+    dif = ema(close, fastlen) - ema(close, slowlen)
     // DEM=EMA_{{(DIF,9)}}
-    dem = pine_ema(dif, 9.0)
+    dem = ema(dif, siglen)
     //OSC=DIF-DEM=DIF-MACD
     osc = dif - dem
     osc
 
-plot(pine_macd())
+plot(pine_macd(3, 3, 3))
+
+[macdLine, signalLine, histLine] = macd(close, 3, 3, 3)
+plot(histLine)
 ";
 
 #[test]
 fn macd_test() {
+    use pine::libs::{ema, macd};
     let lib_info = pine::LibInfo::new(
-        vec![plot::declare_var()],
+        vec![
+            plot::declare_var(),
+            macd::declare_var(),
+            ema::declare_ema_var(),
+        ],
         vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
     );
     let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
     parser.parse_src(String::from(MACD_SCRIPT)).unwrap();
     let data = vec![(
         "close",
-        AnySeries::from_float_vec(vec![Some(200f64), Some(400f64)]),
+        AnySeries::from_float_vec(vec![Some(2f64), Some(4f64), Some(1f64), Some(12f64)]),
     )];
 
     // assert!(parser.run_with_data(data, None).is_ok());
     let out_data = parser.run_with_data(data, None);
+    // assert_eq!(
+    //     out_data.as_ref().unwrap().data_list[0],
+    //     Some(OutputData::new(vec![vec![
+    //         Some(12.763532763532766f64),
+    //         Some(32.82882444136006f64),
+    //     ]]))
+    // );
     assert_eq!(
-        out_data.unwrap().data_list[0],
-        Some(OutputData::new(vec![vec![
-            Some(12.763532763532766f64),
-            Some(32.82882444136006f64),
-        ]]))
+        out_data.as_ref().unwrap().data_list[0],
+        out_data.as_ref().unwrap().data_list[1],
     );
 }
 

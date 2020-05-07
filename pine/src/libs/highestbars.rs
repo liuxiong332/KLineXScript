@@ -3,8 +3,8 @@ use super::VarResult;
 use crate::ast::stat_expr_types::VarIndex;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
 use crate::helper::{
-    ensure_srcs, float_abs, float_max, move_element, pine_ref_to_bool, pine_ref_to_f64,
-    pine_ref_to_f64_series, pine_ref_to_i64, require_param, series_index,
+    ensure_srcs, float_abs, float_max, ge1_param_i64, move_element, pine_ref_to_bool,
+    pine_ref_to_f64, pine_ref_to_f64_series, pine_ref_to_i64, require_param, series_index,
 };
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::InputSrc;
@@ -66,10 +66,10 @@ impl<'a> SeriesCall<'a> for AtrVal {
             });
 
             source = pine_ref_to_f64_series(ctx.get_var(self.dest_index).clone());
-            length = require_param("length", pine_ref_to_i64(mem::replace(&mut param[0], None)))?;
+            length = ge1_param_i64("length", pine_ref_to_i64(mem::replace(&mut param[0], None)))?;
         } else {
             source = pine_ref_to_f64_series(mem::replace(&mut param[0], None));
-            length = require_param("length", pine_ref_to_i64(mem::replace(&mut param[1], None)))?;
+            length = ge1_param_i64("length", pine_ref_to_i64(mem::replace(&mut param[1], None)))?;
         }
         let max_val = runner(&source, length);
         Ok(PineRef::new_rc(Series::from(max_val)))

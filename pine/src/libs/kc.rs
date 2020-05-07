@@ -7,8 +7,8 @@ use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, Syn
 use crate::helper::err_msgs::*;
 use crate::helper::str_replace;
 use crate::helper::{
-    ensure_srcs, move_element, pine_ref_to_bool, pine_ref_to_f64, pine_ref_to_f64_series,
-    pine_ref_to_i64, require_param,
+    ensure_srcs, ge1_param_i64, move_element, pine_ref_to_bool, pine_ref_to_f64,
+    pine_ref_to_f64_series, pine_ref_to_i64, require_param,
 };
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::InputSrc;
@@ -73,7 +73,7 @@ impl KcVal {
         move_tuplet!((series, length, multi, use_true_range) = param);
 
         let sval = pine_ref_to_f64(series);
-        let length = require_param("length", pine_ref_to_i64(length))?;
+        let length = ge1_param_i64("length", pine_ref_to_i64(length))?;
         let multi = require_param("multi", pine_ref_to_f64(multi))?;
         let use_true_range = pine_ref_to_bool(use_true_range).unwrap_or(false);
 

@@ -5,8 +5,8 @@ use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, Syn
 use crate::helper::err_msgs::*;
 use crate::helper::str_replace;
 use crate::helper::{
-    move_element, pine_ref_to_bool, pine_ref_to_f64, pine_ref_to_f64_series, pine_ref_to_i64,
-    require_param,
+    ge1_param_i64, move_element, pine_ref_to_bool, pine_ref_to_f64, pine_ref_to_f64_series,
+    pine_ref_to_i64, require_param,
 };
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::InputSrc;
@@ -75,7 +75,7 @@ impl<'a> SeriesCall<'a> for HmaVal {
         move_tuplet!((source, length) = param);
 
         let source = require_param("source", pine_ref_to_f64_series(source))?;
-        let length = require_param("length", pine_ref_to_i64(length))?;
+        let length = ge1_param_i64("length", pine_ref_to_i64(length))?;
         let val = calc_x(source, length)?;
 
         self.val_history.push(val);

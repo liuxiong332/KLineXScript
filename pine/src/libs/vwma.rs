@@ -4,8 +4,8 @@ use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, Syn
 use crate::helper::err_msgs::*;
 use crate::helper::str_replace;
 use crate::helper::{
-    ensure_srcs, move_element, pine_ref_to_bool, pine_ref_to_f64, pine_ref_to_f64_series,
-    pine_ref_to_i64, pine_ref_to_i64_series, require_param,
+    ensure_srcs, ge1_param_i64, move_element, pine_ref_to_bool, pine_ref_to_f64,
+    pine_ref_to_f64_series, pine_ref_to_i64, pine_ref_to_i64_series, require_param,
 };
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::InputSrc;
@@ -62,7 +62,7 @@ impl<'a> SeriesCall<'a> for EmaVal {
         move_tuplet!((source, length) = param);
 
         let source = require_param("source", pine_ref_to_f64_series(source))?;
-        let length = require_param("length", pine_ref_to_i64(length))?;
+        let length = ge1_param_i64("length", pine_ref_to_i64(length))?;
         let volume = pine_ref_to_i64_series(_ctx.get_var(self.volume_index).clone()).unwrap();
         let result = swma_func(source, volume, length)?;
         Ok(PineRef::new(Series::from(result)))

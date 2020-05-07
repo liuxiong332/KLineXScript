@@ -3,8 +3,8 @@ use super::VarResult;
 use crate::ast::stat_expr_types::VarIndex;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
 use crate::helper::{
-    float_abs, float_max, move_element, pine_ref_to_bool, pine_ref_to_f64, pine_ref_to_f64_series,
-    pine_ref_to_i64, require_param, series_index,
+    float_abs, float_max, ge1_param_i64, move_element, pine_ref_to_bool, pine_ref_to_f64,
+    pine_ref_to_f64_series, pine_ref_to_i64, require_param, series_index,
 };
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::InputSrc;
@@ -47,7 +47,7 @@ impl<'a> SeriesCall<'a> for AtrVal {
         move_tuplet!((source, length) = param);
 
         let source = require_param("source", pine_ref_to_f64_series(source))?;
-        let length = require_param("length", pine_ref_to_i64(length))?;
+        let length = ge1_param_i64("length", pine_ref_to_i64(length))?;
         let check_func = unsafe { mem::transmute::<_, CheckHandler<'a>>(self.check_func) };
         check_func(source, length)
     }

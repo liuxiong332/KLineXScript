@@ -9,8 +9,8 @@ use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, Syn
 use crate::helper::err_msgs::*;
 use crate::helper::str_replace;
 use crate::helper::{
-    ensure_srcs, float_abs, float_max2, move_element, pine_ref_to_bool, pine_ref_to_f64,
-    pine_ref_to_f64_series, pine_ref_to_i64, require_param, series_index,
+    ensure_srcs, float_abs, float_max2, ge1_param_i64, move_element, pine_ref_to_bool,
+    pine_ref_to_f64, pine_ref_to_f64_series, pine_ref_to_i64, require_param, series_index,
 };
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::InputSrc;
@@ -64,7 +64,7 @@ impl KcVal {
         move_tuplet!((series, length) = param);
 
         let series = require_param("series", pine_ref_to_f64_series(series))?;
-        let length = require_param("length", pine_ref_to_i64(length))?;
+        let length = ge1_param_i64("length", pine_ref_to_i64(length))?;
 
         let s0 = series.index_value(0).unwrap();
         let s1 = series.index_value(1).unwrap();

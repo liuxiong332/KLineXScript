@@ -1062,6 +1062,7 @@ impl<'a> SyntaxParser<'a> {
                         _ => SyntaxType::Simple(SimpleSyntaxType::String),
                     };
                     binary.result_type = result_type.clone();
+                    binary.ref_type = result_type.clone();
                     return Ok(ParseValue::new_with_type(result_type));
                 }
                 // The operator must be num type int, float, series(int), series(float)
@@ -1073,6 +1074,7 @@ impl<'a> SyntaxParser<'a> {
                 }
                 if let Some(result_type) = similar_type(&exp1_type, &exp2_type) {
                     binary.result_type = result_type.clone();
+                    binary.ref_type = result_type.clone();
                     Ok(ParseValue::new_with_type(result_type))
                 } else {
                     Err(PineInputError::new(
@@ -1088,7 +1090,15 @@ impl<'a> SyntaxParser<'a> {
                         binary.range,
                     ));
                 }
-                gen_bool(binary, exp1_type, exp2_type)
+                if let Some(result_type) = similar_type(&exp1_type, &exp2_type) {
+                    binary.ref_type = result_type.clone();
+                    gen_bool(binary, exp1_type, exp2_type)
+                } else {
+                    Err(PineInputError::new(
+                        PineErrorKind::TypeMismatch,
+                        binary.range,
+                    ))
+                }
             }
             BinaryOp::Eq | BinaryOp::Neq => {
                 if let Some(_type) = similar_type(&exp2_type, &exp1_type) {
@@ -1242,6 +1252,7 @@ impl<'a> SyntaxParser<'a> {
                 assign.var_index = downcast_ctx(self.context).get_var_index(assign.name.value);
                 let last_type = simple_to_series(cur_type.clone());
                 let val_res = self.parse_exp(&mut assign.val)?;
+                context.update_var(assign.name.value, last_type.clone());
                 if implicity_convert(&val_res.syntax_type, &last_type) {
                     Ok(ParseValue::new_with_type(last_type))
                 } else {

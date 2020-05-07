@@ -203,10 +203,9 @@ pub fn binary_op_run<'a, 'b>(
         _ => {
             let val1 = binary_exp.exp1.rv_run(context)?;
             let val2 = binary_exp.exp2.rv_run(context)?;
-            match (&binary_exp.op, val1.get_type(), val2.get_type()) {
+            match (&binary_exp.op, &binary_exp.ref_type) {
                 // series(string) + series(string)
-                (BinaryOp::Plus, (FirstType::String, SecondType::Series), _)
-                | (_, _, (FirstType::String, SecondType::Series)) => {
+                (BinaryOp::Plus, &SyntaxType::Series(SimpleSyntaxType::String)) => {
                     let s1: RefData<Series<String>> = Series::implicity_from(val1).unwrap();
                     let s2: RefData<Series<String>> = Series::implicity_from(val2).unwrap();
                     Ok(PineRef::new_rc(Series::from(
@@ -214,35 +213,32 @@ pub fn binary_op_run<'a, 'b>(
                     )))
                 }
                 // string + string
-                (BinaryOp::Plus, (FirstType::String, SecondType::Simple), _)
-                | (_, _, (FirstType::String, SecondType::Simple)) => Ok(PineRef::new_rc(
-                    String::implicity_from(val1).unwrap().into_inner()
-                        + &(String::implicity_from(val2).unwrap().into_inner()),
-                )),
+                (BinaryOp::Plus, &SyntaxType::Simple(SimpleSyntaxType::String)) => {
+                    Ok(PineRef::new_rc(
+                        String::implicity_from(val1).unwrap().into_inner()
+                            + &(String::implicity_from(val2).unwrap().into_inner()),
+                    ))
+                }
                 // series(float) +/-/.. any
-                (op, (FirstType::Float, SecondType::Series), _)
-                | (op, _, (FirstType::Float, SecondType::Series)) => {
+                (op, &SyntaxType::Series(SimpleSyntaxType::Float)) => {
                     let f1: RefData<Series<Float>> = Series::implicity_from(val1).unwrap();
                     let f2: RefData<Series<Float>> = Series::implicity_from(val2).unwrap();
                     Ok(bi_operate(op, f1, f2))
                 }
-                // series(int) +/-/.. any
-                (op, (FirstType::Int, SecondType::Series), _)
-                | (op, _, (FirstType::Int, SecondType::Series)) => {
-                    let d1: RefData<Series<Int>> = Series::implicity_from(val1).unwrap();
-                    let d2: RefData<Series<Int>> = Series::implicity_from(val2).unwrap();
-                    Ok(bi_operate(op, d1, d2))
-                }
                 // float +/-/.. any
-                (op, (FirstType::Float, SecondType::Simple), _)
-                | (op, _, (FirstType::Float, SecondType::Simple)) => {
+                (op, &SyntaxType::Simple(SimpleSyntaxType::Float)) => {
                     let f1 = Float::implicity_from(val1).unwrap();
                     let f2 = Float::implicity_from(val2).unwrap();
                     Ok(bi_operate(op, f1, f2))
                 }
+                // series(int) +/-/.. any
+                (op, &SyntaxType::Series(SimpleSyntaxType::Int)) => {
+                    let d1: RefData<Series<Int>> = Series::implicity_from(val1).unwrap();
+                    let d2: RefData<Series<Int>> = Series::implicity_from(val2).unwrap();
+                    Ok(bi_operate(op, d1, d2))
+                }
                 // int +/-/.. any
-                (op, (FirstType::Int, SecondType::Simple), _)
-                | (op, _, (FirstType::Int, SecondType::Simple)) => {
+                (op, &SyntaxType::Simple(SimpleSyntaxType::Int)) => {
                     let d1 = Int::implicity_from(val1).unwrap();
                     let d2 = Int::implicity_from(val2).unwrap();
                     Ok(bi_operate(op, d1, d2))
@@ -300,15 +296,12 @@ mod tests {
         op: BinaryOp,
         v1: Exp<'a>,
         v2: Exp<'a>,
+        ref_type: SyntaxType<'a>,
     ) -> Result<RefData<D>, RuntimeErr> {
+        let mut binary_exp = BinaryExp::new(op, v1, v2, StrRange::new_empty());
+        binary_exp.ref_type = ref_type;
         let mut context = Context::new(None, ContextType::Normal);
-        downcast_pf::<D>(
-            binary_op_run(
-                &BinaryExp::new(op, v1, v2, StrRange::new_empty()),
-                &mut context,
-            )
-            .unwrap(),
-        )
+        downcast_pf::<D>(binary_op_run(&binary_exp, &mut context).unwrap())
     }
 
     fn biop_runner_type<'a, D: PineStaticType + PartialEq + Debug + 'a>(
@@ -339,15 +332,25 @@ mod tests {
     #[test]
     fn binary_op_test() {
         assert_eq!(
-            biop_runner(BinaryOp::Plus, int_exp(1), int_exp(2)),
+            biop_runner(BinaryOp::Plus, int_exp(1), int_exp(2), SyntaxType::int()),
             Ok(RefData::new_box(Some(3)))
         );
         assert_eq!(
-            biop_runner(BinaryOp::Plus, float_exp(1f64), float_exp(2f64)),
+            biop_runner(
+                BinaryOp::Plus,
+                float_exp(1f64),
+                float_exp(2f64),
+                SyntaxType::float()
+            ),
             Ok(RefData::new_box(Some(3f64)))
         );
         assert_eq!(
-            biop_runner(BinaryOp::Plus, int_exp(1i64), float_exp(2f64)),
+            biop_runner(
+                BinaryOp::Plus,
+                int_exp(1i64),
+                float_exp(2f64),
+                SyntaxType::float()
+            ),
             Ok(RefData::new_box(Some(3f64)))
         );
         assert_eq!(
@@ -360,42 +363,78 @@ mod tests {
                 Exp::Str(StringNode::new(
                     String::from("world"),
                     StrRange::new_empty()
-                ))
+                )),
+                SyntaxType::string(),
             ),
             Ok(RefData::new(String::from("helloworld")))
         );
 
         assert_eq!(
-            biop_runner(BinaryOp::Minus, int_exp(2), int_exp(1)),
+            biop_runner(BinaryOp::Minus, int_exp(2), int_exp(1), SyntaxType::int()),
             Ok(RefData::new_box(Some(1)))
         );
         assert_eq!(
-            biop_runner(BinaryOp::Minus, float_exp(2f64), float_exp(1f64)),
+            biop_runner(
+                BinaryOp::Minus,
+                float_exp(2f64),
+                float_exp(1f64),
+                SyntaxType::float()
+            ),
             Ok(RefData::new_box(Some(1f64)))
         );
         assert_eq!(
-            biop_runner(BinaryOp::Mul, int_exp(2i64), int_exp(3i64)),
+            biop_runner(
+                BinaryOp::Mul,
+                int_exp(2i64),
+                int_exp(3i64),
+                SyntaxType::int()
+            ),
             Ok(RefData::new_box(Some(6i64)))
         );
         assert_eq!(
-            biop_runner(BinaryOp::Mul, float_exp(2f64), float_exp(3f64)),
+            biop_runner(
+                BinaryOp::Mul,
+                float_exp(2f64),
+                float_exp(3f64),
+                SyntaxType::float()
+            ),
             Ok(RefData::new_box(Some(6f64)))
         );
         assert_eq!(
-            biop_runner(BinaryOp::Div, int_exp(5i64), int_exp(2i64)),
+            biop_runner(
+                BinaryOp::Div,
+                int_exp(5i64),
+                int_exp(2i64),
+                SyntaxType::int()
+            ),
             Ok(RefData::new_box(Some(2i64)))
         );
         assert_eq!(
-            biop_runner(BinaryOp::Div, float_exp(5f64), float_exp(2f64)),
+            biop_runner(
+                BinaryOp::Div,
+                float_exp(5f64),
+                float_exp(2f64),
+                SyntaxType::float()
+            ),
             Ok(RefData::new_box(Some(2.5f64)))
         );
 
         assert_eq!(
-            biop_runner(BinaryOp::Mod, int_exp(12i64), int_exp(5i64)),
+            biop_runner(
+                BinaryOp::Mod,
+                int_exp(12i64),
+                int_exp(5i64),
+                SyntaxType::int()
+            ),
             Ok(RefData::new_box(Some(2i64)))
         );
         assert_eq!(
-            biop_runner(BinaryOp::Mod, float_exp(12f64), float_exp(5f64)),
+            biop_runner(
+                BinaryOp::Mod,
+                float_exp(12f64),
+                float_exp(5f64),
+                SyntaxType::float()
+            ),
             Ok(RefData::new_box(Some(2f64)))
         );
     }
@@ -419,19 +458,19 @@ mod tests {
             Ok(RefData::new_box(true))
         );
         assert_eq!(
-            biop_runner(BinaryOp::Gt, int_exp(2), int_exp(1)),
+            biop_runner(BinaryOp::Gt, int_exp(2), int_exp(1), SyntaxType::int()),
             Ok(RefData::new_box(true))
         );
         assert_eq!(
-            biop_runner(BinaryOp::Geq, int_exp(2), int_exp(1)),
+            biop_runner(BinaryOp::Geq, int_exp(2), int_exp(1), SyntaxType::int()),
             Ok(RefData::new_box(true))
         );
         assert_eq!(
-            biop_runner(BinaryOp::Lt, int_exp(2), int_exp(1)),
+            biop_runner(BinaryOp::Lt, int_exp(2), int_exp(1), SyntaxType::int()),
             Ok(RefData::new_box(false))
         );
         assert_eq!(
-            biop_runner(BinaryOp::Leq, int_exp(2), int_exp(1)),
+            biop_runner(BinaryOp::Leq, int_exp(2), int_exp(1), SyntaxType::int()),
             Ok(RefData::new_box(false))
         );
     }
@@ -469,20 +508,16 @@ mod tests {
         op: BinaryOp,
         v1: Exp<'a>,
         v2: Exp<'a>,
+        ref_type: SyntaxType<'a>,
     ) -> Result<RefData<D>, RuntimeErr> {
+        let mut binary_exp = BinaryExp::new(op, v1, v2, StrRange::new_empty());
+        binary_exp.ref_type = ref_type;
         let mut context = Context::new(None, ContextType::Normal);
         context.init_vars(vec![
             Some(PineRef::new_box(Some(4))),
             Some(PineRef::new_box(Some(2))),
         ]);
-
-        downcast_pf::<D>(
-            binary_op_run(
-                &BinaryExp::new(op, v1, v2, StrRange::new_empty()),
-                &mut context,
-            )
-            .unwrap(),
-        )
+        downcast_pf::<D>(binary_op_run(&binary_exp, &mut context).unwrap())
     }
 
     fn biop_rv_runner_type<'a, D: PineStaticType + PartialEq + Debug + 'a>(
@@ -517,23 +552,48 @@ mod tests {
     #[test]
     fn rv_op_test() {
         assert_eq!(
-            biop_rv_runner(BinaryOp::Plus, var_exp("arg1", 0), var_exp("arg2", 1)),
+            biop_rv_runner(
+                BinaryOp::Plus,
+                var_exp("arg1", 0),
+                var_exp("arg2", 1),
+                SyntaxType::int()
+            ),
             Ok(RefData::new_box(Some(6)))
         );
         assert_eq!(
-            biop_rv_runner(BinaryOp::Minus, var_exp("arg1", 0), var_exp("arg2", 1)),
+            biop_rv_runner(
+                BinaryOp::Minus,
+                var_exp("arg1", 0),
+                var_exp("arg2", 1),
+                SyntaxType::int()
+            ),
             Ok(RefData::new_box(Some(2)))
         );
         assert_eq!(
-            biop_rv_runner(BinaryOp::Mul, var_exp("arg1", 0), var_exp("arg2", 1)),
+            biop_rv_runner(
+                BinaryOp::Mul,
+                var_exp("arg1", 0),
+                var_exp("arg2", 1),
+                SyntaxType::int()
+            ),
             Ok(RefData::new_box(Some(8)))
         );
         assert_eq!(
-            biop_rv_runner(BinaryOp::Div, var_exp("arg1", 0), var_exp("arg2", 1)),
+            biop_rv_runner(
+                BinaryOp::Div,
+                var_exp("arg1", 0),
+                var_exp("arg2", 1),
+                SyntaxType::int()
+            ),
             Ok(RefData::new_box(Some(2)))
         );
         assert_eq!(
-            biop_rv_runner(BinaryOp::Mod, var_exp("arg1", 0), var_exp("arg2", 1)),
+            biop_rv_runner(
+                BinaryOp::Mod,
+                var_exp("arg1", 0),
+                var_exp("arg2", 1),
+                SyntaxType::int()
+            ),
             Ok(RefData::new_box(Some(0)))
         );
 
@@ -546,19 +606,39 @@ mod tests {
             Ok(RefData::new_box(true))
         );
         assert_eq!(
-            biop_rv_runner(BinaryOp::Lt, var_exp("arg1", 0), var_exp("arg2", 1)),
+            biop_rv_runner(
+                BinaryOp::Lt,
+                var_exp("arg1", 0),
+                var_exp("arg2", 1),
+                SyntaxType::int()
+            ),
             Ok(RefData::new_box(false))
         );
         assert_eq!(
-            biop_rv_runner(BinaryOp::Leq, var_exp("arg1", 0), var_exp("arg2", 1)),
+            biop_rv_runner(
+                BinaryOp::Leq,
+                var_exp("arg1", 0),
+                var_exp("arg2", 1),
+                SyntaxType::int()
+            ),
             Ok(RefData::new_box(false))
         );
         assert_eq!(
-            biop_rv_runner(BinaryOp::Gt, var_exp("arg1", 0), var_exp("arg2", 1)),
+            biop_rv_runner(
+                BinaryOp::Gt,
+                var_exp("arg1", 0),
+                var_exp("arg2", 1),
+                SyntaxType::int()
+            ),
             Ok(RefData::new_box(true))
         );
         assert_eq!(
-            biop_rv_runner(BinaryOp::Geq, var_exp("arg1", 0), var_exp("arg2", 1)),
+            biop_rv_runner(
+                BinaryOp::Geq,
+                var_exp("arg1", 0),
+                var_exp("arg2", 1),
+                SyntaxType::int()
+            ),
             Ok(RefData::new_box(true))
         );
         assert_eq!(

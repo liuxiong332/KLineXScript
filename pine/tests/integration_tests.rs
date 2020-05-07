@@ -169,6 +169,21 @@ plot(alma(close, -9, 0.85, 6))
 plot(close,color = color.red)
 "#;
 
+const VWAP1_SCRIPTS: &'static str = r#"
+length = input(14, "Time Period Length")
+band = input(1.0, "Multipiler")
+vp = 0.0
+for i = 0 to length - 1
+	vp := vp + volume[i]
+    
+xv = 0.0
+for i = 0 to length - 1
+	xv := xv + close[i] * (volume[i])
+
+vwap1 = xv / vp
+plot(vwap1)
+"#;
+
 #[test]
 fn datasrc_test() {
     let lib_info = pine::LibInfo::new(
@@ -242,4 +257,7 @@ fn datasrc_test() {
 
     parser.parse_src(String::from(ALMA_ERR_SCRIPTS)).unwrap();
     assert!(parser.run_with_data(data.clone(), None).is_err());
+
+    parser.parse_src(String::from(VWAP1_SCRIPTS)).unwrap();
+    assert!(parser.run_with_data(data.clone(), None).is_ok());
 }

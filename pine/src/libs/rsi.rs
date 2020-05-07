@@ -1,5 +1,5 @@
 use super::ema::ema_func;
-use super::ema::rma_func;
+use super::ema::series_rma;
 use super::sma::{declare_ma_var, wma_func};
 use super::tr::tr_func;
 use super::VarResult;
@@ -25,14 +25,14 @@ pub fn calc_rsi(
     s0: Float,
     length: i64,
     s1: Float,
-    prev_upward: Float,
-    prev_downward: Float,
+    upwards: &mut Series<Float>,
+    downwards: &mut Series<Float>,
 ) -> Result<(Float, Float, Float), RuntimeErr> {
     let upward = float_max2(s0.minus(s1), Some(0f64));
     let downward = float_max2(s1.minus(s0), Some(0f64));
 
-    let rma1 = rma_func(upward, length, prev_upward)?;
-    let rma2 = rma_func(downward, length, prev_downward)?;
+    let rma1 = series_rma(upward, length, upwards)?;
+    let rma2 = series_rma(downward, length, downwards)?;
     let rs = rma1.div(rma2);
 
     let res = Some(100f64).minus(Some(100f64).div(rs.add(Some(1f64))));
@@ -47,20 +47,20 @@ pub fn calc_rsi_series(s0: Float, s1: Float) -> Result<Float, RuntimeErr> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct KcVal {
-    prev_upward: Float,
-    prev_downward: Float,
+pub struct KcVal<'a> {
+    upwards: Series<'a, Float>,
+    downwards: Series<'a, Float>,
 }
 
-impl KcVal {
-    pub fn new() -> KcVal {
+impl<'a> KcVal<'a> {
+    pub fn new() -> KcVal<'a> {
         KcVal {
-            prev_upward: None,
-            prev_downward: None,
+            upwards: Series::new(),
+            downwards: Series::new(),
         }
     }
 
-    fn process_rsi<'a>(
+    fn process_rsi(
         &mut self,
         _ctx: &mut dyn Ctx<'a>,
         mut param: Vec<Option<PineRef<'a>>>,
@@ -75,9 +75,9 @@ impl KcVal {
                 let s0 = series.index_value(0).unwrap();
                 let s1 = series.index_value(1).unwrap();
                 let (res, upward, downward) =
-                    calc_rsi(s0, length, s1, self.prev_upward, self.prev_downward)?;
-                self.prev_downward = downward;
-                self.prev_upward = upward;
+                    calc_rsi(s0, length, s1, &mut self.upwards, &mut self.downwards)?;
+                self.upwards.commit();
+                self.downwards.commit();
                 Ok(res)
             }
             _ => {
@@ -92,7 +92,7 @@ impl KcVal {
     }
 }
 
-impl<'a> SeriesCall<'a> for KcVal {
+impl<'a> SeriesCall<'a> for KcVal<'a> {
     fn step(
         &mut self,
         _ctx: &mut dyn Ctx<'a>,

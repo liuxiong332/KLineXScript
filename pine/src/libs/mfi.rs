@@ -2,6 +2,7 @@ use super::ema::ema_func;
 use super::ema::rma_func;
 use super::rsi::calc_rsi_series;
 use super::sma::{declare_ma_var, wma_func};
+use super::sum::series_sum;
 use super::tr::tr_func;
 use super::VarResult;
 use crate::ast::stat_expr_types::VarIndex;
@@ -20,41 +21,29 @@ use crate::types::{
     SeriesCall, Tuple,
 };
 use std::rc::Rc;
-
-fn sum_vec<'a>(source: &Vec<Float>, length: i64) -> Float {
-    let mut sum_val = Some(0f64);
-    for i in 0..length {
-        if i < source.len() as i64 {
-            let val = source[i as usize];
-            sum_val = sum_val.add(val);
-        }
-    }
-    sum_val
-}
-
 #[derive(Debug, Clone, PartialEq)]
-pub struct KcVal {
+pub struct KcVal<'a> {
     volume_index: VarIndex,
-    upper_history: Vec<Float>,
-    lower_history: Vec<Float>,
+    upper_history: Series<'a, Float>,
+    lower_history: Series<'a, Float>,
 }
 
-impl KcVal {
-    pub fn new() -> KcVal {
+impl<'a> KcVal<'a> {
+    pub fn new() -> KcVal<'a> {
         KcVal {
             volume_index: VarIndex::new(0, 0),
-            upper_history: vec![],
-            lower_history: vec![],
+            upper_history: Series::new(),
+            lower_history: Series::new(),
         }
     }
 
-    fn handle_index<'a>(&mut self, ctx: &mut dyn Ctx<'a>) {
+    fn handle_index(&mut self, ctx: &mut dyn Ctx<'a>) {
         ensure_srcs(ctx, vec!["volume"], |indexs| {
             self.volume_index = indexs[0];
         });
     }
 
-    fn process_rsi<'a>(
+    fn process_rsi(
         &mut self,
         _ctx: &mut dyn Ctx<'a>,
         mut param: Vec<Option<PineRef<'a>>>,
@@ -75,18 +64,23 @@ impl KcVal {
         } else {
             s0.mul(volume)
         };
+        self.upper_history.update(upper);
 
         let lower = if s0.minus(s1) >= Some(0f64) {
             Some(0f64)
         } else {
             s0.mul(volume)
         };
+        self.lower_history.update(lower);
 
-        self.upper_history.push(upper);
-        self.lower_history.push(lower);
+        // self.upper_history.push(upper);
+        // self.lower_history.push(lower);
 
-        let upper_sum = sum_vec(&self.upper_history, length);
-        let lower_sum = sum_vec(&self.lower_history, length);
+        let upper_sum = series_sum(&self.upper_history, length)?;
+        let lower_sum = series_sum(&self.lower_history, length)?;
+
+        self.upper_history.commit();
+        self.lower_history.commit();
 
         let res = if lower_sum.is_none() {
             None
@@ -98,7 +92,7 @@ impl KcVal {
     }
 }
 
-impl<'a> SeriesCall<'a> for KcVal {
+impl<'a> SeriesCall<'a> for KcVal<'a> {
     fn step(
         &mut self,
         _ctx: &mut dyn Ctx<'a>,
@@ -163,7 +157,7 @@ mod tests {
                 &vec![
                     (
                         "close",
-                        AnySeries::from_float_vec(vec![Some(20f64), Some(10f64), Some(20f64)]),
+                        AnySeries::from_float_vec(vec![Some(20f64), Some(10f64), Some(40f64)]),
                     ),
                     (
                         "volume",
@@ -177,10 +171,12 @@ mod tests {
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(0, 0)),
             Some(PineRef::new(Series::from_vec(vec![
+                None,
                 Some(0f64),
-                Some(0f64),
-                Some(0f64),
+                Some(80f64),
             ])))
         );
     }
 }
+
+// 20 10 20, na 0 40, na 10 0  40 10  rs 2  res 100 - 100 / 5

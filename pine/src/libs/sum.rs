@@ -10,6 +10,15 @@ use crate::types::{
     RefData, RuntimeErr, Series, SeriesCall, NA,
 };
 
+pub fn series_sum<'a>(source: &Series<Float>, length: i64) -> Result<Float, RuntimeErr> {
+    let mut sum_val = Some(0f64);
+    for i in 0..length {
+        let val = source.at(i as usize);
+        sum_val = sum_val.add(val);
+    }
+    Ok(sum_val)
+}
+
 fn sum_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<Float, RuntimeErr> {
     let mut sum_val = Some(0f64);
     for i in 0..length {

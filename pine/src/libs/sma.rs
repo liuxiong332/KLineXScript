@@ -18,6 +18,24 @@ use std::f64;
 use std::mem;
 use std::rc::Rc;
 
+pub fn series_wma<'a>(series: &Series<Float>, length: usize) -> Result<Float, RuntimeErr> {
+    let mut norm = 0f64;
+    let mut sum = 0f64;
+    for i in 0..length {
+        let weight = (length - i) as f64;
+        norm += weight;
+        match series.index_value(i)? {
+            Some(val) => {
+                sum += val * weight as f64;
+            }
+            None => {
+                return Ok(Float::from(None));
+            }
+        }
+    }
+    Ok(Some(sum / norm))
+}
+
 pub fn sma_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<Float, RuntimeErr> {
     let mut sum = 0f64;
     for i in 0..length as usize {
@@ -34,21 +52,7 @@ pub fn sma_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<Float
 }
 
 pub fn wma_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<Float, RuntimeErr> {
-    let mut norm = 0f64;
-    let mut sum = 0f64;
-    for i in 0..length as usize {
-        let weight = ((length - i as i64) * length) as f64;
-        norm += weight;
-        match source.index_value(i)? {
-            Some(val) => {
-                sum += val * weight as f64;
-            }
-            None => {
-                return Ok(Float::from(None));
-            }
-        }
-    }
-    Ok(Some(sum / norm))
+    series_wma(&*source, length as usize)
 }
 
 fn deviation(values: Vec<f64>, avg: f64) -> f64 {

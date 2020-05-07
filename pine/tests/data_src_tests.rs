@@ -1120,6 +1120,53 @@ fn dmi_test() {
     is_equal(&mut parser, 6, 9);
 }
 
+const HMA_SCRIPT: &'static str = r#"
+src = close
+length = 2
+hmaBuildIn = hma(src, length)
+
+// X=2*WMA(C,ROUND(N/2))-WMA(C,N);
+// HULLMA=WMA(X,ROUND(SQRT(N)));
+x = 2 * wma(src, round(length / 2)) - wma(src, length)
+hullma = wma(x, round(sqrt(length)))
+"#;
+
+#[test]
+fn hma_test() {
+    use pine::ast::stat_expr_types::VarIndex;
+    use pine::helper::pine_ref_to_f64_series;
+    use pine::libs::{ceil, cos, hma, sma};
+    use pine::runtime::NoneCallback;
+
+    let lib_info = pine::LibInfo::new(
+        vec![
+            hma::declare_var(),
+            sma::declare_wma_var(),
+            ceil::declare_round_var(),
+            cos::declare_sqrt_var(),
+        ],
+        vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+    parser.parse_src(String::from(HMA_SCRIPT)).unwrap();
+    let data = vec![(
+        "close",
+        AnySeries::from_float_vec(vec![Some(20f64), Some(10f64), Some(5f64), Some(10f64)]),
+    )];
+
+    assert!(parser.run_with_data(data, None).is_ok());
+
+    let is_equal = |parser: &mut pine::PineScript, x, y| {
+        let result1 = pine_ref_to_f64_series(parser.move_var(VarIndex::new(x, 0)));
+        let result2 = pine_ref_to_f64_series(parser.move_var(VarIndex::new(y, 0)));
+        assert_eq!(
+            result1.unwrap().index_value(1).unwrap(),
+            result2.unwrap().index_value(1).unwrap()
+        );
+    };
+    is_equal(&mut parser, 2, 4);
+}
+
 const MYPLOT_SCRIPT: &'static str = "
 // Plot colors
 col_grow_above = #26A69A

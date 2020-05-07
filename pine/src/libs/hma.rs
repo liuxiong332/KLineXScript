@@ -1,4 +1,4 @@
-use super::sma::{declare_ma_var, wma_func};
+use super::sma::{declare_ma_var, series_wma};
 use super::VarResult;
 use crate::ast::stat_expr_types::VarIndex;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
@@ -19,53 +19,32 @@ use std::rc::Rc;
 
 // X=2*WMA(C,ROUND(N/2))-WMA(C,N);
 // HULLMA=WMA(X,ROUND(SQRT(N)));
-fn calc_x<'a>(source: RefData<Series<Float>>, length: i64) -> Result<Float, RuntimeErr> {
-    let val1 = wma_func(
-        RefData::clone(&source),
-        (length as f64 / 2f64).round() as i64,
-    )?;
-    let val2 = wma_func(RefData::clone(&source), length)?;
+fn calc_x<'a>(source: &Series<Float>, length: i64) -> Result<Float, RuntimeErr> {
+    let val1 = series_wma(source, (length as f64 / 2f64).round() as usize)?;
+    let val2 = series_wma(source, length as usize)?;
     let xval = val1.mul(Some(2f64)).minus(val2);
     Ok(xval)
 }
 
-pub fn wma_vec<'a>(source: &Vec<Float>, length: i64) -> Result<Float, RuntimeErr> {
-    let mut norm = 0f64;
-    let mut sum = 0f64;
-    for i in 0..length as usize {
-        let weight = ((length - i as i64) * length) as f64;
-        norm += weight;
-        match &source[i as usize] {
-            Some(val) => {
-                sum += val * weight as f64;
-            }
-            None => {
-                return Ok(Float::from(None));
-            }
-        }
-    }
-    Ok(Some(sum / norm))
-}
-
-fn calc_hullma(srcs: &Vec<Float>, length: i64) -> Result<Float, RuntimeErr> {
-    let sqrt_n = (length as f64).sqrt().round() as i64;
-    wma_vec(srcs, sqrt_n)
+fn calc_hullma(srcs: &Series<Float>, length: i64) -> Result<Float, RuntimeErr> {
+    let sqrt_n = (length as f64).sqrt().round() as usize;
+    series_wma(srcs, sqrt_n)
 }
 
 #[derive(Debug, Clone, PartialEq)]
-struct HmaVal {
-    val_history: Vec<Float>,
+struct HmaVal<'a> {
+    val_history: Series<'a, Float>,
 }
 
-impl HmaVal {
-    pub fn new() -> HmaVal {
+impl<'a> HmaVal<'a> {
+    pub fn new() -> HmaVal<'a> {
         HmaVal {
-            val_history: vec![],
+            val_history: Series::new(),
         }
     }
 }
 
-impl<'a> SeriesCall<'a> for HmaVal {
+impl<'a> SeriesCall<'a> for HmaVal<'a> {
     fn step(
         &mut self,
         _ctx: &mut dyn Ctx<'a>,
@@ -76,11 +55,12 @@ impl<'a> SeriesCall<'a> for HmaVal {
 
         let source = require_param("source", pine_ref_to_f64_series(source))?;
         let length = ge1_param_i64("length", pine_ref_to_i64(length))?;
-        let val = calc_x(source, length)?;
+        let val = calc_x(&*source, length)?;
 
-        self.val_history.push(val);
+        self.val_history.update(val);
         let hullma = calc_hullma(&self.val_history, length)?;
 
+        self.val_history.commit();
         Ok(PineRef::new(Series::from(hullma)))
     }
 
@@ -149,10 +129,12 @@ mod tests {
             runner.get_context().move_var(VarIndex::new(0, 0)),
             Some(PineRef::new(Series::from_vec(vec![
                 None,
-                None,
-                None,
-                Float::from(None)
+                Some(14f64),
+                Some(4f64),
+                Some(14f64)
             ])))
         );
     }
 }
+
+// 6 12 6 12

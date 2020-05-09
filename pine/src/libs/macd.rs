@@ -67,7 +67,7 @@ impl<'a> KcVal<'a> {
         let dem = series_ema(dif, siglen, &mut self.dems)?;
         let osc = dif.minus(dem);
 
-        self.ema2s.commit();
+        self.ema1s.commit();
         self.ema2s.commit();
         self.dems.commit();
 

@@ -1143,7 +1143,6 @@ impl<'a> SyntaxParser<'a> {
         //         name.range,
         //     ));
         // }
-        println!("parse one assign {:?} {:?}", var_type, val);
         if let Some(data_type) = var_type {
             let (is_cast_err, result) = implicity_type_cast(&val, &data_type);
             if is_cast_err {
@@ -1169,7 +1168,6 @@ impl<'a> SyntaxParser<'a> {
 
     fn parse_assign(&mut self, assign: &mut Assignment<'a>) -> ParseResult<'a> {
         let val_res = self.parse_exp(&mut assign.val)?;
-        println!("val res {:?}", val_res);
         if assign.names.len() > 1 {
             if let SyntaxType::Tuple(tuple) = val_res.syntax_type {
                 if tuple.len() != assign.names.len() {

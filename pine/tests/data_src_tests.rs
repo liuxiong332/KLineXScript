@@ -213,11 +213,16 @@ pine_macd(fastlen, slowlen, siglen) =>
     dem = ema(dif, siglen)
     //OSC=DIF-DEM=DIF-MACD
     osc = dif - dem
-    osc
+    [dif, dem, osc]
 
-plot(pine_macd(3, 3, 3))
+[m1, m2, m3] = pine_macd(3, 7, 3)
+plot(m1)
+plot(m2)
+plot(m3)
 
-[macdLine, signalLine, histLine] = macd(close, 3, 3, 3)
+[macdLine, signalLine, histLine] = macd(close, 3, 7, 3)
+plot(macdLine)
+plot(signalLine)
 plot(histLine)
 ";
 
@@ -248,9 +253,22 @@ fn macd_test() {
     //         Some(32.82882444136006f64),
     //     ]]))
     // );
+    println!(
+        "get data {:?} {:?}",
+        out_data.as_ref().unwrap().data_list[0],
+        out_data.as_ref().unwrap().data_list[3]
+    );
     assert_eq!(
         out_data.as_ref().unwrap().data_list[0],
+        out_data.as_ref().unwrap().data_list[3],
+    );
+    assert_eq!(
         out_data.as_ref().unwrap().data_list[1],
+        out_data.as_ref().unwrap().data_list[4],
+    );
+    assert_eq!(
+        out_data.as_ref().unwrap().data_list[2],
+        out_data.as_ref().unwrap().data_list[5],
     );
 }
 

@@ -13,10 +13,8 @@ const {
     output_series,
     output_options,
     output_colors,
+    __wasm: { memory }
 } = require("../pkg");
-const {
-    memory
-} = require("../pkg/node/pine_bg");
 
 init_panic_hook();
 

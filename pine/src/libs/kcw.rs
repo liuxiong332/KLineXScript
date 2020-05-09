@@ -93,7 +93,10 @@ mod tests {
 
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(0, 0)),
-            Some(PineRef::new(Series::from_vec(vec![Some(0f64), Some(0f64)])))
+            Some(PineRef::new(Series::from_vec(vec![
+                Some(0f64),
+                Some(0.8f64)
+            ])))
         );
     }
 }

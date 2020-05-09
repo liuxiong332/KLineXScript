@@ -171,3 +171,9 @@ it("alma test", function () {
     // console.log(result[0].series);
     assert.deepEqual(result[0].series[0].slice(3, 8), new Float64Array([4, 4, 4, 4, 4]));
 });
+
+it("timenow test", function () {
+    let runner = new Runner();
+    runner.parse("int a = timenow\nplot(a)");
+    runner.genIOInfo();
+});

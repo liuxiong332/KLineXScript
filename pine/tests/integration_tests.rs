@@ -187,7 +187,6 @@ plot(vwap1)
 const INVALID_INPUT: &'static str = r#"
 length = input(hl2)
 "#;
-
 #[test]
 fn datasrc_test() {
     let lib_info = pine::LibInfo::new(

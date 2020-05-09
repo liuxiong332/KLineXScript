@@ -75,7 +75,7 @@ impl KcVal {
         let sval = pine_ref_to_f64(series);
         let length = ge1_param_i64("length", pine_ref_to_i64(length))?;
         let multi = require_param("multi", pine_ref_to_f64(multi))?;
-        let use_true_range = pine_ref_to_bool(use_true_range).unwrap_or(false);
+        let use_true_range = pine_ref_to_bool(use_true_range).unwrap_or(true);
 
         let basis = ema_func(sval, length, self.prev_basis)?;
 

@@ -95,3 +95,15 @@ fn volume_test() {
         assert_eq!(vec, vec![1f64, 1f64, 10f64]);
     }
 }
+
+#[wasm_bindgen_test]
+fn timenow_test() {
+    init_panic_hook();
+    // assert_eq!(1 + 1, 2);
+    let mut runner = new_runner();
+    assert_eq!(
+        parse_src(&mut runner, String::from("int a = timenow\nplot(a)")),
+        Ok(())
+    );
+    assert!(gen_io_info(&mut runner).is_ok());
+}

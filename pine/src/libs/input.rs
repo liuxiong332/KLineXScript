@@ -144,20 +144,27 @@ const SOURCES: &[&'static str] = &["close", "open", "high", "low"];
 fn get_name_from_source<'a>(
     context: &mut dyn Ctx<'a>,
     var: &Option<PineRef<'a>>,
-) -> Option<String> {
+) -> Result<Option<String>, RuntimeErr> {
     if var.is_none() {
-        return None;
+        return Ok(None);
     }
-    SOURCES
+    let src = SOURCES
         .iter()
-        .find(|name| match context.get_varname_index(name) {
-            Some(&index) => match context.get_var(VarIndex::new(index, 0)) {
+        .find(|name| match context.get_top_varname_index(name) {
+            Some(index) => match context.get_var(index) {
                 Some(val) => val.as_ptr() == var.as_ref().unwrap().as_ptr(),
                 _ => false,
             },
             _ => false,
         })
-        .map(|&s| String::from(s))
+        .map(|&s| String::from(s));
+    if src.is_none() {
+        return Err(RuntimeErr::InvalidParameters(str_replace(
+            INPUT_SRCS,
+            vec![SOURCES.join(", ")],
+        )));
+    }
+    Ok(src)
 }
 
 fn get_source_from_name<'a>(context: &mut dyn Ctx<'a>, name: String) -> Option<PineRef<'a>> {
@@ -187,7 +194,7 @@ fn input_for_source<'a>(
                 ],
             )));
         }
-        let name = get_name_from_source(context, &param[0]);
+        let name = get_name_from_source(context.get_top_ctx(), &param[0])?;
         downcast_ctx(context).push_input_info(InputInfo::Source(SourceInputInfo {
             defval: name,
             title: pine_ref_to_string(move_element(&mut param, 1)),

@@ -149,7 +149,7 @@ const VWAP_SCRIPTS: &'static str = r#"
 //@version=4
 study(title="VWAP", shorttitle="VWAP", overlay=true)
 
-src = input(hlc3)
+src = input(close)
 t = time
 start = na(t[1]) or t > t[1]
 
@@ -182,6 +182,10 @@ for i = 0 to length - 1
 
 vwap1 = xv / vp
 plot(vwap1)
+"#;
+
+const INVALID_INPUT: &'static str = r#"
+length = input(hl2)
 "#;
 
 #[test]
@@ -260,4 +264,7 @@ fn datasrc_test() {
 
     parser.parse_src(String::from(VWAP1_SCRIPTS)).unwrap();
     assert!(parser.run_with_data(data.clone(), None).is_ok());
+
+    parser.parse_src(String::from(INVALID_INPUT)).unwrap();
+    assert!(parser.run_with_data(data.clone(), None).is_err());
 }

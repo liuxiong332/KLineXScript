@@ -71,8 +71,8 @@ impl<'a> KcVal<'a> {
         let as1val = ema_func(apc, long, self.asmooth1.index_value(1)?)?;
         let as2val = ema_func(as1val, short, self.asmooth2.index_value(1)?)?;
 
-        // TSI = 100 x (Double Smoothed PC / Double Smoothed Absolute PC)
-        let tsi = Some(100f64).mul(s2val).div(as2val);
+        // TSI = (Double Smoothed PC / Double Smoothed Absolute PC)
+        let tsi = s2val.div(as2val);
         self.closes.update_commit(close);
         self.smooth1.update_commit(s1val);
         self.smooth2.update_commit(s2val);
@@ -156,7 +156,7 @@ mod tests {
 
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(0, 0)),
-            Some(PineRef::new(Series::from_vec(vec![None, Some(-100.0)])))
+            Some(PineRef::new(Series::from_vec(vec![None, Some(-1.0)])))
         );
     }
 }

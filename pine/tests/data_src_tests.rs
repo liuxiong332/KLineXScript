@@ -931,7 +931,7 @@ const TSI_SCRIPT: &str = r#"
 pine_tsi(x, s, l) => 
     v1 = ema(ema(x - x[1], l), s) 
     v2 = ema(ema(abs(x - x[1]), l), s) 
-    v1 / v2 * 100
+    v1 / v2
 
 plot(tsi(close, 2, 2))
 plot(pine_tsi(close, 2, 2))

@@ -162,10 +162,11 @@ impl Arithmetic for Float {
     fn div(self, other: Self) -> Self {
         match (self, other) {
             (Some(i1), Some(i2)) => {
-                if i2 == 0f64 {
+                let v = i1 / i2;
+                if v.is_nan() {
                     None
                 } else {
-                    Some(i1 / i2)
+                    Some(v)
                 }
             }
             _ => None,

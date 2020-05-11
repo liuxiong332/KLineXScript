@@ -18,13 +18,13 @@ use std::f64;
 use std::mem;
 use std::rc::Rc;
 
-pub fn series_wma<'a>(series: &Series<Float>, length: usize) -> Result<Float, RuntimeErr> {
+pub fn series_wma<'a>(series: &Series<Float>, length: i64) -> Result<Float, RuntimeErr> {
     let mut norm = 0f64;
     let mut sum = 0f64;
     for i in 0..length {
         let weight = (length - i) as f64;
         norm += weight;
-        match series.index_value(i)? {
+        match series.index_value(i as usize)? {
             Some(val) => {
                 sum += val * weight as f64;
             }
@@ -36,10 +36,10 @@ pub fn series_wma<'a>(series: &Series<Float>, length: usize) -> Result<Float, Ru
     Ok(Some(sum / norm))
 }
 
-pub fn sma_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<Float, RuntimeErr> {
+pub fn series_sma<'a>(series: &Series<Float>, length: i64) -> Result<Float, RuntimeErr> {
     let mut sum = 0f64;
     for i in 0..length as usize {
-        match source.index_value(i)? {
+        match series.index_value(i)? {
             Some(val) => {
                 sum += val / length as f64;
             }
@@ -51,8 +51,16 @@ pub fn sma_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<Float
     Ok(Some(sum))
 }
 
+pub fn series_dev<'a>(series: &Series<Float>, length: i64) -> Result<Float, RuntimeErr> {
+    generic_dev_func(series, length, deviation)
+}
+
+pub fn sma_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<Float, RuntimeErr> {
+    series_sma(&*source, length)
+}
+
 pub fn wma_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<Float, RuntimeErr> {
-    series_wma(&*source, length as usize)
+    series_wma(&*source, length)
 }
 
 fn deviation(values: Vec<f64>, avg: f64) -> f64 {
@@ -68,7 +76,7 @@ fn stdev(values: Vec<f64>, avg: f64) -> f64 {
 }
 
 pub fn generic_dev_func<'a>(
-    source: RefData<Series<Float>>,
+    source: &Series<Float>,
     length: i64,
     func: fn(Vec<f64>, f64) -> f64,
 ) -> Result<Float, RuntimeErr> {
@@ -88,15 +96,15 @@ pub fn generic_dev_func<'a>(
 }
 
 fn dev_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<Float, RuntimeErr> {
-    generic_dev_func(source, length, deviation)
+    generic_dev_func(&*source, length, deviation)
 }
 
 fn variance_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<Float, RuntimeErr> {
-    generic_dev_func(source, length, variance)
+    generic_dev_func(&*source, length, variance)
 }
 
 pub fn stdev_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<Float, RuntimeErr> {
-    generic_dev_func(source, length, stdev)
+    generic_dev_func(&*source, length, stdev)
 }
 
 type HandleFunc = fn(RefData<Series<Float>>, i64) -> Result<Float, RuntimeErr>;

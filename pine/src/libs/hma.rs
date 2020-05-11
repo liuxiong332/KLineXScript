@@ -20,14 +20,14 @@ use std::rc::Rc;
 // X=2*WMA(C,ROUND(N/2))-WMA(C,N);
 // HULLMA=WMA(X,ROUND(SQRT(N)));
 fn calc_x<'a>(source: &Series<Float>, length: i64) -> Result<Float, RuntimeErr> {
-    let val1 = series_wma(source, (length as f64 / 2f64).round() as usize)?;
-    let val2 = series_wma(source, length as usize)?;
+    let val1 = series_wma(source, (length as f64 / 2f64).round() as i64)?;
+    let val2 = series_wma(source, length)?;
     let xval = val1.mul(Some(2f64)).minus(val2);
     Ok(xval)
 }
 
 fn calc_hullma(srcs: &Series<Float>, length: i64) -> Result<Float, RuntimeErr> {
-    let sqrt_n = (length as f64).sqrt().round() as usize;
+    let sqrt_n = (length as f64).sqrt().round() as i64;
     series_wma(srcs, sqrt_n)
 }
 

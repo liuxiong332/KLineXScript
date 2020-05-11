@@ -1241,6 +1241,45 @@ fn stdev_test() {
     );
 }
 
+const CCI_SCRIPT: &str = "
+length = 2
+src = close
+cci1 = (src - sma(src, length)) / (0.015 * dev(src, length))
+plot(cci1)
+plot(cci(src, length)) 
+";
+
+#[test]
+fn cci_test() {
+    use pine::libs::{cci, plot, sma};
+    use pine::runtime::NoneCallback;
+
+    let lib_info = pine::LibInfo::new(
+        vec![
+            sma::declare_dev_var(),
+            sma::declare_sma_var(),
+            cci::declare_var(),
+            plot::declare_var(),
+        ],
+        vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+    parser.parse_src(String::from(CCI_SCRIPT)).unwrap();
+    let data = vec![(
+        "close",
+        AnySeries::from_float_vec(vec![Some(20f64), Some(10f64), Some(5f64)]),
+    )];
+
+    let out_data = parser.run_with_data(data, None);
+    assert!(out_data.is_ok());
+
+    let data_list = out_data.unwrap().data_list;
+    assert_eq!(
+        data_list[0].as_ref().unwrap().series[0].last(),
+        data_list[1].as_ref().unwrap().series[0].last()
+    );
+}
+
 const MYPLOT_SCRIPT: &'static str = "
 // Plot colors
 col_grow_above = #26A69A

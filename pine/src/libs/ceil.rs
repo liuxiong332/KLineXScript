@@ -55,8 +55,6 @@ pub fn declare_math_var<'a>(
         Some(Box::new(MathCallVal::new(func as *mut ()))),
     ));
 
-    // plot(series, title, color, linewidth, style, trackprice, transp, histbase, offset, join, editable, show_last) → plot
-
     let func_type = FunctionTypes(vec![
         FunctionType::new((vec![("x", SyntaxType::float())], SyntaxType::int())),
         FunctionType::new((

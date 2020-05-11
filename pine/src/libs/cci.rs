@@ -80,8 +80,6 @@ pub fn declare_var<'a>() -> VarResult<'a> {
         Callable::new(None, Some(Box::new(CciVal::new())))
     }));
 
-    // plot(series, title, color, linewidth, style, trackprice, transp, histbase, offset, join, editable, show_last) → plot
-
     let func_type = FunctionTypes(vec![FunctionType::new((
         vec![
             ("source", SyntaxType::float_series()),

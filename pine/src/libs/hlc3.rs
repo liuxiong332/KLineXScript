@@ -68,8 +68,6 @@ pub const VAR_NAME: &'static str = "hlc3";
 pub fn declare_var<'a>() -> VarResult<'a> {
     let value = PineRef::new(Evaluate::new(Box::new(AccDistVal::new())));
 
-    // plot(series, title, color, linewidth, style, trackprice, transp, histbase, offset, join, editable, show_last) → plot
-
     let syntax_type = SyntaxType::float_series();
     VarResult::new(value, syntax_type, VAR_NAME)
 }

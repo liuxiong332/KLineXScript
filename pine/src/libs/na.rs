@@ -51,8 +51,6 @@ pub const VAR_NAME: &'static str = "na";
 pub fn declare_var<'a>() -> VarResult<'a> {
     let value = PineRef::new(Callable::new(Some(na_func), None));
 
-    // plot(series, title, color, linewidth, style, trackprice, transp, histbase, offset, join, editable, show_last) → plot
-
     let func_type = FunctionTypes(vec![
         FunctionType::new((vec![("x", SyntaxType::int())], SyntaxType::bool())),
         FunctionType::new((vec![("x", SyntaxType::float())], SyntaxType::bool())),

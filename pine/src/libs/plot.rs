@@ -15,18 +15,34 @@ use crate::types::{
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
+fn resize_offset<'a, T>(data: &mut Vec<Option<T>>, offset: i64) {
+    match offset {
+        0 => {}
+        i if i > 0 => {
+            let mut fillv: Vec<Option<T>> = Vec::with_capacity(offset as usize);
+            fillv.resize_with(offset as usize, || None);
+            data.splice(..0, fillv);
+        }
+        _ => {
+            data.splice(0..offset.abs() as usize, vec![]);
+        }
+    };
+}
+
 fn plot_val<'a>(
     item_val: PineRef<'a>,
+    // offset: i64,
     _context: &mut dyn Ctx<'a>,
 ) -> Result<Vec<Option<f64>>, RuntimeErr> {
-    // let item_data: RefData<Series<Float>> = Series::implicity_from(item_val).unwrap();
-    // plot_series(item_data.into_pf(), context)
     let mut items: RefData<Series<Float>> = Series::implicity_from(item_val).unwrap();
-    Ok(items.move_history())
+    let mut data = items.move_history();
+    // resize_offset(&mut data, offset);
+    Ok(data)
 }
 
 pub fn plot_color<'a>(
     item_val: PineRef<'a>,
+    // offset: i64,
     _context: &mut dyn Ctx<'a>,
 ) -> Result<StrOptionsData, RuntimeErr> {
     // let item_data: RefData<Series<Float>> = Series::implicity_from(item_val).unwrap();
@@ -48,6 +64,7 @@ pub fn plot_color<'a>(
         }
     }
     let options = options.iter().map(|&x| String::from(x)).collect();
+    // resize_offset(&mut values, offset);
     Ok(StrOptionsData { options, values })
 }
 
@@ -56,7 +73,9 @@ fn pine_plot<'a>(
     mut param: Vec<Option<PineRef<'a>>>,
     _func_type: FunctionType<'a>,
 ) -> Result<(), RuntimeErr> {
-    move_tuplet!((series, _title, color) = param);
+    // move_tuplet!((series, _title, color) = param);
+    let series = move_element(&mut param, 0);
+    let color = move_element(&mut param, 2);
     match _func_type.get_type(2) {
         Some(SyntaxType::Series(_)) => match (series, color) {
             (Some(item_val), Some(color)) => {
@@ -508,4 +527,38 @@ mod tests {
             ]
         );
     }
+
+    // #[test]
+    // fn plot_offset_test() {
+    //     let lib_info = LibInfo::new(
+    //         vec![declare_var()],
+    //         vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+    //     );
+    //     let src = "plot(close, offset = 2)\nplot(close, offset = -1)";
+    //     let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+    //     let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+    //     runner
+    //         .run(
+    //             &vec![(
+    //                 "close",
+    //                 AnySeries::from_float_vec(vec![Some(1f64), Some(2f64)]),
+    //             )],
+    //             None,
+    //         )
+    //         .unwrap();
+
+    //     assert_eq!(
+    //         runner.move_output_data(),
+    //         vec![
+    //             Some(OutputData::new(vec![vec![
+    //                 None,
+    //                 None,
+    //                 Some(1f64),
+    //                 Some(2f64)
+    //             ]])),
+    //             Some(OutputData::new(vec![vec![Some(2f64)]]))
+    //         ]
+    //     );
+    // }
 }

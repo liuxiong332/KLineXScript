@@ -1280,6 +1280,54 @@ fn cci_test() {
     );
 }
 
+const CORRELATION_SCRIPT: &str = "
+plot(correlation(close,open,2))
+
+conv = sma(close * open, 2) - sma(close, 2) * sma(open, 2)
+s = conv / (stdev(close, 2) * stdev(open, 2))
+plot(s)
+";
+
+#[test]
+fn correlation_test() {
+    use pine::libs::{correlation, plot, sma};
+    use pine::runtime::NoneCallback;
+
+    let lib_info = pine::LibInfo::new(
+        vec![
+            sma::declare_stdev_var(),
+            sma::declare_sma_var(),
+            correlation::declare_var(),
+            plot::declare_var(),
+        ],
+        vec![
+            ("close", SyntaxType::Series(SimpleSyntaxType::Float)),
+            ("open", SyntaxType::Series(SimpleSyntaxType::Float)),
+        ],
+    );
+    let mut parser = pine::PineScript::new_with_libinfo(lib_info, Some(&NoneCallback()));
+    parser.parse_src(String::from(CORRELATION_SCRIPT)).unwrap();
+    let data = vec![
+        (
+            "close",
+            AnySeries::from_float_vec(vec![Some(20f64), Some(10f64), Some(5f64)]),
+        ),
+        (
+            "open",
+            AnySeries::from_float_vec(vec![Some(10f64), Some(20f64), Some(5f64)]),
+        ),
+    ];
+
+    let out_data = parser.run_with_data(data, None);
+    assert!(out_data.is_ok());
+
+    let data_list = out_data.unwrap().data_list;
+    assert_eq!(
+        data_list[0].as_ref().unwrap().series[0].last(),
+        data_list[1].as_ref().unwrap().series[0].last()
+    );
+}
+
 const MYPLOT_SCRIPT: &'static str = "
 // Plot colors
 col_grow_above = #26A69A

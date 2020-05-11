@@ -13,6 +13,14 @@ pub fn series_index2(series: &Series<Float>, index: usize) -> Float {
     series.index_value(index).unwrap()
 }
 
+#[inline]
+pub fn series_mul(s1: Float, s2: Float, res: &mut Series<Float>) -> Float {
+    use crate::types::traits::Arithmetic;
+    let val = s1.mul(s2);
+    res.update(val);
+    val
+}
+
 pub fn float_max2(f1: Float, f2: Float) -> Float {
     vec![f1.unwrap_or(0f64), f2.unwrap_or(0f64)]
         .into_iter()

@@ -1,3 +1,4 @@
+use super::sma::{series_sma, series_stdev};
 use super::VarResult;
 use crate::ast::stat_expr_types::VarIndex;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
@@ -5,7 +6,7 @@ use crate::helper::err_msgs::*;
 use crate::helper::str_replace;
 use crate::helper::{
     ge1_param_i64, move_element, pine_ref_to_bool, pine_ref_to_f64, pine_ref_to_f64_series,
-    pine_ref_to_i64, require_param,
+    pine_ref_to_i64, require_param, series_mul,
 };
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::InputSrc;
@@ -15,47 +16,37 @@ use crate::types::{
     NA,
 };
 use std::f64;
-use std::mem;
 use std::rc::Rc;
 
-pub fn cor_func<'a>(
-    source_a: RefData<Series<Float>>,
-    source_b: RefData<Series<Float>>,
+// conv = sma(close * open, 2) - sma(close, 2) * sma(open, 2)
+// cor = conv / (stdev(close, 2) * stdev(open, 2))
+pub fn series_correlation<'a>(
+    source_a: &Series<Float>,
+    source_b: &Series<Float>,
     length: i64,
+    abmul: &mut Series<Float>,
 ) -> Result<Float, RuntimeErr> {
-    let mut Exy = 0f64;
-    let mut Ex = 0f64;
-    let mut Ey = 0f64;
-    let mut Ex2 = 0f64;
-    let mut Ey2 = 0f64;
-
-    for i in 0..length as usize {
-        match (source_a.index_value(i)?, source_b.index_value(i)?) {
-            (Some(val1), Some(val2)) => {
-                Exy += val1 * val2;
-                Ex += val1;
-                Ey += val2;
-                Ex2 += val1 * val1;
-                Ex2 += val2 * val2;
-            }
-            _ => {}
-        }
-    }
-    Exy /= length as f64;
-    Ex /= length as f64;
-    Ey /= length as f64;
-    Ex2 /= length as f64;
-    Ey2 /= length as f64;
-
-    let cor_val =
-        (Exy - Ex * Ey) / (Ex2 - Ex.powi(2)).abs().sqrt() / (Ey2 - Ey.powi(2)).abs().sqrt();
-    Ok(Some(cor_val))
+    series_mul(source_a.at(0), source_b.at(0), abmul);
+    let conv = series_sma(abmul, length)?
+        .minus(series_sma(source_a, length)?.mul(series_sma(source_b, length)?));
+    let cor = conv.div(series_stdev(source_a, length)?.mul(series_stdev(source_b, length)?));
+    Ok(cor)
 }
 
 #[derive(Debug, Clone, PartialEq)]
-struct CorrelationVal;
+struct CorrelationVal<'a> {
+    abmul: Series<'a, Float>,
+}
 
-impl<'a> SeriesCall<'a> for CorrelationVal {
+impl<'a> CorrelationVal<'a> {
+    fn new() -> CorrelationVal<'a> {
+        CorrelationVal {
+            abmul: Series::new(),
+        }
+    }
+}
+
+impl<'a> SeriesCall<'a> for CorrelationVal<'a> {
     fn step(
         &mut self,
         _ctx: &mut dyn Ctx<'a>,
@@ -67,9 +58,10 @@ impl<'a> SeriesCall<'a> for CorrelationVal {
         let source_a = require_param("source_a", pine_ref_to_f64_series(source_a))?;
         let source_b = require_param("source_b", pine_ref_to_f64_series(source_b))?;
         let length = ge1_param_i64("length", pine_ref_to_i64(length))?;
-        Ok(PineRef::new(Series::from(cor_func(
-            source_a, source_b, length,
-        )?)))
+
+        let cor_val = series_correlation(&*source_a, &*source_b, length, &mut self.abmul)?;
+        self.abmul.commit();
+        Ok(PineRef::new(Series::from(cor_val)))
     }
 
     fn copy(&self) -> Box<dyn SeriesCall<'a> + 'a> {
@@ -82,7 +74,7 @@ pub fn declare_var<'a>() -> VarResult<'a> {
         Callable::new(
             None,
             Some(Box::new(ParamCollectCall::new_with_caller(Box::new(
-                CorrelationVal,
+                CorrelationVal::new(),
             )))),
         )
     }));

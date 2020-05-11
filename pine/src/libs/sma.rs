@@ -55,6 +55,10 @@ pub fn series_dev<'a>(series: &Series<Float>, length: i64) -> Result<Float, Runt
     generic_dev_func(series, length, deviation)
 }
 
+pub fn series_stdev<'a>(series: &Series<Float>, length: i64) -> Result<Float, RuntimeErr> {
+    generic_dev_func(series, length, stdev)
+}
+
 pub fn sma_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<Float, RuntimeErr> {
     series_sma(&*source, length)
 }

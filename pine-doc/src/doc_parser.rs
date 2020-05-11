@@ -3,7 +3,8 @@ use super::var_doc;
 use super::vardoc_gen::*;
 
 use pine::ast::syntax_type::*;
-use pine::libs::declare_vars;
+use pine::libs::{declare_vars, VarResult};
+use pine::types::PineRef;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
@@ -173,6 +174,19 @@ pub struct LibVarParser {
     pub brief_funcs: BTreeMap<String, String>,
 }
 
+fn inner_vars<'a>() -> Vec<VarResult<'a>> {
+    ["close", "open", "high", "low"]
+        .iter()
+        .map(|name| {
+            VarResult::new(
+                PineRef::new(Some(0f64)),
+                SyntaxType::Series(SimpleSyntaxType::Float),
+                name,
+            )
+        })
+        .collect()
+}
+
 impl LibVarParser {
     pub fn new() -> LibVarParser {
         LibVarParser {
@@ -185,47 +199,50 @@ impl LibVarParser {
 
     pub fn parse_lib_vars(&mut self) {
         let docs = var_doc::declare_vars();
-        declare_vars().iter().for_each(|s| {
-            let name_infos = format_var_type(String::from(s.name), s.syntax_type.clone());
-            name_infos.into_iter().for_each(|s| {
-                let doc = docs
-                    .iter()
-                    .find(|m| m.name == s.name && m.var_type == s.var_type);
-                match s.var_type {
-                    VarType::Variable => {
-                        self.variables.insert(
-                            s.name.clone(),
-                            gen_var_doc(
+        vec![declare_vars(), inner_vars()]
+            .iter()
+            .flatten()
+            .for_each(|s| {
+                let name_infos = format_var_type(String::from(s.name), s.syntax_type.clone());
+                name_infos.into_iter().for_each(|s| {
+                    let doc = docs
+                        .iter()
+                        .find(|m| m.name == s.name && m.var_type == s.var_type);
+                    match s.var_type {
+                        VarType::Variable => {
+                            self.variables.insert(
                                 s.name.clone(),
-                                doc.clone(),
-                                &s.signatures,
-                                String::from("var"),
-                            ),
-                        );
-                        self.brief_vars.insert(
-                            s.name.clone(),
-                            gen_brief_var_doc(s.name.clone(), doc.clone(), &s.signatures),
-                        );
-                    }
-                    VarType::Function => {
-                        self.functions.insert(
-                            s.name.clone(),
-                            gen_var_doc(
+                                gen_var_doc(
+                                    s.name.clone(),
+                                    doc.clone(),
+                                    &s.signatures,
+                                    String::from("var"),
+                                ),
+                            );
+                            self.brief_vars.insert(
                                 s.name.clone(),
-                                doc.clone(),
-                                &s.signatures,
-                                String::from("fun"),
-                            ),
-                        );
-                        self.brief_funcs.insert(
-                            s.name.clone(),
-                            gen_brief_var_doc(s.name.clone(), doc.clone(), &s.signatures),
-                        );
+                                gen_brief_var_doc(s.name.clone(), doc.clone(), &s.signatures),
+                            );
+                        }
+                        VarType::Function => {
+                            self.functions.insert(
+                                s.name.clone(),
+                                gen_var_doc(
+                                    s.name.clone(),
+                                    doc.clone(),
+                                    &s.signatures,
+                                    String::from("fun"),
+                                ),
+                            );
+                            self.brief_funcs.insert(
+                                s.name.clone(),
+                                gen_brief_var_doc(s.name.clone(), doc.clone(), &s.signatures),
+                            );
+                        }
                     }
-                }
-            })
-            // match s.syntax_type {}
-        });
+                })
+                // match s.syntax_type {}
+            });
     }
 }
 

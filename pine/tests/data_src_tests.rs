@@ -1157,7 +1157,7 @@ hmaBuildIn = hma(src, length)
 
 // X=2*WMA(C,ROUND(N/2))-WMA(C,N);
 // HULLMA=WMA(X,ROUND(SQRT(N)));
-x = 2 * wma(src, round(length / 2)) - wma(src, length)
+x = 2 * wma(src, floor(length / 2)) - wma(src, length)
 hullma = wma(x, round(sqrt(length)))
 "#;
 
@@ -1173,6 +1173,7 @@ fn hma_test() {
             hma::declare_var(),
             sma::declare_wma_var(),
             ceil::declare_round_var(),
+            ceil::declare_floor_var(),
             cos::declare_sqrt_var(),
         ],
         vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],

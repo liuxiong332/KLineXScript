@@ -12,6 +12,7 @@ mod bbw;
 mod cci;
 mod ceil;
 mod change;
+mod close;
 mod cmo;
 mod cog;
 mod color;
@@ -28,6 +29,7 @@ mod falling;
 mod fill;
 mod fixnan;
 mod floor;
+mod high;
 mod highest;
 mod highestbars;
 mod hl2;
@@ -41,6 +43,7 @@ mod kc;
 mod kcw;
 mod log;
 mod log10;
+mod low;
 mod lowest;
 mod lowestbars;
 mod macd;
@@ -53,6 +56,7 @@ mod month;
 mod na;
 mod nz;
 mod ohlc4;
+mod open;
 mod plot;
 mod pow;
 mod rising;
@@ -164,6 +168,10 @@ pub fn declare_vars() -> Vec<DocBase> {
         variance::gen_doc(),
         vwma::gen_doc(),
         wma::gen_doc(),
+        close::gen_doc(),
+        open::gen_doc(),
+        high::gen_doc(),
+        low::gen_doc(),
     ]
     .into_iter()
     .flatten()

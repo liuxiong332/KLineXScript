@@ -1,5 +1,6 @@
 use crate::ast::syntax_type::{SimpleSyntaxType, SyntaxType};
-use crate::types::{Bool, Color, Float, Int, PineFrom, PineRef, RefData, Series, NA};
+use crate::types::{Bool, Color, Float, Int, PineFrom, PineRef, RefData, Series, Tuple, NA};
+use std::mem;
 
 pub fn convert<'a>(val: PineRef<'a>, dest_type: &SyntaxType<'a>) -> PineRef<'a> {
     match dest_type {
@@ -40,6 +41,15 @@ pub fn convert<'a>(val: PineRef<'a>, dest_type: &SyntaxType<'a>) -> PineRef<'a> 
             String::implicity_from(val).unwrap().into_pf()
         }
         SyntaxType::Void => val,
-        _ => unreachable!(), // _ => val,
+        SyntaxType::Tuple(tuple) => {
+            let mut tuple_val = Tuple::implicity_from(val).unwrap();
+            let res: Vec<_> = tuple
+                .iter()
+                .zip(mem::replace(&mut tuple_val.0, vec![]).into_iter())
+                .map(|d| convert(d.1, d.0))
+                .collect();
+            PineRef::new_box(Tuple(res))
+        }
+        _ => val, // _ => val,
     }
 }

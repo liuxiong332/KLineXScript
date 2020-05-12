@@ -187,6 +187,43 @@ plot(vwap1)
 const INVALID_INPUT: &'static str = r#"
 length = input(hl2)
 "#;
+
+const LONG_SCRIPT: &'static str = r#"
+study("Zig Zag", overlay=true)
+
+dev_threshold = input(title="Deviation (%)", type=input.float, defval=5, minval=1, maxval=100)
+depth = input(title="Depth", type=input.integer, defval=10, minval=1)
+
+pivots(src, length, isHigh) =>
+    p = nz(src[length])
+
+    if length == 0
+        [bar_index, p]
+    else
+        isFound = true
+        for i = 0 to length - 1
+            if isHigh and src[i] > p
+                isFound := false
+            if not isHigh and src[i] < p
+                isFound := false
+        
+        for i = length + 1 to 2 * length
+            if isHigh and src[i] >= p
+                isFound := false
+            if not isHigh and src[i] <= p
+                isFound := false
+    
+        // [int(na), float(na)]
+        // [bar_index[length], p]
+        if isFound and length * 2 <= bar_index
+            [bar_index[length], p]
+        else
+            [int(na), float(na)]
+        
+
+[iH, pH] = pivots(high, floor(depth / 2), true)
+"#;
+
 #[test]
 fn datasrc_test() {
     let lib_info = pine::LibInfo::new(
@@ -230,40 +267,43 @@ fn datasrc_test() {
         ),
     ];
 
-    parser.parse_src(String::from(MACD_SCRIPT)).unwrap();
-    assert!(parser.run_with_data(data.clone(), None).is_ok());
-
-    parser.parse_src(String::from(AD_SCRIPTS)).unwrap();
-    assert!(parser.run_with_data(data.clone(), None).is_ok());
-
-    // parser.parse_src(String::from(ADL_SCRIPTS)).unwrap();
+    // parser.parse_src(String::from(MACD_SCRIPT)).unwrap();
     // assert!(parser.run_with_data(data.clone(), None).is_ok());
 
-    parser.parse_src(String::from(ALMA_SCRIPTS)).unwrap();
-    println!("{:?}", parser.run_with_data(data.clone(), None));
+    // parser.parse_src(String::from(AD_SCRIPTS)).unwrap();
+    // assert!(parser.run_with_data(data.clone(), None).is_ok());
+
+    // // parser.parse_src(String::from(ADL_SCRIPTS)).unwrap();
+    // // assert!(parser.run_with_data(data.clone(), None).is_ok());
+
+    // parser.parse_src(String::from(ALMA_SCRIPTS)).unwrap();
+    // println!("{:?}", parser.run_with_data(data.clone(), None));
+    // assert!(parser.run_with_data(data.clone(), None).is_ok());
+
+    // parser.parse_src(String::from(VAR_SCRIPTS)).unwrap();
+    // assert!(parser.run_with_data(data.clone(), None).is_ok());
+
+    // parser.parse_src(String::from(ADI_SCRIPTS)).unwrap();
+    // assert!(parser.run_with_data(data.clone(), None).is_ok());
+
+    // parser.parse_src(String::from(VI_SCRIPTS)).unwrap();
+    // assert!(parser.run_with_data(data.clone(), None).is_ok());
+
+    // parser.parse_src(String::from(SUPER_TREND_SCRIPTS)).unwrap();
+    // assert!(parser.run_with_data(data.clone(), None).is_ok());
+
+    // parser.parse_src(String::from(VWAP_SCRIPTS)).unwrap();
+    // assert!(parser.run_with_data(data.clone(), None).is_ok());
+
+    // parser.parse_src(String::from(ALMA_ERR_SCRIPTS)).unwrap();
+    // assert!(parser.run_with_data(data.clone(), None).is_err());
+
+    // parser.parse_src(String::from(VWAP1_SCRIPTS)).unwrap();
+    // assert!(parser.run_with_data(data.clone(), None).is_ok());
+
+    // parser.parse_src(String::from(INVALID_INPUT)).unwrap();
+    // assert!(parser.run_with_data(data.clone(), None).is_err());
+
+    parser.parse_src(String::from(LONG_SCRIPT)).unwrap();
     assert!(parser.run_with_data(data.clone(), None).is_ok());
-
-    parser.parse_src(String::from(VAR_SCRIPTS)).unwrap();
-    assert!(parser.run_with_data(data.clone(), None).is_ok());
-
-    parser.parse_src(String::from(ADI_SCRIPTS)).unwrap();
-    assert!(parser.run_with_data(data.clone(), None).is_ok());
-
-    parser.parse_src(String::from(VI_SCRIPTS)).unwrap();
-    assert!(parser.run_with_data(data.clone(), None).is_ok());
-
-    parser.parse_src(String::from(SUPER_TREND_SCRIPTS)).unwrap();
-    assert!(parser.run_with_data(data.clone(), None).is_ok());
-
-    parser.parse_src(String::from(VWAP_SCRIPTS)).unwrap();
-    assert!(parser.run_with_data(data.clone(), None).is_ok());
-
-    parser.parse_src(String::from(ALMA_ERR_SCRIPTS)).unwrap();
-    assert!(parser.run_with_data(data.clone(), None).is_err());
-
-    parser.parse_src(String::from(VWAP1_SCRIPTS)).unwrap();
-    assert!(parser.run_with_data(data.clone(), None).is_ok());
-
-    parser.parse_src(String::from(INVALID_INPUT)).unwrap();
-    assert!(parser.run_with_data(data.clone(), None).is_err());
 }

@@ -854,10 +854,15 @@ impl<'a> SyntaxParser<'a> {
                     else_blk.range,
                 ));
             }
+            println!(
+                "if else type {:?} {:?}",
+                then_res.syntax_type, else_res.syntax_type
+            );
             // Find the common type that can satisfy the then type and else type
             if let Some(v_type) = common_type(&then_res.syntax_type, &else_res.syntax_type) {
                 // The return type of if-then-else block must be series.
                 let res_type = simple_to_series(v_type);
+                println!("Get result {:?}", res_type);
                 ite.result_type = res_type.clone();
                 return Ok(ParseValue::new_with_type(res_type));
             } else {

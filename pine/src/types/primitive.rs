@@ -455,7 +455,14 @@ impl<'a> PineType<'a> for Tuple<'a> {
         PineRef::Box(Box::new(Tuple(new_vec)))
     }
 }
-impl<'a> PineFrom<'a, Tuple<'a>> for Tuple<'a> {}
+impl<'a> PineFrom<'a, Tuple<'a>> for Tuple<'a> {
+    fn implicity_from(t: PineRef<'a>) -> Result<RefData<Tuple<'a>>, RuntimeErr> {
+        match t.get_type() {
+            (DataType::Tuple, _) => Ok(downcast_pf::<Tuple>(t).unwrap()),
+            _ => Err(RuntimeErr::UnknownRuntimeErr),
+        }
+    }
+}
 
 impl<'a> SimpleType for Tuple<'a> {}
 

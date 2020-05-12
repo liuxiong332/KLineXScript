@@ -1,4 +1,5 @@
 use super::{SimpleSyntaxType, SyntaxType};
+use std::rc::Rc;
 
 // Series variable can only be implicity converted to Series, Simple can be implicity converted to Simple and Series
 pub fn implicity_convert<'a>(origin_type: &SyntaxType<'a>, dest_type: &SyntaxType<'a>) -> bool {
@@ -149,6 +150,9 @@ fn common_simple_type(
 pub fn common_type<'a>(type1: &SyntaxType<'a>, type2: &SyntaxType<'a>) -> Option<SyntaxType<'a>> {
     let type1 = type1.get_v_for_vf();
     let type2 = type2.get_v_for_vf();
+    if type1 == type2 {
+        return Some(type1.clone());
+    }
     match (type1, type2) {
         (SyntaxType::Simple(t1), SyntaxType::Simple(t2)) => {
             let simple_type = common_simple_type(t1, t2);
@@ -164,6 +168,23 @@ pub fn common_type<'a>(type1: &SyntaxType<'a>, type2: &SyntaxType<'a>) -> Option
             match simple_type {
                 None => None,
                 Some(t) => Some(SyntaxType::Series(t)),
+            }
+        }
+        (SyntaxType::Tuple(tuple1), SyntaxType::Tuple(tuple2)) => {
+            if tuple1.len() != tuple2.len() {
+                None
+            } else {
+                let res_tuple: Vec<_> = tuple1
+                    .iter()
+                    .zip(tuple2.iter())
+                    .map(|d| common_type(d.0, d.1))
+                    .collect();
+                if res_tuple.iter().any(|d| d.is_none()) {
+                    None
+                } else {
+                    let res: Vec<_> = res_tuple.into_iter().map(|d| d.unwrap()).collect();
+                    Some(SyntaxType::Tuple(Rc::new(res)))
+                }
             }
         }
         _ => None,

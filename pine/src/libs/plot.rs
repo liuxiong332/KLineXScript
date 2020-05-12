@@ -246,7 +246,7 @@ pub fn declare_var<'a>() -> VarResult<'a> {
     ]);
     let mut obj_type = BTreeMap::new();
     obj_type.insert("style_area", SyntaxType::string());
-    obj_type.insert("style_areabr", SyntaxType::string());
+    // obj_type.insert("style_areabr", SyntaxType::string());
     obj_type.insert("style_circles", SyntaxType::string());
     obj_type.insert("style_columns", SyntaxType::string());
     obj_type.insert("style_cross", SyntaxType::string());
@@ -495,7 +495,8 @@ mod tests {
             vec![("close", SyntaxType::float_series())],
         );
         let src = r"m = [
-            plot.style_area, plot.style_areabr, plot.style_circles, plot.style_columns, 
+            plot.style_area, plot.style_circles, plot.style_columns, 
+            // plot.style_areabr
             plot.style_cross, plot.style_histogram, plot.style_line, plot.style_linebr,
             plot.style_stepline
         ]";
@@ -516,7 +517,7 @@ mod tests {
             tuple_vec,
             vec![
                 PineRef::new_rc(String::from("area")),
-                PineRef::new_rc(String::from("areabr")),
+                // PineRef::new_rc(String::from("areabr")),
                 PineRef::new_rc(String::from("circles")),
                 PineRef::new_rc(String::from("columns")),
                 PineRef::new_rc(String::from("cross")),

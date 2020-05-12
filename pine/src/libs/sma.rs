@@ -79,6 +79,7 @@ fn stdev(values: Vec<f64>, avg: f64) -> f64 {
     variance(values, avg).sqrt()
 }
 
+// For dev function, if the input source length < length, then we need return na.
 pub fn generic_dev_func<'a>(
     source: &Series<Float>,
     length: i64,
@@ -88,6 +89,8 @@ pub fn generic_dev_func<'a>(
     for i in 0..length as usize {
         if let Some(val) = source.index_value(i)? {
             values.push(val);
+        } else {
+            return Ok(None);
         }
     }
     if values.is_empty() {
@@ -254,15 +257,15 @@ mod tests {
         );
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(starti + 2, 0)),
-            Some(PineRef::new(Series::from_vec(vec![Some(0f64), Some(3f64)])))
+            Some(PineRef::new(Series::from_vec(vec![None, Some(3f64)])))
         );
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(starti + 3, 0)),
-            Some(PineRef::new(Series::from_vec(vec![Some(0f64), Some(9f64)])))
+            Some(PineRef::new(Series::from_vec(vec![None, Some(9f64)])))
         );
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(starti + 4, 0)),
-            Some(PineRef::new(Series::from_vec(vec![Some(0f64), Some(3f64)])))
+            Some(PineRef::new(Series::from_vec(vec![None, Some(3f64)])))
         );
     }
 }

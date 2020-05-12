@@ -267,42 +267,42 @@ fn datasrc_test() {
         ),
     ];
 
-    // parser.parse_src(String::from(MACD_SCRIPT)).unwrap();
+    parser.parse_src(String::from(MACD_SCRIPT)).unwrap();
+    assert!(parser.run_with_data(data.clone(), None).is_ok());
+
+    parser.parse_src(String::from(AD_SCRIPTS)).unwrap();
+    assert!(parser.run_with_data(data.clone(), None).is_ok());
+
+    // parser.parse_src(String::from(ADL_SCRIPTS)).unwrap();
     // assert!(parser.run_with_data(data.clone(), None).is_ok());
 
-    // parser.parse_src(String::from(AD_SCRIPTS)).unwrap();
-    // assert!(parser.run_with_data(data.clone(), None).is_ok());
+    parser.parse_src(String::from(ALMA_SCRIPTS)).unwrap();
+    println!("{:?}", parser.run_with_data(data.clone(), None));
+    assert!(parser.run_with_data(data.clone(), None).is_ok());
 
-    // // parser.parse_src(String::from(ADL_SCRIPTS)).unwrap();
-    // // assert!(parser.run_with_data(data.clone(), None).is_ok());
+    parser.parse_src(String::from(VAR_SCRIPTS)).unwrap();
+    assert!(parser.run_with_data(data.clone(), None).is_ok());
 
-    // parser.parse_src(String::from(ALMA_SCRIPTS)).unwrap();
-    // println!("{:?}", parser.run_with_data(data.clone(), None));
-    // assert!(parser.run_with_data(data.clone(), None).is_ok());
+    parser.parse_src(String::from(ADI_SCRIPTS)).unwrap();
+    assert!(parser.run_with_data(data.clone(), None).is_ok());
 
-    // parser.parse_src(String::from(VAR_SCRIPTS)).unwrap();
-    // assert!(parser.run_with_data(data.clone(), None).is_ok());
+    parser.parse_src(String::from(VI_SCRIPTS)).unwrap();
+    assert!(parser.run_with_data(data.clone(), None).is_ok());
 
-    // parser.parse_src(String::from(ADI_SCRIPTS)).unwrap();
-    // assert!(parser.run_with_data(data.clone(), None).is_ok());
+    parser.parse_src(String::from(SUPER_TREND_SCRIPTS)).unwrap();
+    assert!(parser.run_with_data(data.clone(), None).is_ok());
 
-    // parser.parse_src(String::from(VI_SCRIPTS)).unwrap();
-    // assert!(parser.run_with_data(data.clone(), None).is_ok());
+    parser.parse_src(String::from(VWAP_SCRIPTS)).unwrap();
+    assert!(parser.run_with_data(data.clone(), None).is_ok());
 
-    // parser.parse_src(String::from(SUPER_TREND_SCRIPTS)).unwrap();
-    // assert!(parser.run_with_data(data.clone(), None).is_ok());
+    parser.parse_src(String::from(ALMA_ERR_SCRIPTS)).unwrap();
+    assert!(parser.run_with_data(data.clone(), None).is_err());
 
-    // parser.parse_src(String::from(VWAP_SCRIPTS)).unwrap();
-    // assert!(parser.run_with_data(data.clone(), None).is_ok());
+    parser.parse_src(String::from(VWAP1_SCRIPTS)).unwrap();
+    assert!(parser.run_with_data(data.clone(), None).is_ok());
 
-    // parser.parse_src(String::from(ALMA_ERR_SCRIPTS)).unwrap();
-    // assert!(parser.run_with_data(data.clone(), None).is_err());
-
-    // parser.parse_src(String::from(VWAP1_SCRIPTS)).unwrap();
-    // assert!(parser.run_with_data(data.clone(), None).is_ok());
-
-    // parser.parse_src(String::from(INVALID_INPUT)).unwrap();
-    // assert!(parser.run_with_data(data.clone(), None).is_err());
+    parser.parse_src(String::from(INVALID_INPUT)).unwrap();
+    assert!(parser.run_with_data(data.clone(), None).is_err());
 
     parser.parse_src(String::from(LONG_SCRIPT)).unwrap();
     assert!(parser.run_with_data(data.clone(), None).is_ok());

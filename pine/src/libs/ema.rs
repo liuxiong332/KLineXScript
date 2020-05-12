@@ -158,7 +158,7 @@ mod tests {
             .run(
                 &vec![(
                     "close",
-                    AnySeries::from_float_vec(vec![Some(10f64), Some(20f64)]),
+                    AnySeries::from_float_vec(vec![None, Some(10f64), Some(20f64)]),
                 )],
                 None,
             )
@@ -167,6 +167,7 @@ mod tests {
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(0, 0)),
             Some(PineRef::new(Series::from_vec(vec![
+                None,
                 Some(5f64),
                 Some(12.5f64)
             ])))
@@ -174,6 +175,7 @@ mod tests {
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(1, 0)),
             Some(PineRef::new(Series::from_vec(vec![
+                None,
                 Some(5f64),
                 Some(12.5f64)
             ])))

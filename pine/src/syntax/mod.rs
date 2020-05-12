@@ -749,11 +749,9 @@ impl<'a> SyntaxParser<'a> {
         ) {
             let exp1_res = self.parse_exp(&mut condition.exp1)?;
             let exp2_res = self.parse_exp(&mut condition.exp2)?;
-            println!("exp {:?} {:?}", exp1_res, exp2_res);
             if let Some(v_type) = common_type(&exp1_res.syntax_type, &exp2_res.syntax_type) {
                 let res_type = simple_to_series(v_type);
                 condition.result_type = res_type.clone();
-                println!("Get res type {:?}", res_type);
                 Ok(ParseValue::new_with_type(res_type))
             } else {
                 Err(PineInputError::new(

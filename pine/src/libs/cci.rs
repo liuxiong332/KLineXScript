@@ -138,7 +138,7 @@ mod tests {
             runner.get_context().get_var(VarIndex::new(0, 0)),
             &Some(PineRef::new(Series::from_vec(vec![
                 None,
-                Some(5f64 / (10f64 * 0.015f64))
+                Some(5f64 / (5f64 * 0.015f64))
             ])))
         );
     }

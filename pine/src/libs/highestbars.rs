@@ -21,10 +21,10 @@ type GetValFunc = fn(&Option<RefData<Series<Float>>>, i64) -> Int;
 fn get_max_val<'a>(source: &Option<RefData<Series<Float>>>, length: i64) -> Int {
     let mut max_val = Some(0f64);
     let mut max_i = Some(0);
-    for i in 0..length as usize {
-        let cur_val = series_index(source, i);
+    for i in 0..length {
+        let cur_val = series_index(source, i as usize);
         if cur_val > max_val {
-            max_i = Some(i as i64);
+            max_i = Some(-i as i64);
             max_val = cur_val;
         }
     }
@@ -179,7 +179,7 @@ mod tests {
             &Some(PineRef::new(Series::from_vec(vec![
                 Some(0i64),
                 Some(0i64),
-                Some(1i64)
+                Some(-1i64)
             ])))
         );
         assert_eq!(
@@ -187,7 +187,7 @@ mod tests {
             &Some(PineRef::new(Series::from_vec(vec![
                 Some(0i64),
                 Some(0i64),
-                Some(1i64)
+                Some(-1i64)
             ])))
         );
     }

@@ -6,7 +6,15 @@ use crate::types::{Evaluate, EvaluateVal, PineRef, RuntimeErr};
 use chrono::Utc;
 
 #[derive(Debug, Clone, PartialEq)]
-struct TimenowVal;
+struct TimenowVal {
+    now_time: i64,
+}
+
+impl<'a> TimenowVal {
+    fn new() -> TimenowVal {
+        TimenowVal { now_time: 0 }
+    }
+}
 
 impl<'a> EvaluateVal<'a> for TimenowVal {
     fn custom_name(&self) -> &str {
@@ -14,18 +22,21 @@ impl<'a> EvaluateVal<'a> for TimenowVal {
     }
 
     fn call(&mut self, _ctx: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
-        Ok(PineRef::new_box(Some(Utc::now().timestamp_millis())))
+        if self.now_time == 0 {
+            self.now_time = Utc::now().timestamp_millis();
+        }
+        Ok(PineRef::new_box(Some(self.now_time)))
     }
 
     fn copy(&self) -> Box<dyn EvaluateVal<'a>> {
-        Box::new(TimenowVal)
+        Box::new(TimenowVal::new())
     }
 }
 
 pub const VAR_NAME: &'static str = "timenow";
 
 pub fn declare_var<'a>() -> VarResult<'a> {
-    let value = PineRef::new(Evaluate::new(Box::new(TimenowVal)));
+    let value = PineRef::new(Evaluate::new(Box::new(TimenowVal::new())));
     let syntax_type = SyntaxType::int();
     VarResult::new(value, syntax_type, VAR_NAME)
 }

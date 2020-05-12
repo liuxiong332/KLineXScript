@@ -19,10 +19,10 @@ use std::rc::Rc;
 fn get_min_val<'a>(source: &Option<RefData<Series<Float>>>, length: i64) -> Int {
     let mut min_val = Some(std::f64::MAX);
     let mut min_i = Some(0);
-    for i in 0..length as usize {
-        let cur_val = series_index(source, i);
+    for i in 0..length {
+        let cur_val = series_index(source, i as usize);
         if cur_val < min_val {
-            min_i = Some(i as i64);
+            min_i = Some(-i);
             min_val = cur_val;
         }
     }
@@ -73,8 +73,8 @@ mod tests {
         assert_eq!(
             runner.get_context().get_var(VarIndex::new(0, 0)),
             &Some(PineRef::new(Series::from_vec(vec![
-                Some(1i64),
-                Some(1i64),
+                Some(-1i64),
+                Some(-1i64),
                 Some(0i64)
             ])))
         );

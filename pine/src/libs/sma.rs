@@ -68,7 +68,7 @@ pub fn wma_func<'a>(source: RefData<Series<Float>>, length: i64) -> Result<Float
 }
 
 fn deviation(values: Vec<f64>, avg: f64) -> f64 {
-    values.iter().fold(0f64, |mul, x| mul + (x - avg).abs())
+    values.iter().fold(0f64, |mul, x| mul + (x - avg).abs()) / values.len() as f64
 }
 
 fn variance(values: Vec<f64>, avg: f64) -> f64 {
@@ -254,7 +254,7 @@ mod tests {
         );
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(starti + 2, 0)),
-            Some(PineRef::new(Series::from_vec(vec![Some(0f64), Some(6f64)])))
+            Some(PineRef::new(Series::from_vec(vec![Some(0f64), Some(3f64)])))
         );
         assert_eq!(
             runner.get_context().move_var(VarIndex::new(starti + 3, 0)),

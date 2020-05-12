@@ -183,4 +183,48 @@ mod tests {
             ]
         );
     }
+
+    #[test]
+    fn hline_prop_test() {
+        use super::super::color;
+        let lib_info = LibInfo::new(
+            vec![declare_var(), color::declare_var()],
+            vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+        );
+        let src = "h1 = hline(1200)
+        h2 = hline(3.14, title='Pi', color=color.orange, linestyle=hline.style_dotted, linewidth=2)";
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        assert!(runner
+            .run(
+                &vec![(
+                    "close",
+                    AnySeries::from_float_vec(vec![Some(1f64), Some(2f64)]),
+                )],
+                None,
+            )
+            .is_ok());
+        assert_eq!(
+            runner.get_io_info().get_outputs(),
+            &vec![
+                OutputInfo::HLine(HLineInfo {
+                    price: Some(1200f64),
+                    title: None,
+                    color: None,
+                    linestyle: None,
+                    linewidth: None,
+                    editable: None,
+                }),
+                OutputInfo::HLine(HLineInfo {
+                    price: Some(3.14f64),
+                    title: Some(String::from("Pi")),
+                    color: Some(String::from("#FF9800")),
+                    linestyle: Some(String::from("dotted")),
+                    linewidth: Some(2i64),
+                    editable: None,
+                })
+            ]
+        );
+    }
 }

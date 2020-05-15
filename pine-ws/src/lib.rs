@@ -43,12 +43,13 @@ macro_rules! log {
 
 use pine::runtime::{
     AnySeries, InputVal, NoneCallback, OutputData, OutputDataCollect, OutputInfo, PineFormatError,
-    PlotInfo, StrOptionsData,
+    PlotInfo, StrOptionsData, SymbolInfo,
 };
 use pine::PineScript;
 use std::convert::TryInto;
 use std::f64;
 use std::mem::transmute;
+use std::rc::Rc;
 
 #[wasm_bindgen]
 pub fn init_panic_hook() {
@@ -278,6 +279,7 @@ pub fn run_with_data(
     srcs: JsValue,
     count: usize,
     data: &[f64],
+    syminfo: JsValue,
 ) -> Result<ExportOutputArray, JsValue> {
     let runner_ins = unsafe {
         let script = transmute::<*mut (), *mut PineScript>(runner.script);
@@ -287,7 +289,12 @@ pub fn run_with_data(
     debug_assert_eq!(data.len(), src_strs.len() * count);
     let input_data = transfer_input_data(src_strs, count, data);
 
-    match runner_ins.run_with_datal(input_data, count, None) {
+    let info: Option<Rc<SymbolInfo>> = match syminfo.into_serde() {
+        Ok(info) => Some(Rc::new(info)),
+        Err(_) => None,
+    };
+    log!("Get sym info {:?}", info);
+    match runner_ins.run_with_datal(input_data, count, info) {
         Ok(output) => Ok(output_data_to_slice(output)),
         Err(err) => Err(JsValue::from_serde(&err).unwrap()),
     }
@@ -300,6 +307,7 @@ pub fn run(
     srcs: JsValue,
     count: usize,
     data: &[f64],
+    syminfo: JsValue,
 ) -> Result<ExportOutputArray, JsValue> {
     let runner_ins = unsafe {
         let script = transmute::<*mut (), *mut PineScript>(runner.script);
@@ -310,7 +318,12 @@ pub fn run(
 
     let input: Vec<Option<InputVal>> = input_val.into_serde().unwrap();
     let input_data = transfer_input_data(src_strs, count, data);
-    match runner_ins.runl(input, input_data, count, None) {
+
+    let info: Option<Rc<SymbolInfo>> = match syminfo.into_serde() {
+        Ok(info) => Some(Rc::new(info)),
+        Err(_) => None,
+    };
+    match runner_ins.runl(input, input_data, count, info) {
         Ok(output) => Ok(output_data_to_slice(output)),
         Err(err) => Err(JsValue::from_serde(&err).unwrap()),
     }

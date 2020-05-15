@@ -30,7 +30,8 @@ fn runner_test() {
         &mut runner,
         JsValue::from_serde(&vec!["close", "open", "high", "low"]).unwrap(),
         1,
-        input_data.clone().into_boxed_slice().as_mut()
+        input_data.clone().into_boxed_slice().as_mut(),
+        JsValue::NULL,
     )
     .is_ok());
 
@@ -42,7 +43,8 @@ fn runner_test() {
         JsValue::from_serde(&input_vals).unwrap(),
         JsValue::from_serde(&vec!["close", "open", "high", "low"]).unwrap(),
         1,
-        input_data.clone().into_boxed_slice().as_mut()
+        input_data.clone().into_boxed_slice().as_mut(),
+        JsValue::NULL,
     )
     .is_ok());
 
@@ -87,6 +89,7 @@ fn volume_test() {
         JsValue::from_serde(&vec!["volume"]).unwrap(),
         1,
         input_data.into_boxed_slice().as_mut(),
+        JsValue::NULL,
     );
     assert!(result.is_ok());
     if let Ok(output) = result {

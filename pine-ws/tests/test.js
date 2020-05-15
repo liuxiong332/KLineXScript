@@ -155,11 +155,16 @@ it("dayofweek test", function () {
     runner.parse("plot(dayofweek)");
     console.log(runner.genIOInfo().input_srcs);
     // assert.deepEqual(runner.genIOInfo().input_srcs, [{ ticker: null, srcs: ['time'] }]);
+
+    runner.runWithData([], 3, new Float64Array(0), {
+        symbol_type: "stock", timezone: "GTC+8", ticker: "", session: "", trade_start: "",
+        trade_end: "", root: "", currency: "", description: "", mintick: 1,
+    });
 });
 
 it("alma test", function () {
     let runner = new Runner();
-    runner.parse("plot(alma(dayofweek, 4, 0.85, 2.0))");
+    runner.parse("plot(alma(4, 4, 0.85, 2.0))");
     console.log(runner.genIOInfo().input_srcs);
     // assert.deepEqual(runner.genIOInfo().input_srcs, [{ ticker: null, srcs: ['time'] }]);
 
@@ -167,7 +172,10 @@ it("alma test", function () {
     for (let i = 0; i < 8; i += 1) {
         farray[i] = i + 100.0;
     }
-    let result = runner.runWithData(["time"], 8, farray);
+    let result = runner.runWithData(["time"], 8, farray, {
+        symbol_type: "stock", timezone: "America/New_York", ticker: "", session: "", trade_start: "",
+        trade_end: "", root: "", currency: "", description: "", mintick: 1,
+    });
     // console.log(result[0].series);
     assert.deepEqual(result[0].series[0].slice(3, 8), new Float64Array([4, 4, 4, 4, 4]));
 });

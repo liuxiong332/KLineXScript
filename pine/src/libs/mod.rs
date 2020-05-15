@@ -113,7 +113,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         // plotshape::declare_var(),
         color::declare_var(),
         study::declare_var(),
-        syminfo::declare_var(),
+        // syminfo::declare_var(),
         // barstate::declare_var(),
         accdist::declare_var(),
         time::declare_var(),

@@ -11,9 +11,7 @@ use crate::types::{
     CallObjEval, Callable, CallableEvaluate, EvaluateVal, Float, Int, PineClass, PineFrom, PineRef,
     RefData, RuntimeErr, Series, SeriesCall,
 };
-use chrono::Datelike;
-use chrono::TimeZone;
-use chrono::Timelike;
+use chrono::{DateTime, Datelike, Local, TimeZone, Timelike};
 use chrono_tz::Tz;
 use std::collections::BTreeMap;
 use std::mem::transmute;
@@ -27,12 +25,80 @@ use std::rc::Rc;
 //     (time_index, parse_tz_from_ctx(ctx))
 // }
 
-pub fn parse_tz_from_ctx<'a>(ctx: &mut dyn Ctx<'a>) -> Tz {
-    let tz: Tz = match downcast_ctx(ctx).get_syminfo() {
-        Some(syminfo) => syminfo.timezone.parse().unwrap(),
-        None => Tz::America__New_York,
-    };
-    tz
+#[derive(Debug, Clone, PartialEq)]
+pub enum MyTz {
+    Tz(Tz),
+    Local,
+}
+
+impl MyTz {
+    fn year(&self, millis: i64) -> i64 {
+        match self {
+            MyTz::Tz(tz) => tz.timestamp_millis(millis).year() as i64,
+            MyTz::Local => Local.timestamp_millis(millis).year() as i64,
+        }
+    }
+
+    fn month(&self, millis: i64) -> i64 {
+        match self {
+            MyTz::Tz(tz) => tz.timestamp_millis(millis).month() as i64,
+            MyTz::Local => Local.timestamp_millis(millis).month() as i64,
+        }
+    }
+    fn weekofyear(&self, millis: i64) -> i64 {
+        match self {
+            MyTz::Tz(tz) => tz.timestamp_millis(millis).iso_week().week() as i64,
+            MyTz::Local => Local.timestamp_millis(millis).iso_week().week() as i64,
+        }
+    }
+
+    fn dayofmonth(&self, millis: i64) -> i64 {
+        match self {
+            MyTz::Tz(tz) => tz.timestamp_millis(millis).day() as i64,
+            MyTz::Local => Local.timestamp_millis(millis).day() as i64,
+        }
+    }
+
+    fn dayofweek(&self, millis: i64) -> i64 {
+        match self {
+            MyTz::Tz(tz) => tz.timestamp_millis(millis).weekday().number_from_sunday() as i64,
+            MyTz::Local => Local
+                .timestamp_millis(millis)
+                .weekday()
+                .number_from_sunday() as i64,
+        }
+    }
+
+    fn hour(&self, millis: i64) -> i64 {
+        match self {
+            MyTz::Tz(tz) => tz.timestamp_millis(millis).hour() as i64,
+            MyTz::Local => Local.timestamp_millis(millis).hour() as i64,
+        }
+    }
+
+    fn minute(&self, millis: i64) -> i64 {
+        match self {
+            MyTz::Tz(tz) => tz.timestamp_millis(millis).minute() as i64,
+            MyTz::Local => Local.timestamp_millis(millis).minute() as i64,
+        }
+    }
+
+    fn second(&self, millis: i64) -> i64 {
+        match self {
+            MyTz::Tz(tz) => tz.timestamp_millis(millis).second() as i64,
+            MyTz::Local => Local.timestamp_millis(millis).second() as i64,
+        }
+    }
+}
+
+pub fn parse_tz_from_ctx<'a>(ctx: &mut dyn Ctx<'a>) -> MyTz {
+    match downcast_ctx(ctx).get_syminfo() {
+        Some(syminfo) => match syminfo.timezone.parse() {
+            Ok(tz) => MyTz::Tz(tz),
+            Err(_) => MyTz::Local,
+        },
+        None => MyTz::Local,
+    }
 }
 
 // fn get_year_from_ts(tz: &Tz, cur_time: Int) -> Int {
@@ -44,7 +110,7 @@ pub fn parse_tz_from_ctx<'a>(ctx: &mut dyn Ctx<'a>) -> Tz {
 struct TimeVal {
     processor: *mut (),
     time_index: Option<VarIndex>,
-    tz: Option<Tz>,
+    tz: Option<MyTz>,
 }
 
 impl TimeVal {
@@ -69,8 +135,9 @@ impl<'a> EvaluateVal<'a> for TimeVal {
             });
             self.tz = Some(parse_tz_from_ctx(ctx));
         }
-        let processor =
-            unsafe { transmute::<_, fn(Option<PineRef<'a>>, &Tz) -> PineRef<'a>>(self.processor) };
+        let processor = unsafe {
+            transmute::<_, fn(Option<PineRef<'a>>, &MyTz) -> PineRef<'a>>(self.processor)
+        };
         Ok(processor(
             ctx.get_var(self.time_index.unwrap()).clone(),
             self.tz.as_ref().unwrap(),
@@ -85,7 +152,7 @@ impl<'a> EvaluateVal<'a> for TimeVal {
 #[derive(Debug, Clone, PartialEq)]
 struct TimeCallVal {
     processor: *mut (),
-    tz: Option<Tz>,
+    tz: Option<MyTz>,
 }
 
 impl TimeCallVal {
@@ -107,8 +174,9 @@ impl<'a> SeriesCall<'a> for TimeCallVal {
         if self.tz.is_none() {
             self.tz = Some(parse_tz_from_ctx(ctx));
         }
-        let processor =
-            unsafe { transmute::<_, fn(Option<PineRef<'a>>, &Tz) -> PineRef<'a>>(self.processor) };
+        let processor = unsafe {
+            transmute::<_, fn(Option<PineRef<'a>>, &MyTz) -> PineRef<'a>>(self.processor)
+        };
         Ok(processor(
             move_element(&mut param, 0),
             self.tz.as_ref().unwrap(),
@@ -122,7 +190,7 @@ impl<'a> SeriesCall<'a> for TimeCallVal {
 
 pub fn declare_time_var<'a>(
     name: &'static str,
-    processor: fn(Option<PineRef<'a>>, &Tz) -> PineRef<'a>,
+    processor: fn(Option<PineRef<'a>>, &MyTz) -> PineRef<'a>,
     func: fn() -> Callable<'a>,
 ) -> VarResult<'a> {
     let value = PineRef::new(CallableEvaluate::new(
@@ -141,10 +209,10 @@ pub fn declare_time_var<'a>(
     VarResult::new(value, syntax_type, name)
 }
 
-fn get_year<'a>(time: Option<PineRef<'a>>, tz: &Tz) -> PineRef<'a> {
+fn get_year<'a>(time: Option<PineRef<'a>>, tz: &MyTz) -> PineRef<'a> {
     let val: Int = match pine_ref_to_i64(time) {
         Some(v) => {
-            let year = tz.timestamp_millis(v).year() as i64;
+            let year = tz.year(v);
             Some(year)
         }
         None => None,
@@ -152,10 +220,10 @@ fn get_year<'a>(time: Option<PineRef<'a>>, tz: &Tz) -> PineRef<'a> {
     PineRef::new(Series::from(val))
 }
 
-fn get_month<'a>(time: Option<PineRef<'a>>, tz: &Tz) -> PineRef<'a> {
+fn get_month<'a>(time: Option<PineRef<'a>>, tz: &MyTz) -> PineRef<'a> {
     let val: Int = match pine_ref_to_i64(time) {
         Some(v) => {
-            let month = tz.timestamp_millis(v).month() as i64;
+            let month = tz.month(v);
             Some(month)
         }
         None => None,
@@ -163,10 +231,10 @@ fn get_month<'a>(time: Option<PineRef<'a>>, tz: &Tz) -> PineRef<'a> {
     PineRef::new(Series::from(val))
 }
 
-fn get_weekofyear<'a>(time: Option<PineRef<'a>>, tz: &Tz) -> PineRef<'a> {
+fn get_weekofyear<'a>(time: Option<PineRef<'a>>, tz: &MyTz) -> PineRef<'a> {
     let val: Int = match pine_ref_to_i64(time) {
         Some(v) => {
-            let week = tz.timestamp_millis(v).iso_week().week() as i64;
+            let week = tz.weekofyear(v);
             Some(week)
         }
         None => None,
@@ -174,10 +242,10 @@ fn get_weekofyear<'a>(time: Option<PineRef<'a>>, tz: &Tz) -> PineRef<'a> {
     PineRef::new(Series::from(val))
 }
 
-fn get_dayofmonth<'a>(time: Option<PineRef<'a>>, tz: &Tz) -> PineRef<'a> {
+fn get_dayofmonth<'a>(time: Option<PineRef<'a>>, tz: &MyTz) -> PineRef<'a> {
     let val: Int = match pine_ref_to_i64(time) {
         Some(v) => {
-            let week = tz.timestamp_millis(v).day() as i64;
+            let week = tz.dayofmonth(v);
             Some(week)
         }
         None => None,
@@ -185,10 +253,10 @@ fn get_dayofmonth<'a>(time: Option<PineRef<'a>>, tz: &Tz) -> PineRef<'a> {
     PineRef::new(Series::from(val))
 }
 
-fn get_dayofweek<'a>(time: Option<PineRef<'a>>, tz: &Tz) -> PineRef<'a> {
+fn get_dayofweek<'a>(time: Option<PineRef<'a>>, tz: &MyTz) -> PineRef<'a> {
     let val: Int = match pine_ref_to_i64(time) {
         Some(v) => {
-            let week = tz.timestamp_millis(v).weekday().number_from_sunday() as i64;
+            let week = tz.dayofweek(v);
             Some(week)
         }
         None => None,
@@ -196,10 +264,10 @@ fn get_dayofweek<'a>(time: Option<PineRef<'a>>, tz: &Tz) -> PineRef<'a> {
     PineRef::new(Series::from(val))
 }
 
-fn get_hour<'a>(time: Option<PineRef<'a>>, tz: &Tz) -> PineRef<'a> {
+fn get_hour<'a>(time: Option<PineRef<'a>>, tz: &MyTz) -> PineRef<'a> {
     let val: Int = match pine_ref_to_i64(time) {
         Some(v) => {
-            let week = tz.timestamp_millis(v).hour() as i64;
+            let week = tz.hour(v);
             Some(week)
         }
         None => None,
@@ -207,10 +275,10 @@ fn get_hour<'a>(time: Option<PineRef<'a>>, tz: &Tz) -> PineRef<'a> {
     PineRef::new(Series::from(val))
 }
 
-fn get_minute<'a>(time: Option<PineRef<'a>>, tz: &Tz) -> PineRef<'a> {
+fn get_minute<'a>(time: Option<PineRef<'a>>, tz: &MyTz) -> PineRef<'a> {
     let val: Int = match pine_ref_to_i64(time) {
         Some(v) => {
-            let week = tz.timestamp_millis(v).minute() as i64;
+            let week = tz.minute(v);
             Some(week)
         }
         None => None,
@@ -218,10 +286,10 @@ fn get_minute<'a>(time: Option<PineRef<'a>>, tz: &Tz) -> PineRef<'a> {
     PineRef::new(Series::from(val))
 }
 
-fn get_second<'a>(time: Option<PineRef<'a>>, tz: &Tz) -> PineRef<'a> {
+fn get_second<'a>(time: Option<PineRef<'a>>, tz: &MyTz) -> PineRef<'a> {
     let val: Int = match pine_ref_to_i64(time) {
         Some(v) => {
-            let week = tz.timestamp_millis(v).second() as i64;
+            let week = tz.second(v);
             Some(week)
         }
         None => None,
@@ -355,10 +423,10 @@ mod tests {
     use crate::{LibInfo, PineParser, PineRunner};
     use chrono::TimeZone;
 
-    fn get_syminfo() -> SymbolInfo {
+    fn get_syminfo(timezone: String) -> SymbolInfo {
         SymbolInfo {
             symbol_type: String::from("future"),
-            timezone: String::from("Asia/Shanghai"),
+            timezone: timezone,
             ticker: String::from("BATS:MSFT"),
             session: String::from("regular"),
             trade_start: String::from(""),
@@ -418,7 +486,7 @@ mod tests {
         runner
             .run(
                 &vec![("_time", AnySeries::from_int_vec(vec![Some(time)]))],
-                Some(Rc::new(get_syminfo())),
+                Some(Rc::new(get_syminfo(String::from("Asia/Shanghai")))),
             )
             .unwrap();
 
@@ -516,7 +584,7 @@ mod tests {
 
         let lib_info = LibInfo::new(
             vec![declare_dayofweek_var()],
-            vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+            vec![("_time", SyntaxType::Series(SimpleSyntaxType::Int))],
         );
         let src = "m = [
             dayofweek.sunday, dayofweek.monday, dayofweek.tuesday, dayofweek.wednesday, 
@@ -527,7 +595,7 @@ mod tests {
 
         runner
             .run(
-                &vec![("close", AnySeries::from_float_vec(vec![Some(1f64)]))],
+                &vec![("_time", AnySeries::from_int_vec(vec![Some(100i64)]))],
                 None,
             )
             .unwrap();
@@ -546,6 +614,28 @@ mod tests {
                 PineRef::new(Some(6i64)),
                 PineRef::new(Some(7i64))
             ]
+        );
+    }
+
+    #[test]
+    fn timezone_test() {
+        let lib_info = LibInfo::new(
+            vec![declare_dayofweek_var()],
+            vec![("_time", SyntaxType::Series(SimpleSyntaxType::Float))],
+        );
+        let src = "m = dayofweek";
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+        runner
+            .run(
+                &vec![("_time", AnySeries::from_int_vec(vec![Some(100i64)]))],
+                Some(Rc::new(get_syminfo(String::from("America/New_York")))),
+            )
+            .unwrap();
+
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(0, 0)),
+            Some(PineRef::new_rc(Series::from_vec(vec![Some(4i64)])))
         );
     }
 }

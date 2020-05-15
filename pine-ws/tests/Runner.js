@@ -81,9 +81,9 @@ class Runner {
         return gen_io_info(this.runner);
     }
 
-    runWithData(srcs, len, data) {
+    runWithData(srcs, len, data, syminfo) {
         let dataPtr = run_with_data(
-            this.runner, srcs, len, data,
+            this.runner, srcs, len, data, syminfo,
         );
         return getOutputData(dataPtr);
     }
@@ -96,8 +96,8 @@ class Runner {
         return getOutputData(dataPtr);
     }
 
-    run(input, srcs, len, data) {
-        let dataPtr = run(this.runner, input, srcs, len, data);
+    run(input, srcs, len, data, syminfo) {
+        let dataPtr = run(this.runner, input, srcs, len, data, syminfo);
         return getOutputData(dataPtr);
     }
 

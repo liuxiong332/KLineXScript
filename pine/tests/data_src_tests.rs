@@ -1524,8 +1524,9 @@ plot(a4)
 #[test]
 fn dayofweek_test() {
     use pine::libs::{plot, year};
-    use pine::runtime::output::{OutputData, ScriptPurpose, StudyScript};
+    use pine::runtime::output::{OutputData, ScriptPurpose, StudyScript, SymbolInfo};
     use pine::runtime::NoneCallback;
+    use std::rc::Rc;
 
     let lib_info = pine::LibInfo::new(
         vec![
@@ -1543,9 +1544,20 @@ fn dayofweek_test() {
     let result = parser.run_with_data(
         vec![(
             "_time",
-            AnySeries::from_int_vec(vec![Some(1587978379382i64), Some(1588089600000)]),
+            AnySeries::from_int_vec(vec![Some(1587978379382i64), Some(1588003200000)]),
         )],
-        None,
+        Some(Rc::new(SymbolInfo {
+            symbol_type: String::from("future"),
+            timezone: String::from("Asia/Shanghai"),
+            ticker: String::from("BATS:MSFT"),
+            session: String::from("regular"),
+            trade_start: String::from(""),
+            trade_end: String::from(""),
+            root: Some(String::from("le")),
+            currency: String::from("USD"),
+            description: String::from("des"),
+            mintick: 1f64,
+        })),
     );
     assert!(result.is_ok());
     assert_eq!(

@@ -4,7 +4,8 @@ use crate::ast::syntax_type::{FunctionType, FunctionTypes, SyntaxType};
 use crate::helper::{move_element, pine_ref_to_i64, pine_ref_to_string, Resolution, Session};
 use crate::runtime::{downcast_ctx, Ctx};
 use crate::types::{
-    Callable, CallableEvaluate, EvaluateVal, Float, Int, PineRef, RuntimeErr, Series, SeriesCall,
+    Callable, CallableEvaluate, Evaluate, EvaluateVal, Float, Int, PineRef, RuntimeErr, Series,
+    SeriesCall,
 };
 use chrono_tz::Tz;
 use std::cell::RefCell;
@@ -121,9 +122,10 @@ fn process_time<'a>(
 pub const VAR_NAME: &'static str = "time";
 
 pub fn declare_var<'a>() -> VarResult<'a> {
-    let value = PineRef::new(CallableEvaluate::new(Box::new(TimeVal::new()), || {
-        Callable::new(None, Some(Box::new(TimeCallVal::new())))
-    }));
+    let value = PineRef::new(CallableEvaluate::new(
+        || Evaluate::new(Box::new(TimeVal::new())),
+        || Callable::new(None, Some(Box::new(TimeCallVal::new()))),
+    ));
 
     // plot(series, title, color, linewidth, style, trackprice, transp, histbase, offset, join, editable, show_last) → plot
 

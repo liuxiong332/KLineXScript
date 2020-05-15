@@ -9,7 +9,7 @@ use crate::helper::{
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::InputSrc;
 use crate::types::{
-    downcast_pf_ref, int2float, Arithmetic, Callable, CallableEvaluate, CallableFactory,
+    downcast_pf_ref, int2float, Arithmetic, Callable, CallableEvaluate, CallableFactory, Evaluate,
     EvaluateVal, Float, Int, ParamCollectCall, PineRef, RefData, RuntimeErr, Series, SeriesCall,
     NA,
 };
@@ -114,14 +114,17 @@ impl<'a> SeriesCall<'a> for TrVal {
 }
 
 pub fn declare_var<'a>() -> VarResult<'a> {
-    let value = PineRef::new(CallableEvaluate::new(Box::new(TrVal::new()), || {
-        Callable::new(
-            None,
-            Some(Box::new(ParamCollectCall::new_with_caller(Box::new(
-                TrVal::new(),
-            )))),
-        )
-    }));
+    let value = PineRef::new(CallableEvaluate::new(
+        || Evaluate::new(Box::new(TrVal::new())),
+        || {
+            Callable::new(
+                None,
+                Some(Box::new(ParamCollectCall::new_with_caller(Box::new(
+                    TrVal::new(),
+                )))),
+            )
+        },
+    ));
 
     // plot(series, title, color, linewidth, style, trackprice, transp, histbase, offset, join, editable, show_last) → plot
 

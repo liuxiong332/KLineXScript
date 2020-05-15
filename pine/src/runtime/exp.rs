@@ -57,29 +57,32 @@ impl<'a> RVRunner<'a> for Exp<'a> {
                             // let eval_val = downcast_pf_mut::<Evaluate>(&mut s).unwrap();
                             eval_val.call(context)
                         }
-                        (FirstType::CallableEvaluate, SecondType::Simple) => {
-                            let mut eval_val = downcast_pf::<CallableEvaluate>(s.clone()).unwrap();
-
-                            context.create_runnable(RefData::clone(&eval_val).into_rc());
-                            // downcast_pf_mut::<CallableEvaluate>(&mut s).unwrap()
-                            eval_val.call(context)
-                        }
-                        (FirstType::CallableObjectEvaluate, SecondType::Simple) => {
-                            let mut eval_val = downcast_pf::<CallObjEval>(s.clone()).unwrap();
-
-                            context.create_runnable(RefData::clone(&eval_val).into_rc());
-                            // downcast_pf_mut::<CallableEvaluate>(&mut s).unwrap()
-                            eval_val.call(context)
-                        }
-                        (FirstType::EvaluateFactory, SecondType::Simple) => {
+                        (FirstType::CallableEvaluate, SecondType::Simple)
+                        | (FirstType::CallableObjectEvaluate, SecondType::Simple)
+                        | (FirstType::EvaluateFactory, SecondType::Simple) => {
                             // Get evaluate instance from context
                             let mut eval_instance = context.move_fun_instance(name.eval_id);
                             if eval_instance.is_none() {
-                                let factory = downcast_pf::<EvaluateFactory>(s.clone()).unwrap();
-                                context.create_fun_instance(
-                                    name.eval_id,
-                                    PineRef::new_rc(factory.create()),
-                                );
+                                let eval_val = match s.get_type().0 {
+                                    FirstType::CallableEvaluate => {
+                                        let mut eval_factory =
+                                            downcast_pf::<CallableEvaluate>(s.clone()).unwrap();
+                                        eval_factory.create_eval()
+                                    }
+                                    FirstType::CallableObjectEvaluate => {
+                                        let mut eval_factory =
+                                            downcast_pf::<CallObjEval>(s.clone()).unwrap();
+                                        eval_factory.create_eval()
+                                    }
+                                    _ => {
+                                        let factory =
+                                            downcast_pf::<EvaluateFactory>(s.clone()).unwrap();
+                                        factory.create()
+                                    }
+                                };
+                                // let factory = downcast_pf::<EvaluateFactory>(s.clone()).unwrap();
+                                context
+                                    .create_fun_instance(name.eval_id, PineRef::new_rc(eval_val));
                                 eval_instance = context.move_fun_instance(name.eval_id);
                             }
                             let mut eval_val =
@@ -154,7 +157,22 @@ impl<'a> RunnerForObj<'a> for Exp<'a> {
                             eval_val.call(context)
                         }
                         (FirstType::CallableEvaluate, SecondType::Simple) => {
-                            let mut eval_val = downcast_pf::<CallableEvaluate>(s.clone()).unwrap();
+                            let mut eval_instance = context.move_fun_instance(name.eval_id);
+                            if eval_instance.is_none() {
+                                let mut eval_factory =
+                                    downcast_pf::<CallableEvaluate>(s.clone()).unwrap();
+                                let eval_val = eval_factory.create_eval();
+                                context
+                                    .create_fun_instance(name.eval_id, PineRef::new_rc(eval_val));
+                                eval_instance = context.move_fun_instance(name.eval_id);
+                            }
+                            // PineRef<Evaluate> => RefData<Evaluate>
+                            let mut eval_val =
+                                downcast_pf::<Evaluate>(eval_instance.unwrap()).unwrap();
+                            context.create_fun_instance(
+                                name.eval_id,
+                                RefData::clone(&eval_val).into_pf(),
+                            );
                             context.create_runnable(RefData::clone(&eval_val).into_rc());
                             eval_val.call(context)
                         }

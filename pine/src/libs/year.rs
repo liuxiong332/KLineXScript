@@ -8,8 +8,8 @@ use crate::helper::{
 };
 use crate::runtime::{downcast_ctx, Ctx};
 use crate::types::{
-    CallObjEval, Callable, CallableEvaluate, EvaluateVal, Float, Int, PineClass, PineFrom, PineRef,
-    RefData, RuntimeErr, Series, SeriesCall,
+    CallObjEval, Callable, CallableEvaluate, Evaluate, EvaluateVal, Float, Int, PineClass,
+    PineFrom, PineRef, RefData, RuntimeErr, Series, SeriesCall,
 };
 use chrono::{DateTime, Datelike, Local, TimeZone, Timelike};
 use chrono_tz::Tz;
@@ -190,13 +190,10 @@ impl<'a> SeriesCall<'a> for TimeCallVal {
 
 pub fn declare_time_var<'a>(
     name: &'static str,
-    processor: fn(Option<PineRef<'a>>, &MyTz) -> PineRef<'a>,
+    processor: fn() -> Evaluate<'a>,
     func: fn() -> Callable<'a>,
 ) -> VarResult<'a> {
-    let value = PineRef::new(CallableEvaluate::new(
-        Box::new(TimeVal::new(processor as *mut ())),
-        func,
-    ));
+    let value = PineRef::new(CallableEvaluate::new(processor, func));
 
     // plot(series, title, color, linewidth, style, trackprice, transp, histbase, offset, join, editable, show_last) → plot
 
@@ -298,33 +295,45 @@ fn get_second<'a>(time: Option<PineRef<'a>>, tz: &MyTz) -> PineRef<'a> {
 }
 
 pub fn declare_year_var<'a>() -> VarResult<'a> {
-    declare_time_var("year", get_year, || {
-        Callable::new(None, Some(Box::new(TimeCallVal::new(get_year as *mut ()))))
-    })
+    declare_time_var(
+        "year",
+        || Evaluate::new(Box::new(TimeVal::new(get_year as *mut ()))),
+        || Callable::new(None, Some(Box::new(TimeCallVal::new(get_year as *mut ())))),
+    )
 }
 
 pub fn declare_month_var<'a>() -> VarResult<'a> {
-    declare_time_var("month", get_month, || {
-        Callable::new(None, Some(Box::new(TimeCallVal::new(get_month as *mut ()))))
-    })
+    declare_time_var(
+        "month",
+        || Evaluate::new(Box::new(TimeVal::new(get_month as *mut ()))),
+        || Callable::new(None, Some(Box::new(TimeCallVal::new(get_month as *mut ())))),
+    )
 }
 
 pub fn declare_weekofyear_var<'a>() -> VarResult<'a> {
-    declare_time_var("weekofyear", get_weekofyear, || {
-        Callable::new(
-            None,
-            Some(Box::new(TimeCallVal::new(get_weekofyear as *mut ()))),
-        )
-    })
+    declare_time_var(
+        "weekofyear",
+        || Evaluate::new(Box::new(TimeVal::new(get_weekofyear as *mut ()))),
+        || {
+            Callable::new(
+                None,
+                Some(Box::new(TimeCallVal::new(get_weekofyear as *mut ()))),
+            )
+        },
+    )
 }
 
 pub fn declare_dayofmonth_var<'a>() -> VarResult<'a> {
-    declare_time_var("dayofmonth", get_dayofmonth, || {
-        Callable::new(
-            None,
-            Some(Box::new(TimeCallVal::new(get_dayofmonth as *mut ()))),
-        )
-    })
+    declare_time_var(
+        "dayofmonth",
+        || Evaluate::new(Box::new(TimeVal::new(get_dayofmonth as *mut ()))),
+        || {
+            Callable::new(
+                None,
+                Some(Box::new(TimeCallVal::new(get_dayofmonth as *mut ()))),
+            )
+        },
+    )
 }
 
 struct DayOfWeekProps;
@@ -357,8 +366,8 @@ impl<'a> PineClass<'a> for DayOfWeekProps {
 
 pub fn declare_dayofweek_var<'a>() -> VarResult<'a> {
     let value = PineRef::new(CallObjEval::new(
-        Box::new(TimeVal::new(get_dayofweek as *mut ())),
         Box::new(DayOfWeekProps),
+        || Evaluate::new(Box::new(TimeVal::new(get_dayofweek as *mut ()))),
         || {
             Callable::new(
                 None,
@@ -390,27 +399,37 @@ pub fn declare_dayofweek_var<'a>() -> VarResult<'a> {
 }
 
 pub fn declare_hour_var<'a>() -> VarResult<'a> {
-    declare_time_var("hour", get_hour, || {
-        Callable::new(None, Some(Box::new(TimeCallVal::new(get_hour as *mut ()))))
-    })
+    declare_time_var(
+        "hour",
+        || Evaluate::new(Box::new(TimeVal::new(get_hour as *mut ()))),
+        || Callable::new(None, Some(Box::new(TimeCallVal::new(get_hour as *mut ())))),
+    )
 }
 
 pub fn declare_minute_var<'a>() -> VarResult<'a> {
-    declare_time_var("minute", get_minute, || {
-        Callable::new(
-            None,
-            Some(Box::new(TimeCallVal::new(get_minute as *mut ()))),
-        )
-    })
+    declare_time_var(
+        "minute",
+        || Evaluate::new(Box::new(TimeVal::new(get_minute as *mut ()))),
+        || {
+            Callable::new(
+                None,
+                Some(Box::new(TimeCallVal::new(get_minute as *mut ()))),
+            )
+        },
+    )
 }
 
 pub fn declare_second_var<'a>() -> VarResult<'a> {
-    declare_time_var("second", get_second, || {
-        Callable::new(
-            None,
-            Some(Box::new(TimeCallVal::new(get_second as *mut ()))),
-        )
-    })
+    declare_time_var(
+        "second",
+        || Evaluate::new(Box::new(TimeVal::new(get_second as *mut ()))),
+        || {
+            Callable::new(
+                None,
+                Some(Box::new(TimeCallVal::new(get_second as *mut ()))),
+            )
+        },
+    )
 }
 
 #[cfg(test)]
@@ -626,6 +645,17 @@ mod tests {
         let src = "m = dayofweek";
         let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        runner
+            .run(
+                &vec![("_time", AnySeries::from_int_vec(vec![Some(100i64)]))],
+                Some(Rc::new(get_syminfo(String::from("Asia/Shanghai")))),
+            )
+            .unwrap();
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(0, 0)),
+            Some(PineRef::new_rc(Series::from_vec(vec![Some(5i64)])))
+        );
         runner
             .run(
                 &vec![("_time", AnySeries::from_int_vec(vec![Some(100i64)]))],

@@ -746,8 +746,10 @@ impl<'a, 'b, 'c> Ctx<'a> for Context<'a, 'b, 'c> {
     }
 
     fn create_runnable(&mut self, call: Rc<RefCell<dyn Runnable<'a> + 'a>>) {
-        if self.context_type == ContextType::Main && !self.first_commit {
-            self.runnables.push(call);
+        if self.context_type == ContextType::Main {
+            if !self.first_commit {
+                self.runnables.push(call);
+            }
         } else if let Some(ref mut v) = self.parent {
             v.create_runnable(call);
         }

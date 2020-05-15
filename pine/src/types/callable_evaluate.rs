@@ -1,4 +1,4 @@
-use super::evaluate::EvaluateVal;
+use super::evaluate::{Evaluate, EvaluateVal};
 use super::Runnable;
 use crate::runtime::context::Ctx;
 use crate::types::traits::{Category, ComplexType, DataType, PineStaticType, PineType, SecondType};
@@ -6,13 +6,14 @@ use crate::types::{Callable, PineRef, RuntimeErr};
 
 #[derive(Debug)]
 pub struct CallableEvaluate<'a> {
-    val: Box<dyn EvaluateVal<'a> + 'a>,
+    // val: Box<dyn EvaluateVal<'a> + 'a>,
+    create_val: fn() -> Evaluate<'a>,
     create_func: fn() -> Callable<'a>,
 }
 
 impl<'a> PartialEq for CallableEvaluate<'a> {
     fn eq(&self, other: &CallableEvaluate<'a>) -> bool {
-        PartialEq::eq(&*self.val, &*other.val) && self.create_func == other.create_func
+        self.create_val == other.create_val && self.create_func == other.create_func
     }
 }
 
@@ -33,7 +34,7 @@ impl<'a> PineType<'a> for CallableEvaluate<'a> {
 
     fn copy(&self) -> PineRef<'a> {
         PineRef::new_rc(CallableEvaluate {
-            val: self.val.copy(),
+            create_val: self.create_val,
             create_func: self.create_func,
         })
     }
@@ -43,14 +44,17 @@ impl<'a> ComplexType for CallableEvaluate<'a> {}
 
 impl<'a> CallableEvaluate<'a> {
     pub fn new(
-        val: Box<dyn EvaluateVal<'a>>,
+        create_val: fn() -> Evaluate<'a>,
         create_func: fn() -> Callable<'a>,
     ) -> CallableEvaluate<'a> {
-        CallableEvaluate { val, create_func }
+        CallableEvaluate {
+            create_val,
+            create_func,
+        }
     }
 
-    pub fn call(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
-        self.val.call(ctx)
+    pub fn create_eval(&self) -> Evaluate<'a> {
+        (self.create_val)()
     }
 
     pub fn create(&self) -> Callable<'a> {
@@ -58,20 +62,10 @@ impl<'a> CallableEvaluate<'a> {
     }
 }
 
-impl<'a> Runnable<'a> for CallableEvaluate<'a> {
-    fn back(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
-        self.val.back(ctx)
-    }
-
-    fn run(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
-        self.val.run(ctx)
-    }
-}
-
 impl<'a> Clone for CallableEvaluate<'a> {
     fn clone(&self) -> CallableEvaluate<'a> {
         CallableEvaluate {
-            val: self.val.copy(),
+            create_val: self.create_val,
             create_func: self.create_func,
         }
     }
@@ -117,8 +111,10 @@ mod tests {
 
     #[test]
     fn evaluate_test() {
-        let mut evaluate =
-            CallableEvaluate::new(Box::new(MyVal()), || Callable::new(Some(test_func), None));
+        let mut evaluate = CallableEvaluate::new(
+            || Evaluate::new(Box::new(MyVal())),
+            || Callable::new(Some(test_func), None),
+        );
         let mut context = Context::new(None, RunContextType::Normal);
         context.init(2, 0, 0);
         context.set_varname_index("close", 0);
@@ -129,7 +125,7 @@ mod tests {
             (DataType::CallableEvaluate, SecondType::Simple)
         );
         assert_eq!(
-            evaluate.call(&mut context),
+            evaluate.create_eval().call(&mut context),
             Ok(PineRef::new_rc(Series::from(Some(1f64))))
         );
     }

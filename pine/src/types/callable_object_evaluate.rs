@@ -1,4 +1,4 @@
-use super::evaluate::EvaluateVal;
+use super::evaluate::Evaluate;
 use super::{
     Callable, Category, ComplexType, DataType, PineClass, PineFrom, PineRef, PineStaticType,
     PineType, Runnable, RuntimeErr, SecondType,
@@ -7,14 +7,14 @@ use crate::runtime::Ctx;
 
 #[derive(Debug)]
 pub struct CallObjEval<'a> {
-    val: Box<dyn EvaluateVal<'a> + 'a>,
     obj: Box<dyn PineClass<'a> + 'a>,
+    create_val: fn() -> Evaluate<'a>,
     create_func: fn() -> Callable<'a>,
 }
 
 impl<'a> PartialEq for CallObjEval<'a> {
     fn eq(&self, other: &CallObjEval<'a>) -> bool {
-        PartialEq::eq(&*self.val, &*other.val)
+        self.create_val == other.create_val
             && PartialEq::eq(&*self.obj, &*other.obj)
             && self.create_func == other.create_func
     }
@@ -37,8 +37,8 @@ impl<'a> PineType<'a> for CallObjEval<'a> {
 
     fn copy(&self) -> PineRef<'a> {
         PineRef::new_rc(CallObjEval::new(
-            self.val.copy(),
             self.obj.copy(),
+            self.create_val,
             self.create_func,
         ))
     }
@@ -50,19 +50,15 @@ impl<'a> ComplexType for CallObjEval<'a> {}
 
 impl<'a> CallObjEval<'a> {
     pub fn new(
-        val: Box<dyn EvaluateVal<'a>>,
         obj: Box<dyn PineClass<'a> + 'a>,
+        create_val: fn() -> Evaluate<'a>,
         create_func: fn() -> Callable<'a>,
     ) -> CallObjEval<'a> {
         CallObjEval {
-            val,
+            create_val,
             obj,
             create_func,
         }
-    }
-
-    pub fn call(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, RuntimeErr> {
-        self.val.call(ctx)
     }
 
     pub fn get(&self, context: &mut dyn Ctx<'a>, name: &str) -> Result<PineRef<'a>, RuntimeErr> {
@@ -73,26 +69,18 @@ impl<'a> CallObjEval<'a> {
         self.obj.set(name, property)
     }
 
+    pub fn create_eval(&self) -> Evaluate<'a> {
+        (self.create_val)()
+    }
     pub fn create(&self) -> Callable<'a> {
         (self.create_func)()
     }
 }
-
-impl<'a> Runnable<'a> for CallObjEval<'a> {
-    fn back(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
-        self.val.back(ctx)
-    }
-
-    fn run(&mut self, ctx: &mut dyn Ctx<'a>) -> Result<(), RuntimeErr> {
-        self.val.run(ctx)
-    }
-}
-
 impl<'a> Clone for CallObjEval<'a> {
     fn clone(&self) -> CallObjEval<'a> {
         CallObjEval {
-            val: self.val.copy(),
             obj: self.obj.copy(),
+            create_val: self.create_val,
             create_func: self.create_func,
         }
     }
@@ -100,7 +88,7 @@ impl<'a> Clone for CallObjEval<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{downcast_pf, Callable, Int, Object, RefData};
+    use super::super::{downcast_pf, Callable, EvaluateVal, Int, Object, RefData};
     use super::*;
     use crate::ast::stat_expr_types::VarIndex;
     use crate::ast::syntax_type::FunctionType;
@@ -166,9 +154,11 @@ mod tests {
 
     #[test]
     fn object_test() {
-        let mut obj = CallObjEval::new(Box::new(MyVal()), Box::new(A), || {
-            Callable::new(Some(test_func), None)
-        });
+        let mut obj = CallObjEval::new(
+            Box::new(A),
+            || Evaluate::new(Box::new(MyVal())),
+            || Callable::new(Some(test_func), None),
+        );
         let mut context = Context::new(None, ContextType::Normal);
         context.init(2, 0, 0);
         context.set_varname_index("close", 0);
@@ -183,7 +173,7 @@ mod tests {
             RefData::new_box(Some(1))
         );
         assert_eq!(
-            obj.call(&mut context),
+            obj.create_eval().call(&mut context),
             Ok(PineRef::new_rc(Series::from(Some(1f64))))
         );
         let mut callable = obj.create();

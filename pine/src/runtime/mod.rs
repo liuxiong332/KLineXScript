@@ -4,6 +4,7 @@ pub mod data_src;
 pub mod error_format;
 pub mod exp;
 pub mod function;
+pub mod instance_caller;
 pub mod op;
 pub mod output;
 pub mod runtime_convert;

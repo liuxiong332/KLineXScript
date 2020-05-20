@@ -21,7 +21,7 @@ use std::fmt;
 use std::mem;
 use std::rc::Rc;
 
-type PerInfoItem = Option<PerLine>;
+pub type PerInfoItem = Option<PerLine>;
 
 fn pine_ref_to_line<'a>(val: Option<PineRef<'a>>) -> PerInfoItem {
     if val.is_none() {
@@ -35,7 +35,7 @@ fn pine_ref_to_line<'a>(val: Option<PineRef<'a>>) -> PerInfoItem {
 
 // The line definition that represent every line object.
 #[derive(Debug, Clone, PartialEq)]
-struct PerLine {
+pub struct PerLine {
     x1: Int,
     x2: Int,
 }
@@ -54,6 +54,7 @@ impl PineStaticType for PerInfoItem {
 
 impl<'a> PineFrom<'a, PerInfoItem> for PerInfoItem {
     fn implicity_from(t: PineRef<'a>) -> Result<RefData<PerInfoItem>, RuntimeErr> {
+        println!("Get type {:?}", t.get_type());
         match t.get_type() {
             (DataType::Line, SecondType::Simple) => Ok(downcast_pf::<PerInfoItem>(t).unwrap()),
             (DataType::Line, SecondType::Series) => {
@@ -78,39 +79,57 @@ impl<'a> PineType<'a> for Option<PerLine> {
 
 impl<'a> SimpleType for Option<PerLine> {}
 
-// LineInfo represent the series of line object.
-#[derive(Debug, Clone, PartialEq)]
-struct LineInfo<'a> {
-    pub lines: Series<'a, Option<PerLine>>,
-}
+// // LineInfo represent the series of line object.
+// #[derive(Debug, Clone, PartialEq)]
+// struct LineInfo<'a> {
+//     pub lines: Series<'a, PerLineItem>,
+// }
 
-impl<'a> LineInfo<'a> {
-    fn new_line(&mut self) {
-        self.lines.update(Some(PerLine::new()))
-    }
-}
+// impl<'a> LineInfo<'a> {
+//     fn new_line(&mut self) {
+//         self.lines.update(Some(PerLine::new()))
+//     }
+// }
 
-impl<'a> PineType<'a> for LineInfo<'a> {
-    fn get_type(&self) -> (DataType, SecondType) {
-        (DataType::Line, SecondType::Simple)
-    }
+// impl<'a> PineType<'a> for LineInfo<'a> {
+//     fn get_type(&self) -> (DataType, SecondType) {
+//         (DataType::Line, SecondType::Simple)
+//     }
 
-    fn category(&self) -> Category {
-        Category::Complex
-    }
+//     fn category(&self) -> Category {
+//         Category::Complex
+//     }
 
-    fn copy(&self) -> PineRef<'a> {
-        PineRef::new_rc(self.clone())
-    }
-}
+//     fn copy(&self) -> PineRef<'a> {
+//         PineRef::new_rc(self.clone())
+//     }
+// }
 
-impl<'a> ComplexType for LineInfo<'a> {}
+// impl<'a> ComplexType for LineInfo<'a> {}
 
 // The line invocation that create new LineInfo object
-#[derive(Debug, Clone)]
-struct PlotVal;
+#[derive(Debug)]
+struct PlotVal<'a> {
+    lines: RefData<Series<'a, PerInfoItem>>,
+}
 
-impl<'a> SeriesCall<'a> for PlotVal {
+impl<'a> Clone for PlotVal<'a> {
+    fn clone(&self) -> Self {
+        PlotVal {
+            lines: RefData::clone(self.lines.borrow()),
+        }
+    }
+}
+
+impl<'a> PlotVal<'a> {
+    fn new() -> PlotVal<'a> {
+        PlotVal {
+            lines: RefData::new(Series::from(None)),
+        }
+    }
+}
+
+impl<'a> SeriesCall<'a> for PlotVal<'a> {
     fn step(
         &mut self,
         _context: &mut dyn Ctx<'a>,
@@ -152,7 +171,7 @@ pub const VAR_NAME: &'static str = "line";
 
 pub fn declare_var<'a>() -> VarResult<'a> {
     let value = PineRef::new(CallableObject::new(Box::new(PlotProps), || {
-        Callable::new(None, Some(Box::new(PlotVal)))
+        Callable::new(None, Some(Box::new(PlotVal::new())))
     }));
 
     let func_type = FunctionTypes(vec![FunctionType::new((
@@ -169,4 +188,24 @@ pub fn declare_var<'a>() -> VarResult<'a> {
     );
     let syntax_type = SyntaxType::ObjectFunction(Rc::new(obj_type), Rc::new(func_type));
     VarResult::new(value, syntax_type, VAR_NAME)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::runtime::{AnySeries, NoneCallback};
+    use crate::{LibInfo, PineParser, PineRunner};
+
+    #[test]
+    fn line_test() {
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+        );
+        let src = "x = line(na)\nline y = line(na)";
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        runner.runl(&vec![], 2, None).unwrap();
+    }
 }

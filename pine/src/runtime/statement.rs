@@ -3,6 +3,7 @@ use super::context::{
     VarOperate,
 };
 use super::function::Function;
+use super::instance_caller::*;
 use super::runtime_convert::convert;
 use crate::ast::input::StrRange;
 use crate::ast::name::VarName;
@@ -153,6 +154,10 @@ pub fn process_assign_val<'a>(
             | (_, (FirstType::String, SecondType::Series)) => {
                 update_series::<String>(context, index, current_val, true_val)
             }
+            ((FirstType::Line, SecondType::Series), _) => {
+                use crate::libs::line::PerInfoItem;
+                update_series::<PerInfoItem>(context, index, current_val, true_val)
+            }
             ((_, SecondType::Series), _) | (_, (_, SecondType::Series)) => {
                 // Err(RuntimeErr::TypeMismatch(format!(
                 //     "Series type can only be Int, Float, Bool, Color, String, but get {:?}",
@@ -261,7 +266,7 @@ impl<'a> RunnerForName<'a> for Assignment<'a> {
         //     return Err(RuntimeErr::NameDeclared);
         // }
         // context.create_declare(name);
-
+        println!("run name {:?} {:?} {:?}", self.var_type, _vn, val);
         if _vn.value == "_" {
             return Ok(val);
         }
@@ -296,12 +301,15 @@ impl<'a> RunnerForName<'a> for Assignment<'a> {
                 SecondType::Series => Series::<String>::implicity_from(val)?.into_pf(),
                 _ => String::implicity_from(val)?.into_pf(),
             },
-            Some(DataType::Custom(_)) => val,
+            Some(DataType::Custom(_)) => {
+                type_cast_custom(context, self.cast_index, self.cast_func_index, val)?
+            } // Some(DataType::Custom(_)) => val,
         };
         if let (FirstType::NA, _) = true_val.get_type() {
             println!("assignment for {} can not be NA", _vn.value);
             return Err(RuntimeErr::InvalidNADeclarer);
         }
+        println!("run name {:?} {:?}", true_val, varid);
 
         process_assign_val(true_val, downcast_ctx(context), varid, None)
     }
@@ -596,44 +604,8 @@ impl<'a> Runner<'a> for FunctionCall<'a> {
             | (FirstType::CallableObject, SecondType::Simple)
             | (FirstType::CallableEvaluate, SecondType::Simple)
             | (FirstType::CallableObjectEvaluate, SecondType::Simple) => {
-                let mut opt_instance = context.move_fun_instance(self.ctxid);
-                if opt_instance.is_none() {
-                    match result.get_type().0 {
-                        FirstType::CallableFactory => {
-                            let factory = downcast_pf::<CallableFactory>(result).unwrap();
-                            context
-                                .create_fun_instance(self.ctxid, PineRef::new_rc(factory.create()));
-                            opt_instance = context.move_fun_instance(self.ctxid);
-                        }
-                        FirstType::CallableObject => {
-                            let factory = downcast_pf::<CallableObject>(result).unwrap();
-                            context
-                                .create_fun_instance(self.ctxid, PineRef::new_rc(factory.create()));
-                            opt_instance = context.move_fun_instance(self.ctxid);
-                        }
-                        FirstType::CallableEvaluate => {
-                            let factory = downcast_pf::<CallableEvaluate>(result).unwrap();
-                            context
-                                .create_fun_instance(self.ctxid, PineRef::new_rc(factory.create()));
-                            opt_instance = context.move_fun_instance(self.ctxid);
-                        }
-                        FirstType::CallableObjectEvaluate => {
-                            let factory = downcast_pf::<CallObjEval>(result).unwrap();
-                            context
-                                .create_fun_instance(self.ctxid, PineRef::new_rc(factory.create()));
-                            opt_instance = context.move_fun_instance(self.ctxid);
-                        }
-                        _ => unreachable!(),
-                    }
-                }
-                let mut callable = downcast_pf::<Callable>(opt_instance.unwrap()).unwrap();
-
                 let func_type = self.func_type.as_ref().unwrap().clone();
-                let result = callable.call(context, pos_args, dict_args, func_type);
-
-                context.create_fun_instance(self.ctxid, RefData::clone(&callable).into_pf());
-                context.create_runnable(callable.into_rc());
-                result
+                call_func_factory(context, self.ctxid, result, pos_args, dict_args, func_type)
             }
             (FirstType::Function, SecondType::Simple) => {
                 let callable = downcast_pf::<Function>(result).unwrap();

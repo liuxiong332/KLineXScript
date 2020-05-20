@@ -1,6 +1,6 @@
 use crate::ast::stat_expr_types::{
     Block, Condition, Exp, ForRange, FunctionCall, FunctionDef, IfThenElse, RefCall, Statement,
-    TupleNode,
+    TupleNode, VarIndex,
 };
 
 pub struct CtxIdParser {
@@ -203,6 +203,8 @@ mod tests {
         let mut cast = Exp::TypeCast(Box::new(TypeCast {
             data_type: DataType::Bool,
             exp: func_call(name("cond"), vec![], vec![]),
+            cast_index: VarIndex::new(0, 0),
+            func_index: 0,
             range: StrRange::new_empty(),
         }));
         let mut parser = CtxIdParser::new();

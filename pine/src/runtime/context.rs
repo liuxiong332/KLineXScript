@@ -189,6 +189,10 @@ pub fn commit_series_for_operator<'a>(operator: &mut dyn VarOperate<'a>) {
                 (DataType::Color, SecondType::Series) => commit_series::<Color>(val),
                 (DataType::Bool, SecondType::Series) => commit_series::<Bool>(val),
                 (DataType::String, SecondType::Series) => commit_series::<String>(val),
+                (DataType::Line, SecondType::Series) => {
+                    use crate::libs::line::PerInfoItem;
+                    commit_series::<PerInfoItem>(val)
+                }
                 _ => val,
             };
             operator.update_var(index, ret_val);
@@ -213,6 +217,10 @@ pub fn rollback_series_for_operator<'a>(operator: &mut dyn VarOperate<'a>) {
                 (DataType::Color, SecondType::Series) => roll_back_series::<Color>(val),
                 (DataType::Bool, SecondType::Series) => roll_back_series::<Bool>(val),
                 (DataType::String, SecondType::Series) => roll_back_series::<String>(val),
+                (DataType::Line, SecondType::Series) => {
+                    use crate::libs::line::PerInfoItem;
+                    roll_back_series::<PerInfoItem>(val)
+                }
                 _ => val,
             };
             operator.update_var(index, ret_val);

@@ -405,6 +405,12 @@ impl<'a> Exp2<'a> {
 pub struct TypeCast<'a> {
     pub data_type: DataType<'a>,
     pub exp: Exp<'a>,
+
+    // the index in the variable name table
+    pub cast_index: VarIndex,
+    // the index in the function variables.
+    pub func_index: i32,
+
     pub range: StrRange,
 }
 
@@ -413,6 +419,8 @@ impl<'a> TypeCast<'a> {
         TypeCast {
             data_type,
             exp,
+            cast_index: VarIndex::new(0, 0),
+            func_index: 0,
             range,
         }
     }
@@ -421,6 +429,8 @@ impl<'a> TypeCast<'a> {
         TypeCast {
             data_type,
             exp,
+            cast_index: VarIndex::new(0, 0),
+            func_index: 0,
             range: StrRange::new_empty(),
         }
     }
@@ -472,6 +482,11 @@ pub struct Assignment<'a> {
     pub var: bool,
     pub range: StrRange,
     pub varids: Option<Vec<i32>>,
+
+    // the index in the variable name table
+    pub cast_index: VarIndex,
+    // the index in the type-casting function table.
+    pub cast_func_index: i32,
 }
 
 impl<'a> Assignment<'a> {
@@ -489,6 +504,8 @@ impl<'a> Assignment<'a> {
             var_type,
             range,
             varids: None,
+            cast_index: VarIndex::new(0, 0),
+            cast_func_index: 0,
         }
     }
 
@@ -505,6 +522,8 @@ impl<'a> Assignment<'a> {
             var_type,
             range: StrRange::new_empty(),
             varids: None,
+            cast_index: VarIndex::new(0, 0),
+            cast_func_index: 0,
         }
     }
 
@@ -522,6 +541,8 @@ impl<'a> Assignment<'a> {
             var_type,
             range: StrRange::new_empty(),
             varids: Some(varids),
+            cast_index: VarIndex::new(0, 0),
+            cast_func_index: 0,
         }
     }
 }

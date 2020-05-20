@@ -1,14 +1,17 @@
 use super::context::{Ctx, PineRuntimeError, RVRunner, Runner, RunnerForFunc, RunnerForObj};
+use super::instance_caller::*;
 use super::op::{binary_op_run, unary_op_run};
 use super::runtime_convert::convert;
 use crate::ast::num::Numeral;
 pub use crate::ast::stat_expr_types::{
-    Condition, DataType, Exp, FunctionCall, PrefixExp, RefCall, Statement, TypeCast,
+    Condition, DataType, Exp, FunctionCall, PrefixExp, RVVarName, RefCall, Statement, TypeCast,
 };
+use crate::ast::syntax_type::{FunctionType, SimpleSyntaxType, SyntaxType};
 use crate::types::{
-    downcast_pf, downcast_pf_mut, Bool, CallObjEval, CallableEvaluate, CallableObject, Color,
-    DataType as FirstType, Evaluate, EvaluateFactory, Float, Int, Object, PineFrom, PineRef,
-    PineStaticType, PineType, PineVar, RefData, RuntimeErr, SecondType, Series, Tuple, NA,
+    downcast_pf, downcast_pf_mut, Bool, CallObjEval, Callable, CallableEvaluate, CallableFactory,
+    CallableObject, Color, DataType as FirstType, Evaluate, EvaluateFactory, Float, Int, Object,
+    PineFrom, PineRef, PineStaticType, PineType, PineVar, RefData, RuntimeErr, SecondType, Series,
+    Tuple, NA,
 };
 use std::fmt::Debug;
 
@@ -60,41 +63,7 @@ impl<'a> RVRunner<'a> for Exp<'a> {
                         (FirstType::CallableEvaluate, SecondType::Simple)
                         | (FirstType::CallableObjectEvaluate, SecondType::Simple)
                         | (FirstType::EvaluateFactory, SecondType::Simple) => {
-                            // Get evaluate instance from context
-                            let mut eval_instance = context.move_fun_instance(name.eval_id);
-                            if eval_instance.is_none() {
-                                let eval_val = match s.get_type().0 {
-                                    FirstType::CallableEvaluate => {
-                                        let mut eval_factory =
-                                            downcast_pf::<CallableEvaluate>(s.clone()).unwrap();
-                                        eval_factory.create_eval()
-                                    }
-                                    FirstType::CallableObjectEvaluate => {
-                                        let mut eval_factory =
-                                            downcast_pf::<CallObjEval>(s.clone()).unwrap();
-                                        eval_factory.create_eval()
-                                    }
-                                    _ => {
-                                        let factory =
-                                            downcast_pf::<EvaluateFactory>(s.clone()).unwrap();
-                                        factory.create()
-                                    }
-                                };
-                                // let factory = downcast_pf::<EvaluateFactory>(s.clone()).unwrap();
-                                context
-                                    .create_fun_instance(name.eval_id, PineRef::new_rc(eval_val));
-                                eval_instance = context.move_fun_instance(name.eval_id);
-                            }
-                            let mut eval_val =
-                                downcast_pf::<Evaluate>(eval_instance.unwrap()).unwrap();
-                            let result = eval_val.call(context);
-
-                            context.create_fun_instance(
-                                name.eval_id,
-                                RefData::clone(&eval_val).into_pf(),
-                            );
-                            context.create_runnable(RefData::clone(&eval_val).into_rc());
-                            result
+                            call_eval_factory(context, name.eval_id, s.copy())
                         }
                         _ => Ok(s.copy()),
                     };
@@ -157,24 +126,7 @@ impl<'a> RunnerForObj<'a> for Exp<'a> {
                             eval_val.call(context)
                         }
                         (FirstType::CallableEvaluate, SecondType::Simple) => {
-                            let mut eval_instance = context.move_fun_instance(name.eval_id);
-                            if eval_instance.is_none() {
-                                let mut eval_factory =
-                                    downcast_pf::<CallableEvaluate>(s.clone()).unwrap();
-                                let eval_val = eval_factory.create_eval();
-                                context
-                                    .create_fun_instance(name.eval_id, PineRef::new_rc(eval_val));
-                                eval_instance = context.move_fun_instance(name.eval_id);
-                            }
-                            // PineRef<Evaluate> => RefData<Evaluate>
-                            let mut eval_val =
-                                downcast_pf::<Evaluate>(eval_instance.unwrap()).unwrap();
-                            context.create_fun_instance(
-                                name.eval_id,
-                                RefData::clone(&eval_val).into_pf(),
-                            );
-                            context.create_runnable(RefData::clone(&eval_val).into_rc());
-                            eval_val.call(context)
+                            call_eval_factory(context, name.eval_id, s.copy())
                         }
                         _ => Ok(s.copy()),
                     };
@@ -228,6 +180,12 @@ impl<'a> Runner<'a> for TypeCast<'a> {
             (&DataType::String, SecondType::Series) => {
                 let s: RefData<Series<String>> = Series::explicity_from(result).unwrap();
                 Ok(s.into_pf())
+            }
+            (&DataType::Custom(_), SecondType::Simple) => {
+                match type_cast_custom(context, self.cast_index, self.func_index, result) {
+                    Ok(v) => Ok(v),
+                    Err(e) => Err(PineRuntimeError::new(e, self.range)),
+                }
             }
             _t => Err(PineRuntimeError::new(
                 RuntimeErr::UnknownRuntimeErr,

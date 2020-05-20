@@ -852,15 +852,10 @@ impl<'a> SyntaxParser<'a> {
                     else_blk.range,
                 ));
             }
-            println!(
-                "if else type {:?} {:?}",
-                then_res.syntax_type, else_res.syntax_type
-            );
             // Find the common type that can satisfy the then type and else type
             if let Some(v_type) = common_type(&then_res.syntax_type, &else_res.syntax_type) {
                 // The return type of if-then-else block must be series.
                 let res_type = simple_to_series(v_type);
-                println!("Get result {:?}", res_type);
                 ite.result_type = res_type.clone();
                 return Ok(ParseValue::new_with_type(res_type));
             } else {
@@ -994,6 +989,13 @@ impl<'a> SyntaxParser<'a> {
     fn parse_type_cast(&mut self, type_cast: &mut TypeCast<'a>) -> ParseResult<'a> {
         let origin_type = self.parse_exp(&mut type_cast.exp)?.syntax_type;
         let (is_cast_err, result) = explicity_type_cast(&origin_type, &type_cast.data_type);
+        match result {
+            SyntaxType::ObjectClass(obj_cls) => {
+                type_cast.cast_index = downcast_ctx(self.context).get_var_index(obj_cls);
+                type_cast.func_index = downcast_ctx(self.context).gen_lib_func_index();
+            }
+            _ => {}
+        }
         if is_cast_err {
             self.catch(PineInputError::new(
                 PineErrorKind::InvalidTypeCast {
@@ -1134,10 +1136,9 @@ impl<'a> SyntaxParser<'a> {
 
     fn parse_one_assign(
         &mut self,
-        var_type: &Option<DataType<'a>>,
+        assign: &mut Assignment<'a>,
         name: &VarName<'a>,
         val: SyntaxType<'a>,
-        range: StrRange,
     ) -> Result<SyntaxType<'a>, PineInputError> {
         let context = downcast_ctx(self.context);
         // if context.get_var_scope(name.value).is_some() {
@@ -1146,7 +1147,7 @@ impl<'a> SyntaxParser<'a> {
         //         name.range,
         //     ));
         // }
-        if let Some(data_type) = var_type {
+        if let Some(data_type) = &assign.var_type {
             let (is_cast_err, result) = implicity_type_cast(&val, &data_type);
             if is_cast_err {
                 self.catch(PineInputError::new(
@@ -1154,11 +1155,20 @@ impl<'a> SyntaxParser<'a> {
                         origin: SimpleSyntaxType::from(val),
                         cast: SimpleSyntaxType::from(data_type.clone()),
                     },
-                    range,
+                    assign.range,
                 ));
             }
             if name.value != "_" {
                 context.declare_var(name.value, result.clone());
+            }
+
+            // If the assign need type cast, then we need record the cast index
+            match result {
+                SyntaxType::ObjectClass(obj_cls) => {
+                    assign.cast_index = downcast_ctx(self.context).get_var_index(obj_cls);
+                    assign.cast_func_index = downcast_ctx(self.context).gen_lib_func_index();
+                }
+                _ => {}
             }
             Ok(result)
         } else {
@@ -1180,14 +1190,11 @@ impl<'a> SyntaxParser<'a> {
                     ))
                 } else {
                     let mut ret_tuple = vec![];
-                    for (name, val_type) in assign.names.iter().zip(tuple.iter()) {
-                        ret_tuple.push(self.parse_one_assign(
-                            &assign.var_type,
-                            name,
-                            val_type.clone(),
-                            assign.range,
-                        )?);
+                    let mut names = mem::replace(&mut assign.names, vec![]);
+                    for (name, val_type) in names.iter().zip(tuple.iter()) {
+                        ret_tuple.push(self.parse_one_assign(assign, name, val_type.clone())?);
                     }
+                    mem::replace(&mut assign.names, names);
                     let context = downcast_ctx(self.context);
                     let varids = assign
                         .names
@@ -1218,12 +1225,9 @@ impl<'a> SyntaxParser<'a> {
                 ))
             }
         } else {
-            let rtype = self.parse_one_assign(
-                &assign.var_type,
-                &assign.names[0],
-                val_res.syntax_type,
-                assign.range,
-            )?;
+            let names = mem::replace(&mut assign.names, vec![]);
+            let rtype = self.parse_one_assign(assign, &names[0], val_res.syntax_type)?;
+            mem::replace(&mut assign.names, names);
             let context = downcast_ctx(self.context);
 
             let name = assign.names[0];

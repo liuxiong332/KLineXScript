@@ -123,6 +123,7 @@ pub fn implicity_type_cast<'a>(
         },
         DataType::Custom(t) => match cur_type {
             SyntaxType::Series(SimpleSyntaxType::Na) => SyntaxType::ObjectClass(*t),
+            SyntaxType::Simple(SimpleSyntaxType::Na) => SyntaxType::ObjectClass(*t),
             SyntaxType::ObjectClass(n) if n == t => SyntaxType::ObjectClass(n),
             _ => {
                 is_cast_err = true;

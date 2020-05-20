@@ -20,7 +20,7 @@ fn pine_plot<'a>(
 ) -> Result<(), RuntimeErr> {
     move_tuplet!(
         (
-            series, title, char, location, color, transp, offset, text, textcolor, editable, size,
+            series, title, char, location, color, opacity, offset, text, textcolor, editable, size,
             show_last, display
         ) = param
     );
@@ -30,7 +30,7 @@ fn pine_plot<'a>(
             char: pine_ref_to_string(char),
             location: pine_ref_to_string(location),
             color: pine_ref_to_color(color),
-            transp: pine_ref_to_i64(transp),
+            opacity: pine_ref_to_i64(opacity),
             offset: pine_ref_to_i64(offset),
             text: pine_ref_to_string(text),
             textcolor: pine_ref_to_color(textcolor),
@@ -71,7 +71,7 @@ pub fn declare_var<'a>() -> VarResult<'a> {
             ("char", SyntaxType::string()),
             ("location", SyntaxType::string()),
             ("color", SyntaxType::color()),
-            ("transp", SyntaxType::int()),
+            ("opacity", SyntaxType::int()),
             ("offset", SyntaxType::int()),
             ("text", SyntaxType::string()),
             ("textcolor", SyntaxType::color()),
@@ -101,7 +101,7 @@ mod tests {
             vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
         );
         let src = r"plotchar(close, title='Title', char='h', location='a', color=#00ffaa, 
-            transp=70, offset=15, text='hello', textcolor=#111111, 
+            opacity=70, offset=15, text='hello', textcolor=#111111, 
             editable=true, size='t', show_last=100, display=1)";
         let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
@@ -122,7 +122,7 @@ mod tests {
                 char: Some(String::from("h")),
                 location: Some(String::from("a")),
                 color: Some(String::from("#00ffaa")),
-                transp: Some(70),
+                opacity: Some(70),
                 offset: Some(15),
                 text: Some(String::from("hello")),
                 textcolor: Some(String::from("#111111")),

@@ -61,7 +61,7 @@ impl<'a> SeriesCall<'a> for PlotVal {
         _func_type: FunctionType<'a>,
     ) -> Result<PineRef<'a>, RuntimeErr> {
         if self.output_id < 0 && !downcast_ctx(context).check_is_output_info_ready() {
-            move_tuplet!((plot1, plot2, color, transp, title, editable, show_last) = p);
+            move_tuplet!((plot1, plot2, color, opacity, title, editable, show_last) = p);
             let names = match _func_type.get_type(0) {
                 Some(&SyntaxType::ObjectClass("plot")) => ("plot", "plot1", "plot2"),
                 Some(&SyntaxType::ObjectClass("hline")) => ("hline", "hline1", "hline2"),
@@ -73,7 +73,7 @@ impl<'a> SeriesCall<'a> for PlotVal {
                 end: require_param(names.2, pine_ref_to_i64(plot2))?,
                 title: pine_ref_to_string(title),
                 color: pine_ref_to_color(color),
-                transp: pine_ref_to_i64(transp),
+                opacity: pine_ref_to_i64(opacity),
                 editable: pine_ref_to_bool(editable),
                 show_last: pine_ref_to_i64(show_last),
             };
@@ -116,7 +116,7 @@ pub fn declare_var<'a>() -> VarResult<'a> {
                 ("plot1", SyntaxType::ObjectClass("plot")),
                 ("plot2", SyntaxType::ObjectClass("plot")),
                 ("color", SyntaxType::Simple(SimpleSyntaxType::Color)),
-                ("transp", SyntaxType::int()),
+                ("opacity", SyntaxType::int()),
                 ("title", SyntaxType::string()),
                 ("editable", SyntaxType::bool()),
                 ("show_last", SyntaxType::int()),
@@ -128,7 +128,7 @@ pub fn declare_var<'a>() -> VarResult<'a> {
                 ("plot1", SyntaxType::ObjectClass("plot")),
                 ("plot2", SyntaxType::ObjectClass("plot")),
                 ("color", SyntaxType::Series(SimpleSyntaxType::Color)),
-                ("transp", SyntaxType::int()),
+                ("opacity", SyntaxType::int()),
                 ("title", SyntaxType::string()),
                 ("editable", SyntaxType::bool()),
                 ("show_last", SyntaxType::int()),
@@ -140,7 +140,7 @@ pub fn declare_var<'a>() -> VarResult<'a> {
                 ("hline1", SyntaxType::ObjectClass("hline")),
                 ("hline2", SyntaxType::ObjectClass("hline")),
                 ("color", SyntaxType::Simple(SimpleSyntaxType::Color)),
-                ("transp", SyntaxType::int()),
+                ("opacity", SyntaxType::int()),
                 ("title", SyntaxType::string()),
                 ("editable", SyntaxType::bool()),
                 ("show_last", SyntaxType::int()),
@@ -152,7 +152,7 @@ pub fn declare_var<'a>() -> VarResult<'a> {
                 ("hline1", SyntaxType::ObjectClass("hline")),
                 ("hline2", SyntaxType::ObjectClass("hline")),
                 ("color", SyntaxType::Series(SimpleSyntaxType::Color)),
-                ("transp", SyntaxType::int()),
+                ("opacity", SyntaxType::int()),
                 ("title", SyntaxType::string()),
                 ("editable", SyntaxType::bool()),
                 ("show_last", SyntaxType::int()),
@@ -202,7 +202,7 @@ mod tests {
                 end: 2i64,
                 title: Some(String::from("fill")),
                 color: Some(String::from("#111111")),
-                transp: Some(1i64),
+                opacity: Some(1i64),
                 editable: Some(true),
                 show_last: Some(1i64),
             })
@@ -253,7 +253,7 @@ mod tests {
                 end: 1i64,
                 title: Some(String::from("fill")),
                 color: Some(String::from("#111111")),
-                transp: Some(1i64),
+                opacity: Some(1i64),
                 editable: Some(true),
                 show_last: Some(1i64),
             })

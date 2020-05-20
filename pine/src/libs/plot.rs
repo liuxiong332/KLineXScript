@@ -120,7 +120,7 @@ impl<'a> SeriesCall<'a> for PlotVal {
         if self.output_id < 0 && !downcast_ctx(context).check_is_output_info_ready() {
             move_tuplet!(
                 (
-                    _series, title, color, linewidth, style, trackprice, transp, histbase, offset,
+                    _series, title, color, linewidth, style, trackprice, opacity, histbase, offset,
                     join, editable, show_last, display
                 ) = p
             );
@@ -132,7 +132,7 @@ impl<'a> SeriesCall<'a> for PlotVal {
                 },
                 linewidth: pine_ref_to_i64(linewidth),
                 style: pine_ref_to_string(style),
-                transp: pine_ref_to_i64(transp),
+                opacity: pine_ref_to_i64(opacity),
                 trackprice: pine_ref_to_bool(trackprice),
                 histbase: pine_ref_to_f64(histbase),
                 offset: pine_ref_to_i64(offset),
@@ -204,7 +204,7 @@ pub fn declare_var<'a>() -> VarResult<'a> {
         )
     }));
 
-    // plot(series, title, color, linewidth, style, trackprice, transp, histbase, offset, join, editable, show_last) → plot
+    // plot(series, title, color, linewidth, style, trackprice, opacity, histbase, offset, join, editable, show_last) → plot
 
     let func_type = FunctionTypes(vec![
         FunctionType::new((
@@ -215,7 +215,7 @@ pub fn declare_var<'a>() -> VarResult<'a> {
                 ("linewidth", SyntaxType::int()),
                 ("style", SyntaxType::string()),
                 ("trackprice", SyntaxType::bool()),
-                ("transp", SyntaxType::int()),
+                ("opacity", SyntaxType::int()),
                 ("histbase", SyntaxType::float()),
                 ("offset", SyntaxType::int()),
                 ("join", SyntaxType::bool()),
@@ -233,7 +233,7 @@ pub fn declare_var<'a>() -> VarResult<'a> {
                 ("linewidth", SyntaxType::int()),
                 ("style", SyntaxType::string()),
                 ("trackprice", SyntaxType::bool()),
-                ("transp", SyntaxType::int()),
+                ("opacity", SyntaxType::int()),
                 ("histbase", SyntaxType::float()),
                 ("offset", SyntaxType::int()),
                 ("join", SyntaxType::bool()),
@@ -371,7 +371,7 @@ mod tests {
             vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
         );
         let src = r"plot(close, title='Title', color=#00ffaa, linewidth=2, 
-            style='area', transp=70, offset=15, trackprice=true, 
+            style='area', opacity=70, offset=15, trackprice=true, 
             histbase=0.0, join=true, editable=true, show_last=100, display=1)";
         let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
@@ -393,7 +393,7 @@ mod tests {
                 linewidth: Some(2),
                 style: Some(String::from("area")),
                 trackprice: Some(true),
-                transp: Some(70),
+                opacity: Some(70),
                 histbase: Some(0.0f64),
                 offset: Some(15),
                 join: Some(true),
@@ -462,7 +462,7 @@ mod tests {
                 linewidth: None,
                 style: None,
                 trackprice: None,
-                transp: None,
+                opacity: None,
                 histbase: None,
                 offset: None,
                 join: None,

@@ -9,17 +9,31 @@ use crate::helper::{
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::output::{OutputData, OutputInfo, PlotInfo, StrOptionsData};
 use crate::types::{
-    Bool, Callable, CallableObject, Category, Color, ComplexType, DataType, Float, Int,
-    ParamCollectCall, PineClass, PineFrom, PineRef, PineType, RefData, RuntimeErr, SecondType,
-    Series, SeriesCall, NA,
+    downcast_pf, Bool, Callable, CallableObject, Category, Color, ComplexType, DataType, Float,
+    Int, ParamCollectCall, PineClass, PineFrom, PineRef, PineStaticType, PineType, RefData,
+    RuntimeErr, SecondType, Series, SeriesCall, SimpleType, NA,
 };
 use std::borrow::Borrow;
 use std::borrow::BorrowMut;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fmt;
+use std::mem;
 use std::rc::Rc;
 
+type PerInfoItem = Option<PerLine>;
+
+fn pine_ref_to_line<'a>(val: Option<PineRef<'a>>) -> PerInfoItem {
+    if val.is_none() {
+        return None;
+    }
+    match PerInfoItem::implicity_from(val.unwrap()) {
+        Ok(res) => res.into_inner(),
+        Err(_) => None,
+    }
+}
+
+// The line definition that represent every line object.
 #[derive(Debug, Clone, PartialEq)]
 struct PerLine {
     x1: Int,
@@ -32,18 +46,51 @@ impl PerLine {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-struct LineInfo {
-    pub lines: Vec<Option<PerLine>>,
-}
-
-impl LineInfo {
-    fn new_line(&mut self) {
-        self.lines.push(Some(PerLine::new()))
+impl PineStaticType for PerInfoItem {
+    fn static_type() -> (DataType, SecondType) {
+        (DataType::Line, SecondType::Simple)
     }
 }
 
-impl<'a> PineType<'a> for LineInfo {
+impl<'a> PineFrom<'a, PerInfoItem> for PerInfoItem {
+    fn implicity_from(t: PineRef<'a>) -> Result<RefData<PerInfoItem>, RuntimeErr> {
+        match t.get_type() {
+            (DataType::Line, SecondType::Simple) => Ok(downcast_pf::<PerInfoItem>(t).unwrap()),
+            (DataType::Line, SecondType::Series) => {
+                let f: RefData<Series<PerInfoItem>> =
+                    downcast_pf::<Series<PerInfoItem>>(t).unwrap();
+                Ok(RefData::new_box(f.get_current()))
+            }
+            (DataType::NA, _) => Ok(RefData::new_box(None)),
+            _ => Err(RuntimeErr::UnknownRuntimeErr),
+        }
+    }
+}
+
+impl<'a> PineType<'a> for Option<PerLine> {
+    fn get_type(&self) -> (DataType, SecondType) {
+        (DataType::Line, SecondType::Simple)
+    }
+    fn copy(&self) -> PineRef<'a> {
+        PineRef::new_box(self.clone())
+    }
+}
+
+impl<'a> SimpleType for Option<PerLine> {}
+
+// LineInfo represent the series of line object.
+#[derive(Debug, Clone, PartialEq)]
+struct LineInfo<'a> {
+    pub lines: Series<'a, Option<PerLine>>,
+}
+
+impl<'a> LineInfo<'a> {
+    fn new_line(&mut self) {
+        self.lines.update(Some(PerLine::new()))
+    }
+}
+
+impl<'a> PineType<'a> for LineInfo<'a> {
     fn get_type(&self) -> (DataType, SecondType) {
         (DataType::Line, SecondType::Simple)
     }
@@ -57,36 +104,22 @@ impl<'a> PineType<'a> for LineInfo {
     }
 }
 
-impl ComplexType for LineInfo {}
+impl<'a> ComplexType for LineInfo<'a> {}
 
-#[derive(Debug)]
-struct PlotVal {
-    line_info: RefData<LineInfo>,
-}
-
-impl Clone for PlotVal {
-    fn clone(&self) -> Self {
-        self.borrow().clone()
-    }
-}
-
-impl PlotVal {
-    fn new() -> PlotVal {
-        PlotVal {
-            line_info: RefData::new_rc(LineInfo { lines: vec![] }),
-        }
-    }
-}
+// The line invocation that create new LineInfo object
+#[derive(Debug, Clone)]
+struct PlotVal;
 
 impl<'a> SeriesCall<'a> for PlotVal {
     fn step(
         &mut self,
-        context: &mut dyn Ctx<'a>,
+        _context: &mut dyn Ctx<'a>,
         mut p: Vec<Option<PineRef<'a>>>,
         _func_type: FunctionType<'a>,
     ) -> Result<PineRef<'a>, RuntimeErr> {
-        self.line_info.borrow_mut().new_line();
-        Ok(RefData::clone(&self.line_info).into_pf())
+        let v = mem::replace(&mut p[0], None);
+        let line = pine_ref_to_line(v);
+        Ok(PineRef::new_rc(Series::from(line)))
     }
 
     fn copy(&self) -> Box<dyn SeriesCall<'a> + 'a> {
@@ -119,7 +152,7 @@ pub const VAR_NAME: &'static str = "line";
 
 pub fn declare_var<'a>() -> VarResult<'a> {
     let value = PineRef::new(CallableObject::new(Box::new(PlotProps), || {
-        Callable::new(None, Some(Box::new(PlotVal::new())))
+        Callable::new(None, Some(Box::new(PlotVal)))
     }));
 
     let func_type = FunctionTypes(vec![FunctionType::new((

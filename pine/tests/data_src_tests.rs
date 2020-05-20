@@ -1341,7 +1341,7 @@ plot(close, title='Histogram',
     color=(close>=0 ? 
         (close[1] < close ? col_grow_above : col_fall_above) : 
         (close[1] < close ? col_grow_below : col_fall_below) ), 
-    transp=0)
+    opacity=0)
 ";
 
 #[test]
@@ -1730,7 +1730,7 @@ _pr(length) =>
     min = lowest(length)
     100 * (close - max) / (max - min)
 percentR = _pr(2)
-plot(percentR, title="%R", color=#ff6d00, transp=0)
+plot(percentR, title="%R", color=#ff6d00, opacity=0)
 "#;
 
 #[test]

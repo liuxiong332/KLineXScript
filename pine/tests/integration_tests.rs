@@ -33,9 +33,9 @@ mymacd = fast_ma - slow_ma
 signal = sma_signal ? sma(mymacd, signal_length) : ema(mymacd, signal_length)
 hist = mymacd - signal
 
-plot(hist, title="Histogram", style=plot.style_columns, color=(hist>=0 ? (hist[1] < hist ? col_grow_above : col_fall_above) : (hist[1] < hist ? col_grow_below : col_fall_below) ), transp=0 )
-plot(mymacd, title="MACD", color=col_macd, transp=0)
-plot(signal, title="Signal", color=col_signal, transp=0)
+plot(hist, title="Histogram", style=plot.style_columns, color=(hist>=0 ? (hist[1] < hist ? col_grow_above : col_fall_above) : (hist[1] < hist ? col_grow_below : col_fall_below) ), opacity=0 )
+plot(mymacd, title="MACD", color=col_macd, opacity=0)
+plot(signal, title="Signal", color=col_signal, opacity=0)
 "#;
 
 const AD_SCRIPTS: &'static str = r#"
@@ -141,8 +141,8 @@ plot(Tsl, color = linecolor , style = plot.style_line , linewidth = 2,title = "S
 // plotshape(cross(Tsl,close) and close<Tsl , "Down Arrow", "triangledown", "abovebar", color.red,0,0)
 // //plot(Trend==1 and Trend[1]==-1,color = linecolor, style = circles, linewidth = 3,title="Trend")
 
-// plotarrow(Trend == 1 and Trend[1] == -1 ? Trend : na, title="Up Entry Arrow", colorup=color.lime, maxheight=60, minheight=50, transp=0)
-// plotarrow(Trend == -1 and Trend[1] == 1 ? Trend : na, title="Down Entry Arrow", colordown=color.red, maxheight=60, minheight=50, transp=0)
+// plotarrow(Trend == 1 and Trend[1] == -1 ? Trend : na, title="Up Entry Arrow", colorup=color.lime, maxheight=60, minheight=50, opacity=0)
+// plotarrow(Trend == -1 and Trend[1] == 1 ? Trend : na, title="Down Entry Arrow", colordown=color.red, maxheight=60, minheight=50, opacity=0)
 "#;
 
 const VWAP_SCRIPTS: &'static str = r#"

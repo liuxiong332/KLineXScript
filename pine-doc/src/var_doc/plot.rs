@@ -2,7 +2,7 @@ use crate::{DocBase, VarType};
 
 const PINE_FN_EXAMPLE: &'static str = r#"
 ```pine
-plot(high+low, title='Title', color=#00ffaa, linewidth=2, style=plot.style_area, transp=70, offset=15, trackprice=true)
+plot(high+low, title='Title', color=#00ffaa, linewidth=2, style=plot.style_area, opacity=70, offset=15, trackprice=true)
 
 // You may fill the background between any two plots with a fill() function:
 p1 = plot(open)

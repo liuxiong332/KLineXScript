@@ -19,7 +19,7 @@ fn pine_plot<'a>(
 ) -> Result<(), RuntimeErr> {
     move_tuplet!(
         (
-            series, title, colorup, colordown, transp, offset, minheight, maxheight, editable,
+            series, title, colorup, colordown, opacity, offset, minheight, maxheight, editable,
             show_last, display
         ) = param
     );
@@ -28,7 +28,7 @@ fn pine_plot<'a>(
             title: pine_ref_to_string(title),
             colorup: pine_ref_to_color(colorup),
             colordown: pine_ref_to_color(colordown),
-            transp: pine_ref_to_i64(transp),
+            opacity: pine_ref_to_i64(opacity),
             offset: pine_ref_to_i64(offset),
             minheight: pine_ref_to_i64(minheight),
             maxheight: pine_ref_to_i64(maxheight),
@@ -58,7 +58,7 @@ pub fn declare_var<'a>() -> VarResult<'a> {
         Callable::new(None, Some(Box::new(ParamCollectCall::new(pine_plot))))
     }));
 
-    // plot(series, title, color, linewidth, style, trackprice, transp, histbase, offset, join, editable, show_last) → plot
+    // plot(series, title, color, linewidth, style, trackprice, opacity, histbase, offset, join, editable, show_last) → plot
 
     let func_type = FunctionTypes(vec![FunctionType::new((
         vec![
@@ -66,7 +66,7 @@ pub fn declare_var<'a>() -> VarResult<'a> {
             ("title", SyntaxType::string()),
             ("colorup", SyntaxType::color()),
             ("colordown", SyntaxType::color()),
-            ("transp", SyntaxType::int()),
+            ("opacity", SyntaxType::int()),
             ("offset", SyntaxType::int()),
             ("minheight", SyntaxType::int()),
             ("maxheight", SyntaxType::int()),
@@ -95,7 +95,7 @@ mod tests {
             vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
         );
         let src = r"plotarrow(close, title='Title', colorup=#00ffaa, colordown=#00ffbb, 
-            transp=70, offset=15, minheight=1, maxheight=10, 
+            opacity=70, offset=15, minheight=1, maxheight=10, 
             editable=true, show_last=100, display=1)";
         let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
@@ -120,7 +120,7 @@ mod tests {
                 title: Some(String::from("Title")),
                 colorup: Some(String::from("#00ffaa")),
                 colordown: Some(String::from("#00ffbb")),
-                transp: Some(70),
+                opacity: Some(70),
                 offset: Some(15),
                 minheight: Some(1),
                 maxheight: Some(10),

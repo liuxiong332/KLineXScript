@@ -39,7 +39,7 @@ a = open + high + low + close
 plot(correlation(src, ovr, length),
    color=color.purple,
    style=plot.style_area,
-   transp=40)
+   opacity=40)
 
 mn(x, y) => 
 updown(s, m) =>

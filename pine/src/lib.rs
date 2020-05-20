@@ -796,7 +796,7 @@ mod tests {
                     color: None,
                     linewidth: None,
                     style: None,
-                    transp: None,
+                    opacity: None,
                     trackprice: None,
                     histbase: None,
                     offset: None,

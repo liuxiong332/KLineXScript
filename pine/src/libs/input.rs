@@ -322,7 +322,7 @@ fn input_for_float<'a>(
 
     let input_val = ctx_ins.copy_next_input();
     match input_val {
-        Some(InputVal::Int(val)) => Ok(PineRef::new_box(Some(val))),
+        Some(InputVal::Float(val)) => Ok(PineRef::new_box(Some(val))),
         _ => match defval {
             Some(val) => Ok(val),
             _ => Err(RuntimeErr::NotValidParam),
@@ -778,6 +778,29 @@ mod tests {
                 PineRef::new_rc(String::from(STRING_TYPE_STR)),
                 PineRef::new_rc(String::from(STRING_TYPE_STR)),
             ])
+        );
+    }
+
+    #[test]
+    fn input_float_test() {
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![("close", SyntaxType::float_series())],
+        );
+        let src = r#"band = input(1.0, title="Multiplier")"#;
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        runner.change_inputs(vec![Some(InputVal::Float(2f64))]);
+        runner
+            .run(
+                &vec![("close", AnySeries::from_float_vec(vec![Some(1f64)]))],
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(0, 0)),
+            Some(PineRef::new_box(Some(2f64)))
         );
     }
 }

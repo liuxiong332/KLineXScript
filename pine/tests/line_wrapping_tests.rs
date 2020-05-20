@@ -64,7 +64,7 @@ fn expr_test() {
 const FUNC_CALL_STAT: &str = "plot(correlation(src, ovr, length),
 color=color.purple,
 style=plot.style_area,
-transp=40)
+opacity=40)
 ";
 
 #[test]
@@ -102,14 +102,14 @@ fn func_call_test() {
                         ),
                     ),
                     (
-                        VarName::new_with_start("transp", Position::new(3, 0)),
-                        gen_int(40, StrRange::from_start("40", Position::new(3, 7)))
+                        VarName::new_with_start("opacity", Position::new(3, 0)),
+                        gen_int(40, StrRange::from_start("40", Position::new(3, 8)))
                     )
                 ],
-                StrRange::new(Position::new(0, 0), Position::new(3, 10))
+                StrRange::new(Position::new(0, 0), Position::new(3, 11))
             ),],
             None,
-            StrRange::new(Position::new(0, 0), Position::new(3, 10))
+            StrRange::new(Position::new(0, 0), Position::new(3, 11))
         ))
     );
 }

@@ -39,8 +39,6 @@ pub const VAR_NAME: &'static str = "study";
 pub fn declare_var<'a>() -> VarResult<'a> {
     let value = PineRef::new(CallableFactory::new(|| Callable::new(Some(study), None)));
 
-    // plot(series, title, color, linewidth, style, trackprice, transp, histbase, offset, join, editable, show_last) → plot
-
     let func_type = FunctionTypes(vec![FunctionType::new((
         vec![
             ("title", SyntaxType::string()),

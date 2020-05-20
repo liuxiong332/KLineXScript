@@ -22,7 +22,7 @@ const ARGUMENTS: &'static str = r#"
 **plot1 (plot)** The first plot object. Required argument.
 **plot2 (plot)** The second plot object. Required argument.
 **color (color)** Color of the plot. You can use constants like `color=color.red` or `color=#ff001a` as well as complex expressions like `color = close >= open ? color.green : color.red`. Optional argument.
-**transp (int)** Transparency of the filled background. Possible values are from 0 (not transparent) to 100 (invisible). Optional argument.
+**opacity (int)** Transparency of the filled background. Possible values are from 0 (not transparent) to 100 (invisible). Optional argument.
 **title (string)** Title of the created fill object. Optional argument.
 "#;
 

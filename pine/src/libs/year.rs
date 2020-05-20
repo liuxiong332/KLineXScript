@@ -195,8 +195,6 @@ pub fn declare_time_var<'a>(
 ) -> VarResult<'a> {
     let value = PineRef::new(CallableEvaluate::new(processor, func));
 
-    // plot(series, title, color, linewidth, style, trackprice, transp, histbase, offset, join, editable, show_last) → plot
-
     let func_type = FunctionTypes(vec![FunctionType::new((
         vec![("time", SyntaxType::int_series())],
         SyntaxType::int_series(),
@@ -375,8 +373,6 @@ pub fn declare_dayofweek_var<'a>() -> VarResult<'a> {
             )
         },
     ));
-
-    // plot(series, title, color, linewidth, style, trackprice, transp, histbase, offset, join, editable, show_last) → plot
 
     let func_type = FunctionTypes(vec![FunctionType::new((
         vec![("time", SyntaxType::int_series())],

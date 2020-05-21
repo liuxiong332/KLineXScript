@@ -436,7 +436,7 @@ pub struct Tuple<'a>(pub Vec<PineRef<'a>>);
 
 impl<'a> Clone for Tuple<'a> {
     fn clone(&self) -> Self {
-        Tuple(self.0.iter().map(|v| v.copy()).collect())
+        Tuple(self.0.iter().map(|v| v.copy_inner()).collect())
     }
 }
 
@@ -451,7 +451,7 @@ impl<'a> PineType<'a> for Tuple<'a> {
     }
 
     fn copy(&self) -> PineRef<'a> {
-        let new_vec = self.0.iter().map(|it| it.copy()).collect();
+        let new_vec = self.0.iter().map(|it| it.copy_inner()).collect();
         PineRef::Box(Box::new(Tuple(new_vec)))
     }
 }

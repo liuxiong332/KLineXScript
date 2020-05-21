@@ -21,13 +21,13 @@ use std::fmt;
 use std::mem;
 use std::rc::Rc;
 
-pub type PerInfoItem = Option<PerLine>;
+pub type PerLineItem = Option<PerLine>;
 
-fn pine_ref_to_line<'a>(val: Option<PineRef<'a>>) -> PerInfoItem {
+fn pine_ref_to_line<'a>(val: Option<PineRef<'a>>) -> PerLineItem {
     if val.is_none() {
         return None;
     }
-    match PerInfoItem::implicity_from(val.unwrap()) {
+    match PerLineItem::implicity_from(val.unwrap()) {
         Ok(res) => res.into_inner(),
         Err(_) => None,
     }
@@ -46,20 +46,19 @@ impl PerLine {
     }
 }
 
-impl PineStaticType for PerInfoItem {
+impl PineStaticType for PerLineItem {
     fn static_type() -> (DataType, SecondType) {
         (DataType::Line, SecondType::Simple)
     }
 }
 
-impl<'a> PineFrom<'a, PerInfoItem> for PerInfoItem {
-    fn implicity_from(t: PineRef<'a>) -> Result<RefData<PerInfoItem>, RuntimeErr> {
-        println!("Get type {:?}", t.get_type());
+impl<'a> PineFrom<'a, PerLineItem> for PerLineItem {
+    fn implicity_from(t: PineRef<'a>) -> Result<RefData<PerLineItem>, RuntimeErr> {
         match t.get_type() {
-            (DataType::Line, SecondType::Simple) => Ok(downcast_pf::<PerInfoItem>(t).unwrap()),
+            (DataType::Line, SecondType::Simple) => Ok(downcast_pf::<PerLineItem>(t).unwrap()),
             (DataType::Line, SecondType::Series) => {
-                let f: RefData<Series<PerInfoItem>> =
-                    downcast_pf::<Series<PerInfoItem>>(t).unwrap();
+                let f: RefData<Series<PerLineItem>> =
+                    downcast_pf::<Series<PerLineItem>>(t).unwrap();
                 Ok(RefData::new_box(f.get_current()))
             }
             (DataType::NA, _) => Ok(RefData::new_box(None)),
@@ -110,7 +109,7 @@ impl<'a> SimpleType for Option<PerLine> {}
 // The line invocation that create new LineInfo object
 #[derive(Debug)]
 struct PlotVal<'a> {
-    lines: RefData<Series<'a, PerInfoItem>>,
+    lines: RefData<Series<'a, PerLineItem>>,
 }
 
 impl<'a> Clone for PlotVal<'a> {

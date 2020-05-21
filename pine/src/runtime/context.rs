@@ -190,8 +190,8 @@ pub fn commit_series_for_operator<'a>(operator: &mut dyn VarOperate<'a>) {
                 (DataType::Bool, SecondType::Series) => commit_series::<Bool>(val),
                 (DataType::String, SecondType::Series) => commit_series::<String>(val),
                 (DataType::Line, SecondType::Series) => {
-                    use crate::libs::line::PerInfoItem;
-                    commit_series::<PerInfoItem>(val)
+                    use crate::libs::line::PerLineItem;
+                    commit_series::<PerLineItem>(val)
                 }
                 _ => val,
             };
@@ -218,8 +218,8 @@ pub fn rollback_series_for_operator<'a>(operator: &mut dyn VarOperate<'a>) {
                 (DataType::Bool, SecondType::Series) => roll_back_series::<Bool>(val),
                 (DataType::String, SecondType::Series) => roll_back_series::<String>(val),
                 (DataType::Line, SecondType::Series) => {
-                    use crate::libs::line::PerInfoItem;
-                    roll_back_series::<PerInfoItem>(val)
+                    use crate::libs::line::PerLineItem;
+                    roll_back_series::<PerLineItem>(val)
                 }
                 _ => val,
             };
@@ -871,7 +871,7 @@ pub trait Runner<'a> {
     fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError>;
 }
 
-// Evaluate  the expression with right-value.
+// Evaluate the expression with right-value.
 pub trait RVRunner<'a> {
     fn rv_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError>;
 }
@@ -879,6 +879,12 @@ pub trait RVRunner<'a> {
 // evaluate the expression for the function call
 pub trait RunnerForFunc<'a> {
     fn run_for_func(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError>;
+}
+
+// evaluate the expression for the assignment expression
+pub trait RunnerForAssign<'a> {
+    fn run_for_assign(&'a self, context: &mut dyn Ctx<'a>)
+        -> Result<PineRef<'a>, PineRuntimeError>;
 }
 
 // evaluate the expression for the object.

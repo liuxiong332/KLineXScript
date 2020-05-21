@@ -13,7 +13,8 @@ use crate::runtime::output::{
 };
 use crate::types::{
     downcast_pf, Bool, Callable, CallableObject, DataType, Float, Int, ParamCollectCall, PineClass,
-    PineFrom, PineRef, PineType, RefData, RuntimeErr, SecondType, Series, SeriesCall, Tuple, NA,
+    PineFrom, PineRef, PineType, RefData, RuntimeErr, SecondType, Series, SeriesCall,
+    SimpleCallableObject, Tuple, NA,
 };
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -46,13 +47,13 @@ impl<'a> SeriesCall<'a> for InputCall<'a> {
         func_type: FunctionType<'a>,
     ) -> Result<PineRef<'a>, RuntimeErr> {
         if let Some(val) = &*self.val.borrow() {
-            return Ok(val.clone());
+            return Ok(val.copy_inner());
         }
         match pine_input(context, val, func_type) {
             Err(e) => Err(e),
             Ok(res) => {
                 self.val.replace(Some(res.clone()));
-                Ok(res)
+                Ok(res.copy_inner())
             }
         }
     }
@@ -454,7 +455,7 @@ impl<'a> PineClass<'a> for InputProps {
 pub const VAR_NAME: &'static str = "input";
 
 pub fn declare_var<'a>() -> VarResult<'a> {
-    let value = PineRef::new(CallableObject::new(Box::new(InputProps), || {
+    let value = PineRef::new(SimpleCallableObject::new(Box::new(InputProps), || {
         Callable::new(None, Some(Box::new(InputCall::new())))
     }));
     /*

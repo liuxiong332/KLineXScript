@@ -32,6 +32,7 @@ impl<'a> SeriesCall<'a> for BbVal {
         let length = require_param("length", pine_ref_to_i64(length))?;
         let mult = require_param("mult", pine_ref_to_f64(mult))?;
 
+        println!("Series {:?}", series);
         if length < 1i64 {
             return Err(RuntimeErr::InvalidParameters(str_replace(
                 GE_1,

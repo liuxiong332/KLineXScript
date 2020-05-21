@@ -1,4 +1,6 @@
-use super::context::{Ctx, PineRuntimeError, RVRunner, Runner, RunnerForFunc, RunnerForObj};
+use super::context::{
+    Ctx, PineRuntimeError, RVRunner, Runner, RunnerForAssign, RunnerForFunc, RunnerForObj,
+};
 use super::instance_caller::*;
 use super::op::{binary_op_run, unary_op_run};
 use super::runtime_convert::convert;
@@ -11,7 +13,7 @@ use crate::types::{
     downcast_pf, downcast_pf_mut, Bool, CallObjEval, Callable, CallableEvaluate, CallableFactory,
     CallableObject, Color, DataType as FirstType, Evaluate, EvaluateFactory, Float, Int, Object,
     PineFrom, PineRef, PineStaticType, PineType, PineVar, RefData, RuntimeErr, SecondType, Series,
-    Tuple, NA,
+    SimpleCallableObject, Tuple, NA,
 };
 use std::fmt::Debug;
 
@@ -82,6 +84,48 @@ impl<'a> RVRunner<'a> for Exp<'a> {
                 Ok(PineRef::new_box(Tuple(col)))
             }
             _ => self.run(context),
+        }
+    }
+}
+
+impl<'a> RunnerForAssign<'a> for Exp<'a> {
+    fn run_for_assign(
+        &'a self,
+        context: &mut dyn Ctx<'a>,
+    ) -> Result<PineRef<'a>, PineRuntimeError> {
+        match self {
+            Exp::Na(_)
+            | Exp::Bool(_)
+            | Exp::Num(_)
+            | Exp::Str(_)
+            | Exp::Color(_)
+            | Exp::UnaryExp(_)
+            | Exp::BinaryExp(_)
+            | Exp::RefCall(_) => self.rv_run(context),
+            Exp::VarName(_) => match self.rv_run(context) {
+                // The line and label type should not to copy the origin object
+                // other object should copy the origin object for assignment
+                Ok(v) => match v.get_type() {
+                    (FirstType::Line, _) | (FirstType::Label, _) => Ok(v),
+                    _ => Ok(v.copy_inner()),
+                },
+                Err(e) => Err(e),
+            },
+            Exp::Tuple(tuple) => {
+                let mut col: Vec<PineRef<'a>> = vec![];
+                for exp in tuple.exps.iter() {
+                    col.push(exp.run_for_assign(context)?);
+                }
+                Ok(PineRef::new_box(Tuple(col)))
+            }
+            Exp::FuncCall(ref func_call) => func_call.run_for_assign(context),
+            Exp::Condition(ref cond) => cond.run_for_assign(context),
+
+            // All other type objects are temporary object, need not to copy inner.
+            _ => match self.rv_run(context) {
+                Ok(v) => Ok(v.copy_inner()),
+                Err(e) => Err(e),
+            },
         }
     }
 }
@@ -210,6 +254,11 @@ impl<'a> Runner<'a> for PrefixExp<'a> {
                 let subobj = object.get(context, self.right_name.value).unwrap();
                 Ok(subobj)
             }
+            (FirstType::SimpleCallableObject, SecondType::Simple) => {
+                let object = downcast_pf::<SimpleCallableObject>(var).unwrap();
+                let subobj = object.get(context, self.right_name.value).unwrap();
+                Ok(subobj)
+            }
             (FirstType::CallableObjectEvaluate, SecondType::Simple) => {
                 let object = downcast_pf::<CallObjEval>(var).unwrap();
                 let subobj = object.get(context, self.right_name.value).unwrap();
@@ -230,6 +279,26 @@ impl<'a> Runner<'a> for Condition<'a> {
         match *bool_val {
             true => Ok(convert(self.exp1.rv_run(context)?, &self.result_type)),
             false => Ok(convert(self.exp2.rv_run(context)?, &self.result_type)),
+        }
+    }
+}
+
+impl<'a> RunnerForAssign<'a> for Condition<'a> {
+    fn run_for_assign(
+        &'a self,
+        context: &mut dyn Ctx<'a>,
+    ) -> Result<PineRef<'a>, PineRuntimeError> {
+        let cond = self.cond.rv_run(context)?;
+        let bool_val = Bool::implicity_from(cond).unwrap();
+        match *bool_val {
+            true => Ok(convert(
+                self.exp1.run_for_assign(context)?,
+                &self.result_type,
+            )),
+            false => Ok(convert(
+                self.exp2.run_for_assign(context)?,
+                &self.result_type,
+            )),
         }
     }
 }

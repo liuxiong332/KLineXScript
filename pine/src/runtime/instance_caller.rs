@@ -8,7 +8,7 @@ use crate::types::{
     downcast_pf, downcast_pf_mut, Bool, CallObjEval, Callable, CallableEvaluate, CallableFactory,
     CallableObject, Color, DataType as FirstType, Evaluate, EvaluateFactory, Float, Int, Object,
     PineFrom, PineRef, PineStaticType, PineType, PineVar, RefData, RuntimeErr, SecondType, Series,
-    Tuple, NA,
+    SimpleCallableObject, Tuple, NA,
 };
 use std::fmt::Debug;
 
@@ -64,6 +64,10 @@ pub fn call_func_factory<'a>(
             }
             FirstType::CallableObject => {
                 let factory = downcast_pf::<CallableObject>(s).unwrap();
+                factory.create()
+            }
+            FirstType::SimpleCallableObject => {
+                let factory = downcast_pf::<SimpleCallableObject>(s).unwrap();
                 factory.create()
             }
             FirstType::CallableEvaluate => {

@@ -1,6 +1,6 @@
 use super::context::{
-    downcast_ctx, ContextType, Ctx, PineRuntimeError, RVRunner, Runner, RunnerForFunc, StmtRunner,
-    VarOperate,
+    downcast_ctx, ContextType, Ctx, PineRuntimeError, RVRunner, Runner, RunnerForAssign,
+    RunnerForFunc, StmtRunner, VarOperate,
 };
 use super::function::Function;
 use super::instance_caller::*;
@@ -122,13 +122,13 @@ pub fn process_assign_val<'a>(
         None => {
             // If the syntax type is specified, then we convert the val to this type
             if let Some(syntax_type) = syntax_type {
-                let true_val = true_val.copy_inner();
+                // let true_val = true_val.copy_inner();
                 let res_val = convert_val_for_type(true_val, syntax_type)?;
                 context.create_var(varid, res_val.clone());
                 Ok(res_val)
             } else {
                 // When assignment, must copy new variable.
-                let true_val = true_val.copy_inner();
+                // let true_val = true_val.copy_inner();
                 context.create_var(varid, true_val.clone());
                 Ok(true_val)
             }
@@ -155,8 +155,8 @@ pub fn process_assign_val<'a>(
                 update_series::<String>(context, index, current_val, true_val)
             }
             ((FirstType::Line, SecondType::Series), _) => {
-                use crate::libs::line::PerInfoItem;
-                update_series::<PerInfoItem>(context, index, current_val, true_val)
+                use crate::libs::line::PerLineItem;
+                update_series::<PerLineItem>(context, index, current_val, true_val)
             }
             ((_, SecondType::Series), _) | (_, (_, SecondType::Series)) => {
                 // Err(RuntimeErr::TypeMismatch(format!(
@@ -266,7 +266,6 @@ impl<'a> RunnerForName<'a> for Assignment<'a> {
         //     return Err(RuntimeErr::NameDeclared);
         // }
         // context.create_declare(name);
-        println!("run name {:?} {:?} {:?}", self.var_type, _vn, val);
         if _vn.value == "_" {
             return Ok(val);
         }
@@ -306,10 +305,8 @@ impl<'a> RunnerForName<'a> for Assignment<'a> {
             } // Some(DataType::Custom(_)) => val,
         };
         if let (FirstType::NA, _) = true_val.get_type() {
-            println!("assignment for {} can not be NA", _vn.value);
             return Err(RuntimeErr::InvalidNADeclarer);
         }
-        println!("run name {:?} {:?}", true_val, varid);
 
         process_assign_val(true_val, downcast_ctx(context), varid, None)
     }
@@ -317,7 +314,7 @@ impl<'a> RunnerForName<'a> for Assignment<'a> {
 
 impl<'a> Runner<'a> for Assignment<'a> {
     fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
-        let val = self.val.rv_run(context)?;
+        let val = self.val.run_for_assign(context)?;
         if self.names.len() == 1 {
             let varid = self.varids.as_ref().unwrap()[0];
             return match self.run_name(context, &self.names[0], val, varid) {
@@ -386,6 +383,10 @@ impl<'a> Runner<'a> for VarAssignment<'a> {
             }
             (FirstType::String, _) => {
                 update_series_range::<String>(ctx_instance, index, exist_val, val, self.range)
+            }
+            (FirstType::Line, _) => {
+                use crate::libs::line::PerLineItem;
+                update_series_range::<PerLineItem>(ctx_instance, index, exist_val, val, self.range)
             }
             _ => Err(PineRuntimeError::new(
                 RuntimeErr::NotSupportOperator,
@@ -529,6 +530,21 @@ impl<'a> StmtRunner<'a> for ForRange<'a> {
     }
 }
 
+fn extract_args_assign<'a>(
+    context: &mut dyn Ctx<'a>,
+    exp: &'a FunctionCall<'a>,
+) -> Result<(Vec<PineRef<'a>>, Vec<(&'a str, PineRef<'a>)>), PineRuntimeError> {
+    let mut ret_pos = vec![];
+    for exp in exp.pos_args.iter() {
+        ret_pos.push(exp.run_for_assign(context)?);
+    }
+    let mut ret_dict = vec![];
+    for (n, exp) in exp.dict_args.iter() {
+        ret_dict.push((n.value, exp.run_for_assign(context)?));
+    }
+    Ok((ret_pos, ret_dict))
+}
+
 fn extract_args<'a>(
     context: &mut dyn Ctx<'a>,
     exp: &'a FunctionCall<'a>,
@@ -584,51 +600,100 @@ pub fn get_sub_ctx<'a, 'b, 'c>(
     &mut **sub_context
 }
 
+fn assign_run<'a>(
+    fun_call: &'a FunctionCall<'a>,
+    context: &mut dyn Ctx<'a>,
+    method: PineRef<'a>,
+) -> Result<PineRef<'a>, PineRuntimeError> {
+    // let result = fun_call.method.run_for_func(context)?;
+
+    let result = match method.get_type() {
+        (FirstType::Callable, SecondType::Simple) => {
+            let mut callable = downcast_pf::<Callable>(method).unwrap();
+            // let ctx_ref = create_sub_ctx(context, self.ctxid, ContextType::FuncDefBlock, 0, 0);
+            let func_type = fun_call.func_type.as_ref().unwrap().clone();
+            let (pos_args, dict_args) = extract_args_assign(context, fun_call)?;
+
+            let result = callable.call(context, pos_args, dict_args, func_type);
+            // ctx_ref.set_is_run(true);
+            context.create_runnable(callable.into_rc());
+            result
+        }
+        (FirstType::SimpleCallableObject, SecondType::Simple) => {
+            let func_type = fun_call.func_type.as_ref().unwrap().clone();
+            let (pos_args, dict_args) = extract_args(context, fun_call)?;
+            call_func_factory(
+                context,
+                fun_call.ctxid,
+                method,
+                pos_args,
+                dict_args,
+                func_type,
+            )
+        }
+        (FirstType::CallableFactory, SecondType::Simple)
+        | (FirstType::CallableObject, SecondType::Simple)
+        | (FirstType::CallableEvaluate, SecondType::Simple)
+        | (FirstType::CallableObjectEvaluate, SecondType::Simple) => {
+            let func_type = fun_call.func_type.as_ref().unwrap().clone();
+            let (pos_args, dict_args) = extract_args_assign(context, fun_call)?;
+            call_func_factory(
+                context,
+                fun_call.ctxid,
+                method,
+                pos_args,
+                dict_args,
+                func_type,
+            )
+        }
+        (FirstType::Function, SecondType::Simple) => {
+            let callable = downcast_pf::<Function>(method).unwrap();
+            let def = callable.get_def();
+            let true_def = &def.spec_defs.as_ref().unwrap()[fun_call.spec_index as usize];
+            let function = Function::new(true_def);
+            let (pos_args, dict_args) = extract_args_assign(context, fun_call)?;
+
+            let ctx_ref = create_sub_ctx(
+                context,
+                fun_call.ctxid,
+                ContextType::FuncDefBlock,
+                function.get_var_count(),
+                function.get_libfun_count(),
+                function.get_subctx_count(),
+            );
+            let result = function.call(ctx_ref, pos_args, dict_args, fun_call.range);
+            ctx_ref.set_is_run(true);
+            return result;
+        }
+        _ => Err(RuntimeErr::NotSupportOperator),
+    };
+    match result {
+        Ok(val) => Ok(val),
+        Err(code) => Err(PineRuntimeError::new(code, fun_call.range)),
+    }
+}
+
 impl<'a> Runner<'a> for FunctionCall<'a> {
     fn run(&'a self, context: &mut dyn Ctx<'a>) -> Result<PineRef<'a>, PineRuntimeError> {
         let result = self.method.run_for_func(context)?;
+        assign_run(self, context, result)
+    }
+}
 
-        let (pos_args, dict_args) = extract_args(context, self)?;
+impl<'a> RunnerForAssign<'a> for FunctionCall<'a> {
+    fn run_for_assign(
+        &'a self,
+        context: &mut dyn Ctx<'a>,
+    ) -> Result<PineRef<'a>, PineRuntimeError> {
+        let method = self.method.run_for_func(context)?;
+        let method_type = method.get_type();
 
-        let result = match result.get_type() {
-            (FirstType::Callable, SecondType::Simple) => {
-                let mut callable = downcast_pf::<Callable>(result).unwrap();
-                // let ctx_ref = create_sub_ctx(context, self.ctxid, ContextType::FuncDefBlock, 0, 0);
-                let func_type = self.func_type.as_ref().unwrap().clone();
-                let result = callable.call(context, pos_args, dict_args, func_type);
-                // ctx_ref.set_is_run(true);
-                context.create_runnable(callable.into_rc());
-                result
-            }
-            (FirstType::CallableFactory, SecondType::Simple)
-            | (FirstType::CallableObject, SecondType::Simple)
-            | (FirstType::CallableEvaluate, SecondType::Simple)
-            | (FirstType::CallableObjectEvaluate, SecondType::Simple) => {
-                let func_type = self.func_type.as_ref().unwrap().clone();
-                call_func_factory(context, self.ctxid, result, pos_args, dict_args, func_type)
-            }
-            (FirstType::Function, SecondType::Simple) => {
-                let callable = downcast_pf::<Function>(result).unwrap();
-                let def = callable.get_def();
-                let true_def = &def.spec_defs.as_ref().unwrap()[self.spec_index as usize];
-                let function = Function::new(true_def);
-                let ctx_ref = create_sub_ctx(
-                    context,
-                    self.ctxid,
-                    ContextType::FuncDefBlock,
-                    function.get_var_count(),
-                    function.get_libfun_count(),
-                    function.get_subctx_count(),
-                );
-                let result = function.call(ctx_ref, pos_args, dict_args, self.range);
-                ctx_ref.set_is_run(true);
-                return result;
-            }
-            _ => Err(RuntimeErr::NotSupportOperator),
-        };
-        match result {
-            Ok(val) => Ok(val),
-            Err(code) => Err(PineRuntimeError::new(code, self.range)),
+        let result = assign_run(self, context, method)?;
+
+        match method_type {
+            // The simple user-defined function must copy the origin object for assignment.
+            (FirstType::Function, SecondType::Simple) => Ok(result.copy_inner()),
+            _ => Ok(result),
         }
     }
 }

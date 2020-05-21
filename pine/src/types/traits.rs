@@ -29,6 +29,8 @@ pub enum DataType {
     CallableFactory,
     Function, // The function defined by the script
     Object,
+    // Simple callable-object is like callable-object, but don't copy the parameters.
+    SimpleCallableObject,
     CallableObject,
     Evaluate, // The variable need lazy evaluate.
     EvaluateFactory,

@@ -454,7 +454,6 @@ fn bb_test() {
     let pine_middle = pine_ref_to_f64_series(parser.move_var(VarIndex::new(4, 0)));
     let pine_upper = pine_ref_to_f64_series(parser.move_var(VarIndex::new(5, 0)));
     let pine_lower = pine_ref_to_f64_series(parser.move_var(VarIndex::new(6, 0)));
-    println!("val {:?} {:?} {:?}", middle, upper, lower);
     assert_eq!(
         middle.unwrap().index_value(1).unwrap().unwrap().floor(),
         pine_middle

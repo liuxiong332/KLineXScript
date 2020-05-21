@@ -9,8 +9,8 @@ use crate::helper::{
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::InputSrc;
 use crate::types::{
-    downcast_pf_ref, int2float, Arithmetic, Callable, CallableFactory, Float, Int, PineRef,
-    RefData, RuntimeErr, Series, SeriesCall,
+    downcast_pf_ref, int2float, Arithmetic, Callable, CallableFactory, Float, Int,
+    ParamCollectCall, PineRef, RefData, RuntimeErr, Series, SeriesCall,
 };
 use std::mem;
 use std::rc::Rc;
@@ -61,7 +61,9 @@ pub const VAR_NAME: &'static str = "falling";
 pub fn declare_s_var<'a>(name: &'static str, check_func: CheckHandler<'a>) -> VarResult<'a> {
     let value = PineRef::new(Callable::new(
         None,
-        Some(Box::new(AtrVal::new(check_func as *mut ()))),
+        Some(Box::new(ParamCollectCall::new_with_caller(Box::new(
+            AtrVal::new(check_func as *mut ()),
+        )))),
     ));
 
     let func_type = FunctionTypes(vec![FunctionType::new((

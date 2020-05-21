@@ -12,8 +12,8 @@ use crate::helper::{
 use crate::runtime::context::{downcast_ctx, Ctx};
 use crate::runtime::InputSrc;
 use crate::types::{
-    downcast_pf_ref, int2float, Arithmetic, Callable, CallableFactory, Float, Int, PineRef,
-    RefData, RuntimeErr, Series, SeriesCall,
+    downcast_pf_ref, int2float, Arithmetic, Callable, CallableFactory, Float, Int,
+    ParamCollectCall, PineRef, RefData, RuntimeErr, Series, SeriesCall,
 };
 use std::cmp;
 use std::mem;
@@ -77,7 +77,12 @@ pub const VAR_NAME: &'static str = "cci";
 
 pub fn declare_var<'a>() -> VarResult<'a> {
     let value = PineRef::new(CallableFactory::new(|| {
-        Callable::new(None, Some(Box::new(CciVal::new())))
+        Callable::new(
+            None,
+            Some(Box::new(ParamCollectCall::new_with_caller(Box::new(
+                CciVal::new(),
+            )))),
+        )
     }));
 
     let func_type = FunctionTypes(vec![FunctionType::new((

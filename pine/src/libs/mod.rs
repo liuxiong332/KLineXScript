@@ -15,6 +15,7 @@ pub mod color;
 pub mod correlation;
 pub mod cos;
 pub mod cum;
+pub mod display;
 pub mod dmi;
 pub mod ema;
 pub mod falling;
@@ -194,6 +195,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         tsi::declare_var(),
         stoch::declare_var(),
         // line::declare_var(),
+        display::declare_var(),
     ];
     debug_assert!(
         check_names(&list).len() == 0,

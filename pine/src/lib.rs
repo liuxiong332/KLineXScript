@@ -135,6 +135,7 @@ impl<'a, 'b> PineParser<'a, 'b> {
             Err((None, errs)) => return Err(errs),
         };
         let syntax_parser;
+
         match parse_syntax(&mut blk, &self.var_types, unsafe {
             let s: *const (dyn InputSrcDetector<'a> + 'b) = self.lib_info;
             mem::transmute::<_, *const (dyn InputSrcDetector<'a>)>(s)

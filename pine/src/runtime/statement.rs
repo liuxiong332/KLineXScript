@@ -31,10 +31,7 @@ impl<'a> StmtRunner<'a> for Statement<'a> {
             Statement::ForRange(ref fr) => StmtRunner::st_run(fr.as_ref(), context),
             Statement::FuncCall(ref fun_call) => StmtRunner::st_run(fun_call.as_ref(), context),
             Statement::FuncDef(ref fun_def) => fun_def.st_run(context),
-            Statement::Exp(ref exp) => {
-                exp.run(context)?;
-                Ok(())
-            }
+            Statement::Exp(ref exp) => exp.st_run(context),
         }
     }
 }
@@ -253,6 +250,14 @@ where
     }
 }
 
+// Check if the item is Line/Label object or not.
+fn check_shape<'a>(item: &PineRef<'a>) -> bool {
+    match item.get_type() {
+        (FirstType::Label, SecondType::Series) | (FirstType::Line, SecondType::Series) => true,
+        _ => false,
+    }
+}
+
 impl<'a> RunnerForName<'a> for Assignment<'a> {
     fn run_name(
         &'a self,
@@ -356,7 +361,13 @@ impl<'a> Runner<'a> for Assignment<'a> {
 
 impl<'a> StmtRunner<'a> for Assignment<'a> {
     fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), PineRuntimeError> {
-        self.run(context)?;
+        let result = self.run(context)?;
+        // If the return value is shape, then we need record this shape
+        if check_shape(&result) {
+            let varref = context.get_var(VarIndex::new(self.varids.as_ref().unwrap()[0], 0));
+            let newvar = varref.clone().unwrap();
+            context.get_main_ctx().declare_shape(newvar, false);
+        }
         Ok(())
     }
 }
@@ -399,6 +410,16 @@ impl<'a> Runner<'a> for VarAssignment<'a> {
 impl<'a> StmtRunner<'a> for VarAssignment<'a> {
     fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), PineRuntimeError> {
         self.run(context)?;
+        Ok(())
+    }
+}
+
+impl<'a> StmtRunner<'a> for Exp<'a> {
+    fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), PineRuntimeError> {
+        let result = self.run(context)?;
+        if check_shape(&result) {
+            context.get_main_ctx().declare_shape(result, true);
+        }
         Ok(())
     }
 }
@@ -607,6 +628,7 @@ fn assign_run<'a>(
 ) -> Result<PineRef<'a>, PineRuntimeError> {
     // let result = fun_call.method.run_for_func(context)?;
 
+    println!("Function method type {:?}", method.get_type());
     let result = match method.get_type() {
         (FirstType::Callable, SecondType::Simple) => {
             let mut callable = downcast_pf::<Callable>(method).unwrap();
@@ -701,7 +723,12 @@ impl<'a> RunnerForAssign<'a> for FunctionCall<'a> {
 impl<'a> StmtRunner<'a> for FunctionCall<'a> {
     fn st_run(&'a self, context: &mut dyn Ctx<'a>) -> Result<(), PineRuntimeError> {
         match Runner::run(self, context) {
-            Ok(_) => Ok(()),
+            Ok(result) => {
+                if check_shape(&result) {
+                    context.get_main_ctx().declare_shape(result, true);
+                }
+                Ok(())
+            }
             Err(e) => Err(e),
         }
     }

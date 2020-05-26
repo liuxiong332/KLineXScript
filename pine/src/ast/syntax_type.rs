@@ -203,4 +203,12 @@ impl<'a> SyntaxType<'a> {
     pub fn bool_series() -> SyntaxType<'a> {
         SyntaxType::Series(SimpleSyntaxType::Bool)
     }
+
+    pub fn color_series() -> SyntaxType<'a> {
+        SyntaxType::Series(SimpleSyntaxType::Color)
+    }
+
+    pub fn string_series() -> SyntaxType<'a> {
+        SyntaxType::Series(SimpleSyntaxType::String)
+    }
 }

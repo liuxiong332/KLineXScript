@@ -345,6 +345,10 @@ impl<'a> Runner<'a> for RefCall<'a> {
             (FirstType::Bool, _) => get_slice::<Bool>(var, arg),
             (FirstType::Color, _) => get_slice::<Color>(var, arg),
             (FirstType::String, _) => get_slice::<String>(var, arg),
+            (FirstType::Line, _) => {
+                use crate::libs::line::PerLineItem;
+                get_slice::<PerLineItem>(var, arg)
+            }
             _ => Err(RuntimeErr::NotSupportOperator),
         };
         match result {

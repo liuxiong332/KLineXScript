@@ -701,6 +701,9 @@ impl<'a> SyntaxParser<'a> {
                 }
             }
             SyntaxType::Series(_) => self.parse_ref_call_arg(ref_call, name_res.syntax_type),
+            SyntaxType::ObjectClass(class) => {
+                Ok(ParseValue::new_with_type(SyntaxType::ObjectClass(class)))
+            }
             _ => Err(PineInputError::new(
                 PineErrorKind::VarNotSeriesInRef,
                 ref_call.range,

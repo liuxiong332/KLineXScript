@@ -59,6 +59,10 @@ pub trait Ctx<'a>: VarOperate<'a> {
 
     // fn any_declare(&self) -> bool;
 
+    fn declare_shape(&mut self, shape: PineRef<'a>, req_commit: bool);
+
+    fn get_shapes(&self) -> &Vec<PineRef<'a>>;
+
     fn get_context_type(&self) -> ContextType;
 
     fn has_parent(&self) -> bool;
@@ -114,6 +118,12 @@ pub struct Context<'a, 'b, 'c> {
     // runnables contains all the callable instance that need commit or rollback
     runnables: Vec<Rc<RefCell<dyn Runnable<'a> + 'a>>>,
     // declare_vars: HashSet<&'a str>,
+
+    // Custom shapes(line, label, ...etc)
+    shapes: Vec<PineRef<'a>>,
+
+    // Custom shapes that require commit. The Context will commit the shape object after every iteration
+    reqcom_shapes: Vec<PineRef<'a>>,
 
     // The iterator index, start from 0
     iterindex: i32,
@@ -247,6 +257,8 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             varname_indexs: HashMap::new(),
             fun_instances: Vec::new(),
             runnables: vec![],
+            shapes: vec![],
+            reqcom_shapes: vec![],
             iterindex: 0,
             // declare_vars: HashSet::new(),
             callback: None,
@@ -273,6 +285,8 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             varname_indexs: HashMap::new(),
             fun_instances: Vec::new(),
             runnables: vec![],
+            shapes: vec![],
+            reqcom_shapes: vec![],
             iterindex: 0,
             // declare_vars: HashSet::new(),
             callback: Some(callback),
@@ -596,6 +610,22 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
         if !self.first_commit {
             self.first_commit = true;
         }
+
+        // Commit all of the shapes(Line, Label)
+        for shape in self.reqcom_shapes.iter_mut() {
+            match shape.get_type() {
+                (DataType::Line, SecondType::Series) => {
+                    use crate::libs::line::PerLineItem;
+                    Series::<'a, PerLineItem>::implicity_from(shape.clone())
+                        .unwrap()
+                        .commit()
+                }
+                // (DataType::Label, SecondType::Series) => {
+                //     Series::implicity_from(shape.clone()).unwrap().commit()
+                // }
+                _ => unreachable!(),
+            }
+        }
     }
 
     pub fn roll_back(&mut self) -> Result<(), PineRuntimeError> {
@@ -608,6 +638,23 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
             }
         }
         mem::replace(&mut self.runnables, callables);
+
+        // Roll back all of the shapes(Line, Label)
+        for shape in self.reqcom_shapes.iter_mut() {
+            use crate::libs::line::PerLineItem;
+
+            match shape.get_type() {
+                (DataType::Line, SecondType::Series) => {
+                    Series::<'a, PerLineItem>::implicity_from(shape.clone())
+                        .unwrap()
+                        .roll_back()
+                }
+                // (DataType::Label, SecondType::Series) => {
+                //     Series::implicity_from(shape.clone()).unwrap().roll_back()
+                // }
+                _ => unreachable!(),
+            }
+        }
         Ok(())
     }
 
@@ -797,6 +844,30 @@ impl<'a, 'b, 'c> Ctx<'a> for Context<'a, 'b, 'c> {
         }
         debug_assert!(dest_ctx.get_context_type() == ContextType::Main);
         (rel_count, dest_ctx)
+    }
+
+    fn declare_shape(&mut self, shape: PineRef<'a>, req_commit: bool) {
+        debug_assert!(self.is_main());
+        match shape.get_type().0 {
+            DataType::Line | DataType::Label => {
+                if self
+                    .shapes
+                    .iter()
+                    .find(|&s| s.as_ptr() == shape.as_ptr())
+                    .is_none()
+                {
+                    if req_commit {
+                        self.reqcom_shapes.push(shape.clone());
+                    }
+                    self.shapes.push(shape);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn get_shapes(&self) -> &Vec<PineRef<'a>> {
+        &self.shapes
     }
 
     fn get_context_type(&self) -> ContextType {

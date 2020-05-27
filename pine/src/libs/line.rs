@@ -13,7 +13,7 @@ use crate::types::{
     DataType, Float, Int, ParamCollectCall, PineClass, PineFrom, PineRef, PineStaticType, PineType,
     RefData, RuntimeErr, SecondType, Series, SeriesCall, SimpleType, NA,
 };
-use std::cell::RefCell;
+use std::cell::{Ref, RefCell};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::mem;
@@ -48,9 +48,9 @@ fn pine_ref_to_line<'a>(val: Option<PineRef<'a>>) -> PerLineItem {
 // The line definition that represent every line object.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PerLine {
-    x1: Float,
+    x1: Int,
     y1: Float,
-    x2: Float,
+    x2: Int,
     y2: Float,
     xloc: i32,
     extend: i32,
@@ -74,7 +74,7 @@ impl PerLine {
         }
     }
 
-    pub fn new_xy(x1: Float, y1: Float, x2: Float, y2: Float) -> PerLine {
+    pub fn new_xy(x1: Int, y1: Float, x2: Int, y2: Float) -> PerLine {
         PerLine {
             x1,
             y1,
@@ -161,9 +161,9 @@ impl<'a> SeriesCall<'a> for LineFromNaVal<'a> {
         } else {
             move_tuplet!((x1, y1, x2, y2, xloc, extend, color, style, width) = p);
             let line = PerLine {
-                x1: pine_ref_to_f64(x1),
+                x1: pine_ref_to_i64(x1),
                 y1: pine_ref_to_f64(y1),
-                x2: pine_ref_to_f64(x2),
+                x2: pine_ref_to_i64(x2),
                 y2: pine_ref_to_f64(y2),
                 xloc: match pine_ref_to_string(xloc) {
                     None => 0,
@@ -204,6 +204,51 @@ fn delete_func<'a>(
     Ok(PineRef::new(NA))
 }
 
+fn get_val_func<'a, T: Default + Clone + fmt::Debug + PineType<'a> + PineStaticType + 'a>(
+    _context: &mut dyn Ctx<'a>,
+    mut param: Vec<Option<PineRef<'a>>>,
+    func: impl Fn(&PerLine) -> T,
+) -> Result<PineRef<'a>, RuntimeErr> {
+    let id = mem::replace(&mut param[0], None);
+    let line = pine_ref_to_line(id);
+    match unsafe { line.as_ptr().as_ref().unwrap() } {
+        None => Ok(PineRef::new(NA)),
+        Some(v) => Ok(PineRef::new(Series::from(func(v)))),
+    }
+}
+
+fn get_x1_func<'a>(
+    _context: &mut dyn Ctx<'a>,
+    param: Vec<Option<PineRef<'a>>>,
+    _func_type: FunctionType<'a>,
+) -> Result<PineRef<'a>, RuntimeErr> {
+    get_val_func(_context, param, |v| v.x1)
+}
+
+fn get_x2_func<'a>(
+    _context: &mut dyn Ctx<'a>,
+    param: Vec<Option<PineRef<'a>>>,
+    _func_type: FunctionType<'a>,
+) -> Result<PineRef<'a>, RuntimeErr> {
+    get_val_func(_context, param, |v| v.x2)
+}
+
+fn get_y1_func<'a>(
+    _context: &mut dyn Ctx<'a>,
+    param: Vec<Option<PineRef<'a>>>,
+    _func_type: FunctionType<'a>,
+) -> Result<PineRef<'a>, RuntimeErr> {
+    get_val_func(_context, param, |v| v.y1)
+}
+
+fn get_y2_func<'a>(
+    _context: &mut dyn Ctx<'a>,
+    param: Vec<Option<PineRef<'a>>>,
+    _func_type: FunctionType<'a>,
+) -> Result<PineRef<'a>, RuntimeErr> {
+    get_val_func(_context, param, |v| v.y2)
+}
+
 struct PlotProps;
 
 impl<'a> PineClass<'a> for PlotProps {
@@ -217,6 +262,10 @@ impl<'a> PineClass<'a> for PlotProps {
                 Callable::new(None, Some(Box::new(LineFromNaVal::new())))
             }))),
             "delete" => Ok(PineRef::new(Callable::new(Some(delete_func), None))),
+            "get_x1" => Ok(PineRef::new(Callable::new(Some(get_x1_func), None))),
+            "get_x2" => Ok(PineRef::new(Callable::new(Some(get_x2_func), None))),
+            "get_y1" => Ok(PineRef::new(Callable::new(Some(get_y1_func), None))),
+            "get_y2" => Ok(PineRef::new(Callable::new(Some(get_y2_func), None))),
             _ => Err(RuntimeErr::NotImplement(str_replace(
                 NO_FIELD_IN_OBJECT,
                 vec![String::from(name), String::from("plot")],
@@ -252,9 +301,9 @@ pub fn declare_var<'a>() -> VarResult<'a> {
         "new",
         SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType::new((
             vec![
-                ("x1", SyntaxType::float_series()),
+                ("x1", SyntaxType::int_series()),
                 ("y1", SyntaxType::float_series()),
-                ("x2", SyntaxType::float_series()),
+                ("x2", SyntaxType::int_series()),
                 ("y2", SyntaxType::float_series()),
                 ("xloc", SyntaxType::string_series()),
                 ("extend", SyntaxType::string_series()),
@@ -263,6 +312,34 @@ pub fn declare_var<'a>() -> VarResult<'a> {
                 ("width", SyntaxType::float_series()),
             ],
             SyntaxType::ObjectClass("line"),
+        ))]))),
+    );
+    obj_type.insert(
+        "get_x1",
+        SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType::new((
+            vec![("id", SyntaxType::ObjectClass("line"))],
+            SyntaxType::int_series(),
+        ))]))),
+    );
+    obj_type.insert(
+        "get_x2",
+        SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType::new((
+            vec![("id", SyntaxType::ObjectClass("line"))],
+            SyntaxType::int_series(),
+        ))]))),
+    );
+    obj_type.insert(
+        "get_y1",
+        SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType::new((
+            vec![("id", SyntaxType::ObjectClass("line"))],
+            SyntaxType::float_series(),
+        ))]))),
+    );
+    obj_type.insert(
+        "get_y2",
+        SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType::new((
+            vec![("id", SyntaxType::ObjectClass("line"))],
+            SyntaxType::float_series(),
         ))]))),
     );
     let syntax_type = SyntaxType::ObjectFunction(Rc::new(obj_type), Rc::new(func_type));
@@ -337,15 +414,15 @@ mod tests {
             Series::implicity_from(result).unwrap(),
             RefData::new(Series::from_vec(vec![
                 Rc::new(RefCell::new(Some(PerLine::new_xy(
-                    Some(1f64),
+                    Some(1i64),
                     Some(2f64),
-                    Some(3f64),
+                    Some(3i64),
                     Some(4f64)
                 )))),
                 Rc::new(RefCell::new(Some(PerLine::new_xy(
-                    Some(1f64),
+                    Some(1i64),
                     Some(2f64),
-                    Some(3f64),
+                    Some(3i64),
                     Some(4f64)
                 ))))
             ]))
@@ -374,12 +451,52 @@ mod tests {
             RefData::new(Series::from_vec(vec![
                 Rc::new(RefCell::new(None)),
                 Rc::new(RefCell::new(Some(PerLine::new_xy(
-                    Some(1f64),
+                    Some(1i64),
                     Some(2f64),
-                    Some(3f64),
+                    Some(3i64),
                     Some(4f64)
                 ))))
             ]))
+        );
+    }
+
+    #[test]
+    fn line_get_test() {
+        use crate::ast::stat_expr_types::VarIndex;
+
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+        );
+        let src = r"
+        x = line.new(1, 2, 3, 4)
+        x1 = line.get_x1(x)
+        x2 = line.get_x2(x)
+        y1 = line.get_y1(x)
+        y2 = line.get_y2(x)
+        ";
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        runner.runl(&vec![], 2, None).unwrap();
+
+        assert_eq!(runner.get_context().get_shapes().len(), 1);
+
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(1, 0)),
+            Some(PineRef::new(Series::from_vec(vec![Some(1i64), Some(1i64)])))
+        );
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(2, 0)),
+            Some(PineRef::new(Series::from_vec(vec![Some(3i64), Some(3i64)])))
+        );
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(3, 0)),
+            Some(PineRef::new(Series::from_vec(vec![Some(2f64), Some(2f64)])))
+        );
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(4, 0)),
+            Some(PineRef::new(Series::from_vec(vec![Some(4f64), Some(4f64)])))
         );
     }
 }

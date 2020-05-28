@@ -155,6 +155,10 @@ pub fn process_assign_val<'a>(
                 use crate::libs::line::PerLineItem;
                 update_series::<PerLineItem>(context, index, current_val, true_val)
             }
+            ((FirstType::Label, SecondType::Series), _) => {
+                use crate::libs::label::PerLabelItem;
+                update_series::<PerLabelItem>(context, index, current_val, true_val)
+            }
             ((_, SecondType::Series), _) | (_, (_, SecondType::Series)) => {
                 // Err(RuntimeErr::TypeMismatch(format!(
                 //     "Series type can only be Int, Float, Bool, Color, String, but get {:?}",
@@ -398,6 +402,10 @@ impl<'a> Runner<'a> for VarAssignment<'a> {
             (FirstType::Line, _) => {
                 use crate::libs::line::PerLineItem;
                 update_series_range::<PerLineItem>(ctx_instance, index, exist_val, val, self.range)
+            }
+            (FirstType::Label, _) => {
+                use crate::libs::label::PerLabelItem;
+                update_series_range::<PerLabelItem>(ctx_instance, index, exist_val, val, self.range)
             }
             _ => Err(PineRuntimeError::new(
                 RuntimeErr::NotSupportOperator,

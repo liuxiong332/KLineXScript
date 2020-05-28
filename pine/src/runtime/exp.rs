@@ -349,6 +349,10 @@ impl<'a> Runner<'a> for RefCall<'a> {
                 use crate::libs::line::PerLineItem;
                 get_slice::<PerLineItem>(var, arg)
             }
+            (FirstType::Label, _) => {
+                use crate::libs::label::PerLabelItem;
+                get_slice::<PerLabelItem>(var, arg)
+            }
             _ => Err(RuntimeErr::NotSupportOperator),
         };
         match result {

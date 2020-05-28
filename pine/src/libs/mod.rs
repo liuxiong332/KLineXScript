@@ -32,6 +32,7 @@ pub mod iff;
 pub mod input;
 pub mod kc;
 pub mod kcw;
+pub mod label;
 pub mod line;
 pub mod lowest;
 pub mod lowestbars;

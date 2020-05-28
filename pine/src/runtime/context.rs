@@ -203,6 +203,10 @@ pub fn commit_series_for_operator<'a>(operator: &mut dyn VarOperate<'a>) {
                     use crate::libs::line::PerLineItem;
                     commit_series::<PerLineItem>(val)
                 }
+                (DataType::Label, SecondType::Series) => {
+                    use crate::libs::label::PerLabelItem;
+                    commit_series::<PerLabelItem>(val)
+                }
                 _ => val,
             };
             operator.update_var(index, ret_val);
@@ -230,6 +234,10 @@ pub fn rollback_series_for_operator<'a>(operator: &mut dyn VarOperate<'a>) {
                 (DataType::Line, SecondType::Series) => {
                     use crate::libs::line::PerLineItem;
                     roll_back_series::<PerLineItem>(val)
+                }
+                (DataType::Label, SecondType::Series) => {
+                    use crate::libs::label::PerLabelItem;
+                    roll_back_series::<PerLabelItem>(val)
                 }
                 _ => val,
             };
@@ -620,9 +628,12 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
                         .unwrap()
                         .commit()
                 }
-                // (DataType::Label, SecondType::Series) => {
-                //     Series::implicity_from(shape.clone()).unwrap().commit()
-                // }
+                (DataType::Label, SecondType::Series) => {
+                    use crate::libs::label::PerLabelItem;
+                    Series::<'a, PerLabelItem>::implicity_from(shape.clone())
+                        .unwrap()
+                        .commit()
+                }
                 _ => unreachable!(),
             }
         }
@@ -641,17 +652,19 @@ impl<'a, 'b, 'c> Context<'a, 'b, 'c> {
 
         // Roll back all of the shapes(Line, Label)
         for shape in self.reqcom_shapes.iter_mut() {
-            use crate::libs::line::PerLineItem;
-
             match shape.get_type() {
                 (DataType::Line, SecondType::Series) => {
+                    use crate::libs::line::PerLineItem;
                     Series::<'a, PerLineItem>::implicity_from(shape.clone())
                         .unwrap()
                         .roll_back()
                 }
-                // (DataType::Label, SecondType::Series) => {
-                //     Series::implicity_from(shape.clone()).unwrap().roll_back()
-                // }
+                (DataType::Label, SecondType::Series) => {
+                    use crate::libs::label::PerLabelItem;
+                    Series::<'a, PerLabelItem>::implicity_from(shape.clone())
+                        .unwrap()
+                        .roll_back()
+                }
                 _ => unreachable!(),
             }
         }

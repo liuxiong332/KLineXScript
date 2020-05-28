@@ -196,6 +196,7 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         tsi::declare_var(),
         stoch::declare_var(),
         // line::declare_var(),
+        // label::declare_var(),
         display::declare_var(),
     ];
     debug_assert!(

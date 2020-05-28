@@ -439,7 +439,7 @@ impl<'a> PineClass<'a> for PlotProps {
             "new" => Ok(PineRef::new(CallableFactory::new(|| {
                 Callable::new(None, Some(Box::new(LineFromNaVal::new())))
             }))),
-            // "delete" => Ok(PineRef::new(Callable::new(Some(delete_func), None))),
+            "delete" => Ok(PineRef::new(Callable::new(Some(delete_func), None))),
             // "get_x1" => Ok(PineRef::new(Callable::new(Some(get_x1_func), None))),
             // "get_x2" => Ok(PineRef::new(Callable::new(Some(get_x2_func), None))),
             // "get_y1" => Ok(PineRef::new(Callable::new(Some(get_y1_func), None))),
@@ -700,5 +700,35 @@ mod tests {
         let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
 
         runner.runl(&vec![], 2, None).unwrap();
+    }
+
+    #[test]
+    fn line_create_test() {
+        use crate::ast::stat_expr_types::VarIndex;
+
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+        );
+        let src = "x = label(na)\nx := label.new(1, 2)";
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        runner.runl(&vec![], 2, None).unwrap();
+
+        assert_eq!(runner.get_context().get_shapes().len(), 1);
+
+        let result = runner.get_context().move_var(VarIndex::new(0, 0)).unwrap();
+
+        let mut label = PerLabel::new();
+        label.x = Some(1i64);
+        label.y = Some(2f64);
+        assert_eq!(
+            Series::implicity_from(result).unwrap(),
+            RefData::new(Series::from_vec(vec![
+                Rc::new(RefCell::new(Some(label.clone()))),
+                Rc::new(RefCell::new(Some(label.clone()))),
+            ]))
+        );
     }
 }

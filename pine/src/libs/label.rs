@@ -24,23 +24,43 @@ pub type PerLabelItem = Rc<RefCell<Option<PerLabel>>>;
 
 #[derive(Clone, Copy, Debug)]
 pub enum StyleEnum {
-    Solid = 0,
-    Dotted = 1,
-    Dashed = 2,
-    ArrowLeft = 3,
-    ArrowRight = 4,
-    ArrowBoth = 5,
+    None = 0,
+    Xcross = 1,
+    Cross = 2,
+    Triangleup = 3,
+    Triangledown = 4,
+    Flag = 5,
+    Circle = 6,
+    Arrowup = 7,
+    Arrowdown = 8,
+    Labelup = 9,
+    Labeldown = 10,
+    Labelleft = 11,
+    Labelright = 12,
+    Labelcenter = 13,
+    Square = 14,
+    Diamond = 15,
 }
 
 impl StyleEnum {
     fn from_str(s: &str) -> Result<StyleEnum, RuntimeErr> {
         match s {
-            "solid" => Ok(StyleEnum::Solid),
-            "dotted" => Ok(StyleEnum::Dotted),
-            "dashed" => Ok(StyleEnum::Dashed),
-            "arrow_left" => Ok(StyleEnum::ArrowLeft),
-            "arrow_right" => Ok(StyleEnum::ArrowRight),
-            "arrow_both" => Ok(StyleEnum::ArrowBoth),
+            "none" => Ok(StyleEnum::None),
+            "xcross" => Ok(StyleEnum::Xcross),
+            "cross" => Ok(StyleEnum::Cross),
+            "triangleup" => Ok(StyleEnum::Triangleup),
+            "triangledown" => Ok(StyleEnum::Triangledown),
+            "flag" => Ok(StyleEnum::Flag),
+            "circle" => Ok(StyleEnum::Circle),
+            "arrowup" => Ok(StyleEnum::Arrowup),
+            "arrowdown" => Ok(StyleEnum::Arrowdown),
+            "labelup" => Ok(StyleEnum::Labelup),
+            "labeldown" => Ok(StyleEnum::Labeldown),
+            "labelleft" => Ok(StyleEnum::Labelleft),
+            "labelright" => Ok(StyleEnum::Labelright),
+            "labelcenter" => Ok(StyleEnum::Labelcenter),
+            "square" => Ok(StyleEnum::Square),
+            "diamond" => Ok(StyleEnum::Diamond),
             _ => Err(RuntimeErr::InvalidParameters(str_replace(
                 INVALID_VALS,
                 vec![String::from("style")],
@@ -50,34 +70,62 @@ impl StyleEnum {
 
     fn from_pf<'a>(s: Option<PineRef<'a>>) -> Result<StyleEnum, RuntimeErr> {
         match pine_ref_to_string(s) {
-            None => Ok(StyleEnum::Solid),
+            None => Ok(StyleEnum::None),
             Some(s) => StyleEnum::from_str(&s[..]),
         }
     }
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum LocEnum {
+pub enum XLocEnum {
     BarIndex = 0,
     BarTime = 1,
 }
 
-impl LocEnum {
-    fn from_str(s: &str, name: &str) -> Result<LocEnum, RuntimeErr> {
+impl XLocEnum {
+    fn from_str(s: &str) -> Result<XLocEnum, RuntimeErr> {
         match s {
-            "bar_index" => Ok(LocEnum::BarIndex),
-            "bar_time" => Ok(LocEnum::BarTime),
+            "bar_index" => Ok(XLocEnum::BarIndex),
+            "bar_time" => Ok(XLocEnum::BarTime),
             _ => Err(RuntimeErr::InvalidParameters(str_replace(
                 INVALID_VALS,
-                vec![String::from(name)],
+                vec![String::from("xloc")],
             ))),
         }
     }
 
-    fn from_pf<'a>(s: Option<PineRef<'a>>, name: &str) -> Result<LocEnum, RuntimeErr> {
+    fn from_pf<'a>(s: Option<PineRef<'a>>) -> Result<XLocEnum, RuntimeErr> {
         match pine_ref_to_string(s) {
-            None => Ok(LocEnum::BarIndex),
-            Some(s) => LocEnum::from_str(&s[..], name),
+            None => Ok(XLocEnum::BarIndex),
+            Some(s) => XLocEnum::from_str(&s[..]),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum YLocEnum {
+    Price = 0,
+    Abovebar = 1,
+    Belowbar = 2,
+}
+
+impl YLocEnum {
+    fn from_str(s: &str) -> Result<YLocEnum, RuntimeErr> {
+        match s {
+            "price" => Ok(YLocEnum::Price),
+            "abovebar" => Ok(YLocEnum::Abovebar),
+            "belowbar" => Ok(YLocEnum::Belowbar),
+            _ => Err(RuntimeErr::InvalidParameters(str_replace(
+                INVALID_VALS,
+                vec![String::from("yloc")],
+            ))),
+        }
+    }
+
+    fn from_pf<'a>(s: Option<PineRef<'a>>) -> Result<YLocEnum, RuntimeErr> {
+        match pine_ref_to_string(s) {
+            None => Ok(YLocEnum::Price),
+            Some(s) => YLocEnum::from_str(&s[..]),
         }
     }
 }
@@ -276,8 +324,8 @@ impl<'a> SeriesCall<'a> for LineFromNaVal<'a> {
                 x: pine_ref_to_i64(x),
                 y: pine_ref_to_f64(y),
                 text: pine_ref_to_string(text),
-                xloc: LocEnum::from_pf(xloc, "xloc")? as i32,
-                yloc: LocEnum::from_pf(yloc, "yloc")? as i32,
+                xloc: XLocEnum::from_pf(xloc)? as i32,
+                yloc: YLocEnum::from_pf(yloc)? as i32,
                 color: pine_ref_to_color(color),
                 style: StyleEnum::from_pf(style)? as i32,
                 textcolor: pine_ref_to_color(textcolor),
@@ -333,6 +381,17 @@ fn get_y_func<'a>(
 ) -> Result<PineRef<'a>, RuntimeErr> {
     get_val_func(_context, param, |v| v.y)
 }
+
+fn get_text_func<'a>(
+    _context: &mut dyn Ctx<'a>,
+    param: Vec<Option<PineRef<'a>>>,
+    _func_type: FunctionType<'a>,
+) -> Result<PineRef<'a>, RuntimeErr> {
+    get_val_func(_context, param, |v| {
+        v.text.clone().unwrap_or(String::from(""))
+    })
+}
+
 fn set_val_func<'a>(
     _context: &mut dyn Ctx<'a>,
     mut param: Vec<Option<PineRef<'a>>>,
@@ -380,6 +439,18 @@ fn set_color_func<'a>(
         Ok(())
     })
 }
+
+fn set_size_func<'a>(
+    _context: &mut dyn Ctx<'a>,
+    param: Vec<Option<PineRef<'a>>>,
+    _func_type: FunctionType<'a>,
+) -> Result<PineRef<'a>, RuntimeErr> {
+    set_val_func(_context, param, |l, v| {
+        l.size = SizeEnum::from_pf(v)? as i32;
+        Ok(())
+    })
+}
+
 fn set_style_func<'a>(
     _context: &mut dyn Ctx<'a>,
     param: Vec<Option<PineRef<'a>>>,
@@ -390,26 +461,67 @@ fn set_style_func<'a>(
         Ok(())
     })
 }
-// fn set_xloc_func<'a>(
-//     _context: &mut dyn Ctx<'a>,
-//     mut param: Vec<Option<PineRef<'a>>>,
-//     _func_type: FunctionType<'a>,
-// ) -> Result<PineRef<'a>, RuntimeErr> {
-//     move_tuplet!((id, x1, x2, xloc) = param);
-//     let label = pine_ref_to_label(id);
 
-//     if label.borrow_mut().is_none() {
-//         *label.borrow_mut() = Some(PerLabel::new());
-//     }
-//     let mut li = label.borrow_mut();
-//     li.as_mut().unwrap().x1 = pine_ref_to_i64(x1);
-//     li.as_mut().unwrap().x2 = pine_ref_to_i64(x2);
-//     li.as_mut().unwrap().xloc = match pine_ref_to_string(xloc) {
-//         None => LocEnum::BarIndex as i32,
-//         Some(s) => LocEnum::from_str(&s[..])? as i32,
-//     };
-//     Ok(PineRef::new(NA))
-// }
+fn set_textalign_func<'a>(
+    _context: &mut dyn Ctx<'a>,
+    param: Vec<Option<PineRef<'a>>>,
+    _func_type: FunctionType<'a>,
+) -> Result<PineRef<'a>, RuntimeErr> {
+    set_val_func(_context, param, |l, v| {
+        l.textalign = TextAlignEnum::from_pf(v)? as i32;
+        Ok(())
+    })
+}
+
+fn set_text_func<'a>(
+    _context: &mut dyn Ctx<'a>,
+    param: Vec<Option<PineRef<'a>>>,
+    _func_type: FunctionType<'a>,
+) -> Result<PineRef<'a>, RuntimeErr> {
+    set_val_func(_context, param, |l, v| {
+        l.text = pine_ref_to_string(v);
+        Ok(())
+    })
+}
+
+fn set_textcolor_func<'a>(
+    _context: &mut dyn Ctx<'a>,
+    param: Vec<Option<PineRef<'a>>>,
+    _func_type: FunctionType<'a>,
+) -> Result<PineRef<'a>, RuntimeErr> {
+    set_val_func(_context, param, |l, v| {
+        l.textcolor = pine_ref_to_color(v);
+        Ok(())
+    })
+}
+
+fn set_xloc_func<'a>(
+    _context: &mut dyn Ctx<'a>,
+    mut param: Vec<Option<PineRef<'a>>>,
+    _func_type: FunctionType<'a>,
+) -> Result<PineRef<'a>, RuntimeErr> {
+    move_tuplet!((id, x, xloc) = param);
+    let label = pine_ref_to_label(id);
+
+    if label.borrow_mut().is_none() {
+        *label.borrow_mut() = Some(PerLabel::new());
+    }
+    let mut li = label.borrow_mut();
+    li.as_mut().unwrap().x = pine_ref_to_i64(x);
+    li.as_mut().unwrap().xloc = XLocEnum::from_pf(xloc)? as i32;
+    Ok(PineRef::new(NA))
+}
+
+fn set_yloc_func<'a>(
+    _context: &mut dyn Ctx<'a>,
+    param: Vec<Option<PineRef<'a>>>,
+    _func_type: FunctionType<'a>,
+) -> Result<PineRef<'a>, RuntimeErr> {
+    set_val_func(_context, param, |l, v| {
+        l.yloc = YLocEnum::from_pf(v)? as i32;
+        Ok(())
+    })
+}
 
 fn set_xy_func<'a>(
     _context: &mut dyn Ctx<'a>,
@@ -440,25 +552,20 @@ impl<'a> PineClass<'a> for PlotProps {
                 Callable::new(None, Some(Box::new(LineFromNaVal::new())))
             }))),
             "delete" => Ok(PineRef::new(Callable::new(Some(delete_func), None))),
-            // "get_x1" => Ok(PineRef::new(Callable::new(Some(get_x1_func), None))),
-            // "get_x2" => Ok(PineRef::new(Callable::new(Some(get_x2_func), None))),
-            // "get_y1" => Ok(PineRef::new(Callable::new(Some(get_y1_func), None))),
-            // "get_y2" => Ok(PineRef::new(Callable::new(Some(get_y2_func), None))),
-            // "set_x1" => Ok(PineRef::new(Callable::new(Some(set_x1_func), None))),
-            // "set_x2" => Ok(PineRef::new(Callable::new(Some(set_x2_func), None))),
-            // "set_y1" => Ok(PineRef::new(Callable::new(Some(set_y1_func), None))),
-            // "set_y2" => Ok(PineRef::new(Callable::new(Some(set_y2_func), None))),
-            // "set_color" => Ok(PineRef::new(Callable::new(Some(set_color_func), None))),
-            // "set_extend" => Ok(PineRef::new(Callable::new(Some(set_extend_func), None))),
-            // "set_style" => Ok(PineRef::new(Callable::new(Some(set_style_func), None))),
-            // "set_width" => Ok(PineRef::new(Callable::new(Some(set_width_func), None))),
-            // "set_x1" => Ok(PineRef::new(Callable::new(Some(set_x1_func), None))),
-            // "set_x2" => Ok(PineRef::new(Callable::new(Some(set_x2_func), None))),
-            // "set_y1" => Ok(PineRef::new(Callable::new(Some(set_y1_func), None))),
-            // "set_y2" => Ok(PineRef::new(Callable::new(Some(set_y2_func), None))),
-            // "set_xloc" => Ok(PineRef::new(Callable::new(Some(set_xloc_func), None))),
-            // "set_xy1" => Ok(PineRef::new(Callable::new(Some(set_xy1_func), None))),
-            // "set_xy2" => Ok(PineRef::new(Callable::new(Some(set_xy2_func), None))),
+            "get_x" => Ok(PineRef::new(Callable::new(Some(get_x_func), None))),
+            "get_y" => Ok(PineRef::new(Callable::new(Some(get_y_func), None))),
+            "get_text" => Ok(PineRef::new(Callable::new(Some(get_text_func), None))),
+            "set_x" => Ok(PineRef::new(Callable::new(Some(set_x_func), None))),
+            "set_y" => Ok(PineRef::new(Callable::new(Some(set_y_func), None))),
+            "set_xy" => Ok(PineRef::new(Callable::new(Some(set_xy_func), None))),
+            "set_color" => Ok(PineRef::new(Callable::new(Some(set_color_func), None))),
+            "set_size" => Ok(PineRef::new(Callable::new(Some(set_size_func), None))),
+            "set_style" => Ok(PineRef::new(Callable::new(Some(set_style_func), None))),
+            "set_text" => Ok(PineRef::new(Callable::new(Some(set_text_func), None))),
+            "set_textalign" => Ok(PineRef::new(Callable::new(Some(set_textalign_func), None))),
+            "set_textcolor" => Ok(PineRef::new(Callable::new(Some(set_textcolor_func), None))),
+            "set_xloc" => Ok(PineRef::new(Callable::new(Some(set_xloc_func), None))),
+            "set_yloc" => Ok(PineRef::new(Callable::new(Some(set_yloc_func), None))),
             _ => Err(RuntimeErr::NotImplement(str_replace(
                 NO_FIELD_IN_OBJECT,
                 vec![String::from(name), String::from("plot")],
@@ -510,31 +617,56 @@ pub fn declare_var<'a>() -> VarResult<'a> {
         ))]))),
     );
     obj_type.insert(
-        "get_x1",
+        "get_x",
         SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType::new((
             vec![("id", SyntaxType::ObjectClass("label"))],
             SyntaxType::int_series(),
         ))]))),
     );
     obj_type.insert(
-        "get_x2",
-        SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType::new((
-            vec![("id", SyntaxType::ObjectClass("label"))],
-            SyntaxType::int_series(),
-        ))]))),
-    );
-    obj_type.insert(
-        "get_y1",
+        "get_y",
         SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType::new((
             vec![("id", SyntaxType::ObjectClass("label"))],
             SyntaxType::float_series(),
         ))]))),
     );
     obj_type.insert(
-        "get_y2",
+        "get_text",
         SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType::new((
             vec![("id", SyntaxType::ObjectClass("label"))],
-            SyntaxType::float_series(),
+            SyntaxType::string_series(),
+        ))]))),
+    );
+
+    obj_type.insert(
+        "set_x",
+        SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType::new((
+            vec![
+                ("id", SyntaxType::ObjectClass("label")),
+                ("x", SyntaxType::int_series()),
+            ],
+            SyntaxType::Void,
+        ))]))),
+    );
+    obj_type.insert(
+        "set_y",
+        SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType::new((
+            vec![
+                ("id", SyntaxType::ObjectClass("label")),
+                ("x", SyntaxType::float_series()),
+            ],
+            SyntaxType::Void,
+        ))]))),
+    );
+    obj_type.insert(
+        "set_xy",
+        SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType::new((
+            vec![
+                ("id", SyntaxType::ObjectClass("label")),
+                ("x", SyntaxType::int_series()),
+                ("y", SyntaxType::float_series()),
+            ],
+            SyntaxType::Void,
         ))]))),
     );
     obj_type.insert(
@@ -548,11 +680,11 @@ pub fn declare_var<'a>() -> VarResult<'a> {
         ))]))),
     );
     obj_type.insert(
-        "set_extend",
+        "set_size",
         SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType::new((
             vec![
                 ("id", SyntaxType::ObjectClass("label")),
-                ("extend", SyntaxType::string_series()),
+                ("size", SyntaxType::string_series()),
             ],
             SyntaxType::Void,
         ))]))),
@@ -562,57 +694,37 @@ pub fn declare_var<'a>() -> VarResult<'a> {
         SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType::new((
             vec![
                 ("id", SyntaxType::ObjectClass("label")),
-                ("extend", SyntaxType::string_series()),
+                ("style", SyntaxType::string_series()),
             ],
             SyntaxType::Void,
         ))]))),
     );
     obj_type.insert(
-        "set_width",
+        "set_text",
         SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType::new((
             vec![
                 ("id", SyntaxType::ObjectClass("label")),
-                ("extend", SyntaxType::int_series()),
+                ("text", SyntaxType::string_series()),
             ],
             SyntaxType::Void,
         ))]))),
     );
     obj_type.insert(
-        "set_x1",
+        "set_textalign",
         SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType::new((
             vec![
                 ("id", SyntaxType::ObjectClass("label")),
-                ("x", SyntaxType::int_series()),
+                ("textalign", SyntaxType::string_series()),
             ],
             SyntaxType::Void,
         ))]))),
     );
     obj_type.insert(
-        "set_x2",
+        "set_textcolor",
         SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType::new((
             vec![
                 ("id", SyntaxType::ObjectClass("label")),
-                ("x", SyntaxType::int_series()),
-            ],
-            SyntaxType::Void,
-        ))]))),
-    );
-    obj_type.insert(
-        "set_y1",
-        SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType::new((
-            vec![
-                ("id", SyntaxType::ObjectClass("label")),
-                ("y", SyntaxType::float_series()),
-            ],
-            SyntaxType::Void,
-        ))]))),
-    );
-    obj_type.insert(
-        "set_y2",
-        SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType::new((
-            vec![
-                ("id", SyntaxType::ObjectClass("label")),
-                ("y", SyntaxType::float_series()),
+                ("textcolor", SyntaxType::color_series()),
             ],
             SyntaxType::Void,
         ))]))),
@@ -622,31 +734,18 @@ pub fn declare_var<'a>() -> VarResult<'a> {
         SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType::new((
             vec![
                 ("id", SyntaxType::ObjectClass("label")),
-                ("x1", SyntaxType::int_series()),
-                ("x2", SyntaxType::int_series()),
+                ("x", SyntaxType::int_series()),
                 ("xloc", SyntaxType::string_series()),
             ],
             SyntaxType::Void,
         ))]))),
     );
     obj_type.insert(
-        "set_xy1",
+        "set_yloc",
         SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType::new((
             vec![
                 ("id", SyntaxType::ObjectClass("label")),
-                ("x", SyntaxType::int_series()),
-                ("y", SyntaxType::float_series()),
-            ],
-            SyntaxType::Void,
-        ))]))),
-    );
-    obj_type.insert(
-        "set_xy2",
-        SyntaxType::Function(Rc::new(FunctionTypes(vec![FunctionType::new((
-            vec![
-                ("id", SyntaxType::ObjectClass("label")),
-                ("x", SyntaxType::int_series()),
-                ("y", SyntaxType::float_series()),
+                ("yloc", SyntaxType::string_series()),
             ],
             SyntaxType::Void,
         ))]))),
@@ -703,7 +802,7 @@ mod tests {
     }
 
     #[test]
-    fn line_create_test() {
+    fn label_create_test() {
         use crate::ast::stat_expr_types::VarIndex;
 
         let lib_info = LibInfo::new(
@@ -728,6 +827,176 @@ mod tests {
             RefData::new(Series::from_vec(vec![
                 Rc::new(RefCell::new(Some(label.clone()))),
                 Rc::new(RefCell::new(Some(label.clone()))),
+            ]))
+        );
+    }
+
+    #[test]
+    fn label_delete_test() {
+        use crate::ast::stat_expr_types::VarIndex;
+
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+        );
+        let src = "x = label(na)\nx := label.new(1, 2)\nlabel.delete(x[1])";
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        runner.runl(&vec![], 2, None).unwrap();
+
+        assert_eq!(runner.get_context().get_shapes().len(), 1);
+
+        let result = runner.get_context().move_var(VarIndex::new(0, 0)).unwrap();
+        let mut label = PerLabel::new();
+        label.x = Some(1i64);
+        label.y = Some(2f64);
+        assert_eq!(
+            Series::implicity_from(result).unwrap(),
+            RefData::new(Series::from_vec(vec![
+                Rc::new(RefCell::new(None)),
+                Rc::new(RefCell::new(Some(label)))
+            ]))
+        );
+    }
+
+    #[test]
+    fn label_get_test() {
+        use crate::ast::stat_expr_types::VarIndex;
+
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+        );
+        let src = r#"
+        x = label.new(1, 2, "hello")
+        x1 = label.get_x(x)
+        x2 = label.get_y(x)
+        x3 = label.get_text(x)
+        "#;
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        runner.runl(&vec![], 2, None).unwrap();
+
+        assert_eq!(runner.get_context().get_shapes().len(), 1);
+
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(1, 0)),
+            Some(PineRef::new(Series::from_vec(vec![Some(1i64), Some(1i64)])))
+        );
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(2, 0)),
+            Some(PineRef::new(Series::from_vec(vec![Some(2f64), Some(2f64)])))
+        );
+        assert_eq!(
+            runner.get_context().move_var(VarIndex::new(3, 0)),
+            Some(PineRef::new(Series::from_vec(vec![
+                String::from("hello"),
+                String::from("hello"),
+            ])))
+        );
+    }
+
+    #[test]
+    fn label_set_test() {
+        use crate::ast::stat_expr_types::VarIndex;
+
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+        );
+        let src = r#"
+        x = label.new(1, 2)
+        label.set_x(x, int(close))
+        label.set_y(x, close + 10)
+        label.set_color(x, #ffffff)
+        label.set_size(x, "auto")
+        label.set_style(x, "none")
+        label.set_text(x, "hello")
+        label.set_textalign(x, "left")
+        label.set_textcolor(x, #111111)
+        "#;
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        runner
+            .run(
+                &vec![(
+                    "close",
+                    AnySeries::from_float_vec(vec![Some(1f64), Some(2f64)]),
+                )],
+                None,
+            )
+            .unwrap();
+        assert_eq!(runner.get_context().get_shapes().len(), 1);
+
+        let result = runner.get_context().move_var(VarIndex::new(0, 0)).unwrap();
+
+        let mut label1 = PerLabel::new();
+        label1.x = Some(1i64);
+        label1.y = Some(11f64);
+        label1.text = Some(String::from("hello"));
+        label1.color = Some(String::from("#ffffff"));
+        label1.size = 0;
+        label1.style = 0;
+        label1.textalign = 0;
+        label1.textcolor = Some(String::from("#111111"));
+
+        let mut label2 = label1.clone();
+        label2.x = Some(2i64);
+        label2.y = Some(12f64);
+
+        assert_eq!(
+            Series::implicity_from(result).unwrap(),
+            RefData::new(Series::from_vec(vec![
+                Rc::new(RefCell::new(Some(label1))),
+                Rc::new(RefCell::new(Some(label2)))
+            ]))
+        );
+    }
+
+    #[test]
+    fn label_set2_test() {
+        use crate::ast::stat_expr_types::VarIndex;
+
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![("close", SyntaxType::Series(SimpleSyntaxType::Float))],
+        );
+        let src = r#"
+        x = label.new(1, 2)
+        label.set_xy(x, 3, 4)
+        label.set_xloc(x, 8, "bar_time")
+        label.set_yloc(x, "abovebar")
+        "#;
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        runner
+            .run(
+                &vec![(
+                    "close",
+                    AnySeries::from_float_vec(vec![Some(1f64), Some(2f64)]),
+                )],
+                None,
+            )
+            .unwrap();
+        assert_eq!(runner.get_context().get_shapes().len(), 1);
+
+        let result = runner.get_context().move_var(VarIndex::new(0, 0)).unwrap();
+
+        let mut label1 = PerLabel::new();
+        label1.x = Some(8i64);
+        label1.y = Some(4f64);
+        label1.xloc = XLocEnum::BarTime as i32;
+        label1.yloc = YLocEnum::Abovebar as i32;
+
+        assert_eq!(
+            Series::implicity_from(result).unwrap(),
+            RefData::new(Series::from_vec(vec![
+                Rc::new(RefCell::new(Some(label1.clone()))),
+                Rc::new(RefCell::new(Some(label1.clone())))
             ]))
         );
     }

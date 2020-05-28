@@ -23,6 +23,23 @@ use std::rc::Rc;
 
 pub type PerLabelItem = Rc<RefCell<Option<PerLabel>>>;
 
+const LABEL_STYLE_NONE: &'static str = "none";
+const LABEL_STYLE_XCROSS: &'static str = "xcross";
+const LABEL_STYLE_CROSS: &'static str = "cross";
+const LABEL_STYLE_TRIANGLEUP: &'static str = "triangleup";
+const LABEL_STYLE_TRIANGLEDOWN: &'static str = "triangledown";
+const LABEL_STYLE_FLAG: &'static str = "flag";
+const LABEL_STYLE_CIRCLE: &'static str = "circle";
+const LABEL_STYLE_ARROWUP: &'static str = "arrowup";
+const LABEL_STYLE_ARROWDOWN: &'static str = "arrowdown";
+const LABEL_STYLE_LABELUP: &'static str = "labelup";
+const LABEL_STYLE_LABELDOWN: &'static str = "labeldown";
+const LABEL_STYLE_LABELLEFT: &'static str = "labelleft";
+const LABEL_STYLE_LABELRIGHT: &'static str = "labelright";
+const LABEL_STYLE_LABELCENTER: &'static str = "labelcenter";
+const LABEL_STYLE_SQUARE: &'static str = "square";
+const LABEL_STYLE_DIAMOND: &'static str = "diamond";
+
 #[derive(Clone, Copy, Debug)]
 pub enum StyleEnum {
     None = 0,
@@ -46,22 +63,22 @@ pub enum StyleEnum {
 impl StyleEnum {
     fn from_str(s: &str) -> Result<StyleEnum, RuntimeErr> {
         match s {
-            "none" => Ok(StyleEnum::None),
-            "xcross" => Ok(StyleEnum::Xcross),
-            "cross" => Ok(StyleEnum::Cross),
-            "triangleup" => Ok(StyleEnum::Triangleup),
-            "triangledown" => Ok(StyleEnum::Triangledown),
-            "flag" => Ok(StyleEnum::Flag),
-            "circle" => Ok(StyleEnum::Circle),
-            "arrowup" => Ok(StyleEnum::Arrowup),
-            "arrowdown" => Ok(StyleEnum::Arrowdown),
-            "labelup" => Ok(StyleEnum::Labelup),
-            "labeldown" => Ok(StyleEnum::Labeldown),
-            "labelleft" => Ok(StyleEnum::Labelleft),
-            "labelright" => Ok(StyleEnum::Labelright),
-            "labelcenter" => Ok(StyleEnum::Labelcenter),
-            "square" => Ok(StyleEnum::Square),
-            "diamond" => Ok(StyleEnum::Diamond),
+            LABEL_STYLE_NONE => Ok(StyleEnum::None),
+            LABEL_STYLE_XCROSS => Ok(StyleEnum::Xcross),
+            LABEL_STYLE_CROSS => Ok(StyleEnum::Cross),
+            LABEL_STYLE_TRIANGLEUP => Ok(StyleEnum::Triangleup),
+            LABEL_STYLE_TRIANGLEDOWN => Ok(StyleEnum::Triangledown),
+            LABEL_STYLE_FLAG => Ok(StyleEnum::Flag),
+            LABEL_STYLE_CIRCLE => Ok(StyleEnum::Circle),
+            LABEL_STYLE_ARROWUP => Ok(StyleEnum::Arrowup),
+            LABEL_STYLE_ARROWDOWN => Ok(StyleEnum::Arrowdown),
+            LABEL_STYLE_LABELUP => Ok(StyleEnum::Labelup),
+            LABEL_STYLE_LABELDOWN => Ok(StyleEnum::Labeldown),
+            LABEL_STYLE_LABELLEFT => Ok(StyleEnum::Labelleft),
+            LABEL_STYLE_LABELRIGHT => Ok(StyleEnum::Labelright),
+            LABEL_STYLE_LABELCENTER => Ok(StyleEnum::Labelcenter),
+            LABEL_STYLE_SQUARE => Ok(StyleEnum::Square),
+            LABEL_STYLE_DIAMOND => Ok(StyleEnum::Diamond),
             _ => Err(RuntimeErr::InvalidParameters(str_replace(
                 INVALID_VALS,
                 vec![String::from("style")],
@@ -567,6 +584,23 @@ impl<'a> PineClass<'a> for PlotProps {
             "set_textcolor" => Ok(PineRef::new(Callable::new(Some(set_textcolor_func), None))),
             "set_xloc" => Ok(PineRef::new(Callable::new(Some(set_xloc_func), None))),
             "set_yloc" => Ok(PineRef::new(Callable::new(Some(set_yloc_func), None))),
+
+            "style_none" => Ok(PineRef::new(String::from(LABEL_STYLE_NONE))),
+            "style_arrowdown" => Ok(PineRef::new(String::from(LABEL_STYLE_ARROWDOWN))),
+            "style_arrowup" => Ok(PineRef::new(String::from(LABEL_STYLE_ARROWUP))),
+            "style_circle" => Ok(PineRef::new(String::from(LABEL_STYLE_CIRCLE))),
+            "style_cross" => Ok(PineRef::new(String::from(LABEL_STYLE_CROSS))),
+            "style_diamond" => Ok(PineRef::new(String::from(LABEL_STYLE_DIAMOND))),
+            "style_flag" => Ok(PineRef::new(String::from(LABEL_STYLE_FLAG))),
+            "style_label_center" => Ok(PineRef::new(String::from(LABEL_STYLE_LABELCENTER))),
+            "style_label_down" => Ok(PineRef::new(String::from(LABEL_STYLE_LABELDOWN))),
+            "style_label_left" => Ok(PineRef::new(String::from(LABEL_STYLE_LABELLEFT))),
+            "style_label_right" => Ok(PineRef::new(String::from(LABEL_STYLE_LABELRIGHT))),
+            "style_label_up" => Ok(PineRef::new(String::from(LABEL_STYLE_LABELRIGHT))),
+            "style_square" => Ok(PineRef::new(String::from(LABEL_STYLE_SQUARE))),
+            "style_triangledown" => Ok(PineRef::new(String::from(LABEL_STYLE_TRIANGLEDOWN))),
+            "style_triangleup" => Ok(PineRef::new(String::from(LABEL_STYLE_TRIANGLEUP))),
+            "style_xcross" => Ok(PineRef::new(String::from(LABEL_STYLE_XCROSS))),
             _ => Err(RuntimeErr::NotImplement(str_replace(
                 NO_FIELD_IN_OBJECT,
                 vec![String::from(name), String::from("plot")],
@@ -751,6 +785,23 @@ pub fn declare_var<'a>() -> VarResult<'a> {
             SyntaxType::Void,
         ))]))),
     );
+
+    obj_type.insert("style_none", SyntaxType::string());
+    obj_type.insert("style_arrowdown", SyntaxType::string());
+    obj_type.insert("style_arrowup", SyntaxType::string());
+    obj_type.insert("style_circle", SyntaxType::string());
+    obj_type.insert("style_cross", SyntaxType::string());
+    obj_type.insert("style_diamond", SyntaxType::string());
+    obj_type.insert("style_flag", SyntaxType::string());
+    obj_type.insert("style_label_center", SyntaxType::string());
+    obj_type.insert("style_label_down", SyntaxType::string());
+    obj_type.insert("style_label_left", SyntaxType::string());
+    obj_type.insert("style_label_right", SyntaxType::string());
+    obj_type.insert("style_label_up", SyntaxType::string());
+    obj_type.insert("style_square", SyntaxType::string());
+    obj_type.insert("style_triangledown", SyntaxType::string());
+    obj_type.insert("style_triangleup", SyntaxType::string());
+    obj_type.insert("style_xcross", SyntaxType::string());
     let syntax_type = SyntaxType::ObjectFunction(Rc::new(obj_type), Rc::new(func_type));
     VarResult::new(value, syntax_type, VAR_NAME)
 }
@@ -999,6 +1050,60 @@ mod tests {
                 Rc::new(RefCell::new(Some(label1.clone()))),
                 Rc::new(RefCell::new(Some(label1.clone())))
             ]))
+        );
+    }
+
+    #[test]
+    fn label_style_test() {
+        use crate::ast::stat_expr_types::VarIndex;
+        use crate::runtime::VarOperate;
+        use crate::types::{downcast_pf, Tuple};
+
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![("close", SyntaxType::float_series())],
+        );
+        let src = r"m = [
+            label.style_none, label.style_arrowdown, label.style_arrowup, label.style_circle,
+            label.style_cross, label.style_diamond, label.style_flag, label.style_label_center,
+            label.style_label_down, label.style_label_left, label.style_label_right, label.style_label_up,
+            label.style_square, label.style_triangledown, label.style_triangleup, label.style_xcross,
+        ]";
+
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        runner
+            .run(
+                &vec![("close", AnySeries::from_float_vec(vec![Some(1f64)]))],
+                None,
+            )
+            .unwrap();
+        let tuple_res =
+            downcast_pf::<Tuple>(runner.get_context().move_var(VarIndex::new(0, 0)).unwrap());
+        let tuple_vec = tuple_res.unwrap().into_inner().0;
+        assert_eq!(
+            tuple_vec,
+            vec![
+                "none",
+                "arrowdown",
+                "arrowup",
+                "circle",
+                "cross",
+                "diamond",
+                "flag",
+                "labelcenter",
+                "labeldown",
+                "labelleft",
+                "labelright",
+                "labelup",
+                "square",
+                "triangledown",
+                "triangleup",
+                "xcross"
+            ]
+            .map(|s| PineRef::new_rc(String::from(s)))
+            .collect()
         );
     }
 }

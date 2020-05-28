@@ -65,7 +65,9 @@ pub mod timestamp;
 pub mod tr;
 pub mod tsi;
 pub mod vwma;
+pub mod xloc;
 pub mod year;
+pub mod yloc;
 
 use crate::ast::syntax_type::SyntaxType;
 use crate::types::PineRef;
@@ -197,6 +199,8 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         stoch::declare_var(),
         // line::declare_var(),
         // label::declare_var(),
+        // xloc::declare_var(),
+        // yloc::declare_var(),
         display::declare_var(),
     ];
     debug_assert!(

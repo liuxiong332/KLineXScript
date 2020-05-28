@@ -1,3 +1,4 @@
+use super::xloc::*;
 use super::VarResult;
 use crate::ast::syntax_type::{FunctionType, FunctionTypes, SimpleSyntaxType, SyntaxType};
 use crate::helper::err_msgs::*;
@@ -81,8 +82,8 @@ pub enum XlocEnum {
 impl XlocEnum {
     fn from_str(s: &str) -> Result<XlocEnum, RuntimeErr> {
         match s {
-            "bar_index" => Ok(XlocEnum::BarIndex),
-            "bar_time" => Ok(XlocEnum::BarTime),
+            XLOC_BAR_INDEX => Ok(XlocEnum::BarIndex),
+            XLOC_BAR_TIME => Ok(XlocEnum::BarTime),
             _ => Err(RuntimeErr::InvalidParameters(str_replace(
                 INVALID_VALS,
                 vec![String::from("xloc")],

@@ -23,6 +23,13 @@ use std::rc::Rc;
 
 pub type PerLineItem = Rc<RefCell<Option<PerLine>>>;
 
+const LINE_STYLE_SOLID: &'static str = "solid";
+const LINE_STYLE_DOTTED: &'static str = "dotted";
+const LINE_STYLE_DASHED: &'static str = "dashed";
+const LINE_STYLE_ARROWLEFT: &'static str = "arrow_left";
+const LINE_STYLE_ARROWRIGHT: &'static str = "arrow_right";
+const LINE_STYLE_ARROWBOTH: &'static str = "arrow_both";
+
 #[derive(Clone, Copy, Debug)]
 pub enum ExtendEnum {
     None = 0,
@@ -59,12 +66,12 @@ pub enum StyleEnum {
 impl StyleEnum {
     fn from_str(s: &str) -> Result<StyleEnum, RuntimeErr> {
         match s {
-            "solid" => Ok(StyleEnum::Solid),
-            "dotted" => Ok(StyleEnum::Dotted),
-            "dashed" => Ok(StyleEnum::Dashed),
-            "arrow_left" => Ok(StyleEnum::ArrowLeft),
-            "arrow_right" => Ok(StyleEnum::ArrowRight),
-            "arrow_both" => Ok(StyleEnum::ArrowBoth),
+            LINE_STYLE_SOLID => Ok(StyleEnum::Solid),
+            LINE_STYLE_DOTTED => Ok(StyleEnum::Dotted),
+            LINE_STYLE_DASHED => Ok(StyleEnum::Dashed),
+            LINE_STYLE_ARROWLEFT => Ok(StyleEnum::ArrowLeft),
+            LINE_STYLE_ARROWRIGHT => Ok(StyleEnum::ArrowRight),
+            LINE_STYLE_ARROWBOTH => Ok(StyleEnum::ArrowBoth),
             _ => Err(RuntimeErr::InvalidParameters(str_replace(
                 INVALID_VALS,
                 vec![String::from("style")],
@@ -510,16 +517,19 @@ impl<'a> PineClass<'a> for PlotProps {
             "set_extend" => Ok(PineRef::new(Callable::new(Some(set_extend_func), None))),
             "set_style" => Ok(PineRef::new(Callable::new(Some(set_style_func), None))),
             "set_width" => Ok(PineRef::new(Callable::new(Some(set_width_func), None))),
-            "set_x1" => Ok(PineRef::new(Callable::new(Some(set_x1_func), None))),
-            "set_x2" => Ok(PineRef::new(Callable::new(Some(set_x2_func), None))),
-            "set_y1" => Ok(PineRef::new(Callable::new(Some(set_y1_func), None))),
-            "set_y2" => Ok(PineRef::new(Callable::new(Some(set_y2_func), None))),
             "set_xloc" => Ok(PineRef::new(Callable::new(Some(set_xloc_func), None))),
             "set_xy1" => Ok(PineRef::new(Callable::new(Some(set_xy1_func), None))),
             "set_xy2" => Ok(PineRef::new(Callable::new(Some(set_xy2_func), None))),
+
+            "style_arrow_both" => Ok(PineRef::new(String::from(LINE_STYLE_ARROWBOTH))),
+            "style_arrow_left" => Ok(PineRef::new(String::from(LINE_STYLE_ARROWLEFT))),
+            "style_arrow_right" => Ok(PineRef::new(String::from(LINE_STYLE_ARROWRIGHT))),
+            "style_dashed" => Ok(PineRef::new(String::from(LINE_STYLE_DASHED))),
+            "style_dotted" => Ok(PineRef::new(String::from(LINE_STYLE_DOTTED))),
+            "style_solid" => Ok(PineRef::new(String::from(LINE_STYLE_SOLID))),
             _ => Err(RuntimeErr::NotImplement(str_replace(
                 NO_FIELD_IN_OBJECT,
-                vec![String::from(name), String::from("plot")],
+                vec![String::from(name), String::from("line")],
             ))),
         }
     }
@@ -707,6 +717,14 @@ pub fn declare_var<'a>() -> VarResult<'a> {
             SyntaxType::Void,
         ))]))),
     );
+
+    obj_type.insert("style_arrow_both", SyntaxType::string());
+    obj_type.insert("style_arrow_left", SyntaxType::string());
+    obj_type.insert("style_arrow_right", SyntaxType::string());
+    obj_type.insert("style_dashed", SyntaxType::string());
+    obj_type.insert("style_dotted", SyntaxType::string());
+    obj_type.insert("style_solid", SyntaxType::string());
+
     let syntax_type = SyntaxType::ObjectFunction(Rc::new(obj_type), Rc::new(func_type));
     VarResult::new(value, syntax_type, VAR_NAME)
 }
@@ -990,6 +1008,49 @@ mod tests {
         assert_eq!(
             Series::implicity_from(result).unwrap(),
             RefData::new(Series::from_vec(vec![Rc::new(RefCell::new(Some(line1))),]))
+        );
+    }
+
+    #[test]
+    fn line_style_test() {
+        use crate::ast::stat_expr_types::VarIndex;
+        use crate::runtime::VarOperate;
+        use crate::types::{downcast_pf, Tuple};
+
+        let lib_info = LibInfo::new(
+            vec![declare_var()],
+            vec![("close", SyntaxType::float_series())],
+        );
+        let src = r"m = [
+            line.style_arrow_both, line.style_arrow_left, line.style_arrow_right,
+            line.style_dashed, line.style_dotted, line.style_solid
+        ]";
+
+        let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
+        let mut runner = PineRunner::new(&lib_info, &blk, &NoneCallback());
+
+        runner
+            .run(
+                &vec![("close", AnySeries::from_float_vec(vec![Some(1f64)]))],
+                None,
+            )
+            .unwrap();
+        let tuple_res =
+            downcast_pf::<Tuple>(runner.get_context().move_var(VarIndex::new(0, 0)).unwrap());
+        let tuple_vec = tuple_res.unwrap().into_inner().0;
+        assert_eq!(
+            tuple_vec,
+            vec![
+                "arrow_both",
+                "arrow_left",
+                "arrow_right",
+                "dashed",
+                "dotted",
+                "solid"
+            ]
+            .iter()
+            .map(|&s| PineRef::new_rc(String::from(s)))
+            .collect::<Vec<_>>()
         );
     }
 }

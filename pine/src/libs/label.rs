@@ -596,7 +596,7 @@ impl<'a> PineClass<'a> for PlotProps {
             "style_label_down" => Ok(PineRef::new(String::from(LABEL_STYLE_LABELDOWN))),
             "style_label_left" => Ok(PineRef::new(String::from(LABEL_STYLE_LABELLEFT))),
             "style_label_right" => Ok(PineRef::new(String::from(LABEL_STYLE_LABELRIGHT))),
-            "style_label_up" => Ok(PineRef::new(String::from(LABEL_STYLE_LABELRIGHT))),
+            "style_label_up" => Ok(PineRef::new(String::from(LABEL_STYLE_LABELUP))),
             "style_square" => Ok(PineRef::new(String::from(LABEL_STYLE_SQUARE))),
             "style_triangledown" => Ok(PineRef::new(String::from(LABEL_STYLE_TRIANGLEDOWN))),
             "style_triangleup" => Ok(PineRef::new(String::from(LABEL_STYLE_TRIANGLEUP))),
@@ -1067,7 +1067,7 @@ mod tests {
             label.style_none, label.style_arrowdown, label.style_arrowup, label.style_circle,
             label.style_cross, label.style_diamond, label.style_flag, label.style_label_center,
             label.style_label_down, label.style_label_left, label.style_label_right, label.style_label_up,
-            label.style_square, label.style_triangledown, label.style_triangleup, label.style_xcross,
+            label.style_square, label.style_triangledown, label.style_triangleup, label.style_xcross
         ]";
 
         let blk = PineParser::new(src, &lib_info).parse_blk().unwrap();
@@ -1102,8 +1102,9 @@ mod tests {
                 "triangleup",
                 "xcross"
             ]
-            .map(|s| PineRef::new_rc(String::from(s)))
-            .collect()
+            .iter()
+            .map(|&s| PineRef::new_rc(String::from(s)))
+            .collect::<Vec<_>>()
         );
     }
 }

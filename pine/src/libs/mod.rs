@@ -53,12 +53,14 @@ pub mod print;
 pub mod rising;
 pub mod rsi;
 pub mod security;
+pub mod size;
 pub mod sma;
 pub mod stoch;
 pub mod study;
 pub mod sum;
 pub mod swma;
 pub mod syminfo;
+pub mod text;
 pub mod time;
 pub mod timenow;
 pub mod timestamp;
@@ -201,6 +203,8 @@ pub fn declare_vars<'a>() -> Vec<VarResult<'a>> {
         // label::declare_var(),
         // xloc::declare_var(),
         // yloc::declare_var(),
+        // size::declare_var(),
+        // text::declare_var(),
         display::declare_var(),
     ];
     debug_assert!(

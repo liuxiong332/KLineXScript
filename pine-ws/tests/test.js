@@ -185,3 +185,27 @@ it("timenow test", function () {
     runner.parse("int a = timenow\nplot(a)");
     runner.genIOInfo();
 });
+
+const RSIScript = `
+src = close
+len = 14
+up = rma(max(change(src), 0), len)
+down = rma(-min(change(src), 0), len)
+rsia = down == 0 ? 100 : up == 0 ? 0 : 100 - (100 / (1 + up / down))
+`;
+
+it("rsi test", function () {
+    let runner = new Runner();
+    runner.parse(RSIScript);
+    // runner.genIOInfo();
+
+    let farray = new Float64Array(100);
+    for (let i = 0; i < 2; i += 1) {
+        farray[i] = i + 100.0;
+    }
+    for (let i = 0; i < 2; i += 1) {
+        farray[i] = NaN;
+    }
+    let result = runner.runWithData(["close"], 4, farray);
+    console.log("result", result);
+});

@@ -152,7 +152,7 @@ fn int_max<'a>(vals: Vec<Option<PineRef<'a>>>) -> Int {
 fn float_max<'a>(vals: Vec<Option<PineRef<'a>>>) -> Float {
     vals.into_iter()
         .filter_map(|v| pine_ref_to_f64(v))
-        .max_by(|x1, x2| x1.partial_cmp(x2).unwrap())
+        .max_by(|x1, x2| x1.partial_cmp(x2).unwrap_or(cmp::Ordering::Equal))
 }
 
 pub fn declare_max_var<'a>() -> VarResult<'a> {
@@ -166,7 +166,7 @@ fn int_min<'a>(vals: Vec<Option<PineRef<'a>>>) -> Int {
 fn float_min<'a>(vals: Vec<Option<PineRef<'a>>>) -> Float {
     vals.into_iter()
         .filter_map(|v| pine_ref_to_f64(v))
-        .min_by(|x1, x2| x1.partial_cmp(x2).unwrap())
+        .min_by(|x1, x2| x1.partial_cmp(x2).unwrap_or(cmp::Ordering::Equal))
 }
 
 pub fn declare_min_var<'a>() -> VarResult<'a> {
